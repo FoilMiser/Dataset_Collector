@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-pmc_worker.py (v0.9)
+pmc_worker.py (v1.1)
 
 Downloads and chunks allowlisted PMC Open Access articles.
 
@@ -42,7 +42,7 @@ except ImportError:
 import xml.etree.ElementTree as ET
 
 
-VERSION = "0.9"
+VERSION = "1.1"
 
 
 def utc_now() -> str:

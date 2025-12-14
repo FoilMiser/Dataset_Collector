@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-download_worker.py (v0.9)
+download_worker.py (v1.1)
 
 Consumes queue JSONL emitted by pipeline_driver.py and downloads dataset payloads
 according to each row's `download` strategy.
@@ -50,7 +50,7 @@ except ImportError:
     FTP = None
 
 
-VERSION = "0.9"
+VERSION = "1.1"
 
 
 def utc_now() -> str:

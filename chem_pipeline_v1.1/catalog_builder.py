@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-catalog_builder.py (v0.9)
+catalog_builder.py (v1.1)
 
 Builds a global catalog of all downloaded datasets with:
   - Dataset versions and metadata
@@ -35,7 +35,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import yaml
 
 
-VERSION = "0.9"
+VERSION = "1.1"
 
 
 def utc_now() -> str:

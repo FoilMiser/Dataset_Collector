@@ -1,4 +1,4 @@
-# Chemistry Corpus Pipeline v0.9 - Requirements
+# Chemistry Corpus Pipeline v1.1 - Requirements
 # Core dependencies
 pyyaml>=6.0
 requests>=2.31.0

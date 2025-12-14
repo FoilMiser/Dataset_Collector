@@ -106,16 +106,16 @@ HIGH PRIORITY (Production readiness)
    [ ] Access controls for reviewers and approvers
 
 3) Testing + CI/CD
-   [ ] Unit tests for license normalization and resolvers
+   [x] Unit tests for license normalization and resolvers
    [ ] Integration tests for download workers and scrubbers with sample data
    [ ] End-to-end smoke tests (green/yellow/red queues + catalog build)
-   [ ] CI pipeline (lint/type checks/tests) with artifact retention
+   [x] CI pipeline (lint/type checks/tests) with artifact retention
 
 4) Deployment + packaging
-   [ ] Dockerfile + docker-compose for reproducible runs
+   [x] Dockerfile + docker-compose for reproducible runs
    [ ] Kubernetes/Helm job templates with secrets/volume wiring
    [ ] Versioned configuration bundles (schemas + denylist + defaults)
-   [ ] Publish pinned requirements/lockfiles
+   [x] Publish pinned requirements/lockfiles
 
 MEDIUM PRIORITY (Quality + coverage)
 ------------------------------------
@@ -155,12 +155,35 @@ LOW PRIORITY (Ergonomics + future-proofing)
     [ ] Backup/restore procedures for catalogs and manifests
 
 ================================================================================
-v1.0 -> v1.1 — FUTURE IMPROVEMENTS
+v1.0 -> v1.1 — SHIPPED
+================================================================================
+
+  [x] Deployment packaging
+      - Dockerfile for reproducible containerized runs
+      - docker-compose.yaml for easy orchestration
+      - Pinned requirements (requirements-lock.txt) for deterministic builds
+  [x] CI/CD pipeline
+      - GitHub Actions workflow with lint checks (ruff)
+      - Automated test runs on push/PR
+      - Coverage reporting with artifact retention
+  [x] Unit tests
+      - License normalization tests (test_license_normalization.py)
+      - Denylist pattern tests (test_denylist.py)
+      - Field schema validation tests (test_field_schemas.py)
+      - Pipeline utility tests (test_pipeline_utils.py)
+  [x] Version consistency
+      - All components upgraded to v1.1
+      - Schema version bumped to v1.1
+      - Documentation updated
+
+================================================================================
+v1.1 -> v1.2 — FUTURE IMPROVEMENTS
 ================================================================================
 
 - Governance + review UX: dashboard, batch approvals, reviewer access controls
-- CI hardening: automated unit/integration tests, artifact retention
-- Deployment packaging: Dockerfile/Helm templates and pinned lockfiles
+- Integration tests for download workers and scrubbers with sample data
+- End-to-end smoke tests (green/yellow/red queues + catalog build)
+- Kubernetes/Helm job templates with secrets/volume wiring
 - Monitoring + alerting: metrics exporters and failure notifications
 
 ================================================================================

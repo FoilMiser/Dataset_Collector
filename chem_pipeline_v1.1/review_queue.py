@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-review_queue.py (v0.9)
+review_queue.py (v1.1)
 
 Manual review helper for YELLOW targets.
 
@@ -36,7 +36,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 
-VERSION = "0.9"
+VERSION = "1.1"
 
 
 def utc_now() -> str:

@@ -1,0 +1,46 @@
+# Chemistry Corpus Pipeline v1.1 - Docker Compose
+# Provides easy orchestration for running the pipeline.
+#
+# Usage:
+#   docker-compose run --rm pipeline ./run_pipeline.sh --targets targets.yaml
+#   docker-compose run --rm pipeline ./run_pipeline.sh --targets targets.yaml --execute
+
+version: '3.8'
+
+services:
+  pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: chem-pipeline:v1.1
+    volumes:
+      # Mount data directory for persistent storage
+      - ${DATA_ROOT:-/data/chem}:/data/chem
+      # Mount config files if customized
+      - ./targets.yaml:/app/targets.yaml:ro
+      - ./license_map.yaml:/app/license_map.yaml:ro
+      - ./denylist.yaml:/app/denylist.yaml:ro
+      - ./field_schemas.yaml:/app/field_schemas.yaml:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+    working_dir: /app
+    # Default: show help
+    command: ["./run_pipeline.sh", "--help"]
+
+  # Convenience service for running classification only
+  classify:
+    extends:
+      service: pipeline
+    command: ["./run_pipeline.sh", "--targets", "targets.yaml", "--stage", "classify"]
+
+  # Convenience service for reviewing YELLOW items
+  review:
+    extends:
+      service: pipeline
+    command: ["./run_pipeline.sh", "--targets", "targets.yaml", "--stage", "review"]
+
+  # Convenience service for building catalog
+  catalog:
+    extends:
+      service: pipeline
+    command: ["python", "catalog_builder.py", "--targets", "targets.yaml", "--output", "/data/chem/_catalogs/global_catalog.json"]

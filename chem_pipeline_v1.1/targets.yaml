@@ -1,15 +1,20 @@
 # targets.yaml
-# v0.9 — full inventory + dataset-specific download/extract "resolvers"
+# v1.1 — full inventory + dataset-specific download/extract "resolvers"
 # Requires companion: ./license_map.yaml, ./field_schemas.yaml, ./denylist.yaml
 #
-# v0.9 NEW:
+# v1.1 updates:
+#   - Schema version bumped to 1.1 for consistency
+#   - Dockerfile/docker-compose support for containerized runs
+#   - CI/CD pipeline with automated tests
+#
+# v0.9 features:
 #   - Incremental + delta-only modes with checkpointed resume
 #   - Audit logging with run IDs and cryptographic signatures
 #   - Health checks and circuit breaker retries for resolvers
 #   - MinHash/LSH deduplication and spectrum normalization enabled by default
 #   - parquet_output: optional Parquet format output
 #
-schema_version: "0.8"
+schema_version: "1.1"
 updated_utc: "2025-12-14"
 
 companion_files:
@@ -71,7 +76,7 @@ globals:
     verify_checksums: true
     enable_resume: true
     max_concurrent_workers: 4
-    user_agent: "chem-corpus-pipeline/0.6"
+    user_agent: "chem-corpus-pipeline/1.1"
 
   text_processing_defaults:
     max_chunk_chars: 6000

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-yellow_scrubber.py (v0.9)
+yellow_scrubber.py (v1.1)
 
 Stage-2 transformations for YELLOW bucket datasets (quarantine -> permissive),
 plus record-level allowlist planning.
@@ -48,7 +48,7 @@ except ImportError:
     requests = None
 
 
-VERSION = "0.9"
+VERSION = "1.1"
 
 
 def utc_now() -> str:

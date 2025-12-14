@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-pipeline_driver.py (v1.0)
+pipeline_driver.py (v1.1)
 
 Reads:
-  - targets.yaml (schema v1.0)
+  - targets.yaml (schema v1.1)
   - license_map.yaml
   - denylist.yaml (v0.2)
 
@@ -30,6 +30,12 @@ v1.0 changes:
   - Evidence fetcher supports custom headers for license-gated pages
   - Run metadata upgraded to v1.0 and documentation refreshed
 
+v1.1 changes:
+  - Dockerfile and docker-compose for reproducible runs
+  - CI/CD workflow with lint and tests
+  - Pinned requirements with lockfile
+  - Basic unit tests for license normalization and resolvers
+
 Not legal advice.
 """
 
@@ -52,7 +58,7 @@ except ImportError:
     requests = None
 
 
-VERSION = "1.0"
+VERSION = "1.1"
 
 
 def utc_now() -> str:

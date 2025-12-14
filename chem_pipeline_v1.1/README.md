@@ -1,4 +1,4 @@
-# Chemistry Corpus Pipeline Prototype (v1.0)
+# Chemistry Corpus Pipeline Prototype (v1.1)
 
 A safety-first **prototype** pipeline for building a chemistry-focused training corpus from open datasets and open-access literature, with strong emphasis on **license compliance, provenance tracking, and safe-by-default execution**.
 
@@ -61,6 +61,25 @@ This repo helps you:
 - **GREEN**: clear, compatible licensing + no disallowed restrictions -> can be downloaded as-is
 - **YELLOW**: ambiguous licensing or "restricted" sources -> requires **manual signoff** and/or a safe transform (computed-only extraction, record-level filtering, etc.)
 - **RED**: explicitly incompatible licenses/restrictions/denylist match -> rejected
+
+---
+
+## What's New in v1.1
+
+### 1) Deployment + Reproducibility
+- **Dockerfile** and **docker-compose.yaml** for reproducible containerized runs
+- **Pinned requirements** (`requirements-lock.txt`) for deterministic builds
+- Easy orchestration: `docker-compose run --rm pipeline ./run_pipeline.sh --targets targets.yaml`
+
+### 2) CI/CD + Testing
+- **GitHub Actions workflow** with lint checks (ruff) and automated tests
+- **Unit tests** for license normalization, denylist patterns, and field schemas
+- Test coverage reporting with artifact retention
+
+### 3) Code Quality
+- All components upgraded to v1.1 with consistent versioning
+- Improved documentation and inline comments
+- Schema version bumped to v1.1 across all configuration files
 
 ---
 
@@ -231,7 +250,7 @@ python3 catalog_builder.py --targets targets.yaml --output /data/chem/_catalogs/
 - `catalog_builder.py` - builds a global catalog and training manifests
 
 ### Configuration
-- `targets.yaml` - dataset inventory + download/transform settings (schema v0.9)
+- `targets.yaml` - dataset inventory + download/transform settings (schema v1.1)
 - `license_map.yaml` - SPDX normalization rules + gating policy
 - `field_schemas.yaml` - versioned schemas for extracted/normalized records
 - `denylist.yaml` - explicit denylist patterns (v0.2 with severity and provenance)
@@ -264,7 +283,7 @@ python3 catalog_builder.py --targets targets.yaml --output /data/chem/_catalogs/
 
 ---
 
-## v1.0 Configuration Options
+## v1.1 Configuration Options
 
 ### globals.require_yellow_signoff
 ```yaml
@@ -353,7 +372,63 @@ Pipeline code is provided as-is for research and development use.
 
 ---
 
+## Docker Usage (v1.1)
+
+### Build the image
+```bash
+cd chem_pipeline_v1.1
+docker build -t chem-pipeline:v1.1 .
+```
+
+### Run with Docker
+```bash
+# Dry-run
+docker run -v /data/chem:/data/chem chem-pipeline:v1.1 \
+    ./run_pipeline.sh --targets targets.yaml
+
+# Execute
+docker run -v /data/chem:/data/chem chem-pipeline:v1.1 \
+    ./run_pipeline.sh --targets targets.yaml --execute
+```
+
+### Run with Docker Compose
+```bash
+# Classify stage
+docker-compose run --rm classify
+
+# Review YELLOW items
+docker-compose run --rm review
+
+# Full pipeline
+docker-compose run --rm pipeline ./run_pipeline.sh --targets targets.yaml --execute
+```
+
+---
+
+## Running Tests (v1.1)
+
+```bash
+# Install test dependencies
+pip install pytest pytest-cov
+
+# Run tests
+cd chem_pipeline_v1.1
+pytest tests/ -v
+
+# Run with coverage
+pytest tests/ -v --cov=. --cov-report=term-missing
+```
+
+---
+
 ## Changelog
+
+### v1.1 (2025-12-14)
+- Dockerfile and docker-compose for reproducible containerized runs
+- CI/CD workflow with lint checks and automated tests
+- Unit tests for license normalization, denylist, and field schemas
+- Pinned requirements (requirements-lock.txt) for deterministic builds
+- All components upgraded to v1.1 with consistent versioning
 
 ### v1.0 (2026-06-01)
 - SPDX resolution confidence scoring with bucket gating
