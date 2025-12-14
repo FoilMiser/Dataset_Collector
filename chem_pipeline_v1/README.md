@@ -1,4 +1,4 @@
-# Chemistry Corpus Pipeline Prototype (v0.9)
+# Chemistry Corpus Pipeline Prototype (v1.0)
 
 A safety-first **prototype** pipeline for building a chemistry-focused training corpus from open datasets and open-access literature, with strong emphasis on **license compliance, provenance tracking, and safe-by-default execution**.
 
@@ -63,6 +63,21 @@ This repo helps you:
 - **RED**: explicitly incompatible licenses/restrictions/denylist match -> rejected
 
 ---
+
+## What's New in v1.0
+
+### 1) License confidence + change detection
+- SPDX normalization now returns a confidence score and will **force YELLOW** when below a configurable threshold
+- Evidence snapshots track SHA256 digests and automatically flag **license content changes** for manual review
+- New `--min-license-confidence` CLI option to tune gating strictness per run
+
+### 2) Better handling of license-gated/dynamic pages
+- Evidence fetcher accepts custom headers (`--evidence-header KEY=VALUE`) to support cookies or tokens
+- Metadata records which headers were used in the manifest for traceability
+
+### 3) Documentation + checklists
+- Added legal review checklist for RED/YELLOW edge cases
+- Version metadata bumped to v1.0 across manifests and wrapper script
 
 ## What's New in v0.9
 
@@ -249,7 +264,7 @@ python3 catalog_builder.py --targets targets.yaml --output /data/chem/_catalogs/
 
 ---
 
-## v0.9 Configuration Options
+## v1.0 Configuration Options
 
 ### globals.require_yellow_signoff
 ```yaml
@@ -287,6 +302,17 @@ globals:
     report_coverage: true
 ```
 
+### pipeline_driver CLI (evidence handling)
+```
+# Require at least 0.8 confidence for GREEN classification
+python pipeline_driver.py --targets targets.yaml --min-license-confidence 0.8
+
+# Pass cookies or tokens to evidence fetcher for license-gated pages
+python pipeline_driver.py --targets targets.yaml \
+  --evidence-header "Cookie=session=abc" \
+  --evidence-header "X-Requested-With=XMLHttpRequest"
+```
+
 ---
 
 ## Notes / Safety
@@ -296,6 +322,11 @@ globals:
 - Always snapshot license/terms evidence before large downloads.
 - Treat "conditional" / ambiguous licenses as YELLOW until reviewed.
 - Use `split_group_id` to prevent data leakage across train/valid splits.
+- For RED/YELLOW decisions, run through the legal checklist:
+  - Confirm evidence snapshot hash matches the manifest and note any change detections
+  - Verify restriction phrases manually even if automated scan is empty
+  - Check provenance links in denylist hits and document rationale for overrides
+  - Capture reviewer contact + constraints in `review_signoff.json`
 
 ---
 
@@ -323,6 +354,12 @@ Pipeline code is provided as-is for research and development use.
 ---
 
 ## Changelog
+
+### v1.0 (2026-06-01)
+- SPDX resolution confidence scoring with bucket gating
+- License evidence change detection to force manual review
+- Customizable evidence headers for license-gated sources
+- Added legal review checklist in documentation
 
 ### v0.9 (2026-02-01)
 - Parallel + incremental processing with checkpoint/restart
