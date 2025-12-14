@@ -1,8 +1,8 @@
 # denylist.yaml
-# v0.2 — explicit denylist patterns (v0.8 enhancements)
+# v0.2 — explicit denylist patterns (v0.9 enhancements)
 #
 # The pipeline scans target id/name, license evidence URL, and download config.
-# v0.8 NEW: Structured patterns, per-pattern severity, and mandatory provenance.
+# v0.9 NEW: Structured patterns, per-pattern severity, and mandatory provenance.
 #
 # Severity levels:
 #   - hard_red: Forces RED immediately (default, backwards compatible)
@@ -13,7 +13,7 @@
 schema_version: "0.2"
 updated_utc: "2025-12-14"
 
-# v0.8: Domain extraction patterns (match against extracted domain from URLs)
+# v0.9: Domain extraction patterns (match against extracted domain from URLs)
 domain_patterns:
   # Example:
   # - domain: "example.com"
@@ -21,7 +21,7 @@ domain_patterns:
   #   link: "https://example.com/terms"
   #   rationale: "Terms explicitly prohibit ML training"
 
-# v0.8: Publisher/provider tags (match against publisher metadata if available)
+# v0.9: Publisher/provider tags (match against publisher metadata if available)
 publisher_patterns:
   # Example:
   # - publisher: "Example Publisher"
@@ -30,7 +30,7 @@ publisher_patterns:
   #   rationale: "Unclear terms, needs manual review"
 
 patterns:
-  # Example pattern with v0.8 required provenance fields:
+  # Example pattern with v0.9 required provenance fields:
   # - type: "substring"        # substring | regex | domain
   #   value: "example.com"
   #   fields: ["license_evidence_url", "download_blob"]

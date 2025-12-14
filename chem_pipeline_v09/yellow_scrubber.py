@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-yellow_scrubber.py (v0.8)
+yellow_scrubber.py (v0.9)
 
 Stage-2 transformations for YELLOW bucket datasets (quarantine -> permissive),
 plus record-level allowlist planning.
@@ -14,7 +14,7 @@ Implemented:
      - Resilient parsing with fallback URLs
      - Improved field detection
 
-v0.8 changes:
+v0.9 changes:
   - NEW: Parquet output option (--emit-parquet)
   - NEW: Near-duplicate detection (--dedupe)
   - NEW: InChIKey/SMILES normalization (--normalize)
@@ -48,7 +48,7 @@ except ImportError:
     requests = None
 
 
-VERSION = "0.8"
+VERSION = "0.9"
 
 
 def utc_now() -> str:

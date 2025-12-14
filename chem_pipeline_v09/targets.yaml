@@ -1,11 +1,12 @@
 # targets.yaml
-# v0.8 — full inventory + dataset-specific download/extract "resolvers"
+# v0.9 — full inventory + dataset-specific download/extract "resolvers"
 # Requires companion: ./license_map.yaml, ./field_schemas.yaml, ./denylist.yaml
 #
-# v0.8 NEW:
-#   - globals.require_yellow_signoff: enforce signoff for all YELLOW items
-#   - split_group_id: dataset-aware splitting to prevent data leakage
-#   - near_duplicate_detection: optional MinHash/LSH deduplication
+# v0.9 NEW:
+#   - Incremental + delta-only modes with checkpointed resume
+#   - Audit logging with run IDs and cryptographic signatures
+#   - Health checks and circuit breaker retries for resolvers
+#   - MinHash/LSH deduplication and spectrum normalization enabled by default
 #   - parquet_output: optional Parquet format output
 #
 schema_version: "0.8"
@@ -29,10 +30,10 @@ globals:
     copyleft: "/data/chem/pools/copyleft"
     quarantine: "/data/chem/pools/quarantine"
 
-  # v0.8: Require signoff for all YELLOW items (enforces manual review)
+  # v0.9: Require signoff for all YELLOW items (enforces manual review)
   require_yellow_signoff: false
 
-  # v0.8: Near-duplicate detection settings
+  # v0.9: Near-duplicate detection settings
   near_duplicate_detection:
     enabled: false
     method: "minhash_lsh"  # minhash_lsh | exact_hash
@@ -40,13 +41,13 @@ globals:
     threshold: 0.8  # Jaccard similarity threshold
     emit_duplicate_groups: true
 
-  # v0.8: Parquet output settings
+  # v0.9: Parquet output settings
   parquet_output:
     enabled: false
     compression: "snappy"  # snappy | gzip | zstd
     row_group_size: 100000
 
-  # v0.8: InChIKey/SMILES normalization settings
+  # v0.9: InChIKey/SMILES normalization settings
   normalization:
     enabled: false
     rdkit_canonicalize: true
@@ -122,7 +123,7 @@ gates_catalog:
   # v0.6: new gates
   collect_statistics: "Collect dataset statistics (tokens, property distributions)."
   validate_schema: "Validate extracted data against field_schemas.yaml."
-  # v0.8: new gates
+  # v0.9: new gates
   near_duplicate_detection: "Run MinHash/LSH deduplication pass."
   normalize_structures: "Canonicalize SMILES/InChIKey using RDKit."
   emit_parquet: "Output schema-validated records as Parquet files."
@@ -142,7 +143,7 @@ resolvers:
     mode: "article_url"
     note: "Prefer Figshare API if available; otherwise manual download from article page."
     api_base: "https://api.figshare.com/v2"
-    # v0.8: Enhanced Figshare resolver
+    # v0.9: Enhanced Figshare resolver
     api_version: "2"
     rate_limit:
       requests_per_minute: 60
@@ -152,7 +153,7 @@ resolvers:
       files: "/articles/{article_id}/files"
       download: "/articles/{article_id}/files/{file_id}"
   github:
-    # v0.8: NEW GitHub release resolver
+    # v0.9: NEW GitHub release resolver
     mode: "release"
     api_base: "https://api.github.com"
     rate_limit:
@@ -409,7 +410,7 @@ targets:
       pool: "copyleft"
       formats: ["bz2", "jsonl.gz"]
 
-  # v0.8: NEW record-level filtering sources
+  # v0.9: NEW record-level filtering sources
 
   - id: "mona"
     name: "MassBank of North America (MoNA)"
@@ -427,7 +428,7 @@ targets:
         compute_sha256: true
     gates_override:
       add: ["record_level_filter", "validate_schema", "collect_statistics"]
-    # v0.8: split_group_id for related spectra
+    # v0.9: split_group_id for related spectra
     split_group_id: "mona_spectra_group"
     output:
       pool: "quarantine"
@@ -451,7 +452,7 @@ targets:
         compute_sha256: true
     gates_override:
       add: ["record_level_filter", "validate_schema", "collect_statistics"]
-    # v0.8: split_group_id for related natural product clusters
+    # v0.9: split_group_id for related natural product clusters
     split_group_id: "gnps_cluster_group"
     output:
       pool: "quarantine"

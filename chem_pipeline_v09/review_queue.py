@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-review_queue.py (v0.8)
+review_queue.py (v0.9)
 
 Manual review helper for YELLOW targets.
 
@@ -8,19 +8,19 @@ This script is intentionally lightweight and conservative:
 - It reads YELLOW queue JSONL (emitted by pipeline_driver.py)
 - It shows a summary of pending items
 - It can write a review_signoff.json into each target's manifest dir
-- NEW in v0.8: Export reviewed targets to CSV/JSON, extended signoff schema
+- NEW in v0.9: Export reviewed targets to CSV/JSON, extended signoff schema
 
 Signoff file schema (v0.2):
 {
   "target_id": "...",
   "status": "approved" | "rejected" | "deferred",
   "reviewer": "Name",
-  "reviewer_contact": "email@example.com",      # NEW in v0.8 (optional)
+  "reviewer_contact": "email@example.com",      # NEW in v0.9 (optional)
   "reason": "Why",
   "promote_to": "GREEN" | "" ,                  # optional
-  "evidence_links_checked": ["url1", "url2"],   # NEW in v0.8 (optional)
-  "constraints": "Attribution requirements...",  # NEW in v0.8 (optional)
-  "notes": "Additional notes...",               # NEW in v0.8 (optional)
+  "evidence_links_checked": ["url1", "url2"],   # NEW in v0.9 (optional)
+  "constraints": "Attribution requirements...",  # NEW in v0.9 (optional)
+  "notes": "Additional notes...",               # NEW in v0.9 (optional)
   "reviewed_at_utc": "YYYY-MM-DDTHH:MM:SSZ"
 }
 """
@@ -36,7 +36,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 
-VERSION = "0.8"
+VERSION = "0.9"
 
 
 def utc_now() -> str:
@@ -136,7 +136,7 @@ def write_signoff(
         "signoff_schema_version": "0.2",
         "tool_version": VERSION,
     }
-    # v0.8: Extended fields (optional)
+    # v0.9: Extended fields (optional)
     if reviewer_contact:
         signoff["reviewer_contact"] = reviewer_contact
     if evidence_links_checked:
@@ -172,7 +172,7 @@ def cmd_set(args: argparse.Namespace, status: str) -> int:
     if status == "approved" and hasattr(args, "promote_to") and args.promote_to:
         promote_to = str(args.promote_to).upper()
 
-    # v0.8: Extended signoff fields
+    # v0.9: Extended signoff fields
     evidence_links: Optional[List[str]] = None
     if hasattr(args, "evidence_links") and args.evidence_links:
         evidence_links = [link.strip() for link in args.evidence_links.split(",")]
@@ -194,7 +194,7 @@ def cmd_set(args: argparse.Namespace, status: str) -> int:
 
 
 def cmd_export(args: argparse.Namespace) -> int:
-    """Export reviewed targets to CSV or JSON (NEW in v0.8)."""
+    """Export reviewed targets to CSV or JSON (NEW in v0.9)."""
     qpath = Path(args.queue)
     yellow_rows = read_jsonl(qpath)
 
@@ -252,14 +252,14 @@ def cmd_export(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    ap = argparse.ArgumentParser(description="Manual review helper for YELLOW targets (v0.8).")
+    ap = argparse.ArgumentParser(description="Manual review helper for YELLOW targets (v0.9).")
     ap.add_argument("--queue", default="/data/chem/_queues/yellow_pipeline.jsonl", help="Path to yellow queue JSONL")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     p_list = sub.add_parser("list", help="List pending YELLOW items")
     p_list.add_argument("--limit", type=int, default=50)
 
-    # v0.8: Extended signoff fields for approve/reject/defer
+    # v0.9: Extended signoff fields for approve/reject/defer
     def add_extended_args(parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--reviewer-contact", dest="reviewer_contact", default="", help="Reviewer email/contact (optional)")
         parser.add_argument("--evidence-links", dest="evidence_links", default="", help="Comma-separated URLs of checked evidence (optional)")
@@ -285,8 +285,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_def.add_argument("--reason", required=True)
     add_extended_args(p_def)
 
-    # v0.8: NEW export command
-    p_export = sub.add_parser("export", help="Export reviewed targets to CSV/JSON report (NEW in v0.8)")
+    # v0.9: NEW export command
+    p_export = sub.add_parser("export", help="Export reviewed targets to CSV/JSON report (NEW in v0.9)")
     p_export.add_argument("--output", required=True, help="Output file path")
     p_export.add_argument("--format", default="csv", choices=["csv", "json"], help="Output format (default: csv)")
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-catalog_builder.py (v0.8)
+catalog_builder.py (v0.9)
 
 Builds a global catalog of all downloaded datasets with:
   - Dataset versions and metadata
@@ -9,7 +9,7 @@ Builds a global catalog of all downloaded datasets with:
   - Token estimates and statistics
   - Training manifest composition
 
-v0.8 features:
+v0.9 features:
   - NEW: Near-duplicate group reporting
   - NEW: Split report (counts + token estimates per split_group_id)
   - NEW: Normalization coverage reporting
@@ -35,7 +35,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import yaml
 
 
-VERSION = "0.8"
+VERSION = "0.9"
 
 
 def utc_now() -> str:

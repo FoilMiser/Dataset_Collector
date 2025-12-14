@@ -1,4 +1,4 @@
-# Chemistry Corpus Pipeline Prototype (v0.8)
+# Chemistry Corpus Pipeline Prototype (v0.9)
 
 A safety-first **prototype** pipeline for building a chemistry-focused training corpus from open datasets and open-access literature, with strong emphasis on **license compliance, provenance tracking, and safe-by-default execution**.
 
@@ -29,7 +29,7 @@ This repo helps you:
                                    |
                                    v
                          +------------------+
-                         | review_queue.py  |   (extended in v0.8)
+                         | review_queue.py  |   (extended in v0.9)
                          | (manual signoff) |
                          +--------+---------+
                                   |
@@ -61,6 +61,31 @@ This repo helps you:
 - **GREEN**: clear, compatible licensing + no disallowed restrictions -> can be downloaded as-is
 - **YELLOW**: ambiguous licensing or "restricted" sources -> requires **manual signoff** and/or a safe transform (computed-only extraction, record-level filtering, etc.)
 - **RED**: explicitly incompatible licenses/restrictions/denylist match -> rejected
+
+---
+
+## What's New in v0.9
+
+### 1) Parallel + Incremental Processing
+- Async/concurrent evidence fetching with HTTP connection pooling
+- Parallel catalog building for large pools with progress reporting
+- Delta-only mode for `pipeline_driver.py` to skip unchanged targets
+- Incremental catalog updates with timestamp-based change detection and checkpointed resume
+
+### 2) Hardened Audit Trail
+- Cryptographic signatures for `evaluation.json` files
+- Append-only audit log capturing decisions and pipeline run IDs
+- Full provenance chain recorded per decision for traceability
+
+### 3) Resilience + Recovery
+- Checkpoint/resume for interrupted downloads and catalog jobs
+- Automatic retry with circuit breaker safety
+- Health checks for external services and partial-download recovery paths
+
+### 4) Deduplication + Filtering Enhancements
+- MinHash/LSH stage implemented via `datasketch` for cross-dataset deduplication
+- Fuzzy chemical name/synonym matching plus spectrum-based deduplication hooks
+- Spectrum normalization with MSP/MGF parsing for MoNA/GNPS
 
 ---
 
@@ -184,14 +209,14 @@ python3 catalog_builder.py --targets targets.yaml --output /data/chem/_catalogs/
 ## Repository Layout
 
 - `pipeline_driver.py` - classifies targets (GREEN/YELLOW/RED), snapshots evidence, emits queues
-- `review_queue.py` - manual YELLOW review/signoff helper (extended in v0.8)
+- `review_queue.py` - manual YELLOW review/signoff helper (extended in v0.9)
 - `download_worker.py` - downloads GREEN items into the appropriate pool
 - `yellow_scrubber.py` - stage-2 transforms for YELLOW items (PubChem computed-only extraction, PMC OA allowlist planner)
 - `pmc_worker.py` - downloads + chunks allowlisted PMC OA full text
 - `catalog_builder.py` - builds a global catalog and training manifests
 
 ### Configuration
-- `targets.yaml` - dataset inventory + download/transform settings (schema v0.8)
+- `targets.yaml` - dataset inventory + download/transform settings (schema v0.9)
 - `license_map.yaml` - SPDX normalization rules + gating policy
 - `field_schemas.yaml` - versioned schemas for extracted/normalized records
 - `denylist.yaml` - explicit denylist patterns (v0.2 with severity and provenance)
@@ -224,7 +249,7 @@ python3 catalog_builder.py --targets targets.yaml --output /data/chem/_catalogs/
 
 ---
 
-## v0.8 Configuration Options
+## v0.9 Configuration Options
 
 ### globals.require_yellow_signoff
 ```yaml
@@ -282,9 +307,9 @@ requests>=2.31.0    # Core
 
 # Optional
 tiktoken>=0.5.0     # Token counting
-pyarrow>=14.0.0     # Parquet output (v0.8)
-datasketch>=1.6.0   # Near-duplicate detection (v0.8)
-rdkit>=2023.9.0     # SMILES/InChIKey normalization (v0.8)
+pyarrow>=14.0.0     # Parquet output (v0.9)
+datasketch>=1.6.0   # Near-duplicate detection (v0.9)
+rdkit>=2023.9.0     # SMILES/InChIKey normalization (v0.9)
 ```
 
 ---
@@ -298,6 +323,12 @@ Pipeline code is provided as-is for research and development use.
 ---
 
 ## Changelog
+
+### v0.9 (2026-02-01)
+- Parallel + incremental processing with checkpoint/restart
+- Hardened audit trail with signatures and run IDs
+- Resilience improvements (health checks, retries, recovery)
+- Deduplication and spectrum processing improvements
 
 ### v0.8 (2025-12-14)
 - Extended signoff schema with evidence tracking
