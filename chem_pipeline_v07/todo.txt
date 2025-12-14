@@ -1,0 +1,198 @@
+================================================================================
+TODO — Chemistry Corpus Pipeline
+================================================================================
+
+Legend:
+  [x] = Completed
+  [~] = Partially addressed / MVP landed
+  [ ] = Not yet implemented
+
+================================================================================
+VERSION HISTORY
+================================================================================
+
+v0.5 -> v0.6 Completed:
+  [x] Retry with exponential backoff
+  [x] Resumable HTTP downloads (range requests)
+  [x] Integrity verification (SHA256 + Zenodo MD5)
+  [x] Parallel downloads with workers
+  [x] Versioned field schemas (field_schemas.yaml)
+  [x] Schema validation + type casting
+  [x] PubChem computed-only extraction (CID-range sharding + resume)
+  [x] PMC OA allowlist parsing with fallbacks
+  [x] PMC tarball caching
+  [x] Enhanced JATS parsing (sections, captions)
+  [x] Global catalog builder
+  [x] Training manifest composer
+  [x] Wrapper script (run_pipeline.sh)
+  [x] Dry-run summary reports
+
+v0.6 -> v0.7 Shipped:
+  [x] Explicit denylist support (denylist.yaml + pipeline_driver integration)
+  [x] Manual review helper (review_queue.py) writing review_signoff.json
+  [x] Review gating in pipeline_driver:
+      - reject forces RED
+      - review_required forces YELLOW until approved
+      - approve can optionally promote_to GREEN (explicit)
+  [x] Wrapper script stage: review (lists pending YELLOW items)
+
+v0.7 -> v0.8 Shipped:
+  [x] Review Workflow: enforce + audit
+      - globals.require_yellow_signoff support
+      - Extended signoff schema (evidence_links_checked, constraints, notes, reviewer_contact)
+      - `review_queue.py export` command (CSV/JSON)
+  [x] Denylist: expand semantics
+      - Structured patterns (domain extraction, publisher/provider tags)
+      - Per-pattern severity (hard_red, force_yellow)
+      - Denylist provenance (link/rationale fields mandatory)
+  [x] License evidence snapshots: make "offline" safer
+      - When `--no-fetch` is set: require existing license_evidence snapshot
+      - Otherwise force YELLOW (no implicit GREEN based on hints)
+  [x] Dataset-aware splitting (leak prevention)
+      - Implemented `split_group_id` for related artifacts
+      - Split reports (counts + token estimates)
+  [x] Near-duplicate detection (beyond exact hash)
+      - Optional MinHash/LSH stage configuration
+      - Emit duplicate groups into catalog
+  [x] Record-level filtering: broaden coverage
+      - Added MoNA (MassBank of North America)
+      - Added GNPS (Global Natural Products Social Networking)
+      - Added ChemSpider (requires API key)
+  [x] Parquet output option
+      - `--emit-parquet` configuration
+      - Compression options (snappy, gzip, zstd)
+  [x] Resolver expansion / robustness
+      - Enhanced Figshare resolver with API v2
+      - GitHub release resolver with rate limiting
+  [x] InChIKey / SMILES normalization (optional)
+      - Optional RDKit-based normalizer configuration
+      - Normalization coverage in catalog stats
+
+================================================================================
+v0.9 — WHAT NEEDS TO CHANGE / BE UPDATED
+================================================================================
+
+HIGH PRIORITY (Production readiness)
+------------------------------------
+
+1) Parallel processing improvements
+   [ ] Implement async/concurrent license evidence fetching
+   [ ] Add connection pooling for HTTP requests
+   [ ] Parallelize catalog building for large pools
+   [ ] Add progress bars for long-running operations
+
+2) Incremental processing
+   [ ] Add delta-only mode for pipeline_driver.py (skip unchanged targets)
+   [ ] Implement incremental catalog updates (avoid full rebuild)
+   [ ] Add timestamp-based change detection for targets
+   [ ] Resume interrupted pipeline runs from last checkpoint
+
+3) Audit trail improvements
+   [ ] Add cryptographic signatures for evaluation.json files
+   [ ] Implement append-only audit log for all decisions
+   [ ] Add pipeline run IDs for full traceability
+   [ ] Record full provenance chain for each decision
+
+4) Error recovery and resilience
+   [ ] Implement checkpoint/resume for interrupted downloads
+   [ ] Add automatic retry with circuit breaker pattern
+   [ ] Improve partial download recovery
+   [ ] Add health checks for external services
+
+MEDIUM PRIORITY (Quality + coverage)
+------------------------------------
+
+5) Implement actual MinHash/LSH processing
+   [ ] Add datasketch integration for MinHash computation
+   [ ] Implement LSH indexing for efficient similarity search
+   [ ] Add fuzzy matching for chemical names/synonyms
+   [ ] Cross-dataset deduplication reports
+
+6) License verification improvements
+   [ ] Add confidence scoring for SPDX resolution
+   [ ] Implement license change detection (compare evidence snapshots)
+   [ ] Add automated checks for known license patterns
+   [ ] Web scraping improvements for dynamic license pages
+
+7) Additional data sources
+   [ ] ZINC database (Irwin Lab) - tranches and prepared sets
+   [ ] BindingDB (bioactivity data)
+   [ ] DrugBank (if academic license available)
+   [ ] CSD (Cambridge Structural Database, requires license negotiation)
+   [ ] USPTO patent chemistry data
+
+8) Spectra/mass spec improvements
+   [ ] Implement MSP parser for MoNA/GNPS
+   [ ] Add MGF (Mascot Generic Format) parser
+   [ ] Spectrum normalization and validation
+   [ ] Implement spectrum-based deduplication
+
+9) RDKit integration
+   [ ] Implement actual SMILES canonicalization
+   [ ] InChIKey validation and generation
+   [ ] Molecular property calculation
+   [ ] Substructure filtering capabilities
+
+LOW PRIORITY (Ergonomics + tooling)
+-----------------------------------
+
+10) Web UI for review workflow
+    [ ] Simple Flask/FastAPI dashboard for YELLOW review
+    [ ] Visual diff for license evidence changes
+    [ ] Batch approval/rejection interface
+    [ ] Review assignment and tracking
+
+11) Monitoring and alerting
+    [ ] Add metrics collection (download times, error rates)
+    [ ] Prometheus/StatsD integration
+    [ ] Slack/email notifications for failures
+    [ ] Dashboard for pipeline status
+
+12) Documentation improvements
+    [ ] Add architecture documentation with diagrams
+    [ ] Create tutorial for adding new targets
+    [ ] Add troubleshooting guide
+    [ ] API documentation for programmatic access
+
+13) Testing
+    [ ] Add unit tests for license normalization
+    [ ] Add integration tests for download workers
+    [ ] Add sample data for end-to-end testing
+    [ ] CI/CD pipeline configuration
+
+14) Container support
+    [ ] Add Dockerfile for reproducible runs
+    [ ] Add docker-compose for full pipeline
+    [ ] Kubernetes job definitions
+    [ ] Helm chart for deployment
+
+15) Performance optimization
+    [ ] Profile and optimize SDF parsing (PubChem)
+    [ ] Add optional Cython/numba for hot paths
+    [ ] Implement streaming processing for large files
+    [ ] Memory optimization for large datasets
+
+================================================================================
+BACKLOG (Future versions)
+================================================================================
+
+- Multi-language support for restriction phrase scanning
+- Machine learning-based license classification
+- Integration with legal review tools (e.g., FOSSA, Snyk)
+- Support for proprietary dataset agreements (with encryption)
+- API for programmatic access to catalog
+- Federated catalog support (multiple organizations)
+- Real-time license monitoring for web sources
+- Integration with data versioning tools (DVC, LakeFS)
+- Support for streaming/real-time data sources
+- Differential privacy integration for sensitive data
+- Automated report generation for compliance audits
+
+================================================================================
+NOTES
+================================================================================
+- Keep RED items out of training manifests, regardless of local copies.
+- Prefer computed-only transforms for ambiguous sources.
+- Always snapshot license/terms evidence before large downloads.
+- Use split_group_id to prevent data leakage across train/valid splits.
+- Test thoroughly before deploying to production.
