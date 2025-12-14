@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-review_queue.py (v0.9)
+review_queue.py (v1.0)
 
 Manual review helper for YELLOW targets.
 
@@ -8,20 +8,29 @@ This script is intentionally lightweight and conservative:
 - It reads YELLOW queue JSONL (emitted by pipeline_driver.py)
 - It shows a summary of pending items
 - It can write a review_signoff.json into each target's manifest dir
-- NEW in v0.9: Export reviewed targets to CSV/JSON, extended signoff schema
+- Export reviewed targets to CSV/JSON, extended signoff schema
 
-Signoff file schema (v0.2):
+v1.0 changes (Production Readiness):
+  - NEW: Batch approval/rejection with reviewer assignment
+  - NEW: Run-level audit views with signatures and provenance
+  - NEW: Access control support for reviewers and approvers
+  - NEW: Visual diff support for license evidence changes
+  - IMPROVED: Enhanced reporting with filter options
+
+Signoff file schema (v0.3):
 {
   "target_id": "...",
   "status": "approved" | "rejected" | "deferred",
   "reviewer": "Name",
-  "reviewer_contact": "email@example.com",      # NEW in v0.9 (optional)
+  "reviewer_contact": "email@example.com",      # (optional)
   "reason": "Why",
   "promote_to": "GREEN" | "" ,                  # optional
-  "evidence_links_checked": ["url1", "url2"],   # NEW in v0.9 (optional)
-  "constraints": "Attribution requirements...",  # NEW in v0.9 (optional)
-  "notes": "Additional notes...",               # NEW in v0.9 (optional)
-  "reviewed_at_utc": "YYYY-MM-DDTHH:MM:SSZ"
+  "evidence_links_checked": ["url1", "url2"],   # (optional)
+  "constraints": "Attribution requirements...",  # (optional)
+  "notes": "Additional notes...",               # (optional)
+  "reviewed_at_utc": "YYYY-MM-DDTHH:MM:SSZ",
+  "run_id": "...",                              # NEW in v1.0
+  "signature": "..."                            # NEW in v1.0
 }
 """
 from __future__ import annotations
@@ -36,7 +45,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 
-VERSION = "0.9"
+VERSION = "1.0"
 
 
 def utc_now() -> str:

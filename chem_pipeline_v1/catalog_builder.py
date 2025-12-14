@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-catalog_builder.py (v0.9)
+catalog_builder.py (v1.0)
 
 Builds a global catalog of all downloaded datasets with:
   - Dataset versions and metadata
@@ -9,10 +9,17 @@ Builds a global catalog of all downloaded datasets with:
   - Token estimates and statistics
   - Training manifest composition
 
+v1.0 changes (Production Readiness):
+  - NEW: Parallel catalog building with progress reporting
+  - NEW: Incremental updates with timestamp-based change detection
+  - NEW: Cross-dataset deduplication reports
+  - NEW: Normalization coverage with validation stats
+  - IMPROVED: Performance tuning for large pools
+
 v0.9 features:
-  - NEW: Near-duplicate group reporting
-  - NEW: Split report (counts + token estimates per split_group_id)
-  - NEW: Normalization coverage reporting
+  - Near-duplicate group reporting
+  - Split report (counts + token estimates per split_group_id)
+  - Normalization coverage reporting
 
 Usage:
   python catalog_builder.py --targets targets.yaml --output /data/chem/_catalogs/global_catalog.json
@@ -35,7 +42,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import yaml
 
 
-VERSION = "0.9"
+VERSION = "1.0"
 
 
 def utc_now() -> str:

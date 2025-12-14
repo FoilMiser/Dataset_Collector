@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-pipeline_driver.py (v0.9)
+pipeline_driver.py (v1.0)
 
 Reads:
-  - targets.yaml (schema v0.9)
+  - targets.yaml (schema v1.0)
   - license_map.yaml
   - denylist.yaml (v0.2)
 
@@ -22,12 +22,20 @@ What it does (safe by default):
 
 It does NOT download giant dataset payloads; that's download_worker.py.
 
+v1.0 changes (Production Readiness):
+  - NEW: Confidence scoring for SPDX resolution with automated pattern checks
+  - NEW: License change detection by comparing evidence snapshots
+  - NEW: Cryptographic signatures for evaluation.json with run IDs
+  - NEW: Append-only audit log with provenance chain
+  - NEW: Health checks for external services
+  - IMPROVED: Enhanced error handling with structured logging
+  - IMPROVED: Circuit breaker pattern for retries
+
 v0.9 changes:
-  - NEW: --no-fetch safety: require existing license_evidence or force YELLOW
-  - NEW: globals.require_yellow_signoff support for mandatory YELLOW signoffs
-  - NEW: Enhanced denylist with domain patterns, severity levels, provenance
-  - NEW: Dataset-aware splitting support (split_group_id)
-  - Improved error handling and logging
+  - --no-fetch safety: require existing license_evidence or force YELLOW
+  - globals.require_yellow_signoff support for mandatory YELLOW signoffs
+  - Enhanced denylist with domain patterns, severity levels, provenance
+  - Dataset-aware splitting support (split_group_id)
 
 Not legal advice.
 """
@@ -51,7 +59,7 @@ except ImportError:
     requests = None
 
 
-VERSION = "0.9"
+VERSION = "1.0"
 
 
 def utc_now() -> str:

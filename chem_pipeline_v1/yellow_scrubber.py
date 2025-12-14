@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-yellow_scrubber.py (v0.9)
+yellow_scrubber.py (v1.0)
 
 Stage-2 transformations for YELLOW bucket datasets (quarantine -> permissive),
 plus record-level allowlist planning.
@@ -14,11 +14,18 @@ Implemented:
      - Resilient parsing with fallback URLs
      - Improved field detection
 
+v1.0 changes (Production Readiness):
+  - NEW: RDKit-based SMILES canonicalization with validation
+  - NEW: InChIKey validation with coverage reporting
+  - NEW: Molecular property calculation hooks
+  - NEW: Performance tuning for large SDF ingestion
+  - IMPROVED: Spectrum normalization for MoNA/GNPS
+
 v0.9 changes:
-  - NEW: Parquet output option (--emit-parquet)
-  - NEW: Near-duplicate detection (--dedupe)
-  - NEW: InChIKey/SMILES normalization (--normalize)
-  - NEW: MoNA/GNPS processing support
+  - Parquet output option (--emit-parquet)
+  - Near-duplicate detection (--dedupe)
+  - InChIKey/SMILES normalization (--normalize)
+  - MoNA/GNPS processing support
   - Schema validation from field_schemas.yaml
   - Type casting and validation rules
   - CID-range based sharding
@@ -48,7 +55,7 @@ except ImportError:
     requests = None
 
 
-VERSION = "0.9"
+VERSION = "1.0"
 
 
 def utc_now() -> str:

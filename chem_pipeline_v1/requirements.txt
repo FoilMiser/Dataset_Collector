@@ -1,0 +1,36 @@
+# Chemistry Corpus Pipeline v1.0 - Requirements
+#
+# Production-ready dependency specifications with pinned versions
+# for reproducible deployments.
+
+# Core dependencies (required)
+pyyaml>=6.0,<7.0
+requests>=2.31.0,<3.0
+
+# Optional: for HuggingFace datasets strategy
+# datasets>=2.20.0
+
+# Optional: for accurate token counting in catalog_builder
+# tiktoken>=0.5.0
+
+# Optional: for parallel processing improvements
+# concurrent-futures (included in Python 3.2+)
+
+# Optional for Parquet output
+# pyarrow>=14.0.0,<18.0
+
+# Optional for near-duplicate detection
+# datasketch>=1.6.0,<2.0
+
+# Optional for InChIKey/SMILES normalization
+# rdkit>=2023.9.0
+
+# v1.0: Optional for testing
+# pytest>=7.0.0
+# pytest-cov>=4.0.0
+
+# v1.0: Optional for type checking
+# mypy>=1.0.0
+
+# v1.0: Optional for linting
+# ruff>=0.1.0

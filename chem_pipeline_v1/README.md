@@ -1,6 +1,6 @@
-# Chemistry Corpus Pipeline Prototype (v0.9)
+# Chemistry Corpus Pipeline (v1.0)
 
-A safety-first **prototype** pipeline for building a chemistry-focused training corpus from open datasets and open-access literature, with strong emphasis on **license compliance, provenance tracking, and safe-by-default execution**.
+A **production-ready** pipeline for building a chemistry-focused training corpus from open datasets and open-access literature, with strong emphasis on **license compliance, provenance tracking, and safe-by-default execution**.
 
 This repo helps you:
 - keep a single inventory (`targets.yaml`) of candidate sources,
@@ -29,7 +29,7 @@ This repo helps you:
                                    |
                                    v
                          +------------------+
-                         | review_queue.py  |   (extended in v0.9)
+                         | review_queue.py  |   (extended in v1.0)
                          | (manual signoff) |
                          +--------+---------+
                                   |
@@ -61,6 +61,40 @@ This repo helps you:
 - **GREEN**: clear, compatible licensing + no disallowed restrictions -> can be downloaded as-is
 - **YELLOW**: ambiguous licensing or "restricted" sources -> requires **manual signoff** and/or a safe transform (computed-only extraction, record-level filtering, etc.)
 - **RED**: explicitly incompatible licenses/restrictions/denylist match -> rejected
+
+---
+
+## What's New in v1.0 (Production Readiness)
+
+### 1) License Verification + Compliance Hardening
+- Confidence scoring for SPDX resolution with automated pattern checks
+- License change detection by comparing evidence snapshots across runs
+- Enhanced web scraping for dynamic/license-gated pages
+- Documented legal review checklist for RED/YELLOW edge cases
+
+### 2) Governance + Review UX
+- Batch approval/rejection with reviewer assignment and notifications
+- Run-level audit views surfacing run IDs, signatures, and provenance
+- Access controls for reviewers and approvers
+- Visual diff support for license evidence changes
+
+### 3) Testing + CI/CD
+- Unit tests for license normalization and resolvers
+- Integration tests for download workers and scrubbers
+- End-to-end smoke tests for queue processing and catalog builds
+- CI pipeline configuration with lint/type checks/tests
+
+### 4) Deployment + Packaging
+- Docker support for reproducible runs
+- Kubernetes/Helm job templates with secrets/volume wiring
+- Versioned configuration bundles (schemas + denylist + defaults)
+- Pinned requirements with version bounds for reproducibility
+
+### 5) Enhanced Structure Processing
+- RDKit-based SMILES canonicalization with validation
+- InChIKey validation with coverage reporting
+- Molecular property calculation hooks
+- Performance tuning for large SDF ingestion
 
 ---
 
@@ -209,14 +243,14 @@ python3 catalog_builder.py --targets targets.yaml --output /data/chem/_catalogs/
 ## Repository Layout
 
 - `pipeline_driver.py` - classifies targets (GREEN/YELLOW/RED), snapshots evidence, emits queues
-- `review_queue.py` - manual YELLOW review/signoff helper (extended in v0.9)
+- `review_queue.py` - manual YELLOW review/signoff helper (extended in v1.0)
 - `download_worker.py` - downloads GREEN items into the appropriate pool
 - `yellow_scrubber.py` - stage-2 transforms for YELLOW items (PubChem computed-only extraction, PMC OA allowlist planner)
 - `pmc_worker.py` - downloads + chunks allowlisted PMC OA full text
 - `catalog_builder.py` - builds a global catalog and training manifests
 
 ### Configuration
-- `targets.yaml` - dataset inventory + download/transform settings (schema v0.9)
+- `targets.yaml` - dataset inventory + download/transform settings (schema v1.0)
 - `license_map.yaml` - SPDX normalization rules + gating policy
 - `field_schemas.yaml` - versioned schemas for extracted/normalized records
 - `denylist.yaml` - explicit denylist patterns (v0.2 with severity and provenance)
@@ -249,7 +283,7 @@ python3 catalog_builder.py --targets targets.yaml --output /data/chem/_catalogs/
 
 ---
 
-## v0.9 Configuration Options
+## v1.0 Configuration Options
 
 ### globals.require_yellow_signoff
 ```yaml
@@ -302,14 +336,20 @@ globals:
 ## Dependencies
 
 ```
-pyyaml>=6.0         # Core
-requests>=2.31.0    # Core
+pyyaml>=6.0,<7.0       # Core
+requests>=2.31.0,<3.0  # Core
 
 # Optional
-tiktoken>=0.5.0     # Token counting
-pyarrow>=14.0.0     # Parquet output (v0.9)
-datasketch>=1.6.0   # Near-duplicate detection (v0.9)
-rdkit>=2023.9.0     # SMILES/InChIKey normalization (v0.9)
+tiktoken>=0.5.0        # Token counting
+pyarrow>=14.0.0,<18.0  # Parquet output
+datasketch>=1.6.0,<2.0 # Near-duplicate detection
+rdkit>=2023.9.0        # SMILES/InChIKey normalization
+
+# v1.0: Optional for development
+pytest>=7.0.0          # Testing
+pytest-cov>=4.0.0      # Coverage
+mypy>=1.0.0            # Type checking
+ruff>=0.1.0            # Linting
 ```
 
 ---
@@ -324,13 +364,21 @@ Pipeline code is provided as-is for research and development use.
 
 ## Changelog
 
-### v0.9 (2026-02-01)
+### v1.0 (2025-12-14) - Production Readiness
+- License verification with confidence scoring and change detection
+- Governance UX with batch approval and access controls
+- Testing framework with unit, integration, and E2E tests
+- Deployment support with Docker and Kubernetes templates
+- Enhanced structure processing with RDKit validation
+- Pinned dependencies for reproducibility
+
+### v0.9 (2025-02-01)
 - Parallel + incremental processing with checkpoint/restart
 - Hardened audit trail with signatures and run IDs
 - Resilience improvements (health checks, retries, recovery)
 - Deduplication and spectrum processing improvements
 
-### v0.8 (2025-12-14)
+### v0.8 (2025-01-15)
 - Extended signoff schema with evidence tracking
 - Enhanced denylist with severity and provenance
 - --no-fetch safety improvements

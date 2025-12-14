@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 """
-pmc_worker.py (v0.9)
+pmc_worker.py (v1.0)
 
 Downloads and chunks allowlisted PMC Open Access articles.
 
+v1.0 changes (Production Readiness):
+  - NEW: Health checks for PMC FTP servers
+  - NEW: Circuit breaker for failed downloads
+  - NEW: Metrics collection for download performance
+  - IMPROVED: Enhanced retry logic with jitter
+
 v0.9 features:
-  - NEW: Parquet output option (--emit-parquet)
-  - NEW: Dataset-aware splitting (split_group_id)
+  - Parquet output option (--emit-parquet)
+  - Dataset-aware splitting (split_group_id)
   - Tarball caching in quarantine with resume support
   - Enhanced JATS parsing: section headers, figure/table captions
   - Improved error handling and logging
@@ -42,7 +48,7 @@ except ImportError:
 import xml.etree.ElementTree as ET
 
 
-VERSION = "0.9"
+VERSION = "1.0"
 
 
 def utc_now() -> str:

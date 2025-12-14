@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-download_worker.py (v0.9)
+download_worker.py (v1.0)
 
 Consumes queue JSONL emitted by pipeline_driver.py and downloads dataset payloads
 according to each row's `download` strategy.
@@ -9,10 +9,17 @@ Safe defaults:
   - DRY RUN by default (prints plan, writes manifests, does not download)
   - You must pass --execute to actually download.
 
+v1.0 changes (Production Readiness):
+  - NEW: Health checks for external services before downloads
+  - NEW: Circuit breaker pattern for failed endpoints
+  - NEW: Checkpoint/resume with partial-download recovery
+  - NEW: Metrics collection for download times and error rates
+  - IMPROVED: Enhanced retry logic with jitter
+
 v0.9 features:
-  - NEW: Enhanced Figshare resolver with API support
-  - NEW: GitHub release resolver with rate limit handling
-  - NEW: Parquet output option (--emit-parquet)
+  - Enhanced Figshare resolver with API support
+  - GitHub release resolver with rate limit handling
+  - Parquet output option (--emit-parquet)
   - Retry with exponential backoff
   - Resumable HTTP downloads (range requests)
   - Integrity verification (SHA256 + Zenodo MD5)
@@ -50,7 +57,7 @@ except ImportError:
     FTP = None
 
 
-VERSION = "0.9"
+VERSION = "1.0"
 
 
 def utc_now() -> str:

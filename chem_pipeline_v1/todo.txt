@@ -86,89 +86,120 @@ v0.8 -> v0.9 Shipped:
       - Fuzzy chemical synonym matching and spectrum-based deduplication hooks
       - MSP/MGF parsing and normalization for MoNA/GNPS
 
+v0.9 -> v1.0 Shipped (Production Readiness):
+  [x] License verification + compliance hardening
+      - Confidence scoring for SPDX resolution + automated pattern checks
+      - License change detection by comparing evidence snapshots
+      - Enhanced web scraping for dynamic/license-gated pages
+      - Documented legal review checklist for RED/YELLOW edge cases
+  [x] Governance + review UX
+      - Batch approval/rejection with reviewer assignment/notifications
+      - Run-level audit views (surface run IDs, signatures, provenance)
+      - Access controls for reviewers and approvers
+      - Visual diff support for license evidence changes
+  [x] Testing + CI/CD
+      - Unit tests for license normalization and resolvers
+      - Integration tests for download workers and scrubbers with sample data
+      - End-to-end smoke tests (green/yellow/red queues + catalog build)
+      - CI pipeline (lint/type checks/tests) with artifact retention
+  [x] Deployment + packaging
+      - Docker support for reproducible runs
+      - Kubernetes/Helm job templates with secrets/volume wiring
+      - Versioned configuration bundles (schemas + denylist + defaults)
+      - Publish pinned requirements/lockfiles
+  [x] RDKit + structure processing
+      - Hardened SMILES canonicalization and InChIKey validation
+      - Molecular property calculation + substructure filtering hooks
+      - Performance tuning for large SDF ingestion
+
 ================================================================================
-v0.9 -> v1.0 — WHAT NEEDS TO CHANGE / BE UPDATED
+v1.0 -> v1.1 — WHAT NEEDS TO CHANGE / BE UPDATED
 ================================================================================
 
-HIGH PRIORITY (Production readiness)
+HIGH PRIORITY (Scaling + Robustness)
 ------------------------------------
 
-1) License verification + compliance hardening
-   [ ] Confidence scoring for SPDX resolution + automated pattern checks
-   [ ] License change detection by comparing evidence snapshots
-   [ ] Web scraping improvements for dynamic/license-gated pages
-   [ ] Documented legal review checklist for RED/YELLOW edge cases
+1) Data coverage expansions
+   [ ] Add ZINC database pipeline with licensing verification
+   [ ] Add BindingDB pipeline with affinity data extraction
+   [ ] Add DrugBank pipeline (where licensed)
+   [ ] Add USPTO patent chemistry extraction
+   [ ] Expand spectrum ingestion for additional MSP/MGF sources
 
-2) Governance + review UX
-   [ ] Flask/FastAPI dashboard for YELLOW review with visual diffs
-   [ ] Batch approval/rejection + reviewer assignment/notifications
-   [ ] Run-level audit views (surface run IDs, signatures, provenance)
-   [ ] Access controls for reviewers and approvers
-
-3) Testing + CI/CD
-   [ ] Unit tests for license normalization and resolvers
-   [ ] Integration tests for download workers and scrubbers with sample data
-   [ ] End-to-end smoke tests (green/yellow/red queues + catalog build)
-   [ ] CI pipeline (lint/type checks/tests) with artifact retention
-
-4) Deployment + packaging
-   [ ] Dockerfile + docker-compose for reproducible runs
-   [ ] Kubernetes/Helm job templates with secrets/volume wiring
-   [ ] Versioned configuration bundles (schemas + denylist + defaults)
-   [ ] Publish pinned requirements/lockfiles
-
-MEDIUM PRIORITY (Quality + coverage)
-------------------------------------
-
-5) Data coverage expansions
-   [ ] Add ZINC, BindingDB, DrugBank (where licensed), and USPTO pipelines
-   [ ] Expand spectrum ingestion for MoNA/GNPS and other MSP/MGF sources
-   [ ] Cross-dataset deduplication reports that include spectra + structure IDs
-
-6) RDKit + structure processing
-   [ ] Harden SMILES canonicalization and InChIKey validation
-   [ ] Molecular property calculation + substructure filtering hooks
-   [ ] Performance tuning for large SDF ingestion (Cython/numba optional)
-
-7) Monitoring + alerting
+2) Monitoring + alerting
    [ ] Metrics on download times, error rates, queue throughput
-   [ ] Prometheus/StatsD exporters and Grafana dashboard examples
+   [ ] Prometheus/StatsD exporters with example dashboards
+   [ ] Grafana dashboard templates for pipeline health
    [ ] Slack/email notifications for failures or stalled queues
+   [ ] SLA monitoring for critical data sources
 
-8) Documentation + onboarding
-   [ ] Architecture doc + diagrams
+3) Web dashboard for governance
+   [ ] Flask/FastAPI dashboard for YELLOW review with visual diffs
+   [ ] Real-time queue status and progress visualization
+   [ ] Interactive approval/rejection with audit trail
+   [ ] Role-based access control (RBAC) for reviewers
+
+4) Documentation + onboarding
+   [ ] Architecture doc with detailed diagrams
    [ ] Tutorial for adding new targets and resolvers
    [ ] Troubleshooting guide and FAQ for common failures
    [ ] API/programmatic access examples
+   [ ] Video walkthroughs for common workflows
 
-LOW PRIORITY (Ergonomics + future-proofing)
--------------------------------------------
+MEDIUM PRIORITY (Quality + Ergonomics)
+--------------------------------------
 
-9) Performance + ergonomics
-    [ ] Streaming processing for large files + memory profiling
-    [ ] Optional progress dashboards (CLI + web) for long jobs
-    [ ] Configurable caching/prefetch for common resolvers
+5) Performance + streaming
+   [ ] Streaming processing for large files (>10GB) with memory profiling
+   [ ] Optional progress dashboards (CLI + web) for long jobs
+   [ ] Configurable caching/prefetch for common resolvers
+   [ ] Batch processing optimizations for catalog builds
 
-10) Container/orchestration polish
-    [ ] Helm chart hardening (quotas, pod disruption budgets)
-    [ ] Airflow/Argo examples for scheduled runs
-    [ ] Backup/restore procedures for catalogs and manifests
+6) Cross-dataset intelligence
+   [ ] Cross-dataset deduplication reports with structure + spectra IDs
+   [ ] Compound identity resolution across sources
+   [ ] Conflict detection for contradictory data
+   [ ] Data quality scoring per source
+
+7) Container/orchestration polish
+   [ ] Helm chart hardening (resource quotas, pod disruption budgets)
+   [ ] Airflow/Argo workflow examples for scheduled runs
+   [ ] Backup/restore procedures for catalogs and manifests
+   [ ] Multi-region deployment support
+
+8) Advanced license analysis
+   [ ] Machine learning-based license classification assistance
+   [ ] Integration with legal review tools (e.g., FOSSA, Snyk)
+   [ ] License compatibility matrix generation
+   [ ] Automated license change alerts
+
+LOW PRIORITY (Future-proofing)
+------------------------------
+
+9) Multi-language + international support
+   [ ] Multi-language support for restriction phrase scanning
+   [ ] International license variants detection
+   [ ] Localized documentation
+
+10) Advanced integrations
+    [ ] Integration with data versioning tools (DVC, LakeFS)
+    [ ] Support for streaming/real-time data sources
+    [ ] Federated catalog support (multiple organizations)
+    [ ] API for programmatic access to catalog
 
 ================================================================================
 BACKLOG (Future versions)
 ================================================================================
 
-- Multi-language support for restriction phrase scanning
-- Machine learning-based license classification
-- Integration with legal review tools (e.g., FOSSA, Snyk)
 - Support for proprietary dataset agreements (with encryption)
-- API for programmatic access to catalog
-- Federated catalog support (multiple organizations)
-- Real-time license monitoring for web sources
-- Integration with data versioning tools (DVC, LakeFS)
-- Support for streaming/real-time data sources
 - Differential privacy integration for sensitive data
 - Automated report generation for compliance audits
+- Real-time license monitoring for web sources
+- GraphQL API for catalog queries
+- Plugin architecture for custom resolvers
+- Distributed processing with Ray/Dask
+- Model-specific data preparation pipelines
+- A/B testing infrastructure for data quality experiments
 
 ================================================================================
 NOTES
@@ -178,3 +209,4 @@ NOTES
 - Always snapshot license/terms evidence before large downloads.
 - Use split_group_id to prevent data leakage across train/valid splits.
 - Test thoroughly before deploying to production.
+- Monitor external data sources for license changes.
