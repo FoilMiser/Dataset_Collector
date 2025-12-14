@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# run_pipeline.sh (v0.7)
+# run_pipeline.sh (v1.0)
 #
 # Single wrapper script for the Chemistry Corpus Pipeline.
 # Orchestrates all stages with sensible defaults.
@@ -22,7 +22,7 @@
 
 set -euo pipefail
 
-VERSION="0.9"
+VERSION="1.0"
 
 # Colors for output
 RED='\033[0;31m'

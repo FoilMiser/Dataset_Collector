@@ -94,10 +94,10 @@ HIGH PRIORITY (Production readiness)
 ------------------------------------
 
 1) License verification + compliance hardening
-   [ ] Confidence scoring for SPDX resolution + automated pattern checks
-   [ ] License change detection by comparing evidence snapshots
-   [ ] Web scraping improvements for dynamic/license-gated pages
-   [ ] Documented legal review checklist for RED/YELLOW edge cases
+   [x] Confidence scoring for SPDX resolution + automated pattern checks
+   [x] License change detection by comparing evidence snapshots
+   [x] Web scraping improvements for dynamic/license-gated pages
+   [x] Documented legal review checklist for RED/YELLOW edge cases
 
 2) Governance + review UX
    [ ] Flask/FastAPI dashboard for YELLOW review with visual diffs
@@ -153,6 +153,15 @@ LOW PRIORITY (Ergonomics + future-proofing)
     [ ] Helm chart hardening (quotas, pod disruption budgets)
     [ ] Airflow/Argo examples for scheduled runs
     [ ] Backup/restore procedures for catalogs and manifests
+
+================================================================================
+v1.0 -> v1.1 — FUTURE IMPROVEMENTS
+================================================================================
+
+- Governance + review UX: dashboard, batch approvals, reviewer access controls
+- CI hardening: automated unit/integration tests, artifact retention
+- Deployment packaging: Dockerfile/Helm templates and pinned lockfiles
+- Monitoring + alerting: metrics exporters and failure notifications
 
 ================================================================================
 BACKLOG (Future versions)

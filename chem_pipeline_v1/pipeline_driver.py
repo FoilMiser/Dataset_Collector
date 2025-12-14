@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-pipeline_driver.py (v0.9)
+pipeline_driver.py (v1.0)
 
 Reads:
-  - targets.yaml (schema v0.9)
+  - targets.yaml (schema v1.0)
   - license_map.yaml
   - denylist.yaml (v0.2)
 
@@ -16,18 +16,19 @@ Produces:
 
 What it does (safe by default):
   - Fetches/snapshots license evidence URLs (HTML/PDF if served)
-  - Normalizes license to SPDX-ish using license_map normalization rules
+  - Normalizes license to SPDX-ish using license_map normalization rules with confidence scoring
   - Scans for restriction phrases (no LLM / no TDM / no AI training)
+  - Detects license evidence changes compared to prior runs and downgrades to YELLOW when changes require review
+  - Allows controlled evidence fetching for license-gated/dynamic pages via custom headers
   - Computes effective bucket based on profile + SPDX allow/conditional/deny + restriction phrase hits
 
 It does NOT download giant dataset payloads; that's download_worker.py.
 
-v0.9 changes:
-  - NEW: --no-fetch safety: require existing license_evidence or force YELLOW
-  - NEW: globals.require_yellow_signoff support for mandatory YELLOW signoffs
-  - NEW: Enhanced denylist with domain patterns, severity levels, provenance
-  - NEW: Dataset-aware splitting support (split_group_id)
-  - Improved error handling and logging
+v1.0 changes:
+  - License confidence scoring with configurable minimum threshold
+  - License evidence change detection to force manual review when terms change
+  - Evidence fetcher supports custom headers for license-gated pages
+  - Run metadata upgraded to v1.0 and documentation refreshed
 
 Not legal advice.
 """
@@ -51,7 +52,7 @@ except ImportError:
     requests = None
 
 
-VERSION = "0.9"
+VERSION = "1.0"
 
 
 def utc_now() -> str:
@@ -62,6 +63,13 @@ def ensure_dir(p: Path) -> None:
 
 def sha256_bytes(b: bytes) -> str:
     return hashlib.sha256(b).hexdigest()
+
+
+def sha256_file(path: Path) -> Optional[str]:
+    try:
+        return sha256_bytes(path.read_bytes())
+    except Exception:
+        return None
 
 def read_yaml(path: Path) -> Dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -306,23 +314,28 @@ def read_review_signoff(manifest_dir: Path) -> Dict[str, Any]:
     except Exception:
         return {}
 
-def normalize_spdx(license_map: LicenseMap, evidence_text: str, spdx_hint: str) -> str:
+def resolve_spdx_with_confidence(
+    license_map: LicenseMap, evidence_text: str, spdx_hint: str
+) -> Tuple[str, float, str]:
+    """Resolve SPDX with a lightweight confidence score and rationale."""
+
     hint = normalize_whitespace(str(spdx_hint or ""))
     if hint and hint.upper() not in {"MIXED", "UNKNOWN", "DERIVED"}:
-        return hint
+        return hint, 0.95, "explicit SPDX hint"
 
     blob = normalize_whitespace(f"{hint} {evidence_text}")
     blob_l = lower(blob)
 
     for rule in license_map.normalization_rules:
         needles = [lower(x) for x in (rule.get("match_any") or []) if x]
-        if any(n in blob_l for n in needles):
-            return str(rule.get("spdx", "UNKNOWN")) or "UNKNOWN"
+        if needles and any(n in blob_l for n in needles):
+            confidence = min(0.9, 0.6 + 0.05 * len(needles))
+            return str(rule.get("spdx", "UNKNOWN")) or "UNKNOWN", confidence, "normalized via rule match"
 
     if hint.upper() == "DERIVED":
-        return "Derived"
+        return "Derived", 0.6, "derived content flag"
 
-    return "UNKNOWN"
+    return "UNKNOWN", 0.2, "no confident match"
 
 def spdx_bucket(license_map: LicenseMap, spdx: str) -> str:
     s = str(spdx or "").strip()
@@ -345,7 +358,8 @@ def fetch_url_with_retry(
     url: str,
     timeout_s: int = 30,
     max_retries: int = 3,
-    backoff_base: float = 2.0
+    backoff_base: float = 2.0,
+    headers: Optional[Dict[str, str]] = None,
 ) -> Tuple[Optional[bytes], Optional[str], Dict[str, Any]]:
     """Fetch URL with retry and exponential backoff."""
     if requests is None:
@@ -358,7 +372,7 @@ def fetch_url_with_retry(
             r = requests.get(
                 url,
                 timeout=timeout_s,
-                headers={"User-Agent": f"chem-corpus-pipeline/{VERSION}"}
+                headers={"User-Agent": f"chem-corpus-pipeline/{VERSION}", **(headers or {})},
             )
             r.raise_for_status()
             ctype = r.headers.get("Content-Type", "")
@@ -376,16 +390,31 @@ def fetch_url_with_retry(
 def snapshot_evidence(
     manifest_dir: Path,
     url: str,
-    max_retries: int = 3
+    max_retries: int = 3,
+    headers: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
-    result: Dict[str, Any] = {"url": url, "fetched_at_utc": utc_now(), "status": "skipped"}
+    result: Dict[str, Any] = {
+        "url": url,
+        "fetched_at_utc": utc_now(),
+        "status": "skipped",
+        "headers_used": headers or {},
+    }
     if not url:
         result["status"] = "no_url"
         return result
 
-    content, info, meta = fetch_url_with_retry(url, max_retries=max_retries)
+    previous_digest = None
+    existing_path = None
+    for ext in [".html", ".pdf", ".txt", ".json"]:
+        candidate = manifest_dir / f"license_evidence{ext}"
+        if candidate.exists():
+            existing_path = candidate
+            previous_digest = sha256_file(candidate)
+            break
+
+    content, info, meta = fetch_url_with_retry(url, max_retries=max_retries, headers=headers)
     result["fetch_meta"] = meta
-    
+
     if content is None:
         result["status"] = "error"
         result["error"] = info
@@ -393,7 +422,15 @@ def snapshot_evidence(
 
     ctype = info or ""
     digest = sha256_bytes(content)
-    result.update({"status": "ok", "content_type": ctype, "sha256": digest, "bytes": len(content)})
+    result.update({
+        "status": "ok",
+        "content_type": ctype,
+        "sha256": digest,
+        "bytes": len(content),
+        "previous_sha256": previous_digest,
+        "previous_path": str(existing_path) if existing_path else None,
+        "changed_from_previous": bool(previous_digest and previous_digest != digest),
+    })
 
     ext = ".html"
     if "pdf" in ctype.lower():
@@ -538,14 +575,29 @@ def generate_dry_run_report(
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=f"Pipeline Driver v{VERSION}")
-    ap.add_argument("--targets", required=True, help="Path to targets.yaml (v0.9)")
+    ap.add_argument("--targets", required=True, help="Path to targets.yaml (v1.0)")
     ap.add_argument("--license-map", default=None, help="Path to license_map.yaml (defaults to companion_files.license_map)")
     ap.add_argument("--out-manifests", default=None, help="Override manifests_root")
     ap.add_argument("--out-queues", default=None, help="Override queues_root")
     ap.add_argument("--no-fetch", action="store_true", help="Do not fetch evidence URLs (offline mode - v0.9: forces YELLOW if no snapshot)")
     ap.add_argument("--max-retries", type=int, default=3, help="Max retries for evidence fetching")
+    ap.add_argument("--min-license-confidence", type=float, default=0.6, help="Minimum SPDX confidence required before GREEN classification")
+    ap.add_argument(
+        "--evidence-header",
+        action="append",
+        default=[],
+        help="Custom header for evidence fetcher (KEY=VALUE). Useful for license-gated pages",
+    )
     ap.add_argument("--quiet", action="store_true", help="Suppress dry-run report output")
     args = ap.parse_args()
+
+    headers: Dict[str, str] = {}
+    for raw in args.evidence_header:
+        if "=" not in raw:
+            continue
+        k, v = raw.split("=", 1)
+        if k.strip():
+            headers[k.strip()] = v.strip()
 
     targets_path = Path(args.targets).resolve()
     targets_cfg = read_yaml(targets_path)
@@ -609,6 +661,7 @@ def main() -> None:
 
         evidence_snapshot = {"status": "skipped", "url": evidence_url}
         evidence_text = ""
+        license_change_detected = False
 
         # v0.9: Check for existing evidence snapshot in --no-fetch mode
         no_fetch_missing_evidence = False
@@ -616,9 +669,11 @@ def main() -> None:
             evidence_snapshot = snapshot_evidence(
                 target_manifest_dir,
                 evidence_url,
-                max_retries=args.max_retries
+                max_retries=args.max_retries,
+                headers=headers,
             )
             evidence_text = extract_text_for_scanning(evidence_snapshot)
+            license_change_detected = bool(evidence_snapshot.get("changed_from_previous"))
         elif "snapshot_terms" in gates and args.no_fetch:
             # v0.9: In offline mode, check for existing snapshot
             existing_evidence_path = None
@@ -628,14 +683,25 @@ def main() -> None:
                     existing_evidence_path = candidate
                     break
             if existing_evidence_path:
-                evidence_snapshot = {"status": "from_cache", "url": evidence_url, "path": str(existing_evidence_path)}
+                existing_digest = sha256_file(existing_evidence_path)
+                evidence_snapshot = {
+                    "status": "from_cache",
+                    "url": evidence_url,
+                    "path": str(existing_evidence_path),
+                    "sha256": existing_digest,
+                    "previous_sha256": existing_digest,
+                    "changed_from_previous": False,
+                    "headers_used": headers,
+                }
                 evidence_text = extract_text_for_scanning({"saved_path": str(existing_evidence_path)})
             else:
                 # v0.9: No existing snapshot + --no-fetch -> force YELLOW
                 no_fetch_missing_evidence = True
-                evidence_snapshot = {"status": "missing_offline", "url": evidence_url}
+                evidence_snapshot = {"status": "missing_offline", "url": evidence_url, "headers_used": headers}
 
-        resolved = normalize_spdx(license_map, evidence_text=evidence_text, spdx_hint=spdx_hint)
+        resolved, resolved_confidence, confidence_reason = resolve_spdx_with_confidence(
+            license_map, evidence_text=evidence_text, spdx_hint=spdx_hint
+        )
 
         restriction_hits: List[str] = []
         if "restriction_phrase_scan" in gates:
@@ -648,6 +714,14 @@ def main() -> None:
             resolved_spdx=resolved,
             restriction_hits=restriction_hits,
         )
+
+        if resolved_confidence < args.min_license_confidence and eff_bucket == "GREEN":
+            eff_bucket = "YELLOW"
+            review_required = True
+
+        if license_change_detected and eff_bucket == "GREEN":
+            eff_bucket = "YELLOW"
+            review_required = True
 
         # v0.9: Denylist gating with severity support
         denylist_forced_bucket = None
@@ -702,11 +776,15 @@ def main() -> None:
             "license_profile": profile,
             "spdx_hint": spdx_hint,
             "resolved_spdx": resolved,
+            "resolved_spdx_confidence": resolved_confidence,
+            "resolved_spdx_confidence_reason": confidence_reason,
             "restriction_hits": restriction_hits,
             "gates": gates,
             "effective_bucket": eff_bucket,
             "license_evidence_url": evidence_url,
             "evidence_snapshot": evidence_snapshot,
+            "evidence_headers_used": headers,
+            "license_change_detected": license_change_detected,
             "download": t.get("download", {}),
             "build": t.get("build", {}),
             "data_type": t.get("data_type", []),
@@ -725,6 +803,7 @@ def main() -> None:
             "effective_bucket": eff_bucket,
             "license_profile": profile,
             "resolved_spdx": resolved,
+            "resolved_spdx_confidence": resolved_confidence,
             "restriction_hits": restriction_hits,
             "license_evidence_url": evidence_url,
             "manifest_dir": str(target_manifest_dir),
@@ -738,6 +817,7 @@ def main() -> None:
             "split_group_id": split_group_id,
             "denylist_hits": dl_hits,
             "review_required": review_required,
+            "license_change_detected": license_change_detected,
         }
 
         if not enabled:
