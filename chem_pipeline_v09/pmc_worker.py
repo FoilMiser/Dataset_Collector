@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-pmc_worker.py (v0.8)
+pmc_worker.py (v0.9)
 
 Downloads and chunks allowlisted PMC Open Access articles.
 
-v0.8 features:
+v0.9 features:
   - NEW: Parquet output option (--emit-parquet)
   - NEW: Dataset-aware splitting (split_group_id)
   - Tarball caching in quarantine with resume support
@@ -42,7 +42,7 @@ except ImportError:
 import xml.etree.ElementTree as ET
 
 
-VERSION = "0.8"
+VERSION = "0.9"
 
 
 def utc_now() -> str:

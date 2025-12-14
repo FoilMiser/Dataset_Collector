@@ -1,4 +1,4 @@
-# Chemistry Corpus Pipeline v0.8 - Requirements
+# Chemistry Corpus Pipeline v0.9 - Requirements
 # Core dependencies
 pyyaml>=6.0
 requests>=2.31.0
@@ -12,11 +12,11 @@ requests>=2.31.0
 # Optional: for parallel processing improvements
 # concurrent-futures (included in Python 3.2+)
 
-# v0.8: Optional for Parquet output
+# v0.9: Optional for Parquet output
 # pyarrow>=14.0.0
 
-# v0.8: Optional for near-duplicate detection
+# v0.9: Optional for near-duplicate detection
 # datasketch>=1.6.0
 
-# v0.8: Optional for InChIKey/SMILES normalization
+# v0.9: Optional for InChIKey/SMILES normalization
 # rdkit>=2023.9.0

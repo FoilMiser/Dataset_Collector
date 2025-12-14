@@ -68,109 +68,91 @@ v0.7 -> v0.8 Shipped:
       - Optional RDKit-based normalizer configuration
       - Normalization coverage in catalog stats
 
+v0.8 -> v0.9 Shipped:
+  [x] Parallel + incremental processing
+      - Async/concurrent license evidence fetching with HTTP pooling
+      - Parallel catalog building with progress bars for large pools
+      - Delta-only runs, incremental catalog updates, and checkpointed resumes
+  [x] Audit trail + provenance
+      - Cryptographic signatures for evaluation.json files
+      - Append-only audit log with pipeline run IDs
+      - Full provenance chain captured per decision
+  [x] Resilience + recovery
+      - Checkpoint/resume for downloads and catalog stages
+      - Circuit breaker retries and partial-download recovery
+      - Health checks for critical external services
+  [x] Deduplication + spectra coverage
+      - MinHash/LSH deduplication with cross-dataset reports
+      - Fuzzy chemical synonym matching and spectrum-based deduplication hooks
+      - MSP/MGF parsing and normalization for MoNA/GNPS
+
 ================================================================================
-v0.9 — WHAT NEEDS TO CHANGE / BE UPDATED
+v0.9 -> v1.0 — WHAT NEEDS TO CHANGE / BE UPDATED
 ================================================================================
 
 HIGH PRIORITY (Production readiness)
 ------------------------------------
 
-1) Parallel processing improvements
-   [ ] Implement async/concurrent license evidence fetching
-   [ ] Add connection pooling for HTTP requests
-   [ ] Parallelize catalog building for large pools
-   [ ] Add progress bars for long-running operations
+1) License verification + compliance hardening
+   [ ] Confidence scoring for SPDX resolution + automated pattern checks
+   [ ] License change detection by comparing evidence snapshots
+   [ ] Web scraping improvements for dynamic/license-gated pages
+   [ ] Documented legal review checklist for RED/YELLOW edge cases
 
-2) Incremental processing
-   [ ] Add delta-only mode for pipeline_driver.py (skip unchanged targets)
-   [ ] Implement incremental catalog updates (avoid full rebuild)
-   [ ] Add timestamp-based change detection for targets
-   [ ] Resume interrupted pipeline runs from last checkpoint
+2) Governance + review UX
+   [ ] Flask/FastAPI dashboard for YELLOW review with visual diffs
+   [ ] Batch approval/rejection + reviewer assignment/notifications
+   [ ] Run-level audit views (surface run IDs, signatures, provenance)
+   [ ] Access controls for reviewers and approvers
 
-3) Audit trail improvements
-   [ ] Add cryptographic signatures for evaluation.json files
-   [ ] Implement append-only audit log for all decisions
-   [ ] Add pipeline run IDs for full traceability
-   [ ] Record full provenance chain for each decision
+3) Testing + CI/CD
+   [ ] Unit tests for license normalization and resolvers
+   [ ] Integration tests for download workers and scrubbers with sample data
+   [ ] End-to-end smoke tests (green/yellow/red queues + catalog build)
+   [ ] CI pipeline (lint/type checks/tests) with artifact retention
 
-4) Error recovery and resilience
-   [ ] Implement checkpoint/resume for interrupted downloads
-   [ ] Add automatic retry with circuit breaker pattern
-   [ ] Improve partial download recovery
-   [ ] Add health checks for external services
+4) Deployment + packaging
+   [ ] Dockerfile + docker-compose for reproducible runs
+   [ ] Kubernetes/Helm job templates with secrets/volume wiring
+   [ ] Versioned configuration bundles (schemas + denylist + defaults)
+   [ ] Publish pinned requirements/lockfiles
 
 MEDIUM PRIORITY (Quality + coverage)
 ------------------------------------
 
-5) Implement actual MinHash/LSH processing
-   [ ] Add datasketch integration for MinHash computation
-   [ ] Implement LSH indexing for efficient similarity search
-   [ ] Add fuzzy matching for chemical names/synonyms
-   [ ] Cross-dataset deduplication reports
+5) Data coverage expansions
+   [ ] Add ZINC, BindingDB, DrugBank (where licensed), and USPTO pipelines
+   [ ] Expand spectrum ingestion for MoNA/GNPS and other MSP/MGF sources
+   [ ] Cross-dataset deduplication reports that include spectra + structure IDs
 
-6) License verification improvements
-   [ ] Add confidence scoring for SPDX resolution
-   [ ] Implement license change detection (compare evidence snapshots)
-   [ ] Add automated checks for known license patterns
-   [ ] Web scraping improvements for dynamic license pages
+6) RDKit + structure processing
+   [ ] Harden SMILES canonicalization and InChIKey validation
+   [ ] Molecular property calculation + substructure filtering hooks
+   [ ] Performance tuning for large SDF ingestion (Cython/numba optional)
 
-7) Additional data sources
-   [ ] ZINC database (Irwin Lab) - tranches and prepared sets
-   [ ] BindingDB (bioactivity data)
-   [ ] DrugBank (if academic license available)
-   [ ] CSD (Cambridge Structural Database, requires license negotiation)
-   [ ] USPTO patent chemistry data
+7) Monitoring + alerting
+   [ ] Metrics on download times, error rates, queue throughput
+   [ ] Prometheus/StatsD exporters and Grafana dashboard examples
+   [ ] Slack/email notifications for failures or stalled queues
 
-8) Spectra/mass spec improvements
-   [ ] Implement MSP parser for MoNA/GNPS
-   [ ] Add MGF (Mascot Generic Format) parser
-   [ ] Spectrum normalization and validation
-   [ ] Implement spectrum-based deduplication
+8) Documentation + onboarding
+   [ ] Architecture doc + diagrams
+   [ ] Tutorial for adding new targets and resolvers
+   [ ] Troubleshooting guide and FAQ for common failures
+   [ ] API/programmatic access examples
 
-9) RDKit integration
-   [ ] Implement actual SMILES canonicalization
-   [ ] InChIKey validation and generation
-   [ ] Molecular property calculation
-   [ ] Substructure filtering capabilities
+LOW PRIORITY (Ergonomics + future-proofing)
+-------------------------------------------
 
-LOW PRIORITY (Ergonomics + tooling)
------------------------------------
+9) Performance + ergonomics
+    [ ] Streaming processing for large files + memory profiling
+    [ ] Optional progress dashboards (CLI + web) for long jobs
+    [ ] Configurable caching/prefetch for common resolvers
 
-10) Web UI for review workflow
-    [ ] Simple Flask/FastAPI dashboard for YELLOW review
-    [ ] Visual diff for license evidence changes
-    [ ] Batch approval/rejection interface
-    [ ] Review assignment and tracking
-
-11) Monitoring and alerting
-    [ ] Add metrics collection (download times, error rates)
-    [ ] Prometheus/StatsD integration
-    [ ] Slack/email notifications for failures
-    [ ] Dashboard for pipeline status
-
-12) Documentation improvements
-    [ ] Add architecture documentation with diagrams
-    [ ] Create tutorial for adding new targets
-    [ ] Add troubleshooting guide
-    [ ] API documentation for programmatic access
-
-13) Testing
-    [ ] Add unit tests for license normalization
-    [ ] Add integration tests for download workers
-    [ ] Add sample data for end-to-end testing
-    [ ] CI/CD pipeline configuration
-
-14) Container support
-    [ ] Add Dockerfile for reproducible runs
-    [ ] Add docker-compose for full pipeline
-    [ ] Kubernetes job definitions
-    [ ] Helm chart for deployment
-
-15) Performance optimization
-    [ ] Profile and optimize SDF parsing (PubChem)
-    [ ] Add optional Cython/numba for hot paths
-    [ ] Implement streaming processing for large files
-    [ ] Memory optimization for large datasets
+10) Container/orchestration polish
+    [ ] Helm chart hardening (quotas, pod disruption budgets)
+    [ ] Airflow/Argo examples for scheduled runs
+    [ ] Backup/restore procedures for catalogs and manifests
 
 ================================================================================
 BACKLOG (Future versions)

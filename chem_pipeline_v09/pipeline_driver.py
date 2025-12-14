@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-pipeline_driver.py (v0.8)
+pipeline_driver.py (v0.9)
 
 Reads:
-  - targets.yaml (schema v0.8)
+  - targets.yaml (schema v0.9)
   - license_map.yaml
   - denylist.yaml (v0.2)
 
@@ -22,7 +22,7 @@ What it does (safe by default):
 
 It does NOT download giant dataset payloads; that's download_worker.py.
 
-v0.8 changes:
+v0.9 changes:
   - NEW: --no-fetch safety: require existing license_evidence or force YELLOW
   - NEW: globals.require_yellow_signoff support for mandatory YELLOW signoffs
   - NEW: Enhanced denylist with domain patterns, severity levels, provenance
@@ -51,7 +51,7 @@ except ImportError:
     requests = None
 
 
-VERSION = "0.8"
+VERSION = "0.9"
 
 
 def utc_now() -> str:
@@ -121,7 +121,7 @@ def load_license_map(path: Path) -> LicenseMap:
 
 
 # ------------------------------
-# Denylist (v0.8)
+# Denylist (v0.9)
 # ------------------------------
 
 def extract_domain(url: str) -> str:
@@ -144,7 +144,7 @@ def load_denylist(path: Path) -> Dict[str, Any]:
         domain_patterns = d.get("domain_patterns", []) or []
         publisher_patterns = d.get("publisher_patterns", []) or []
 
-        # Normalize main patterns (v0.8: with severity and provenance)
+        # Normalize main patterns (v0.9: with severity and provenance)
         norm = []
         for p in patterns:
             if not isinstance(p, dict):
@@ -160,13 +160,13 @@ def load_denylist(path: Path) -> Dict[str, Any]:
                 "type": kind,
                 "value": value,
                 "fields": [str(f) for f in (fields or [])],
-                "severity": str(p.get("severity", "hard_red")).lower(),  # v0.8: hard_red | force_yellow
+                "severity": str(p.get("severity", "hard_red")).lower(),  # v0.9: hard_red | force_yellow
                 "reason": str(p.get("reason", p.get("rationale", "")) or ""),
-                "link": str(p.get("link", "") or ""),  # v0.8: provenance
-                "rationale": str(p.get("rationale", "") or ""),  # v0.8: provenance
+                "link": str(p.get("link", "") or ""),  # v0.9: provenance
+                "rationale": str(p.get("rationale", "") or ""),  # v0.9: provenance
             })
 
-        # v0.8: Normalize domain patterns
+        # v0.9: Normalize domain patterns
         norm_domain = []
         for p in domain_patterns:
             if not isinstance(p, dict):
@@ -181,7 +181,7 @@ def load_denylist(path: Path) -> Dict[str, Any]:
                 "rationale": str(p.get("rationale", "") or ""),
             })
 
-        # v0.8: Normalize publisher patterns
+        # v0.9: Normalize publisher patterns
         norm_publisher = []
         for p in publisher_patterns:
             if not isinstance(p, dict):
@@ -205,7 +205,7 @@ def load_denylist(path: Path) -> Dict[str, Any]:
         return {"patterns": [], "domain_patterns": [], "publisher_patterns": []}
 
 def denylist_hits(denylist: Dict[str, Any], hay: Dict[str, str]) -> List[Dict[str, Any]]:
-    """Return list of matched denylist patterns with field, reason, severity (v0.8)."""
+    """Return list of matched denylist patterns with field, reason, severity (v0.9)."""
     hits: List[Dict[str, Any]] = []
 
     # Process standard patterns
@@ -229,7 +229,7 @@ def denylist_hits(denylist: Dict[str, Any], hay: Dict[str, str]) -> List[Dict[st
                 except re.error:
                     continue
             elif kind == "domain":
-                # v0.8: Domain extraction matching
+                # v0.9: Domain extraction matching
                 src_domain = extract_domain(src)
                 if src_domain and val.lower() in src_domain:
                     matched = True
@@ -249,7 +249,7 @@ def denylist_hits(denylist: Dict[str, Any], hay: Dict[str, str]) -> List[Dict[st
                 })
                 break
 
-    # v0.8: Process domain patterns (against URLs in hay)
+    # v0.9: Process domain patterns (against URLs in hay)
     domain_pats = (denylist or {}).get("domain_patterns", []) or []
     url_fields = ["license_evidence_url", "download_blob"]
     for dp in domain_pats:
@@ -273,7 +273,7 @@ def denylist_hits(denylist: Dict[str, Any], hay: Dict[str, str]) -> List[Dict[st
                 })
                 break
 
-    # v0.8: Process publisher patterns (if publisher metadata available)
+    # v0.9: Process publisher patterns (if publisher metadata available)
     publisher_pats = (denylist or {}).get("publisher_patterns", []) or []
     publisher_val = str(hay.get("publisher", "") or "")
     if publisher_val:
@@ -538,11 +538,11 @@ def generate_dry_run_report(
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=f"Pipeline Driver v{VERSION}")
-    ap.add_argument("--targets", required=True, help="Path to targets.yaml (v0.8)")
+    ap.add_argument("--targets", required=True, help="Path to targets.yaml (v0.9)")
     ap.add_argument("--license-map", default=None, help="Path to license_map.yaml (defaults to companion_files.license_map)")
     ap.add_argument("--out-manifests", default=None, help="Override manifests_root")
     ap.add_argument("--out-queues", default=None, help="Override queues_root")
-    ap.add_argument("--no-fetch", action="store_true", help="Do not fetch evidence URLs (offline mode - v0.8: forces YELLOW if no snapshot)")
+    ap.add_argument("--no-fetch", action="store_true", help="Do not fetch evidence URLs (offline mode - v0.9: forces YELLOW if no snapshot)")
     ap.add_argument("--max-retries", type=int, default=3, help="Max retries for evidence fetching")
     ap.add_argument("--quiet", action="store_true", help="Suppress dry-run report output")
     args = ap.parse_args()
@@ -567,7 +567,7 @@ def main() -> None:
     default_gates = globals_cfg.get("default_gates", []) or []
     targets = targets_cfg.get("targets", []) or []
 
-    # v0.8: Global setting to require signoff for all YELLOW items
+    # v0.9: Global setting to require signoff for all YELLOW items
     require_yellow_signoff = bool(globals_cfg.get("require_yellow_signoff", False))
 
     green_rows: List[Dict[str, Any]] = []
@@ -603,14 +603,14 @@ def main() -> None:
             "name": name,
             "license_evidence_url": evidence_url,
             "download_blob": download_blob,
-            "publisher": str(t.get("publisher", "") or ""),  # v0.8: publisher metadata for denylist
+            "publisher": str(t.get("publisher", "") or ""),  # v0.9: publisher metadata for denylist
         }
         dl_hits = denylist_hits(denylist, dl_hay)
 
         evidence_snapshot = {"status": "skipped", "url": evidence_url}
         evidence_text = ""
 
-        # v0.8: Check for existing evidence snapshot in --no-fetch mode
+        # v0.9: Check for existing evidence snapshot in --no-fetch mode
         no_fetch_missing_evidence = False
         if "snapshot_terms" in gates and not args.no_fetch:
             evidence_snapshot = snapshot_evidence(
@@ -620,7 +620,7 @@ def main() -> None:
             )
             evidence_text = extract_text_for_scanning(evidence_snapshot)
         elif "snapshot_terms" in gates and args.no_fetch:
-            # v0.8: In offline mode, check for existing snapshot
+            # v0.9: In offline mode, check for existing snapshot
             existing_evidence_path = None
             for ext in [".html", ".pdf", ".txt", ".json"]:
                 candidate = target_manifest_dir / f"license_evidence{ext}"
@@ -631,7 +631,7 @@ def main() -> None:
                 evidence_snapshot = {"status": "from_cache", "url": evidence_url, "path": str(existing_evidence_path)}
                 evidence_text = extract_text_for_scanning({"saved_path": str(existing_evidence_path)})
             else:
-                # v0.8: No existing snapshot + --no-fetch -> force YELLOW
+                # v0.9: No existing snapshot + --no-fetch -> force YELLOW
                 no_fetch_missing_evidence = True
                 evidence_snapshot = {"status": "missing_offline", "url": evidence_url}
 
@@ -649,7 +649,7 @@ def main() -> None:
             restriction_hits=restriction_hits,
         )
 
-        # v0.8: Denylist gating with severity support
+        # v0.9: Denylist gating with severity support
         denylist_forced_bucket = None
         if dl_hits:
             # Check severity levels - hard_red forces RED, force_yellow forces YELLOW
@@ -665,7 +665,7 @@ def main() -> None:
         if denylist_forced_bucket:
             eff_bucket = denylist_forced_bucket
 
-        # v0.8: --no-fetch safety: force YELLOW if missing evidence in offline mode
+        # v0.9: --no-fetch safety: force YELLOW if missing evidence in offline mode
         if no_fetch_missing_evidence and eff_bucket == "GREEN":
             eff_bucket = "YELLOW"
 
@@ -681,11 +681,11 @@ def main() -> None:
         elif review_status == "approved" and promote_to == "GREEN" and not restriction_hits and eff_bucket != "RED":
             eff_bucket = "GREEN"
 
-        # v0.8: require_yellow_signoff - if enabled and bucket is YELLOW without signoff, stay YELLOW
+        # v0.9: require_yellow_signoff - if enabled and bucket is YELLOW without signoff, stay YELLOW
         if require_yellow_signoff and eff_bucket == "YELLOW" and review_status not in {"approved", "rejected"}:
             review_required = True  # Ensure review_required is set
 
-        # v0.8: Dataset-aware splitting support
+        # v0.9: Dataset-aware splitting support
         split_group_id = str(t.get("split_group_id", "") or tid)
 
         evaluation = {
@@ -712,7 +712,7 @@ def main() -> None:
             "data_type": t.get("data_type", []),
             "priority": t.get("priority", None),
             "statistics": t.get("statistics", {}),
-            # v0.8: New fields
+            # v0.9: New fields
             "split_group_id": split_group_id,  # For dataset-aware splitting
             "no_fetch_missing_evidence": no_fetch_missing_evidence,
             "require_yellow_signoff": require_yellow_signoff,
@@ -734,7 +734,7 @@ def main() -> None:
             "priority": t.get("priority", None),
             "enabled": enabled,
             "statistics": t.get("statistics", {}),
-            # v0.8: New fields
+            # v0.9: New fields
             "split_group_id": split_group_id,
             "denylist_hits": dl_hits,
             "review_required": review_required,
