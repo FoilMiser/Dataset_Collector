@@ -1,0 +1,553 @@
+# targets_engineering_v0.1.yaml
+# Engineering-focused, legally-cleared dataset targets for the pipeline (engineering_pipeline_v1).
+#
+# Notes:
+# - Many “engineering” corpora are mixed-license. Prefer record-level licensing (CommonPile subsets, OpenAlex metadata).
+# - Patents are public records; still treat as PII-bearing (inventor names/addresses) and scrub/redact before training.
+# - Some high-value sources (USPTO ODP bulk, GovInfo bulk dirs, OpenAlex snapshot) need a small “directory/API downloader”
+#   (see ENGINEERING_PIPELINE_ADAPTATION.md).
+
+schema_version: "1.0"
+updated_utc: "2024-06-30T00:00:00Z"
+
+companion_files:
+  license_map: "license_map.yaml"
+  denylist: "denylist.yaml"
+
+globals:
+  storage_root: "/data/engineering"
+  pools:
+    raw: "/data/engineering/pools/raw"
+    quarantine: "/data/engineering/pools/quarantine"
+    permissive: "/data/engineering/pools/permissive"
+    copyleft: "/data/engineering/pools/copyleft"
+    public_domain: "/data/engineering/pools/public_domain"
+    record_level: "/data/engineering/pools/record_level"
+    rejected: "/data/engineering/pools/rejected"
+  temp_dir: "/tmp/dataset_pipeline"
+  max_workers: 8
+
+policy:
+  # For an “ethical + legally-cleared” engineering build, force an explicit review step for all YELLOW sources.
+  require_yellow_signoff: true
+
+# Queues written by pipeline_driver.py
+queues:
+  green: "queues/green_download.jsonl"
+  yellow_review: "queues/yellow_pipeline.jsonl"
+  red_rejected: "queues/red_rejected.jsonl"
+  manifests: "manifests"
+
+default_gates:
+  - snapshot_terms
+  - detect_license
+
+# Optional (future) gates you’ll likely add for engineering:
+#  - pii_scrub_patents
+#  - topic_filter_engineering
+#  - dedup_near
+#  - record_level_license_filter
+
+targets:
+
+  # -------------------------------------------------------------------
+  # CommonPile (record-level) — best “starter” corpus for engineering NLP
+  # -------------------------------------------------------------------
+
+  - id: commonpile_uspto_filtered
+    name: "CommonPile: USPTO patents (filtered)"
+    enabled: true
+    priority: 10
+    publisher: "CommonPile / USPTO"
+    license_profile: record_level
+    license_evidence:
+      spdx_hint: "MIXED"
+      url: "https://huggingface.co/datasets/common-pile/uspto_filtered"
+    data_type: text
+    download:
+      strategy: huggingface_datasets
+      dataset_id: "common-pile/uspto_filtered"
+      splits: ["train"]
+    output:
+      pool: record_level
+    notes:
+      - "Primary patents text corpus (already filtered by CommonPile)."
+      - "Still scrub PII (inventor names/addresses) before training."
+
+  - id: commonpile_regulations_filtered
+    name: "CommonPile: Regulations (filtered)"
+    enabled: true
+    priority: 20
+    publisher: "CommonPile / US Government"
+    license_profile: record_level
+    license_evidence:
+      spdx_hint: "MIXED"
+      url: "https://huggingface.co/datasets/common-pile/regulations_filtered"
+    data_type: text
+    download:
+      strategy: huggingface_datasets
+      dataset_id: "common-pile/regulations_filtered"
+      splits: ["train"]
+    output:
+      pool: record_level
+    notes:
+      - "Useful for engineering compliance/safety, but watch for third‑party inserts; keep record-level filter on."
+
+  - id: commonpile_usgpo_filtered
+    name: "CommonPile: US Government Publishing Office (filtered)"
+    enabled: true
+    priority: 30
+    publisher: "CommonPile / USGPO"
+    license_profile: record_level
+    license_evidence:
+      spdx_hint: "MIXED"
+      url: "https://huggingface.co/datasets/common-pile/usgpo_filtered"
+    data_type: text
+    download:
+      strategy: huggingface_datasets
+      dataset_id: "common-pile/usgpo_filtered"
+      splits: ["train"]
+    output:
+      pool: record_level
+    notes:
+      - "Great general technical/government documentation signal; use topic filters to emphasize engineering terms."
+
+  - id: commonpile_arxiv_papers_filtered
+    name: "CommonPile: arXiv papers (filtered)"
+    enabled: true
+    priority: 40
+    publisher: "CommonPile / arXiv"
+    license_profile: record_level
+    license_evidence:
+      spdx_hint: "MIXED"
+      url: "https://huggingface.co/datasets/common-pile/arxiv_papers_filtered"
+    data_type: text
+    download:
+      strategy: huggingface_datasets
+      dataset_id: "common-pile/arxiv_papers_filtered"
+      splits: ["train"]
+    output:
+      pool: record_level
+    notes:
+      - "Mixed licensing per paper. Keep only permissive/PD records if you need commercial-safe training."
+
+  - id: commonpile_arxiv_abstracts_filtered
+    name: "CommonPile: arXiv abstracts (filtered)"
+    enabled: true
+    priority: 50
+    publisher: "CommonPile / arXiv"
+    license_profile: record_level
+    license_evidence:
+      spdx_hint: "MIXED"
+      url: "https://huggingface.co/datasets/common-pile/arxiv_abstracts_filtered"
+    data_type: text
+    download:
+      strategy: huggingface_datasets
+      dataset_id: "common-pile/arxiv_abstracts_filtered"
+      splits: ["train"]
+    output:
+      pool: record_level
+    notes:
+      - "Lower-risk than full papers, still record-level licensing."
+
+  - id: commonpile_stackexchange_filtered
+    name: "CommonPile: StackExchange (filtered)"
+    enabled: true
+    priority: 60
+    publisher: "CommonPile / StackExchange"
+    license_profile: record_level
+    license_evidence:
+      spdx_hint: "CC-BY-SA-4.0"
+      url: "https://huggingface.co/datasets/common-pile/stackexchange_filtered"
+    data_type: text
+    download:
+      strategy: huggingface_datasets
+      dataset_id: "common-pile/stackexchange_filtered"
+      splits: ["train"]
+    output:
+      pool: copyleft
+    notes:
+      - "CC-BY-SA: keep separate (copyleft pool) unless you have a clear policy for SA content."
+
+  - id: commonpile_github_archive_filtered
+    name: "CommonPile: GitHub Archive (filtered)"
+    enabled: true
+    priority: 70
+    publisher: "CommonPile / GitHub"
+    license_profile: record_level
+    license_evidence:
+      spdx_hint: "MIXED"
+      url: "https://huggingface.co/datasets/common-pile/github_archive_filtered"
+    data_type: code
+    download:
+      strategy: huggingface_datasets
+      dataset_id: "common-pile/github_archive_filtered"
+      splits: ["train"]
+    output:
+      pool: record_level
+    notes:
+      - "High value for engineering software tooling; requires strict record-level licensing + repo license resolution."
+
+  # -------------------------------------------------------------------
+  # USPTO / Patents (official) — needs custom API/downloader (planned)
+  # -------------------------------------------------------------------
+
+  - id: uspto_odp_bulk_api_catalog
+    name: "USPTO Open Data Portal (ODP): Bulk Datasets API catalog"
+    enabled: true
+    priority: 80
+    publisher: "USPTO"
+    license_profile: public_domain
+    license_evidence:
+      spdx_hint: "CC-PDDC"
+      url: "https://catalog.data.gov/dataset/open-data-portal-odp-bulk-datasets-api-search-product-data-and-download"
+    data_type: metadata
+    download:
+      strategy: http
+      urls:
+        - "https://catalog.data.gov/dataset/open-data-portal-odp-bulk-datasets-api-search-product-data-and-download"
+    output:
+      pool: public_domain
+    notes:
+      - "This target records the legal + discovery entrypoint (public domain mark)."
+      - "Implement uspto_odp_worker.py to enumerate & fetch bulk artifacts using ODP endpoints."
+
+  - id: uspto_patent_grant_fulltext_odp
+    name: "USPTO (ODP): Patent Grant Full Text (1976–present)"
+    enabled: false
+    priority: 81
+    publisher: "USPTO"
+    license_profile: public_domain
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://catalog.data.gov/dataset/patent-grant-full-text-1976-present-154b8"
+    data_type: text
+    download:
+      strategy: http
+      urls:
+        - "https://catalog.data.gov/dataset/patent-grant-full-text-1976-present-154b8"
+    output:
+      pool: public_domain
+    notes:
+      - "Enable after implementing ODP API downloader (directory/API listing + chunked downloading)."
+
+  # -------------------------------------------------------------------
+  # PatentsView (CC-BY-4.0) — bulk site blocks some scrapers; use API/docs
+  # -------------------------------------------------------------------
+
+  - id: patentsview_patentsearch_api_docs
+    name: "PatentsView: PatentSearch API docs (license evidence)"
+    enabled: true
+    priority: 90
+    publisher: "PatentsView"
+    license_profile: permissive
+    license_evidence:
+      spdx_hint: "CC-BY-4.0"
+      url: "https://search.patentsview.org/docs/"
+    data_type: metadata
+    download:
+      strategy: http
+      urls:
+        - "https://search.patentsview.org/docs/"
+    output:
+      pool: permissive
+    notes:
+      - "Use as license-evidence anchor; bulk downloads may require alternate mirrors or API-based ingestion."
+
+  - id: patentsview_bulk_tables
+    name: "PatentsView: bulk tables (planned downloader / mirror)"
+    enabled: false
+    priority: 91
+    publisher: "PatentsView"
+    license_profile: permissive
+    license_evidence:
+      spdx_hint: "CC-BY-4.0"
+      url: "https://search.patentsview.org/docs/"
+    data_type: table
+    download:
+      strategy: http
+      urls:
+        - "https://patentsview.org/download/data-download-tables"
+    output:
+      pool: permissive
+    notes:
+      - "Site may block automated download; implement mirror strategy or use PatentsView API + incremental export."
+
+  # -------------------------------------------------------------------
+  # Open metadata useful for engineering: OpenAlex + ROR + Wikidata
+  # -------------------------------------------------------------------
+
+  - id: openalex_snapshot_docs
+    name: "OpenAlex: snapshot docs (CC0)"
+    enabled: true
+    priority: 100
+    publisher: "OurResearch / OpenAlex"
+    license_profile: public_domain
+    license_evidence:
+      spdx_hint: "CC0-1.0"
+      url: "https://docs.openalex.org/additional-help/faq"
+    data_type: metadata
+    download:
+      strategy: http
+      urls:
+        - "https://docs.openalex.org/additional-help/faq"
+    output:
+      pool: public_domain
+    notes:
+      - "OpenAlex records are CC0; use snapshot + topic filters (Concepts/Topics) for engineering."
+
+  - id: openalex_snapshot_full
+    name: "OpenAlex: full snapshot (planned S3 downloader)"
+    enabled: false
+    priority: 101
+    publisher: "OurResearch / OpenAlex"
+    license_profile: public_domain
+    license_evidence:
+      spdx_hint: "CC0-1.0"
+      url: "https://registry.opendata.aws/openalex/"
+    data_type: table
+    download:
+      strategy: http
+      urls:
+        - "https://registry.opendata.aws/openalex/"
+    output:
+      pool: public_domain
+    notes:
+      - "Implement an aws-s3 sync downloader or a simple 'http_directory' downloader; huge dataset."
+
+  - id: wikidata_dump_cc0
+    name: "Wikidata: JSON dump (CC0)"
+    enabled: true
+    priority: 110
+    publisher: "Wikimedia"
+    license_profile: public_domain
+    license_evidence:
+      spdx_hint: "CC0-1.0"
+      url: "https://www.wikidata.org/wiki/Wikidata:Licensing"
+    data_type: graph
+    download:
+      strategy: http
+      urls:
+        - "https://dumps.wikimedia.org/wikidatawiki/entities/latest-all.json.bz2"
+    output:
+      pool: public_domain
+    notes:
+      - "Add engineering entity linking (materials, standards orgs, components, units)."
+
+  # -------------------------------------------------------------------
+  # US Government engineering-relevant data (public domain-ish, but mixed)
+  # -------------------------------------------------------------------
+
+  - id: data_gov_policy_anchor
+    name: "Data.gov: policies/terms (license evidence anchor)"
+    enabled: true
+    priority: 200
+    publisher: "Data.gov"
+    license_profile: public_domain
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://data.gov/privacy-policy/"
+    data_type: metadata
+    download:
+      strategy: http
+      urls:
+        - "https://data.gov/privacy-policy/"
+    output:
+      pool: public_domain
+    notes:
+      - "Use as an evidence anchor; still check each dataset’s Access & Use section."
+
+  - id: usgs_copyrights_and_credits
+    name: "USGS: Copyrights & Credits (license evidence anchor)"
+    enabled: true
+    priority: 210
+    publisher: "USGS"
+    license_profile: record_level
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits"
+    data_type: metadata
+    download:
+      strategy: http
+      urls:
+        - "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits"
+    output:
+      pool: record_level
+    notes:
+      - "USGS is mostly public domain but can contain third-party material; treat as record_level."
+
+  - id: nasa_media_guidelines
+    name: "NASA: Images and media usage guidelines (license evidence anchor)"
+    enabled: true
+    priority: 220
+    publisher: "NASA"
+    license_profile: record_level
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://www.nasa.gov/nasa-brand-center/images-and-media/"
+    data_type: metadata
+    download:
+      strategy: http
+      urls:
+        - "https://www.nasa.gov/nasa-brand-center/images-and-media/"
+    output:
+      pool: record_level
+    notes:
+      - "NASA content is generally not copyrighted, but not always; keep record-level checks for contractors/partners."
+
+  - id: nist_open_license_anchor
+    name: "NIST: Open license / reuse statements (evidence anchor)"
+    enabled: true
+    priority: 230
+    publisher: "NIST"
+    license_profile: record_level
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://www.nist.gov/open/license"
+    data_type: metadata
+    download:
+      strategy: http
+      urls:
+        - "https://www.nist.gov/open/license"
+    output:
+      pool: record_level
+    notes:
+      - "NIST content is often public domain, but some datasets/software have specific notices; keep record-level."
+
+  # -------------------------------------------------------------------
+  # Engineering specs, handbooks, and tooling (mostly permissive / mixed)
+  # -------------------------------------------------------------------
+
+  - id: riscv_isa_specs
+    name: "RISC-V ISA Specs (Git repo)"
+    enabled: true
+    priority: 300
+    publisher: "RISC-V International"
+    license_profile: permissive
+    license_evidence:
+      spdx_hint: "CC-BY-4.0"
+      url: "https://github.com/riscv/riscv-isa-manual"
+    data_type: text
+    download:
+      strategy: git
+      repo: "https://github.com/riscv/riscv-isa-manual.git"
+      depth: 1
+    output:
+      pool: permissive
+    notes:
+      - "High-quality architecture & systems engineering reference material."
+
+  - id: opentitan_docs
+    name: "OpenTitan docs/specs (Git repo)"
+    enabled: true
+    priority: 310
+    publisher: "lowRISC / OpenTitan"
+    license_profile: permissive
+    license_evidence:
+      spdx_hint: "Apache-2.0"
+      url: "https://github.com/lowRISC/opentitan"
+    data_type: text
+    download:
+      strategy: git
+      repo: "https://github.com/lowRISC/opentitan.git"
+      depth: 1
+    output:
+      pool: permissive
+    notes:
+      - "Hardware security engineering docs + design patterns; ensure you keep only doc directories if desired."
+
+  - id: openfoam_docs_and_code
+    name: "OpenFOAM (copyleft engineering simulation)"
+    enabled: true
+    priority: 320
+    publisher: "OpenFOAM Foundation"
+    license_profile: copyleft
+    license_evidence:
+      spdx_hint: "GPL-3.0-only"
+      url: "https://www.openfoam.com/legal"
+    data_type: code
+    download:
+      strategy: git
+      repo: "https://github.com/OpenFOAM/OpenFOAM-dev.git"
+      depth: 1
+    output:
+      pool: copyleft
+    notes:
+      - "Keep clearly separated if you’re building a commercial-safe model."
+
+  - id: openstax_engineering_textbooks
+    name: "OpenStax (open textbooks; CC BY 4.0) — curated subset"
+    enabled: false
+    priority: 330
+    publisher: "OpenStax"
+    license_profile: permissive
+    license_evidence:
+      spdx_hint: "CC-BY-4.0"
+      url: "https://openstax.org/license"
+    data_type: text
+    download:
+      strategy: http
+      urls:
+        - "https://openstax.org/subjects/science"
+    output:
+      pool: permissive
+    notes:
+      - "Enable once you implement a “curated_url_list” downloader for specific books/PDF/HTML exports."
+      - "Prefer HTML or clean text exports; avoid PDFs unless you add robust extraction."
+
+  # -------------------------------------------------------------------
+  # Red (deny) — include for traceability; do not ingest content
+  # -------------------------------------------------------------------
+
+  - id: ieee_xplore
+    name: "IEEE Xplore (restricted)"
+    enabled: true
+    priority: 900
+    publisher: "IEEE"
+    license_profile: deny
+    license_evidence:
+      spdx_hint: "Custom-Restrictive"
+      url: "https://ieeexplore.ieee.org/Xplorehelp/overview-of-ieee-xplore/ieee-xplore-terms-of-use"
+    data_type: text
+    download:
+      strategy: http
+      urls:
+        - "https://ieeexplore.ieee.org/Xplorehelp/overview-of-ieee-xplore/ieee-xplore-terms-of-use"
+    output:
+      pool: rejected
+    notes:
+      - "Keep as a red target so pipeline writes a rejection manifest + evidence snapshot."
+
+  - id: asme_digital_collection
+    name: "ASME Digital Collection (restricted)"
+    enabled: true
+    priority: 901
+    publisher: "ASME"
+    license_profile: deny
+    license_evidence:
+      spdx_hint: "Custom-Restrictive"
+      url: "https://asmedigitalcollection.asme.org/terms-of-use"
+    data_type: text
+    download:
+      strategy: http
+      urls:
+        - "https://asmedigitalcollection.asme.org/terms-of-use"
+    output:
+      pool: rejected
+
+  - id: astm_standards
+    name: "ASTM standards (restricted)"
+    enabled: true
+    priority: 902
+    publisher: "ASTM"
+    license_profile: deny
+    license_evidence:
+      spdx_hint: "Custom-Restrictive"
+      url: "https://www.astm.org/terms-of-use"
+    data_type: text
+    download:
+      strategy: http
+      urls:
+        - "https://www.astm.org/terms-of-use"
+    output:
+      pool: rejected
