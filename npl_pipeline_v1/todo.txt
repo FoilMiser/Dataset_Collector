@@ -1,0 +1,189 @@
+================================================================================
+TODO — Ethical Physics / NLP Corpus Pipeline
+================================================================================
+
+Legend:
+  [x] = Completed
+  [~] = Partially addressed / MVP landed
+  [ ] = Not yet implemented
+
+================================================================================
+VERSION HISTORY
+================================================================================
+
+v0.5 -> v0.6 Completed:
+  [x] Retry with exponential backoff
+  [x] Resumable HTTP downloads (range requests)
+  [x] Integrity verification (SHA256 + Zenodo MD5)
+  [x] Parallel downloads with workers
+  [x] Versioned field schemas (field_schemas.yaml)
+  [x] Schema validation + type casting
+  [x] PubChem computed-only extraction (CID-range sharding + resume)
+  [x] PMC OA allowlist parsing with fallbacks
+  [x] PMC tarball caching
+  [x] Enhanced JATS parsing (sections, captions)
+  [x] Global catalog builder
+  [x] Training manifest composer
+  [x] Wrapper script (run_pipeline.sh)
+  [x] Dry-run summary reports
+
+v0.6 -> v0.7 Shipped:
+  [x] Explicit denylist support (denylist.yaml + pipeline_driver integration)
+  [x] Manual review helper (review_queue.py) writing review_signoff.json
+  [x] Review gating in pipeline_driver:
+      - reject forces RED
+      - review_required forces YELLOW until approved
+      - approve can optionally promote_to GREEN (explicit)
+  [x] Wrapper script stage: review (lists pending YELLOW items)
+
+v0.7 -> v0.8 Shipped:
+  [x] Review Workflow: enforce + audit
+      - globals.require_yellow_signoff support
+      - Extended signoff schema (evidence_links_checked, constraints, notes, reviewer_contact)
+      - `review_queue.py export` command (CSV/JSON)
+  [x] Denylist: expand semantics
+      - Structured patterns (domain extraction, publisher/provider tags)
+      - Per-pattern severity (hard_red, force_yellow)
+      - Denylist provenance (link/rationale fields mandatory)
+  [x] License evidence snapshots: make "offline" safer
+      - When `--no-fetch` is set: require existing license_evidence snapshot
+      - Otherwise force YELLOW (no implicit GREEN based on hints)
+  [x] Dataset-aware splitting (leak prevention)
+      - Implemented `split_group_id` for related artifacts
+      - Split reports (counts + token estimates)
+  [x] Near-duplicate detection (beyond exact hash)
+      - Optional MinHash/LSH stage configuration
+      - Emit duplicate groups into catalog
+  [x] Record-level filtering: broaden coverage
+      - Added MoNA (MassBank of North America)
+      - Added GNPS (Global Natural Products Social Networking)
+      - Added ChemSpider (requires API key)
+  [x] Parquet output option
+      - `--emit-parquet` configuration
+      - Compression options (snappy, gzip, zstd)
+  [x] Resolver expansion / robustness
+      - Enhanced Figshare resolver with API v2
+      - GitHub release resolver with rate limiting
+  [x] InChIKey / SMILES normalization (optional)
+      - Optional RDKit-based normalizer configuration
+      - Normalization coverage in catalog stats
+
+v0.8 -> v0.9 Shipped:
+  [x] Parallel + incremental processing
+      - Async/concurrent license evidence fetching with HTTP pooling
+      - Parallel catalog building with progress bars for large pools
+      - Delta-only runs, incremental catalog updates, and checkpointed resumes
+  [x] Audit trail + provenance
+      - Cryptographic signatures for evaluation.json files
+      - Append-only audit log with pipeline run IDs
+      - Full provenance chain captured per decision
+  [x] Resilience + recovery
+      - Checkpoint/resume for downloads and catalog stages
+      - Circuit breaker retries and partial-download recovery
+      - Health checks for critical external services
+  [x] Deduplication + spectra coverage
+      - MinHash/LSH deduplication with cross-dataset reports
+      - Fuzzy chemical synonym matching and spectrum-based deduplication hooks
+      - MSP/MGF parsing and normalization for MoNA/GNPS
+
+================================================================================
+v0.9 -> v1.0 — WHAT NEEDS TO CHANGE / BE UPDATED
+================================================================================
+
+HIGH PRIORITY (Production readiness)
+------------------------------------
+
+1) License verification + compliance hardening
+   [x] Confidence scoring for SPDX resolution + automated pattern checks
+   [x] License change detection by comparing evidence snapshots
+   [x] Web scraping improvements for dynamic/license-gated pages
+   [x] Documented legal review checklist for RED/YELLOW edge cases
+
+2) Governance + review UX
+   [ ] Flask/FastAPI dashboard for YELLOW review with visual diffs
+   [ ] Batch approval/rejection + reviewer assignment/notifications
+   [ ] Run-level audit views (surface run IDs, signatures, provenance)
+   [ ] Access controls for reviewers and approvers
+
+3) Testing + CI/CD
+   [ ] Unit tests for license normalization and resolvers
+   [ ] Integration tests for download workers and scrubbers with sample data
+   [ ] End-to-end smoke tests (green/yellow/red queues + catalog build)
+   [ ] CI pipeline (lint/type checks/tests) with artifact retention
+
+4) Deployment + packaging
+   [ ] Dockerfile + docker-compose for reproducible runs
+   [ ] Kubernetes/Helm job templates with secrets/volume wiring
+   [ ] Versioned configuration bundles (schemas + denylist + defaults)
+   [ ] Publish pinned requirements/lockfiles
+
+MEDIUM PRIORITY (Quality + coverage)
+------------------------------------
+
+5) Data coverage expansions
+   [ ] Add ZINC, BindingDB, DrugBank (where licensed), and USPTO pipelines
+   [ ] Expand spectrum ingestion for MoNA/GNPS and other MSP/MGF sources
+   [ ] Cross-dataset deduplication reports that include spectra + structure IDs
+
+6) RDKit + structure processing
+   [ ] Harden SMILES canonicalization and InChIKey validation
+   [ ] Molecular property calculation + substructure filtering hooks
+   [ ] Performance tuning for large SDF ingestion (Cython/numba optional)
+
+7) Monitoring + alerting
+   [ ] Metrics on download times, error rates, queue throughput
+   [ ] Prometheus/StatsD exporters and Grafana dashboard examples
+   [ ] Slack/email notifications for failures or stalled queues
+
+8) Documentation + onboarding
+   [ ] Architecture doc + diagrams
+   [ ] Tutorial for adding new targets and resolvers
+   [ ] Troubleshooting guide and FAQ for common failures
+   [ ] API/programmatic access examples
+
+LOW PRIORITY (Ergonomics + future-proofing)
+-------------------------------------------
+
+9) Performance + ergonomics
+    [ ] Streaming processing for large files + memory profiling
+    [ ] Optional progress dashboards (CLI + web) for long jobs
+    [ ] Configurable caching/prefetch for common resolvers
+
+10) Container/orchestration polish
+    [ ] Helm chart hardening (quotas, pod disruption budgets)
+    [ ] Airflow/Argo examples for scheduled runs
+    [ ] Backup/restore procedures for catalogs and manifests
+
+================================================================================
+v1.0 -> v1.1 — FUTURE IMPROVEMENTS
+================================================================================
+
+- Governance + review UX: dashboard, batch approvals, reviewer access controls
+- CI hardening: automated unit/integration tests, artifact retention
+- Deployment packaging: Dockerfile/Helm templates and pinned lockfiles
+- Monitoring + alerting: metrics exporters and failure notifications
+
+================================================================================
+BACKLOG (Future versions)
+================================================================================
+
+- Multi-language support for restriction phrase scanning
+- Machine learning-based license classification
+- Integration with legal review tools (e.g., FOSSA, Snyk)
+- Support for proprietary dataset agreements (with encryption)
+- API for programmatic access to catalog
+- Federated catalog support (multiple organizations)
+- Real-time license monitoring for web sources
+- Integration with data versioning tools (DVC, LakeFS)
+- Support for streaming/real-time data sources
+- Differential privacy integration for sensitive data
+- Automated report generation for compliance audits
+
+================================================================================
+NOTES
+================================================================================
+- Keep RED items out of training manifests, regardless of local copies.
+- Prefer computed-only transforms for ambiguous sources.
+- Always snapshot license/terms evidence before large downloads.
+- Use split_group_id to prevent data leakage across train/valid splits.
+- Test thoroughly before deploying to production.
