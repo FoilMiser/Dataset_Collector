@@ -253,7 +253,7 @@ def cmd_export(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description="Manual review helper for YELLOW targets (v0.9).")
-    ap.add_argument("--queue", default="/data/chem/_queues/yellow_pipeline.jsonl", help="Path to yellow queue JSONL")
+    ap.add_argument("--queue", default="/data/nlp_gov/_queues/yellow_pipeline.jsonl", help="Path to yellow queue JSONL")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     p_list = sub.add_parser("list", help="List pending YELLOW items")

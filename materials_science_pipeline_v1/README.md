@@ -1,9 +1,9 @@
-# Physics Corpus Pipeline Prototype (v1.0)
+# Materials Science + Physics Ethics Corpus Pipeline Prototype (v1.0)
 
-A safety-first **prototype** pipeline for building a physics/astronomy/HEP-focused training corpus from open datasets and open-access literature, with strong emphasis on **license compliance, provenance tracking, and safe-by-default execution**.
+An adaptation of the chemistry pipeline tuned for **materials science and physics** datasets with explicit attention to ethical sourcing, sustainability context, and strong **license compliance, provenance tracking, and safe-by-default execution**.
 
 This repo helps you:
-- keep a single inventory (`targets.yaml`) of candidate sources,
+- keep a single inventory (`targets.yaml`) of candidate sources (see `targets_materials_ethics_v0_7.yaml`),
 - snapshot license/terms evidence into per-target manifests,
 - classify each source into **GREEN / YELLOW / RED** queues,
 - run **download** (GREEN) and **scrub/extract** (YELLOW) stages,

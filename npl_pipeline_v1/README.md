@@ -1,6 +1,11 @@
-# Physics Corpus Pipeline Prototype (v1.0)
+# Ethical Physics / NLP Corpus Pipeline Prototype (v1.0)
 
-A safety-first **prototype** pipeline for building a physics/astronomy/HEP-focused training corpus from open datasets and open-access literature, with strong emphasis on **license compliance, provenance tracking, and safe-by-default execution**.
+A safety-first **prototype** pipeline for building an ethically screened, physics-oriented language corpus from open datasets and open-access literature, with strong emphasis on **license compliance, provenance tracking, and safe-by-default execution**.
+
+This variant reuses the proven chem v1.0 scaffolding but swaps in:
+- `targets.yaml` from `nlp_targets.yaml` (government-focused, SPDX-aware targets inventory),
+- `license_map.yaml` from `license_map_v0_3.yaml` (adds OGL/OPL mappings and restriction scanning),
+- `README_gov_addons.md` for CKAN + sitemap helpers when expanding the corpus to new portals.
 
 This repo helps you:
 - keep a single inventory (`targets.yaml`) of candidate sources,
@@ -173,7 +178,7 @@ Creates manifests + queues, but does not download or transform:
 ```bash
 ./run_pipeline.sh --targets targets.yaml --stage review
 # or:
-python3 review_queue.py --queue /data/chem/_queues/yellow_pipeline.jsonl list
+python3 review_queue.py --queue /data/nlp_gov/_queues/yellow_pipeline.jsonl list
 ```
 
 ### Approve/reject a target (writes review_signoff.json)
@@ -216,7 +221,7 @@ python3 review_queue.py approve \
 
 ### Build catalog
 ```bash
-python3 catalog_builder.py --targets targets.yaml --output /data/chem/_catalogs/global_catalog.json
+python3 catalog_builder.py --targets targets.yaml --output /data/nlp_gov/_catalogs/global_catalog.json
 ```
 
 ---
@@ -241,7 +246,7 @@ python3 catalog_builder.py --targets targets.yaml --output /data/chem/_catalogs/
 ## Output Structure (default)
 
 ```
-/data/chem/
+/data/nlp_gov/
   pools/
     permissive/
     copyleft/

@@ -2,7 +2,7 @@
 #
 # run_pipeline.sh (v1.0)
 #
-# Single wrapper script for the Physics Corpus Pipeline.
+# Single wrapper script for the Engineering / Ethical Physics Corpus Pipeline.
 # Orchestrates all stages with sensible defaults.
 #
 # Usage:
@@ -47,7 +47,7 @@ ENABLE_CACHE=""
 # Print usage
 usage() {
     cat << EOF
-Physics Corpus Pipeline v${VERSION}
+Engineering / Ethical Physics Corpus Pipeline v${VERSION}
 
 Usage: $0 [OPTIONS]
 
@@ -157,7 +157,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Print header
 echo -e "${BLUE}======================================${NC}"
-echo -e "${BLUE}Physics Corpus Pipeline v${VERSION}${NC}"
+echo -e "${BLUE}Chemistry Corpus Pipeline v${VERSION}${NC}"
 echo -e "${BLUE}======================================${NC}"
 echo ""
 echo -e "Targets:  ${GREEN}$TARGETS${NC}"
@@ -184,7 +184,7 @@ run_download() {
     echo -e "${YELLOW}[Stage: Download]${NC} Downloading GREEN targets..."
     
     # Get queues root from targets.yaml
-    QUEUES_ROOT=$(python -c "import yaml; print(yaml.safe_load(open('$TARGETS'))['globals'].get('queues_root', '/data/chem/_queues'))")
+    QUEUES_ROOT=$(python -c "import yaml; print(yaml.safe_load(open('$TARGETS'))['globals'].get('queues_root', '/data/engineering/_queues'))")
     QUEUE_FILE="$QUEUES_ROOT/green_download.jsonl"
     
     if [[ ! -f "$QUEUE_FILE" ]]; then
@@ -235,7 +235,7 @@ run_pmc() {
     
     # Try to find allowlist if not specified
     if [[ -z "$PMC_ALLOWLIST" ]]; then
-        QUARANTINE_ROOT=$(python -c "import yaml; print(yaml.safe_load(open('$TARGETS'))['globals']['pools'].get('quarantine', '/data/chem/pools/quarantine'))")
+        QUARANTINE_ROOT=$(python -c "import yaml; print(yaml.safe_load(open('$TARGETS'))['globals']['pools'].get('quarantine', '/data/engineering/pools/quarantine'))")
         PMC_ALLOWLIST="$QUARANTINE_ROOT/pmc_oa_fulltext/pmc_allowlist.jsonl"
     fi
     
@@ -260,7 +260,7 @@ run_pmc() {
 run_catalog() {
     echo -e "${YELLOW}[Stage: Catalog]${NC} Building global catalog..."
     
-    CATALOGS_ROOT=$(python -c "import yaml; print(yaml.safe_load(open('$TARGETS'))['globals'].get('catalogs_root', '/data/chem/_catalogs'))")
+    CATALOGS_ROOT=$(python -c "import yaml; print(yaml.safe_load(open('$TARGETS'))['globals'].get('catalogs_root', '/data/engineering/_catalogs'))")
     
     python "$SCRIPT_DIR/catalog_builder.py" \
         --targets "$TARGETS" \

@@ -15,7 +15,7 @@ v0.9 features:
   - NEW: Normalization coverage reporting
 
 Usage:
-  python catalog_builder.py --targets targets.yaml --output /data/chem/_catalogs/global_catalog.json
+  python catalog_builder.py --targets targets.yaml --output /data/engineering/_catalogs/global_catalog.json
 
 Not legal advice.
 """
@@ -322,10 +322,10 @@ def main() -> None:
     globals_cfg = targets_cfg.get("globals", {})
     pools_cfg = globals_cfg.get("pools", {})
     
-    permissive_root = Path(pools_cfg.get("permissive", "/data/chem/pools/permissive")).expanduser()
-    copyleft_root = Path(pools_cfg.get("copyleft", "/data/chem/pools/copyleft")).expanduser()
-    quarantine_root = Path(pools_cfg.get("quarantine", "/data/chem/pools/quarantine")).expanduser()
-    manifests_root = Path(globals_cfg.get("manifests_root", "/data/chem/_manifests")).expanduser()
+    permissive_root = Path(pools_cfg.get("permissive", "/data/engineering/pools/permissive")).expanduser()
+    copyleft_root = Path(pools_cfg.get("copyleft", "/data/engineering/pools/copyleft")).expanduser()
+    quarantine_root = Path(pools_cfg.get("quarantine", "/data/engineering/pools/quarantine")).expanduser()
+    manifests_root = Path(globals_cfg.get("manifests_root", "/data/engineering/_manifests")).expanduser()
     
     print(f"Building global catalog v{VERSION}...")
     print(f"  Permissive pool: {permissive_root}")

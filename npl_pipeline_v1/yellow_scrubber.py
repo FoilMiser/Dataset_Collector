@@ -626,7 +626,7 @@ def main() -> None:
     ap.add_argument("--targets", required=True, help="targets.yaml v0.6")
     ap.add_argument("--license-map", default=None)
     ap.add_argument("--field-schemas", default=None, help="field_schemas.yaml")
-    ap.add_argument("--pools-root", default="/data/chem/pools")
+    ap.add_argument("--pools-root", default="/data/nlp_gov/pools")
     ap.add_argument("--pubchem-enable", action="store_true")
     ap.add_argument("--pubchem-limit-files", type=int, default=None)
     ap.add_argument("--pubchem-limit-rows", type=int, default=None)
@@ -714,7 +714,7 @@ def main() -> None:
         run_report["pmc_ran"] = True
         run_report["outputs"].append({"pmc_plan": plan})
 
-    logs_dir = Path("/data/chem/_logs").expanduser()
+    logs_dir = Path("/data/nlp_gov/_logs").expanduser()
     ensure_dir(logs_dir)
     out_path = logs_dir / f"yellow_scrubber_run_{int(time.time())}.json"
     write_json(out_path, run_report)

@@ -270,7 +270,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=f"PMC Worker v{VERSION}")
     ap.add_argument("--targets", required=True)
     ap.add_argument("--allowlist", required=True)
-    ap.add_argument("--pools-root", default="/data/chem/pools")
+    ap.add_argument("--pools-root", default="/data/engineering/pools")
     ap.add_argument("--execute", action="store_true")
     ap.add_argument("--limit-records", type=int, default=None)
     ap.add_argument("--max-downloads-per-run", type=int, default=None)
@@ -278,7 +278,7 @@ def main() -> None:
     ap.add_argument("--shard-rows", type=int, default=5000)
     ap.add_argument("--emit-train-split", type=float, default=None)
     ap.add_argument("--enable-cache", action="store_true")
-    ap.add_argument("--log-dir", default="/data/chem/_logs")
+    ap.add_argument("--log-dir", default="/data/engineering/_logs")
     args = ap.parse_args()
 
     targets_path = Path(args.targets).expanduser().resolve()

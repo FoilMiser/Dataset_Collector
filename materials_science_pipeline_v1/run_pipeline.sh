@@ -2,7 +2,7 @@
 #
 # run_pipeline.sh (v1.0)
 #
-# Single wrapper script for the Physics Corpus Pipeline.
+# Single wrapper script for the Materials Science + Physics Ethics Pipeline.
 # Orchestrates all stages with sensible defaults.
 #
 # Usage:
@@ -47,7 +47,7 @@ ENABLE_CACHE=""
 # Print usage
 usage() {
     cat << EOF
-Physics Corpus Pipeline v${VERSION}
+Materials Science + Physics Ethics Pipeline v${VERSION}
 
 Usage: $0 [OPTIONS]
 
@@ -157,7 +157,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Print header
 echo -e "${BLUE}======================================${NC}"
-echo -e "${BLUE}Physics Corpus Pipeline v${VERSION}${NC}"
+echo -e "${BLUE}Chemistry Corpus Pipeline v${VERSION}${NC}"
 echo -e "${BLUE}======================================${NC}"
 echo ""
 echo -e "Targets:  ${GREEN}$TARGETS${NC}"

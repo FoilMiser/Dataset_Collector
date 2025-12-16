@@ -195,7 +195,7 @@ def http_download_with_resume(ctx: DownloaderContext, url: str, out_path: Path,
     for attempt in range(ctx.retry.max_attempts):
         meta["attempts"] = attempt + 1
         try:
-            headers = {"User-Agent": f"chem-corpus-downloader/{VERSION}"}
+            headers = {"User-Agent": f"engineering-corpus-downloader/{VERSION}"}
             if start_byte > 0:
                 headers["Range"] = f"bytes={start_byte}-"
             
@@ -354,7 +354,7 @@ def handle_zenodo(ctx: DownloaderContext, target: Dict[str, Any], out_dir: Path)
     # Fetch metadata
     for attempt in range(ctx.retry.max_attempts):
         try:
-            r = requests.get(api_url, timeout=60, headers={"User-Agent": f"chem-corpus/{VERSION}"})
+            r = requests.get(api_url, timeout=60, headers={"User-Agent": f"engineering-corpus/{VERSION}"})
             r.raise_for_status()
             meta = r.json()
             break
@@ -504,8 +504,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=f"Download Worker v{VERSION}")
     ap.add_argument("--queue", required=True, help="Queue JSONL")
     ap.add_argument("--targets-yaml", default=None, help="targets.yaml for pools")
-    ap.add_argument("--pools-root", default="/data/chem/pools", help="Fallback pools root")
-    ap.add_argument("--logs-dir", default="/data/chem/_logs", help="Logs directory")
+    ap.add_argument("--pools-root", default="/data/engineering/pools", help="Fallback pools root")
+    ap.add_argument("--logs-dir", default="/data/engineering/_logs", help="Logs directory")
     ap.add_argument("--execute", action="store_true", help="Actually download")
     ap.add_argument("--overwrite", action="store_true", help="Overwrite existing")
     ap.add_argument("--verify-sha256", action="store_true", help="Compute sha256")

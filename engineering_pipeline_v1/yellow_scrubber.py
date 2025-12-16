@@ -436,7 +436,7 @@ def fetch_text_with_fallback(urls: List[str], timeout_s: int = 30) -> Tuple[str,
     for url in urls:
         try:
             r = requests.get(url, timeout=timeout_s, 
-                           headers={"User-Agent": f"chem-corpus-scrubber/{VERSION}"})
+                           headers={"User-Agent": f"engineering-corpus-scrubber/{VERSION}"})
             r.raise_for_status()
             return r.text, url
         except Exception:
@@ -449,7 +449,7 @@ def download_file(url: str, out_path: Path, timeout_s: int = 60) -> Dict[str, An
     ensure_dir(out_path.parent)
     
     with requests.get(url, stream=True, timeout=timeout_s,
-                     headers={"User-Agent": f"chem-corpus-scrubber/{VERSION}"}) as r:
+                     headers={"User-Agent": f"engineering-corpus-scrubber/{VERSION}"}) as r:
         r.raise_for_status()
         tmp = out_path.with_suffix(out_path.suffix + ".part")
         with tmp.open("wb") as f:
@@ -626,7 +626,7 @@ def main() -> None:
     ap.add_argument("--targets", required=True, help="targets.yaml v0.6")
     ap.add_argument("--license-map", default=None)
     ap.add_argument("--field-schemas", default=None, help="field_schemas.yaml")
-    ap.add_argument("--pools-root", default="/data/chem/pools")
+    ap.add_argument("--pools-root", default="/data/engineering/pools")
     ap.add_argument("--pubchem-enable", action="store_true")
     ap.add_argument("--pubchem-limit-files", type=int, default=None)
     ap.add_argument("--pubchem-limit-rows", type=int, default=None)
@@ -714,7 +714,7 @@ def main() -> None:
         run_report["pmc_ran"] = True
         run_report["outputs"].append({"pmc_plan": plan})
 
-    logs_dir = Path("/data/chem/_logs").expanduser()
+    logs_dir = Path("/data/engineering/_logs").expanduser()
     ensure_dir(logs_dir)
     out_path = logs_dir / f"yellow_scrubber_run_{int(time.time())}.json"
     write_json(out_path, run_report)
