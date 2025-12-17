@@ -1,0 +1,632 @@
+# biology_targets.yaml
+# v0.1 — Biology-focused targets for the ethics-first dataset pipeline
+# Companion files expected alongside this YAML:
+#   - ./bio_license_map.yaml
+#   - ./field_schemas.yaml        (re-use from chem pipeline for now; add bio schemas in v0.2)
+#   - ./denylist.yaml             (re-use; extend with bio-specific providers as needed)
+#
+# NOTE: Some targets are intentionally YELLOW/disabled until you implement:
+#   - record-level license filters (GBIF/iNaturalist/etc.)
+#   - human-subject / PHI/PII guardrails
+#   - API-based resolvers for query-driven portals
+#
+schema_version: "0.8"
+updated_utc: "2025-12-16"
+
+companion_files:
+  license_map: "./bio_license_map.yaml"
+  field_schemas: "./field_schemas.yaml"
+  denylist: "./denylist.yaml"
+
+globals:
+  storage_root: "/data/bio"
+  staging_root: "/data/bio/_staging"
+  manifests_root: "/data/bio/_manifests"
+  queues_root: "/data/bio/_queues"
+  catalogs_root: "/data/bio/_catalogs"
+  logs_root: "/data/bio/_logs"
+
+  pools:
+    permissive: "/data/bio/pools/permissive"
+    copyleft: "/data/bio/pools/copyleft"
+    quarantine: "/data/bio/pools/quarantine"
+
+  # Require signoff for all YELLOW items (recommended true for early biology runs)
+  require_yellow_signoff: true
+
+  near_duplicate_detection:
+    enabled: false
+    method: "minhash_lsh"
+    num_perm: 128
+    threshold: 0.8
+    emit_duplicate_groups: true
+
+  parquet_output:
+    enabled: false
+    compression: "snappy"
+    row_group_size: 100000
+
+  text_processing_defaults:
+    max_chunk_chars: 6000
+    min_chunk_chars: 500
+    drop_tables: false
+    drop_references_section: true
+    keep_citations_inline: false
+    include_section_headers: true
+    include_figure_captions: true
+    include_table_captions: true
+
+  statistics_defaults:
+    estimate_tokens: true
+    token_model: "cl100k_base"
+    collect_property_distributions: true
+    sample_size_for_distributions: 10000
+
+  # These are "declared" gates; only a subset is currently implemented in code.
+  # (pipeline_driver currently *implements* snapshot_terms, resolve_license_spdx, restriction_phrase_scan.)
+  default_gates:
+    - "snapshot_terms"
+    - "resolve_license_spdx"
+    - "restriction_phrase_scan"
+    - "pii_phi_scan"                 # TODO(v0.2): implement
+    - "human_subjects_policy_scan"   # TODO(v0.2): implement
+    - "biosecurity_policy_scan"      # TODO(v0.2): implement
+    - "emit_training_manifest"
+    - "emit_attribution_bundle"
+
+  download_defaults:
+    retry_max: 3
+    retry_backoff_base: 2.0
+    retry_backoff_max: 60
+    timeout_connect: 30
+    timeout_read: 300
+    verify_checksums: true
+    enable_resume: true
+    max_concurrent_workers: 4
+    user_agent: "bio-corpus-pipeline/0.1"
+
+queues:
+  emit:
+    - id: "green_download"
+      path: "/data/bio/_queues/green_download.jsonl"
+      criteria:
+        effective_bucket: "GREEN"
+        enabled: true
+    - id: "yellow_pipeline"
+      path: "/data/bio/_queues/yellow_pipeline.jsonl"
+      criteria:
+        effective_bucket: "YELLOW"
+        enabled: true
+    - id: "red_rejected"
+      path: "/data/bio/_queues/red_rejected.jsonl"
+      criteria:
+        effective_bucket: "RED"
+        enabled: true
+
+gates_catalog:
+  snapshot_terms: "Save Terms/ToS + license page HTML/PDF + retrieval timestamp."
+  resolve_license_spdx: "Normalize license to SPDX via bio_license_map.yaml rules; store evidence."
+  restriction_phrase_scan: "Scan terms/content for restriction phrases (no-LLM/no-TDM/etc.)."
+  record_level_filter: "Require per-record license metadata; keep only allowlist."
+  computed_only_extract: "Extract only safe computed identifiers/structured fields; drop depositor free text."
+  extract_text_chunks: "Extract text into JSONL chunks using globals.text_processing_defaults unless overridden."
+  pii_phi_scan: "Scan extracted text/metadata for PII/PHI; quarantine or drop on hit. (TODO)"
+  human_subjects_policy_scan: "Detect human-subject/patient-level datasets; require explicit permissions. (TODO)"
+  biosecurity_policy_scan: "Flag/remove clearly misuse-oriented procedural content. (TODO)"
+  emit_training_manifest: "Manifest of included files/records + checksums + license evidence."
+  emit_attribution_bundle: "Generate ATTRIBUTION.md + CITATIONS.bib for included sources."
+  manual_legal_review: "Human review required before training."
+  segregate_copyleft_pool: "Force output into copyleft pool and keep isolated."
+  collect_statistics: "Collect dataset statistics (tokens, field distributions)."
+  validate_schema: "Validate extracted data against field_schemas.yaml."
+  near_duplicate_detection: "Run MinHash/LSH deduplication pass."
+  emit_parquet: "Output schema-validated records as Parquet files."
+  split_aware_partition: "Partition data respecting split_group_id for leak prevention."
+
+resolvers:
+  zenodo:
+    mode: "record_id_or_doi"
+    api: "https://zenodo.org/api/records/{record_id}"
+    outputs:
+      - "files[*].links.self"
+      - "files[*].checksum"
+    verify_checksum: true
+    checksum_algorithm: "md5"
+  figshare:
+    mode: "article_url"
+    api_base: "https://api.figshare.com/v2"
+    api_version: "2"
+    rate_limit:
+      requests_per_minute: 60
+      retry_on_429: true
+    endpoints:
+      article: "/articles/{article_id}"
+      files: "/articles/{article_id}/files"
+      download: "/articles/{article_id}/files/{file_id}"
+  github:
+    mode: "release"
+    api_base: "https://api.github.com"
+    rate_limit:
+      requests_per_hour: 60
+      retry_on_403: true
+      exponential_backoff: true
+    endpoints:
+      releases: "/repos/{owner}/{repo}/releases"
+      latest: "/repos/{owner}/{repo}/releases/latest"
+      assets: "/repos/{owner}/{repo}/releases/{release_id}/assets"
+    note: "Use GITHUB_TOKEN environment variable for higher rate limits."
+  dataverse:
+    mode: "persistent_id"
+    default_instance: "https://dataverse.harvard.edu"
+    configurable_instances:
+      - "https://dataverse.harvard.edu"
+      - "https://dataverse.tdl.org"
+  huggingface_datasets:
+    mode: "dataset_id"
+    note: "Use datasets.load_dataset; capture dataset card + license field."
+  git:
+    mode: "repo"
+    note: "Capture commit hash; store LICENSE + README as evidence."
+  ftp:
+    mode: "base_url + globs"
+    note: "Use list + filter by glob; store directory listing snapshot."
+  api:
+    mode: "base_url"
+    note: "Cache responses; store query params & rate limit behavior. (TODO: add api strategy to downloader)"
+
+targets:
+
+  # -------------------------------------------------------------------
+  # 0) Your synthetic biology curriculum (deterministic + auto-graded)
+  # -------------------------------------------------------------------
+  - id: "synthetic_biology_problems"
+    name: "Your generated deterministic biology problems (auto-graded)"
+    enabled: true
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "Proprietary", url: "" }
+    data_type: ["synthetic", "problems", "biology"]
+    download:
+      strategy: "none"
+    build:
+      owner: "you"
+      output_formats: ["jsonl"]
+      required_fields:
+        - "problem_id"
+        - "domain"
+        - "difficulty"
+        - "prompt"
+        - "answer_key"
+        - "grading_fn"
+        - "metadata"
+    gates_override:
+      add: ["emit_training_manifest"]
+
+  # -------------------------------------------------------------------
+  # 1) High-signal open reference databases (structured biology)
+  # -------------------------------------------------------------------
+
+  - id: "pdb_rcsb_structures"
+    name: "wwPDB / RCSB PDB — structure data (bulk)"
+    enabled: true
+    priority: 10
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "CC0-1.0", url: "https://www.rcsb.org/pages/policies" }
+    data_type: ["structures", "proteins", "nucleic_acids", "3d"]
+    download:
+      strategy: "ftp"
+      base_url: "ftp://ftp.wwpdb.org/pub/pdb/data/structures/divided/mmCIF/"
+      include_globs: ["*.cif.gz"]
+      integrity:
+        verify_size: true
+        compute_sha256: true
+    gates_override:
+      add: ["validate_schema", "collect_statistics"]
+    output:
+      pool: "permissive"
+      formats: ["cif.gz"]
+
+  - id: "uniprot_uniprotkb_sprot"
+    name: "UniProtKB/Swiss-Prot (reviewed proteins)"
+    enabled: true
+    priority: 10
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "CC-BY-4.0", url: "https://www.uniprot.org/help/license" }
+    data_type: ["proteins", "annotations", "ids", "sequences"]
+    download:
+      strategy: "ftp"
+      base_url: "ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/"
+      include_globs: ["uniprot_sprot.dat.gz", "uniprot_sprot.fasta.gz", "uniprot_sprot.xml.gz"]
+      integrity:
+        verify_size: true
+        compute_sha256: true
+    gates_override:
+      add: ["computed_only_extract", "validate_schema", "collect_statistics"]
+    output:
+      pool: "permissive"
+      formats: ["dat.gz", "fasta.gz", "xml.gz"]
+
+  - id: "uniprot_uniprotkb_trembl"
+    name: "UniProtKB/TrEMBL (unreviewed proteins)"
+    enabled: false  # huge; enable when you add sharding + tighter filters
+    priority: 6
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "CC-BY-4.0", url: "https://www.uniprot.org/help/license" }
+    data_type: ["proteins", "annotations", "ids", "sequences"]
+    download:
+      strategy: "ftp"
+      base_url: "ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/"
+      include_globs: ["uniprot_trembl.dat.gz", "uniprot_trembl.fasta.gz"]
+    output:
+      pool: "quarantine"
+      formats: ["dat.gz", "fasta.gz"]
+
+  - id: "gene_ontology_go"
+    name: "Gene Ontology (GO) — core ontology + annotations"
+    enabled: true
+    priority: 9
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "CC-BY-4.0", url: "http://geneontology.org/docs/go-citation-policy/" }
+    data_type: ["ontology", "annotations", "ids"]
+    download:
+      strategy: "http"
+      urls:
+        - "http://purl.obolibrary.org/obo/go.obo"
+        - "http://purl.obolibrary.org/obo/go.owl"
+    gates_override:
+      add: ["validate_schema"]
+    output:
+      pool: "permissive"
+      formats: ["obo", "owl"]
+
+  - id: "reactome_pathways"
+    name: "Reactome — pathways and reactions"
+    enabled: true
+    priority: 8
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "CC-BY-4.0", url: "https://reactome.org/license" }
+    data_type: ["pathways", "reactions", "genes", "proteins"]
+    download:
+      strategy: "http"
+      urls:
+        - "https://reactome.org/download/current/reactome.homo_sapiens.interactions.txt"
+        - "https://reactome.org/download/current/ReactomePathways.txt"
+        - "https://reactome.org/download/current/ReactomePathwaysRelation.txt"
+    output:
+      pool: "permissive"
+      formats: ["txt", "tsv"]
+
+  - id: "wikidata_dumps"
+    name: "Wikidata dumps (biology-relevant entities)"
+    enabled: true
+    priority: 7
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "CC0-1.0", url: "https://www.wikidata.org/wiki/Wikidata:Licensing" }
+    data_type: ["knowledge_graph", "ids", "links"]
+    download:
+      strategy: "http"
+      urls: ["https://dumps.wikimedia.org/wikidatawiki/entities/"]
+    output:
+      pool: "permissive"
+      formats: ["json", "jsonl", "ttl", "nt"]
+
+  - id: "opentree_taxonomy"
+    name: "OpenTree of Life taxonomy"
+    enabled: false  # TODO: implement github_release strategy in download_worker or switch to a static HTTP artifact
+    priority: 7
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "CC0-1.0", url: "https://github.com/OpenTreeOfLife/opentree/wiki/Open-Tree-of-Life-data-use-policy" }
+    data_type: ["taxonomy", "phylogeny", "ids"]
+    download:
+      strategy: "none"
+    output:
+      pool: "permissive"
+      formats: ["tgz"]
+
+  - id: "obo_foundry_bundle"
+    name: "OBO Foundry (bundle of ontologies; mixed licenses)"
+    enabled: false  # enable after you implement per-ontology license vetting
+    priority: 5
+    license_profile: "record_level"
+    license_evidence: { spdx_hint: "MIXED", url: "https://obofoundry.org/" }
+    data_type: ["ontology", "ids"]
+    download:
+      strategy: "http"
+      urls: ["https://obofoundry.org/registry/ontologies.jsonld"]
+    gates_override:
+      add: ["record_level_filter", "manual_legal_review"]
+    output:
+      pool: "quarantine"
+      formats: ["jsonld"]
+
+  # -------------------------------------------------------------------
+  # 2) NCBI bulk (careful: mixed provenance; keep structured-only extracts)
+  # -------------------------------------------------------------------
+
+  - id: "ncbi_taxdump"
+    name: "NCBI Taxonomy (taxdump)"
+    enabled: true
+    priority: 8
+    license_profile: "unknown"
+    license_evidence: { spdx_hint: "US-PUBLIC-DOMAIN", url: "https://www.ncbi.nlm.nih.gov/home/about/policies/" }
+    data_type: ["taxonomy", "ids"]
+    download:
+      strategy: "ftp"
+      base_url: "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/"
+      include_globs: ["taxdump.tar.gz", "taxdump_readme.txt"]
+      integrity:
+        verify_size: true
+        compute_sha256: true
+    gates_override:
+      add: ["computed_only_extract", "manual_legal_review"]
+    output:
+      pool: "quarantine"
+      formats: ["tar.gz", "txt"]
+
+  - id: "ncbi_gene_info"
+    name: "NCBI gene_info (Entrez Gene) — structured gene metadata"
+    enabled: true
+    priority: 7
+    license_profile: "unknown"
+    license_evidence: { spdx_hint: "US-PUBLIC-DOMAIN", url: "https://www.ncbi.nlm.nih.gov/home/about/policies/" }
+    data_type: ["genes", "ids", "annotations"]
+    download:
+      strategy: "ftp"
+      base_url: "ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/"
+      include_globs: ["gene_info.gz", "gene2go.gz", "gene2refseq.gz"]
+    gates_override:
+      add: ["computed_only_extract", "manual_legal_review", "collect_statistics"]
+    output:
+      pool: "quarantine"
+      formats: ["gz"]
+
+  # -------------------------------------------------------------------
+  # 3) Open-access literature (text) — keep license record-level
+  # -------------------------------------------------------------------
+
+  - id: "pmc_oa_fulltext"
+    name: "PMC Open Access subset (full text, mixed licenses)"
+    enabled: true
+    priority: 8
+    license_profile: "record_level"
+    license_evidence: { spdx_hint: "MIXED", url: "https://pmc.ncbi.nlm.nih.gov/tools/openftlist/" }
+    data_type: ["papers", "full_text", "jats_xml"]
+    download:
+      strategy: "http"
+      urls: ["https://pmc.ncbi.nlm.nih.gov/tools/openftlist/"]
+      cache:
+        enabled: true
+        cache_dir: "quarantine/pmc_oa_fulltext/_cache"
+        max_cache_size_gb: 150
+    gates_override:
+      add: ["record_level_filter", "extract_text_chunks", "collect_statistics"]
+    text_processing:
+      include_section_headers: true
+      include_figure_captions: true
+      include_table_captions: true
+      drop_references_section: true
+    output:
+      pool: "quarantine"
+      formats: ["xml", "jsonl.gz"]
+
+  - id: "commonpile_pmc_oa"
+    name: "CommonPile: PMC OA slice (pre-filtered to permissive licenses)"
+    enabled: true
+    priority: 8
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "CC-BY-4.0", url: "https://huggingface.co/datasets/common-pile/common-pile" }
+    data_type: ["papers", "full_text"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/common-pile"
+      config: "pmc"
+      splits: ["train"]
+    gates_override:
+      add: ["extract_text_chunks", "collect_statistics"]
+    output:
+      pool: "permissive"
+      formats: ["jsonl.gz"]
+
+  - id: "commonpile_pes2o"
+    name: "CommonPile: peS2o (open-licensed scientific papers)"
+    enabled: true
+    priority: 7
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "CC-BY-4.0", url: "https://huggingface.co/datasets/common-pile/common-pile" }
+    data_type: ["papers", "full_text"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/common-pile"
+      config: "pes2o"
+      splits: ["train"]
+    gates_override:
+      add: ["extract_text_chunks", "collect_statistics"]
+    output:
+      pool: "permissive"
+      formats: ["jsonl.gz"]
+
+  - id: "commonpile_bhl"
+    name: "CommonPile: Biodiversity Heritage Library (public domain)"
+    enabled: true
+    priority: 6
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "US-PUBLIC-DOMAIN", url: "https://huggingface.co/datasets/common-pile/common-pile" }
+    data_type: ["biodiversity", "books", "papers", "text"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/common-pile"
+      config: "biodiversity_heritage_library"
+      splits: ["train"]
+    gates_override:
+      add: ["extract_text_chunks", "collect_statistics"]
+    output:
+      pool: "permissive"
+      formats: ["jsonl.gz"]
+
+  - id: "openstax_biology"
+    name: "OpenStax Biology (OER textbook)"
+    enabled: false  # TODO: implement OpenStax book exporter/crawler; current HTTP strategy only grabs a landing page
+    priority: 6
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "CC-BY-4.0", url: "https://openstax.org/details/books/biology-2e" }
+    data_type: ["textbook", "education", "biology"]
+    download:
+      strategy: "none"
+    gates_override:
+      add: ["extract_text_chunks"]
+    output:
+      pool: "permissive"
+      formats: ["html", "jsonl.gz"]
+
+  - id: "openstax_anatomy_physiology"
+    name: "OpenStax Anatomy & Physiology (OER textbook)"
+    enabled: false  # TODO: implement OpenStax book exporter/crawler; current HTTP strategy only grabs a landing page
+    priority: 6
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "CC-BY-4.0", url: "https://openstax.org/details/books/anatomy-and-physiology-2e" }
+    data_type: ["textbook", "education", "anatomy", "physiology"]
+    download:
+      strategy: "none"
+    gates_override:
+      add: ["extract_text_chunks"]
+    output:
+      pool: "permissive"
+      formats: ["html", "jsonl.gz"]
+
+  # -------------------------------------------------------------------
+  # 4) Government (US public domain), plus “open government” abroad
+  # -------------------------------------------------------------------
+
+  - id: "us_gov_cdc_eid_journal"
+    name: "CDC Emerging Infectious Diseases journal (public domain/open)"
+    enabled: false  # TODO: add crawler/bulk exporter; current HTTP strategy only grabs a landing page
+    priority: 6
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "US-PUBLIC-DOMAIN", url: "https://wwwnc.cdc.gov/eid/page/copyright-and-disclaimer" }
+    data_type: ["public_health", "papers", "reports"]
+    download:
+      strategy: "none"
+    gates_override:
+      add: ["snapshot_terms", "extract_text_chunks", "collect_statistics"]
+    output:
+      pool: "permissive"
+      formats: ["html", "jsonl.gz"]
+
+  - id: "commonpile_usgpo"
+    name: "CommonPile: USGPO (U.S. Government Publishing Office)"
+    enabled: true
+    priority: 6
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "US-PUBLIC-DOMAIN", url: "https://huggingface.co/datasets/common-pile/common-pile" }
+    data_type: ["government", "reports", "public_domain"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/common-pile"
+      config: "usgpo"
+      splits: ["train"]
+    gates_override:
+      add: ["extract_text_chunks"]
+    output:
+      pool: "permissive"
+      formats: ["jsonl.gz"]
+
+  - id: "commonpile_regulations_gov"
+    name: "CommonPile: Regulations.gov (public comments + notices; scan for restrictions)"
+    enabled: true
+    priority: 4
+    license_profile: "unknown"
+    license_evidence: { spdx_hint: "MIXED", url: "https://huggingface.co/datasets/common-pile/common-pile" }
+    data_type: ["government", "regulation"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/common-pile"
+      config: "regulations"
+      splits: ["train"]
+    gates_override:
+      add: ["restriction_phrase_scan", "pii_phi_scan", "manual_legal_review"]
+    output:
+      pool: "quarantine"
+      formats: ["jsonl.gz"]
+
+  - id: "uk_open_government_biology_placeholder"
+    name: "UK Gov open data (OGL) — biology/public health (placeholder)"
+    enabled: false  # enable after you add a crawler/exporter for specific datasets
+    priority: 3
+    license_profile: "open_gov"
+    license_evidence: { spdx_hint: "OGL-UK-3.0", url: "https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/" }
+    data_type: ["government", "open_data"]
+    download:
+      strategy: "none"
+    gates_override:
+      add: ["manual_legal_review"]
+    output:
+      pool: "quarantine"
+      formats: ["csv", "json"]
+
+  # -------------------------------------------------------------------
+  # 5) Copyleft (keep isolated)
+  # -------------------------------------------------------------------
+
+  - id: "wikipedia_en_biology"
+    name: "Wikipedia EN dumps (biology pages) — CC BY-SA"
+    enabled: false  # enable only if you decide to manage BY-SA obligations
+    priority: 2
+    license_profile: "copyleft"
+    license_evidence: { spdx_hint: "CC-BY-SA-4.0", url: "https://en.wikipedia.org/wiki/Wikipedia:Copyrights" }
+    data_type: ["text", "encyclopedia"]
+    download:
+      strategy: "http"
+      urls: ["https://dumps.wikimedia.org/enwiki/latest/"]
+    gates_override:
+      add: ["manual_legal_review", "segregate_copyleft_pool", "extract_text_chunks"]
+    output:
+      pool: "copyleft"
+      formats: ["bz2", "jsonl.gz"]
+
+  # -------------------------------------------------------------------
+  # 6) High-value but license/ethics-sensitive (keep disabled until implemented)
+  # -------------------------------------------------------------------
+
+  - id: "gbif_occurrence_records"
+    name: "GBIF occurrence records (license varies per record; requires record-level filtering)"
+    enabled: false
+    priority: 5
+    license_profile: "record_level"
+    license_evidence: { spdx_hint: "MIXED", url: "https://www.gbif.org/" }
+    data_type: ["biodiversity", "occurrences", "ecology"]
+    download:
+      strategy: "none"  # TODO: implement GBIF download API workflow + record-level license filter
+    gates_override:
+      add: ["record_level_filter", "manual_legal_review"]
+    output:
+      pool: "quarantine"
+      formats: ["dwca", "csv", "jsonl.gz"]
+
+  - id: "inaturalist_observations"
+    name: "iNaturalist observations (license varies per observation)"
+    enabled: false
+    priority: 4
+    license_profile: "record_level"
+    license_evidence: { spdx_hint: "MIXED", url: "https://www.inaturalist.org/pages/terms" }
+    data_type: ["biodiversity", "observations", "images", "text"]
+    download:
+      strategy: "none"  # TODO: implement export + per-record license selection (CC0/CC-BY only)
+    gates_override:
+      add: ["record_level_filter", "manual_legal_review", "pii_phi_scan"]
+    output:
+      pool: "quarantine"
+      formats: ["json", "csv"]
+
+  - id: "clinical_notes_or_ehr"
+    name: "Clinical notes / EHR (hard block)"
+    enabled: false
+    priority: 1
+    license_profile: "human_subjects"
+    license_evidence: { spdx_hint: "RESTRICTED", url: "" }
+    data_type: ["human_subjects", "phi"]
+    download:
+      strategy: "none"
+    gates_override:
+      add: ["manual_legal_review"]
+    output:
+      pool: "quarantine"
+      formats: []
