@@ -1,0 +1,265 @@
+# field_schemas.yaml
+# v0.7 — Versioned field definitions for logic extraction
+#
+# Each schema version is immutable once released. Create a new version for changes.
+# This ensures reproducibility: you can always know exactly what fields were extracted.
+
+schema_version: "0.7"
+updated_utc: "2025-12-16"
+
+schemas:
+
+  logic_theorem_v1.0.0:
+    description: "Normalized theorem statements from formal proof repos"
+    version: "1.0.0"
+    created_utc: "2025-12-16"
+    source: "proof_repo_worker"
+    notes: |
+      Captures one theorem/lemma/definition per record with provenance and license evidence.
+    fields:
+      record_type:
+        description: "Type of record (theorem_statement, lemma, definition)"
+        type: "string"
+        required: true
+        nullable: false
+      proof_language:
+        description: "Proof language detected (lean|coq|isabelle|hol|metamath|other)"
+        type: "string"
+        required: true
+        nullable: false
+      repo_url:
+        description: "Source repository URL"
+        type: "string"
+        required: true
+        nullable: false
+      commit:
+        description: "Git commit hash used for extraction"
+        type: "string"
+        required: true
+        nullable: false
+      path:
+        description: "File path within the repository"
+        type: "string"
+        required: true
+        nullable: false
+      theorem_name:
+        description: "Name/identifier of the theorem or lemma"
+        type: "string"
+        required: false
+        nullable: true
+      statement:
+        description: "Normalized statement text"
+        type: "string"
+        required: true
+        nullable: false
+      imports:
+        description: "List of imports/dependencies (best-effort)"
+        type: "array"
+        items: { type: "string" }
+        required: false
+        nullable: true
+      license_spdx:
+        description: "Resolved SPDX identifier"
+        type: "string"
+        required: false
+        nullable: true
+      license_evidence_path:
+        description: "Path to license evidence within manifests"
+        type: "string"
+        required: false
+        nullable: true
+
+  logic_proof_script_v1.0.0:
+    description: "Proof scripts with provenance and optional tactic traces"
+    version: "1.0.0"
+    created_utc: "2025-12-16"
+    source: "proof_repo_worker"
+    fields:
+      record_type:
+        description: "Type of proof record (proof_script|tactic_trace)"
+        type: "string"
+        required: true
+        nullable: false
+      proof_language:
+        description: "Proof language detected"
+        type: "string"
+        required: true
+        nullable: false
+      repo_url:
+        description: "Source repository URL"
+        type: "string"
+        required: true
+        nullable: false
+      commit:
+        description: "Git commit hash used for extraction"
+        type: "string"
+        required: true
+        nullable: false
+      path:
+        description: "File path within the repository"
+        type: "string"
+        required: true
+        nullable: false
+      theorem_name:
+        description: "Name/identifier if the script is associated with a theorem"
+        type: "string"
+        required: false
+        nullable: true
+      proof:
+        description: "Proof script text"
+        type: "string"
+        required: true
+        nullable: false
+      dependencies:
+        description: "List of dependencies/imports (best-effort)"
+        type: "array"
+        items: { type: "string" }
+        required: false
+        nullable: true
+      license_spdx:
+        description: "Resolved SPDX identifier"
+        type: "string"
+        required: false
+        nullable: true
+      license_evidence_path:
+        description: "Path to license evidence within manifests"
+        type: "string"
+        required: false
+        nullable: true
+
+  logic_smt_problem_v1.0.0:
+    description: "SMT-LIB v2 problems normalized for cataloging"
+    version: "1.0.0"
+    created_utc: "2025-12-16"
+    source: "benchmark_worker"
+    fields:
+      record_type:
+        description: "Problem record type"
+        type: "string"
+        required: true
+        nullable: false
+      format:
+        description: "Problem format (smt2)"
+        type: "string"
+        required: true
+        nullable: false
+      problem_text:
+        description: "Raw SMT-LIB text"
+        type: "string"
+        required: true
+        nullable: false
+      problem_meta:
+        description: "Parsed metadata (set-logic, status, etc.)"
+        type: "object"
+        required: false
+        nullable: true
+      expected_result:
+        description: "Expected solver result when present"
+        type: "string"
+        required: false
+        nullable: true
+      license_spdx:
+        description: "Resolved SPDX identifier"
+        type: "string"
+        required: false
+        nullable: true
+      license_evidence_path:
+        description: "Path to license evidence within manifests"
+        type: "string"
+        required: false
+        nullable: true
+
+  logic_sat_problem_v1.0.0:
+    description: "SAT/DIMACS CNF problems normalized for cataloging"
+    version: "1.0.0"
+    created_utc: "2025-12-16"
+    source: "benchmark_worker"
+    fields:
+      record_type:
+        description: "Problem record type"
+        type: "string"
+        required: true
+        nullable: false
+      format:
+        description: "Problem format (dimacs)"
+        type: "string"
+        required: true
+        nullable: false
+      problem_text:
+        description: "Raw DIMACS CNF text"
+        type: "string"
+        required: true
+        nullable: false
+      problem_meta:
+        description: "Parsed metadata (p-line, clause/variable counts)"
+        type: "object"
+        required: false
+        nullable: true
+      expected_result:
+        description: "Expected solver result when present"
+        type: "string"
+        required: false
+        nullable: true
+      license_spdx:
+        description: "Resolved SPDX identifier"
+        type: "string"
+        required: false
+        nullable: true
+      license_evidence_path:
+        description: "Path to license evidence within manifests"
+        type: "string"
+        required: false
+        nullable: true
+
+  logic_nl_reasoning_v1.0.0:
+    description: "Natural language logic datasets normalized for reasoning tasks"
+    version: "1.0.0"
+    created_utc: "2025-12-16"
+    source: "nl_logic_worker"
+    fields:
+      premises:
+        description: "List of premise sentences"
+        type: "array"
+        items: { type: "string" }
+        required: true
+        nullable: false
+      question:
+        description: "Question or hypothesis"
+        type: "string"
+        required: true
+        nullable: false
+      answer:
+        description: "Answer or label"
+        type: "string"
+        required: true
+        nullable: false
+      proof:
+        description: "Proof or explanation when available"
+        type: "string"
+        required: false
+        nullable: true
+      difficulty:
+        description: "Difficulty annotation if provided"
+        type: "string"
+        required: false
+        nullable: true
+      source_split:
+        description: "Original dataset split (train/val/test)"
+        type: "string"
+        required: false
+        nullable: true
+      split_group_id:
+        description: "Grouping key to avoid leakage across splits"
+        type: "string"
+        required: false
+        nullable: true
+      license_spdx:
+        description: "Resolved SPDX identifier"
+        type: "string"
+        required: false
+        nullable: true
+      license_evidence_path:
+        description: "Path to license evidence within manifests"
+        type: "string"
+        required: false
+        nullable: true
