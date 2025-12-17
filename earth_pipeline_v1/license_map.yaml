@@ -1,0 +1,173 @@
+# licenses_earth.yaml
+# License screening policy for Environmental / Earth Systems corpora
+# Generated: 2025-12-17
+
+version: "0.1"
+policy_name: "earth_license_screen_v0_1"
+
+# -----------------------------------------------------------------------------
+# License tiers
+# -----------------------------------------------------------------------------
+tiers:
+
+  green:
+    description: "Freely reusable for training + redistribution, with minimal obligations."
+    allow_license_ids:
+      # US Public Domain / government-produced works (with third-party exceptions)
+      - "US-PD"
+      # Creative Commons (permissive)
+      - "CC0-1.0"
+      - "CC-BY-4.0"
+      - "CC-BY-3.0"
+      - "CC-BY-2.0"
+      # Open Government Licences (UK/Canada)
+      - "OGL-UK-3.0"
+      - "OGL-Canada-2.0"
+      # Public Domain dedication for data
+      - "PDDL-1.0"
+    deny_license_id_patterns:
+      - "^CC-BY-NC.*"
+      - "^CC-BY-ND.*"
+      - "^CC-BY-SA.*"
+      - "^ODbL-1\.0$"
+      - "ALL-RIGHTS-RESERVED"
+      - "PROPRIETARY"
+      - "RESTRICTED"
+    obligations:
+      require_attribution: true
+      require_change_notice_when_modified: true
+
+  yellow:
+    description: "Potentially usable but requires per-record license capture, attribution storage, and optional scrubbing."
+    allow_license_ids:
+      # include the green licenses plus additional open-but-conditional ones
+      - "US-PD"
+      - "CC0-1.0"
+      - "CC-BY-4.0"
+      - "CC-BY-3.0"
+      - "CC-BY-2.0"
+      - "OGL-UK-3.0"
+      - "OGL-Canada-2.0"
+      - "PDDL-1.0"
+      # share-alike / reciprocal licenses: allowed ONLY if you accept the obligations
+      - "CC-BY-SA-4.0"
+      - "ODbL-1.0"
+      # Copernicus Sentinel legal notice is not SPDX; treat as custom id
+      - "COPERNICUS-SENTINEL-LEGAL-NOTICE"
+    deny_license_id_patterns:
+      - "^CC-BY-NC.*"
+      - "^CC-BY-ND.*"
+      - "ALL-RIGHTS-RESERVED"
+      - "PROPRIETARY"
+      - "RESTRICTED"
+    obligations:
+      require_attribution: true
+      store_required_attribution_text: true
+      store_preferred_citation: true
+      sharealike_review_required: true
+
+  red:
+    description: "Do not ingest into the legally-cleared training corpus."
+    deny_license_id_patterns:
+      - ".*"   # catch-all (explicit block targets go here)
+    obligations: {}
+
+# -----------------------------------------------------------------------------
+# Heuristics for auto-detection when an explicit license field is missing
+# -----------------------------------------------------------------------------
+heuristics:
+
+  # If a page/document contains these strings, treat as suspicious (route to yellow or red).
+  suspicious_rights_strings:
+    - "all rights reserved"
+    - "permission required"
+    - "no reproduction"
+    - "may not be reproduced"
+    - "copyright"
+    - "©"
+    - "licensed material"
+    - "terms of use"
+    - "non-commercial"
+    - "no derivatives"
+
+  # If detected, force the item into RED unless the source is explicitly whitelisted.
+  hard_block_strings:
+    - "CC BY-NC"
+    - "CC-BY-NC"
+    - "CC BY-ND"
+    - "CC-BY-ND"
+    - "CC BY-NC-ND"
+    - "CC-BY-NC-ND"
+    - "proprietary"
+    - "subscription required"
+    - "paywall"
+
+  # Some government sites include third-party images/figures by permission.
+  # When a target is otherwise green, these signals can trigger an exclusion of that asset
+  # (or routing to yellow for manual review).
+  third_party_media_signals:
+    - "photo courtesy"
+    - "used with permission"
+    - "copyright holder"
+    - "courtesy of"
+    - "licensed from"
+    - "credit:"
+    - "reprinted with permission"
+
+# -----------------------------------------------------------------------------
+# Content safety & ethics (Earth Systems specific)
+# -----------------------------------------------------------------------------
+ethics:
+
+  # Species & habitat protection: avoid distributing precise coordinates for sensitive taxa/places.
+  # This is an ingestion-time scrubber policy; do not rely on downstream handling.
+  sensitive_geospatial_policy:
+    default_action: "keep"
+    if_contains_any:
+      - "endangered"
+      - "nesting site"
+      - "critical habitat"
+      - "poaching"
+      - "protected species"
+    then:
+      action: "coarsen_or_drop_coordinates"
+      coarsen_to: "0.1_degree"   # ~11km at equator
+      drop_fields:
+        - "verbatimLocality"
+        - "locationRemarks"
+
+  pii_policy:
+    default_action: "drop_fields"
+    fields_to_drop:
+      - "recordedBy"
+      - "identifiedBy"
+      - "email"
+      - "phone"
+      - "address"
+    notes: "Designed primarily for biodiversity/citizen-science records; adjust per source."
+
+# -----------------------------------------------------------------------------
+# Source-class defaults (used by the license auditor)
+# -----------------------------------------------------------------------------
+source_defaults:
+
+  us_federal:
+    assumed_license_id: "US-PD"
+    notes: "Assume public domain for federal works, but watch for third-party inserts."
+
+  uk_ogl:
+    assumed_license_id: "OGL-UK-3.0"
+    notes: "Requires attribution; store the attribution statement if provided."
+
+  canada_ogl:
+    assumed_license_id: "OGL-Canada-2.0"
+    notes: "Requires attribution; store the attribution statement if provided."
+
+  cc_by:
+    assumed_license_id: "CC-BY-4.0"
+    notes: "Requires attribution and indicating changes."
+
+  odbl:
+    assumed_license_id: "ODbL-1.0"
+    notes: "Share-alike database obligations; review distribution plans."
+
