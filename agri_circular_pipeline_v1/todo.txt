@@ -1,0 +1,32 @@
+================================================================================
+TODO — Agri Circular Pipeline
+================================================================================
+
+Legend:
+  [x] = Completed
+  [~] = Partially addressed / MVP landed
+  [ ] = Not yet implemented
+
+================================================================================
+NEAR-TERM ADAPTATION CHECKLIST (v0.1 -> v0.2)
+================================================================================
+
+  [~] Copy chem_pipeline_v1 scaffolding and retarget storage roots to /data/agri_circular
+  [ ] Implement echo_worker.py for ECHO ZIPs (facility + permit schemas, aggregation views)
+  [ ] Implement agrovoc_worker.py (term tables + synonym expansion)
+  [ ] Optional: geo_worker.py for safe tiling/downsampling of geospatial products
+  [ ] Harden denylist/rules for personal addresses and operational security details
+  [ ] Expand field_schemas.yaml with echo_facility_record.v1, waste_stream_event.v1, agrovoc_term.v1
+  [ ] Preserve attribution metadata in manifests for AGROVOC and other YELLOW sources
+  [ ] Add unit harmonization layer for waste stream metrics (kg/ton, wet vs dry mass, COD/BOD)
+  [ ] Wire CommonPile/GBIF/FAOSTAT candidates with per-record license filtering before enabling
+
+================================================================================
+PIPELINE FEATURES (CARRIED FROM CHEMISTRY BASELINE)
+================================================================================
+
+  [x] Queue builder + license evidence snapshots (pipeline_driver)
+  [x] Manual review helper (review_queue) with export/reporting
+  [x] Download worker with retries, resume, and checksum validation
+  [x] Catalog builder and training manifest composer
+  [x] Optional PMC/legacy modules retained but disabled by default
