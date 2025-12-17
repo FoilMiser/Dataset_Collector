@@ -1,0 +1,464 @@
+# targets_logic.yaml
+# v0.1 — Logic specialization (adapted from chem pipeline targets.yaml)
+# Companion files expected: ./license_map.yaml, ./field_schemas.yaml, ./denylist.yaml
+#
+# Notes
+# - Keep YELLOW sources isolated in a copyleft/quarantine pool until manual review.
+# - Prefer sources with machine-readable licenses (GitHub LICENSE, CC deeds, etc.).
+# - For repositories: use the raw LICENSE URL as license_evidence.url so pipeline_driver can snapshot it.
+# - For CommonPile: treat as record-level and ingest via a separate “local import” worker (planned).
+#
+schema_version: "0.8"
+updated_utc: "2025-12-16"
+
+companion_files:
+  license_map: "./license_map.yaml"
+  field_schemas: "./field_schemas.yaml"
+  denylist: "./denylist.yaml"
+
+globals:
+  storage_root: "/data/logic"
+  staging_root: "/data/logic/_staging"
+  manifests_root: "/data/logic/_manifests"
+  queues_root: "/data/logic/_queues"
+  catalogs_root: "/data/logic/_catalogs"
+  logs_root: "/data/logic/_logs"
+
+  pools:
+    permissive: "/data/logic/pools/permissive"
+    copyleft: "/data/logic/pools/copyleft"
+    quarantine: "/data/logic/pools/quarantine"
+
+  # If set true: pipeline_driver will keep all YELLOW items blocked unless an “approved” signoff exists.
+  require_yellow_signoff: false
+
+  near_duplicate_detection:
+    enabled: true
+    method: "minhash_lsh"   # minhash_lsh | exact_hash
+    num_perm: 128
+    threshold: 0.85
+    emit_duplicate_groups: true
+
+  parquet_output:
+    enabled: false
+    compression: "snappy"
+    row_group_size: 100000
+
+  # Logic-friendly defaults (used by future extractors; ignored by pipeline_driver today)
+  normalization:
+    enabled: true
+    canonicalize_unicode: true
+    normalize_whitespace: true
+    strip_zero_width: true
+    # For proof languages, keep comments by default (often contain proof context); set to true for “statement-only” corpora.
+    drop_comments: false
+
+  default_gates:
+    - "snapshot_terms"
+    - "resolve_license_spdx"
+    - "restriction_phrase_scan"
+    - "emit_training_manifest"
+    - "emit_attribution_bundle"
+
+  download_defaults:
+    retry_max: 3
+    retry_backoff_base: 2.0
+    retry_backoff_max: 60
+    timeout_connect: 30
+    timeout_read: 300
+    verify_checksums: true
+    enable_resume: true
+    max_concurrent_workers: 4
+    user_agent: "logic-corpus-pipeline/0.1"
+
+  text_processing_defaults:
+    max_chunk_chars: 6000
+    min_chunk_chars: 500
+    drop_tables: true
+    drop_references_section: false
+    keep_citations_inline: false
+    include_section_headers: true
+    include_figure_captions: false
+    include_table_captions: false
+
+  statistics_defaults:
+    estimate_tokens: true
+    token_model: "cl100k_base"
+    collect_property_distributions: true
+    sample_size_for_distributions: 10000
+
+queues:
+  emit:
+    - id: "green_download"
+      path: "/data/logic/_queues/green_download.jsonl"
+      criteria:
+        effective_bucket: "GREEN"
+        enabled: true
+    - id: "yellow_pipeline"
+      path: "/data/logic/_queues/yellow_pipeline.jsonl"
+      criteria:
+        effective_bucket: "YELLOW"
+        enabled: true
+    - id: "red_rejected"
+      path: "/data/logic/_queues/red_rejected.jsonl"
+      criteria:
+        effective_bucket: "RED"
+        enabled: true
+
+gates_catalog:
+  snapshot_terms: "Save Terms/ToS + license page HTML/PDF/TXT + retrieval timestamp."
+  resolve_license_spdx: "Normalize license to SPDX via license_map.yaml rules; store evidence."
+  restriction_phrase_scan: "Scan terms/content for restriction phrases (no-LLM/no-TDM/etc.)."
+  record_level_filter: "Require per-record license metadata; keep only allowlist."
+  extract_text_chunks: "Extract text into JSONL chunks using globals.text_processing_defaults unless overridden."
+  emit_training_manifest: "Manifest of included files/records + checksums + license evidence."
+  emit_attribution_bundle: "Generate ATTRIBUTION.md + CITATIONS.bib for included sources."
+  manual_legal_review: "Human review required before training."
+  segregate_copyleft_pool: "Force output into copyleft pool and keep isolated."
+  near_duplicate_detection: "Run MinHash/LSH deduplication pass."
+  split_aware_partition: "Partition data respecting split_group_id for leak prevention."
+
+resolvers:
+  github:
+    mode: "release"
+    api_base: "https://api.github.com"
+    rate_limit:
+      requests_per_hour: 60
+      retry_on_403: true
+      exponential_backoff: true
+    endpoints:
+      releases: "/repos/{owner}/{repo}/releases"
+      latest: "/repos/{owner}/{repo}/releases/latest"
+      assets: "/repos/{owner}/{repo}/releases/{release_id}/assets"
+    note: "Use GITHUB_TOKEN env var for higher rate limits."
+  huggingface_datasets:
+    mode: "dataset_id"
+    note: "Use datasets.load_dataset; capture dataset card + license field."
+  git:
+    mode: "repo"
+    note: "Capture commit hash; store LICENSE + README as evidence."
+  http:
+    mode: "direct_url"
+    note: "Direct file download with resume."
+  ftp:
+    mode: "base_url + globs"
+    note: "List + filter by glob; store directory listing snapshot (planned)."
+  zenodo:
+    mode: "record_id_or_doi"
+    api: "https://zenodo.org/api/records/{record_id}"
+    outputs:
+      - "files[*].links.self"
+      - "files[*].checksum"
+    verify_checksum: true
+    checksum_algorithm: "md5"
+  dataverse:
+    mode: "persistent_id"
+    default_instance: "https://dataverse.harvard.edu"
+
+# ---------------------------------------------------------------------
+# TARGETS
+# ---------------------------------------------------------------------
+# Conventions:
+# - license_profile:
+#     permissive  -> intended GREEN if SPDX resolves to allow
+#     copyleft    -> intended YELLOW (segregate pool)
+#     record_level-> intended YELLOW (must filter per record)
+#     deny        -> intended RED
+# - spdx_hint SHOULD be "UNKNOWN" unless you are 100% sure.
+#   Provide license_evidence.url so pipeline_driver can snapshot and normalize.
+
+targets:
+
+  # 0) Your deterministic/synthetic logic curriculum (recommended anchor corpus)
+  - id: "synthetic_logic_problems"
+    name: "Your generated deterministic logic problems (auto-graded)"
+    enabled: true
+    priority: 10
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "MIT", url: "" }
+    notes: "Set this to the SPDX you grant yourself (e.g., MIT or CC0) so it classifies as GREEN."
+    data_type: ["synthetic", "logic", "problems", "curriculum"]
+    download:
+      strategy: "none"
+    build:
+      owner: "you"
+      output_formats: ["jsonl"]
+      required_fields:
+        - "problem_id"
+        - "domain"            # e.g., prop_logic | fol | modal | smt | sat
+        - "difficulty"
+        - "prompt"
+        - "answer_key"
+        - "grading_fn"
+        - "metadata"
+
+  # A) Formal proof corpora (GREEN candidates)
+  - id: "lean_mathlib4"
+    name: "Lean mathlib4 (formal proofs)"
+    enabled: true
+    priority: 10
+    publisher: "mathlib"
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "UNKNOWN", url: "https://raw.githubusercontent.com/leanprover-community/mathlib4/master/LICENSE" }
+    data_type: ["formal_proofs", "lean", "theorems", "tactics"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/leanprover-community/mathlib4.git"
+      checkout: "master"
+    output:
+      pool: "permissive"
+      formats: ["git"]
+
+  - id: "metamath_setmm"
+    name: "Metamath set.mm (formal proofs)"
+    enabled: true
+    priority: 9
+    publisher: "metamath"
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "UNKNOWN", url: "https://raw.githubusercontent.com/metamath/set.mm/master/LICENSE" }
+    data_type: ["formal_proofs", "metamath", "theorems", "proofs"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/metamath/set.mm.git"
+      checkout: "master"
+    output:
+      pool: "permissive"
+      formats: ["git"]
+
+  - id: "open_logic_project"
+    name: "Open Logic Project (open textbook + LaTeX sources)"
+    enabled: true
+    priority: 8
+    publisher: "openlogicproject"
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "UNKNOWN", url: "https://raw.githubusercontent.com/OpenLogicProject/OpenLogic/master/LICENSE" }
+    data_type: ["textbooks", "logic", "explanations", "latex"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/OpenLogicProject/OpenLogic.git"
+      checkout: "master"
+    gates_override:
+      add: ["extract_text_chunks"]
+    output:
+      pool: "permissive"
+      formats: ["git", "jsonl.gz"]
+
+  - id: "forallx_calgarystyle"
+    name: "forall x (open logic textbook; Calgary-style edition)"
+    enabled: false
+    priority: 7
+    publisher: "forallx"
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "UNKNOWN", url: "" }
+    data_type: ["textbooks", "logic", "exercises"]
+    download:
+      strategy: "git"
+      repo: ""
+      checkout: "main"
+    notes: "Fill repo + LICENSE url for the exact edition you want (license can differ by edition)."
+    output:
+      pool: "permissive"
+      formats: ["git", "jsonl.gz"]
+
+  # B) Logic benchmarks / solver ecosystems (often mixed -> YELLOW until proven per-file)
+  - id: "smtlib_benchmarks"
+    name: "SMT-LIB benchmarks (mixed submitter licensing; treat as record-level)"
+    enabled: true
+    priority: 8
+    publisher: "smtlib"
+    license_profile: "record_level"
+    license_evidence: { spdx_hint: "MIXED", url: "https://smt-lib.org" }
+    data_type: ["benchmarks", "smt", "smt2"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/SMT-LIB/benchmarks.git"
+      checkout: "master"
+    gates_override:
+      add: ["record_level_filter"]
+    output:
+      pool: "quarantine"
+      formats: ["git"]
+
+  - id: "smtlib_format"
+    name: "SMT-LIB format + docs"
+    enabled: true
+    priority: 6
+    publisher: "smtlib"
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "UNKNOWN", url: "https://raw.githubusercontent.com/SMT-LIB/SMT-LIB-2/master/LICENSE" }
+    data_type: ["specs", "smt", "documentation"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/SMT-LIB/SMT-LIB-2.git"
+      checkout: "master"
+    output:
+      pool: "permissive"
+      formats: ["git"]
+
+  - id: "sat_competition_benchmarks"
+    name: "SAT Competition benchmark corpora (license varies; quarantine by default)"
+    enabled: false
+    priority: 6
+    publisher: "satcompetition"
+    license_profile: "record_level"
+    license_evidence: { spdx_hint: "UNKNOWN", url: "" }
+    data_type: ["benchmarks", "sat", "dimacs"]
+    download:
+      strategy: "http"
+      urls: []
+    notes: "Prefer an official archive with explicit license; otherwise keep in quarantine and extract only problem instances if permitted."
+    output:
+      pool: "quarantine"
+      formats: ["zip", "tar.gz"]
+
+  # C) NL logic / reasoning datasets (some are permissive, some share-alike)
+  - id: "rule_taker"
+    name: "RuleTaker (rule-based reasoning; NL+rules)"
+    enabled: false
+    priority: 7
+    publisher: "allenai"
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "UNKNOWN", url: "" }
+    data_type: ["nl_reasoning", "rules", "entailment"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "allenai/ruletaker"
+    notes: "Confirm dataset_id + license in dataset card, then set license_evidence.url to the dataset card or repo LICENSE."
+    output:
+      pool: "permissive"
+      formats: ["hf_dataset"]
+
+  - id: "proofwriter"
+    name: "ProofWriter (synthetic logical reasoning)"
+    enabled: false
+    priority: 7
+    publisher: "allenai"
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "UNKNOWN", url: "" }
+    data_type: ["nl_reasoning", "rules", "proof_chains"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "allenai/proofwriter"
+    notes: "Confirm license + dataset_id; then fill license_evidence.url."
+    output:
+      pool: "permissive"
+      formats: ["hf_dataset"]
+
+  - id: "folio"
+    name: "FOLIO (first-order logic in NL; share-alike)"
+    enabled: false
+    priority: 5
+    publisher: "folio"
+    license_profile: "copyleft"
+    license_evidence: { spdx_hint: "UNKNOWN", url: "" }
+    data_type: ["nl_reasoning", "fol", "entailment"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: ""
+    gates_override:
+      add: ["manual_legal_review", "segregate_copyleft_pool"]
+    output:
+      pool: "copyleft"
+      formats: ["hf_dataset"]
+
+  # D) CommonPile ingestion lane (record-level; requires separate “local import” tooling)
+  - id: "commonpile_logic_slice"
+    name: "CommonPile slice: logic / theorem proving / formal methods (record-level)"
+    enabled: false
+    priority: 9
+    publisher: "commonpile"
+    license_profile: "record_level"
+    license_evidence: { spdx_hint: "MIXED", url: "" }
+    data_type: ["commonpile", "nl_text", "logic"]
+    download:
+      strategy: "none"
+    ingest:
+      # Planned: a local import worker that reads your CommonPile shards from disk,
+      # filters by topic, and retains per-record license/provenance.
+      local_shards_glob: "/data/commonpile/**/*.jsonl.zst"
+      topic_query:
+        include_terms:
+          - "logic"
+          - "propositional logic"
+          - "first-order logic"
+          - "modal logic"
+          - "theorem prover"
+          - "proof assistant"
+          - "SMT"
+          - "SAT"
+          - "formal verification"
+          - "type theory"
+        exclude_terms:
+          - "astrology"
+          - "tarot"
+    gates_override:
+      add: ["record_level_filter", "extract_text_chunks"]
+    output:
+      pool: "quarantine"
+      formats: ["jsonl.zst", "jsonl.gz"]
+
+  # E) Copyleft knowledge sources (useful, but isolate)
+  - id: "wikipedia_en_logic"
+    name: "Wikipedia EN dumps (logic-related pages)"
+    enabled: false
+    priority: 4
+    publisher: "wikimedia"
+    license_profile: "copyleft"
+    license_evidence: { spdx_hint: "UNKNOWN", url: "https://en.wikipedia.org/wiki/Wikipedia:Copyrights" }
+    data_type: ["text", "encyclopedia", "logic"]
+    download:
+      strategy: "http"
+      urls:
+        - "https://dumps.wikimedia.org/enwiki/latest/enwiki-latest-pages-articles.xml.bz2"
+    gates_override:
+      add: ["manual_legal_review", "segregate_copyleft_pool", "extract_text_chunks"]
+    output:
+      pool: "copyleft"
+      formats: ["bz2", "jsonl.gz"]
+
+  - id: "stackexchange_logic"
+    name: "Stack Exchange data dump (Logic / Math / CS Theory tags; share-alike)"
+    enabled: false
+    priority: 4
+    publisher: "stackexchange"
+    license_profile: "copyleft"
+    license_evidence: { spdx_hint: "UNKNOWN", url: "" }
+    data_type: ["qna", "logic", "proofs"]
+    download:
+      strategy: "http"
+      urls: []
+    gates_override:
+      add: ["manual_legal_review", "segregate_copyleft_pool", "extract_text_chunks"]
+    output:
+      pool: "copyleft"
+      formats: ["7z", "xml", "jsonl.gz"]
+
+  # F) RED / do-not-train (kept here to make rejection auditable)
+  - id: "tptp_problem_library"
+    name: "TPTP Problem Library (restrictive redistribution terms for modified versions)"
+    enabled: true
+    priority: 1
+    publisher: "tptp"
+    license_profile: "deny"
+    license_evidence: { spdx_hint: "Custom-Restrictive", url: "" }
+    data_type: ["benchmarks", "atp"]
+    download:
+      strategy: "http"
+      urls: []
+    output:
+      pool: "quarantine"
+      formats: []
+
+  - id: "sep_stanford_encyclopedia_of_philosophy"
+    name: "Stanford Encyclopedia of Philosophy (copyrighted; not a training corpus)"
+    enabled: true
+    priority: 1
+    publisher: "stanford"
+    license_profile: "deny"
+    license_evidence: { spdx_hint: "All-Rights-Reserved", url: "https://plato.stanford.edu" }
+    data_type: ["reference", "philosophy", "logic"]
+    download:
+      strategy: "none"
+    output:
+      pool: "quarantine"
+      formats: []
