@@ -1,0 +1,76 @@
+================================================================================
+TODO — Code Corpus Pipeline
+================================================================================
+
+Legend:
+  [x] = Completed
+  [~] = Partially addressed / MVP landed
+  [ ] = Not yet implemented
+
+================================================================================
+VERSION HISTORY (code adaptation)
+================================================================================
+
+v0.9 -> v1.0 Completed:
+  [x] Adapt pipeline_driver + targets to code inventory
+  [x] License evidence + SPDX normalization carried over
+  [x] Queue emission for GREEN/YELLOW/RED
+  [x] Basic review helper + signoff schema (v0.2)
+  [x] Code-specific field_schemas + license_map skeletons
+
+================================================================================
+v1.0 -> v1.1 — WHAT NEEDS TO CHANGE / BE UPDATED
+================================================================================
+
+HIGH PRIORITY (Production readiness)
+------------------------------------
+1) Code-focused extraction workers
+   [~] code_worker.py shim writes stub artifacts
+   [ ] secret_scanner.py for high-signal token/password detection
+   [ ] code_chunker.py for AST-aware chunking + attribution bundles
+   [ ] hook workers into yellow stage after review approval
+
+2) Manual review UX
+   [~] YELLOW review plan export (yellow_scrubber.py)
+   [ ] Lightweight CLI to assign reviewers + track notes
+   [ ] Optional FastAPI dashboard for approvals with provenance links
+
+3) Testing + CI
+   [ ] Unit tests for SPDX resolution + restriction scans
+   [ ] Sample queue fixtures for code targets
+   [ ] Smoke test that classify -> download -> catalog runs on tiny fixtures
+
+4) Documentation
+   [ ] Worker how-to: adding new code targets + extraction configs
+   [ ] Review workflow guide (from queue to signoff)
+   [ ] Troubleshooting FAQ for resolver failures (git/http/hf/zenodo)
+
+MEDIUM PRIORITY (Quality + coverage)
+------------------------------------
+5) License handling and safety gates
+   [ ] Implement record-level license checks for mixed benchmark pools
+   [ ] Expand restriction phrase library for common code licenses
+   [ ] Add copyleft segregation enforcement in download_worker outputs
+
+6) Data normalization
+   [ ] Unicode/whitespace normalization options per worker
+   [ ] Split-aware partitioning with split_group_id in catalogs
+   [ ] Optional near-duplicate detection tuned for code/doc pairs
+
+LOW PRIORITY (Ergonomics + future-proofing)
+-------------------------------------------
+7) Packaging + deployment
+   [ ] Dockerfile for code pipeline + example volume mounts
+   [ ] Example orchestration (cron/Argo) for recurring runs
+   [ ] Publish pinned requirements/lockfile
+
+8) Observability
+   [ ] Metrics on queue sizes, download throughput, and review turnaround
+   [ ] Alerts for missing license evidence or stalled downloads
+
+================================================================================
+Notes for next iteration
+================================================================================
+- Keep synthetic/owned datasets clearly marked as permissive anchors.
+- For community benchmarks, require per-file licensing and prefer sources with SPDX headers.
+- Align catalogs with field_schemas versions once workers emit records.
