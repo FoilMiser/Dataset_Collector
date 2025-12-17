@@ -1,0 +1,147 @@
+# field_schemas.yaml
+# v0.8 — Versioned field definitions for code extraction
+#
+# Each schema version is immutable once released. Create a new version for changes.
+# This ensures reproducibility: you can always know exactly what fields were extracted.
+
+schema_version: "0.8"
+updated_utc: "2025-12-16"
+
+schemas:
+
+  code_file_v1.0.0:
+    description: "Normalized source file records with per-repo provenance and licensing"
+    version: "1.0.0"
+    created_utc: "2025-12-16"
+    source: "code_worker"
+    notes: |
+      Captures one source file per record. Designed to keep per-file licensing,
+      provenance, and optional secret-scan metadata before chunking.
+    fields:
+      record_type:
+        description: "Type of record (source_file, doc_file)"
+        type: "string"
+        required: true
+        nullable: false
+      language:
+        description: "Normalized language (lowercase)"
+        type: "string"
+        required: true
+        nullable: false
+      repo_url:
+        description: "Source repository URL or dataset identifier"
+        type: "string"
+        required: true
+        nullable: false
+      commit:
+        description: "Git commit hash used for extraction (if applicable)"
+        type: "string"
+        required: false
+        nullable: true
+      source_path:
+        description: "Path to the file within the repo/archive"
+        type: "string"
+        required: true
+        nullable: false
+      source_url:
+        description: "Direct download URL or dataset record URL"
+        type: "string"
+        required: false
+        nullable: true
+      license_spdx:
+        description: "SPDX identifier for this file (post-normalization)"
+        type: "string"
+        required: true
+        nullable: false
+      license_raw:
+        description: "Raw license string detected for the file"
+        type: "string"
+        required: false
+        nullable: true
+      provenance:
+        description: "Provenance bundle (dataset id, commit, archive shard, etc.)"
+        type: "object"
+        required: true
+        nullable: false
+      has_secrets:
+        description: "Boolean flag if a secret scanner found potential credentials"
+        type: "boolean"
+        required: false
+        nullable: true
+      secrets_report_path:
+        description: "Path to the redaction/quarantine report for this file"
+        type: "string"
+        required: false
+        nullable: true
+      is_generated:
+        description: "Heuristic flag if the file appears generated (minified, vendored, etc.)"
+        type: "boolean"
+        required: false
+        nullable: true
+      text:
+        description: "Raw textual payload of the source file (may be code or docs)"
+        type: "string"
+        required: true
+        nullable: false
+
+  code_chunk_v1.0.0:
+    description: "Chunked code or doc segments with AST-aware boundaries"
+    version: "1.0.0"
+    created_utc: "2025-12-16"
+    source: "code_chunker"
+    notes: |
+      Chunks derived from code_file_v1.0.0. Chunks retain context and attribution so
+      training pipelines can satisfy removal or attribution obligations.
+    fields:
+      parent_record_id:
+        description: "Identifier of the parent code_file record"
+        type: "string"
+        required: true
+        nullable: false
+      chunk_id:
+        description: "Unique chunk identifier within the parent file"
+        type: "string"
+        required: true
+        nullable: false
+      language:
+        description: "Normalized language (lowercase)"
+        type: "string"
+        required: true
+        nullable: false
+      code:
+        description: "Chunked code or docstring payload"
+        type: "string"
+        required: true
+        nullable: false
+      docstring:
+        description: "Optional docstring/comment context kept with the chunk"
+        type: "string"
+        required: false
+        nullable: true
+      symbols:
+        description: "Function/class names or top-level symbols covered by this chunk"
+        type: "array"
+        items: "string"
+        required: false
+        nullable: true
+      imports:
+        description: "Imports referenced in the chunk (best-effort)"
+        type: "array"
+        items: "string"
+        required: false
+        nullable: true
+      license_spdx:
+        description: "SPDX identifier inherited from parent file"
+        type: "string"
+        required: true
+        nullable: false
+      provenance:
+        description: "Provenance bundle inherited from parent file"
+        type: "object"
+        required: true
+        nullable: false
+      secrets_redacted:
+        description: "Whether any secrets were redacted in this chunk"
+        type: "boolean"
+        required: false
+        nullable: true
