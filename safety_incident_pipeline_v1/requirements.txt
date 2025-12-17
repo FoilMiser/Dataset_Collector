@@ -1,0 +1,22 @@
+# Safety Incident & Compliance Corpus Pipeline v0.9 - Requirements
+# Core dependencies
+pyyaml>=6.0
+requests>=2.31.0
+
+# Optional: for HuggingFace datasets strategy
+# datasets>=2.20.0
+
+# Optional: for accurate token counting in catalog_builder
+# tiktoken>=0.5.0
+
+# Optional: for parallel processing improvements
+# concurrent-futures (included in Python 3.2+)
+
+# v0.9: Optional for Parquet output
+# pyarrow>=14.0.0
+
+# v0.9: Optional for near-duplicate detection
+# datasketch>=1.6.0
+
+# v0.9: Optional for InChIKey/SMILES normalization
+# rdkit>=2023.9.0
