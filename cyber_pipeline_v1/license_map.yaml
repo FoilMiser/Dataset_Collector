@@ -1,0 +1,182 @@
+# license_map.yaml
+# v0.3 — companion file for cyber targets.yaml (schema v0.8)
+#
+# This is NOT legal advice. It is a conservative, automation-friendly policy layer:
+# - "allow" = generally permissive / OK for model training
+# - "conditional" = often OK but requires careful handling (attribution, share-alike, Terms of Use)
+# - "deny_prefixes" = hard reject (NonCommercial, NoDerivatives, proprietary/custom restrictive)
+#
+# Cyber adjustments:
+# - Explicit normalization for MITRE ATT&CK/CWE/CAPEC/D3FEND ToU (LicenseRef-MITRE-TOU) -> conditional.
+# - Explicit normalization for CVE Program Terms of Use (LicenseRef-CVE-TOU) -> conditional.
+# - Treat Sigma custom license and GPL telemetry datasets as conditional by default.
+
+schema_version: "0.3"
+updated_utc: "2026-01-15"
+
+spdx:
+  allow:
+    - "CC0-1.0"
+    - "CC-BY-4.0"
+    - "CC-BY-3.0"
+    - "MIT"
+    - "Apache-2.0"
+    - "BSD-2-Clause"
+    - "BSD-3-Clause"
+    - "ISC"
+    - "Unlicense"
+    - "US-PUBLIC-DOMAIN"
+    - "PDDL-1.0"
+
+  conditional:
+    - "CC-BY-SA-4.0"
+    - "CC-BY-SA-3.0"
+    - "GPL-3.0-only"
+    - "GPL-3.0-or-later"
+    - "GPL-2.0-only"
+    - "GPL-2.0-or-later"
+    - "LGPL-3.0-only"
+    - "LGPL-3.0-or-later"
+    - "LGPL-2.1-only"
+    - "LGPL-2.1-or-later"
+    - "MPL-2.0"
+    - "ODbL-1.0"
+    - "LicenseRef-MITRE-TOU"
+    - "LicenseRef-CVE-TOU"
+    - "LicenseRef-Sigma-License"
+
+  deny_prefixes:
+    - "CC-BY-NC"
+    - "CC-BY-ND"
+    - "CC-BY-NC-ND"
+    - "CC-BY-NC-SA"
+    - "Proprietary"
+    - "Custom-Restrictive"
+    - "All-Rights-Reserved"
+    - "BUSL"
+    - "Elastic"
+    - "SSPL"
+
+normalization:
+  rules:
+    # Public Domain / Permissive
+    - match_any: ["CC0", "Creative Commons Zero", "Public Domain Dedication", "CC0 1.0"]
+      spdx: "CC0-1.0"
+    - match_any: ["PDDL", "Public Domain Dedication and License", "Open Data Commons Public Domain"]
+      spdx: "PDDL-1.0"
+    - match_any: ["U.S. Government work", "United States Government work", "public domain", "US public domain"]
+      spdx: "US-PUBLIC-DOMAIN"
+
+    # Creative Commons Attribution
+    - match_any: ["CC-BY 4.0", "CC BY 4.0", "Creative Commons Attribution 4.0", "CC-BY-4.0"]
+      spdx: "CC-BY-4.0"
+    - match_any: ["CC-BY 3.0", "CC BY 3.0", "Creative Commons Attribution 3.0", "CC-BY-3.0"]
+      spdx: "CC-BY-3.0"
+
+    # Creative Commons ShareAlike
+    - match_any: ["CC-BY-SA 4.0", "CC BY-SA 4.0", "Creative Commons Attribution-ShareAlike 4.0", "CC-BY-SA-4.0"]
+      spdx: "CC-BY-SA-4.0"
+    - match_any: ["CC-BY-SA 3.0", "CC BY-SA 3.0", "Creative Commons Attribution-ShareAlike 3.0", "CC-BY-SA-3.0"]
+      spdx: "CC-BY-SA-3.0"
+
+    # Open source licenses
+    - match_any: ["Apache License 2.0", "Apache-2.0", "Apache 2.0"]
+      spdx: "Apache-2.0"
+    - match_any: ["MIT License", "MIT"]
+      spdx: "MIT"
+    - match_any: ["BSD 3-Clause", "BSD-3-Clause", "3-Clause BSD"]
+      spdx: "BSD-3-Clause"
+    - match_any: ["BSD 2-Clause", "BSD-2-Clause", "2-Clause BSD", "Simplified BSD"]
+      spdx: "BSD-2-Clause"
+    - match_any: ["Mozilla Public License 2.0", "MPL-2.0", "MPL 2.0"]
+      spdx: "MPL-2.0"
+
+    # GPL family
+    - match_any: ["GNU General Public License v3", "GPL-3.0", "GPLv3"]
+      spdx: "GPL-3.0-or-later"
+    - match_any: ["GNU General Public License v2", "GPL-2.0", "GPLv2"]
+      spdx: "GPL-2.0-or-later"
+    - match_any: ["GNU Lesser General Public License", "LGPL"]
+      spdx: "LGPL-3.0-or-later"
+
+    # Database licenses
+    - match_any: ["Open Database License", "ODbL", "ODbL 1.0"]
+      spdx: "ODbL-1.0"
+
+    # Cyber Terms of Use
+    - match_any: ["MITRE ATT&CK Terms of Use", "ATT&CK terms of use", "MITRE ToU", "CAPEC Terms of Use", "CWE Terms of Use", "D3FEND Terms of Use"]
+      spdx: "LicenseRef-MITRE-TOU"
+    - match_any: ["CVE Terms of Use", "CVE TOU", "CVE Program Terms"]
+      spdx: "LicenseRef-CVE-TOU"
+    - match_any: ["SigmaHQ", "Sigma license", "Detection Rule License", "DRL license"]
+      spdx: "LicenseRef-Sigma-License"
+
+    # Restrictive licenses (detect and mark)
+    - match_any: ["noncommercial", "non-commercial", "NC license", "for non-commercial"]
+      spdx: "CC-BY-NC-4.0"
+    - match_any: ["no derivatives", "no-derivatives", "ND license"]
+      spdx: "CC-BY-ND-4.0"
+    - match_any: ["all rights reserved"]
+      spdx: "All-Rights-Reserved"
+    - match_any: ["Business Source License", "BUSL"]
+      spdx: "BUSL-1.1"
+    - match_any: ["Elastic License"]
+      spdx: "Elastic-2.0"
+    - match_any: ["Server Side Public License", "SSPL"]
+      spdx: "SSPL-1.0"
+
+    # Generic fallbacks (should come last)
+    - match_any: ["terms of use", "terms and conditions", "custom license", "proprietary"]
+      spdx: "Custom-Restrictive"
+
+restriction_scan:
+  phrases:
+    - "no ai"
+    - "no artificial intelligence"
+    - "no machine learning"
+    - "no ml"
+    - "no llm"
+    - "no large language model"
+    - "no generative ai"
+    - "no generative artificial intelligence"
+    - "may not be used to train"
+    - "no model training"
+    - "no training of models"
+    - "prohibited from training"
+    - "not for training"
+    - "no text and data mining"
+    - "no tdm"
+    - "no text mining"
+    - "no data mining"
+    - "no commercial use"
+    - "non-commercial use only"
+    - "commercial use prohibited"
+    - "for academic use only"
+    - "for research use only"
+    - "educational use only"
+    - "prohibited use"
+    - "not permitted for"
+    - "restricted use"
+    - "usage restrictions apply"
+    - "opt out of ai training"
+    - "excluded from ai training"
+    - "robots.txt noai"
+    - "noai meta tag"
+
+gating:
+  conditional_spdx_bucket: "YELLOW"
+  unknown_spdx_bucket: "YELLOW"
+  deny_spdx_bucket: "RED"
+  restriction_phrase_bucket: "YELLOW"
+
+profiles:
+  permissive:
+    default_bucket: "GREEN"
+  copyleft:
+    default_bucket: "YELLOW"
+  record_level:
+    default_bucket: "YELLOW"
+  unknown:
+    default_bucket: "YELLOW"
+  deny:
+    default_bucket: "RED"
