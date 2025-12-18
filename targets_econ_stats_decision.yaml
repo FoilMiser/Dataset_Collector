@@ -1,0 +1,429 @@
+# targets_econ_stats_decision.yaml
+# Economics + Statistics + Decision Science (planning, cost curves, incentives, optimization)
+# Designed for the chem_pipeline_v1 driver/worker contract (pipeline_driver.py -> download_worker.py).
+#
+# NOTE: This file focuses on *legally clear + low-bias* sources. Partisan blogs/think-tanks are intentionally excluded.
+# NOTE: Many high-value econ sources are API-first (Census, BEA national, OECD SDMX, etc.). Those are included as
+#       disabled placeholders until an API/SDMX resolver is implemented.
+
+schema_version: "1.0"
+updated_utc: "2025-12-17T00:00:00Z"
+
+companion_files:
+  license_map: "license_map.yaml"
+  field_schemas: "field_schemas.yaml"
+  denylist: "denylist.yaml"  # recommend adding econ-specific deny patterns; see ECON_STATS_DECISION_ADAPTATION.md
+
+globals:
+  queues_root: "/data/econ/_queues"
+  manifests_root: "/data/econ/_manifests"
+  # Used by download_worker.py when --targets-yaml is supplied
+  pools:
+    permissive: "/data/econ/pools/permissive"
+    copyleft: "/data/econ/pools/copyleft"
+    quarantine: "/data/econ/pools/quarantine"
+
+  # Governance defaults
+  require_yellow_signoff: true
+  require_license_snapshot: true
+
+  # Default gate plan (conceptual; pipeline_driver enqueues downloads/builds only today)
+  default_gates:
+    - snapshot_terms
+    - license_check
+    - download
+    - build
+    - extract_text_chunks
+    - pii_scan
+    - advocacy_source_filter
+    - near_duplicate_detection
+
+targets:
+
+  # ----------------------------
+  # GREEN (high-confidence legal)
+  # ----------------------------
+
+  - id: "bls_time_series_cu_cpi"
+    name: "BLS time series: CPI (CU) flat files"
+    enabled: true
+    priority: 95
+    publisher: "U.S. Bureau of Labor Statistics (BLS)"
+    data_type: "time_series_tabular"
+    license_profile: "permissive"
+    license_spdx_hint: "US-PUBLIC-DOMAIN"
+    license_evidence_url: "https://www.bls.gov/opub/copyright-information.htm"
+    output_pool: "permissive"
+    download:
+      strategy: "http"
+      urls:
+        - "https://download.bls.gov/pub/time.series/cu/cu.data.0.Current"
+        - "https://download.bls.gov/pub/time.series/cu/cu.series"
+        - "https://download.bls.gov/pub/time.series/cu/cu.item"
+        - "https://download.bls.gov/pub/time.series/cu/cu.area"
+        - "https://download.bls.gov/pub/time.series/cu/cu.period"
+        - "https://download.bls.gov/pub/time.series/cu/cu.base"
+        - "https://download.bls.gov/pub/time.series/cu/cu.footnote"
+    build:
+      - stage: "tabular_normalize"
+        config:
+          format: "bls_flatfile"
+          series_table: "cu.series"
+          value_table: "cu.data.0.Current"
+          dimension_tables: ["cu.item", "cu.area", "cu.period", "cu.base", "cu.footnote"]
+
+  - id: "bls_time_series_la_laus"
+    name: "BLS time series: Local Area Unemployment Statistics (LAUS) current flat files"
+    enabled: true
+    priority: 92
+    publisher: "U.S. Bureau of Labor Statistics (BLS)"
+    data_type: "time_series_tabular"
+    license_profile: "permissive"
+    license_spdx_hint: "US-PUBLIC-DOMAIN"
+    license_evidence_url: "https://www.bls.gov/opub/copyright-information.htm"
+    output_pool: "permissive"
+    download:
+      strategy: "http"
+      urls:
+        # LAUS current series are partitioned into multiple files
+        - "https://download.bls.gov/pub/time.series/la/la.data.0.CurrentU00-04"
+        - "https://download.bls.gov/pub/time.series/la/la.data.0.CurrentU05-09"
+        - "https://download.bls.gov/pub/time.series/la/la.data.0.CurrentU10-14"
+        - "https://download.bls.gov/pub/time.series/la/la.data.0.CurrentU15-19"
+        - "https://download.bls.gov/pub/time.series/la/la.data.0.CurrentU20-24"
+        - "https://download.bls.gov/pub/time.series/la/la.series"
+        - "https://download.bls.gov/pub/time.series/la/la.area"
+        - "https://download.bls.gov/pub/time.series/la/la.period"
+        - "https://download.bls.gov/pub/time.series/la/la.measure"
+        - "https://download.bls.gov/pub/time.series/la/la.area_type"
+    build:
+      - stage: "tabular_normalize"
+        config:
+          format: "bls_flatfile_multi"
+          series_table: "la.series"
+          value_tables_glob: "la.data.0.CurrentU*"
+          dimension_tables: ["la.area", "la.period", "la.measure", "la.area_type"]
+
+  - id: "bls_time_series_ce_ces"
+    name: "BLS time series: Current Employment Statistics (CES) – AllCESSeries"
+    enabled: true
+    priority: 90
+    publisher: "U.S. Bureau of Labor Statistics (BLS)"
+    data_type: "time_series_tabular"
+    license_profile: "permissive"
+    license_spdx_hint: "US-PUBLIC-DOMAIN"
+    license_evidence_url: "https://www.bls.gov/opub/copyright-information.htm"
+    output_pool: "permissive"
+    download:
+      strategy: "http"
+      urls:
+        - "https://download.bls.gov/pub/time.series/ce/ce.data.0.AllCESSeries"
+        - "https://download.bls.gov/pub/time.series/ce/ce.series"
+        - "https://download.bls.gov/pub/time.series/ce/ce.industry"
+        - "https://download.bls.gov/pub/time.series/ce/ce.period"
+        - "https://download.bls.gov/pub/time.series/ce/ce.datatype"
+    build:
+      - stage: "tabular_normalize"
+        config:
+          format: "bls_flatfile"
+          series_table: "ce.series"
+          value_table: "ce.data.0.AllCESSeries"
+          dimension_tables: ["ce.industry", "ce.period", "ce.datatype"]
+
+  - id: "eia_opendata_bulk_manifest"
+    name: "EIA Open Data – bulk download manifest (JSON)"
+    enabled: true
+    priority: 88
+    publisher: "U.S. Energy Information Administration (EIA)"
+    data_type: "manifest"
+    license_profile: "permissive"
+    license_spdx_hint: "US-PUBLIC-DOMAIN"
+    license_evidence_url: "https://www.eia.gov/about/copyrights_reuse.php"
+    output_pool: "permissive"
+    download:
+      strategy: "http"
+      urls:
+        - "https://www.eia.gov/opendata/bulk/manifest.txt"
+    build:
+      - stage: "eia_bulk_plan"
+        config:
+          # Use manifest accessURL fields to decide what to download next
+          download_top_level_sets: ["TOTAL", "PET", "NG", "ELEC", "COAL", "AEO.2025"]
+          # Ingest only series marked non-copyrighted when present
+          respect_series_copyright_flag: true
+
+  - id: "eia_opendata_bulk_selected"
+    name: "EIA Open Data – selected bulk ZIP files (energy economics / cost curves / adoption signals)"
+    enabled: false  # enable after verifying size constraints and implementing eia_bulk_plan stage
+    priority: 80
+    publisher: "U.S. Energy Information Administration (EIA)"
+    data_type: "time_series_json_bulk"
+    license_profile: "permissive"
+    license_spdx_hint: "US-PUBLIC-DOMAIN"
+    license_evidence_url: "https://www.eia.gov/about/copyrights_reuse.php"
+    output_pool: "permissive"
+    download:
+      strategy: "http"
+      urls:
+        - "http://api.eia.gov/bulk/TOTAL.zip"
+        - "http://api.eia.gov/bulk/PET.zip"
+        - "http://api.eia.gov/bulk/NG.zip"
+        - "http://api.eia.gov/bulk/ELEC.zip"
+    build:
+      - stage: "eia_bulk_unpack_and_normalize"
+        config:
+          jsonl_output: true
+          emit_tabular_views: true
+
+  - id: "bea_regional_cainc30"
+    name: "BEA Regional Economic Accounts – CAINC30 (county personal income)"
+    enabled: true
+    priority: 86
+    publisher: "U.S. Bureau of Economic Analysis (BEA)"
+    data_type: "tabular"
+    license_profile: "permissive"
+    license_spdx_hint: "US-PUBLIC-DOMAIN"
+    license_evidence_url: "https://www.bea.gov/help/faq/145"
+    output_pool: "permissive"
+    download:
+      strategy: "http"
+      urls:
+        - "https://apps.bea.gov/regional/zip/CAINC30.zip"
+    build:
+      - stage: "zip_unpack"
+      - stage: "tabular_normalize"
+        config:
+          format: "csv_auto"
+          expected_columns_hint: ["GeoFIPS", "LineCode", "TimePeriod", "DataValue"]
+
+  - id: "bea_regional_cagdp2"
+    name: "BEA Regional Economic Accounts – CAGDP2 (GDP by county/metro/other areas)"
+    enabled: true
+    priority: 85
+    publisher: "U.S. Bureau of Economic Analysis (BEA)"
+    data_type: "tabular"
+    license_profile: "permissive"
+    license_spdx_hint: "US-PUBLIC-DOMAIN"
+    license_evidence_url: "https://www.bea.gov/help/faq/145"
+    output_pool: "permissive"
+    download:
+      strategy: "http"
+      urls:
+        - "https://apps.bea.gov/regional/zip/CAGDP2.zip"
+    build:
+      - stage: "zip_unpack"
+      - stage: "tabular_normalize"
+        config:
+          format: "csv_auto"
+          expected_columns_hint: ["GeoFIPS", "LineCode", "TimePeriod", "DataValue"]
+
+  - id: "worldbank_wdi_bulk_csv"
+    name: "World Bank – World Development Indicators (WDI) bulk CSV"
+    enabled: true
+    priority: 84
+    publisher: "World Bank"
+    data_type: "tabular_time_series"
+    license_profile: "permissive"
+    license_spdx_hint: "CC-BY-4.0"
+    license_evidence_url: "https://www.worldbank.org/en/about/legal/terms-of-use-for-datasets"
+    output_pool: "permissive"
+    download:
+      strategy: "http"
+      urls:
+        - "https://databank.worldbank.org/data/download/WDI_CSV.zip"
+    build:
+      - stage: "zip_unpack"
+      - stage: "tabular_normalize"
+        config:
+          format: "worldbank_wdi_csv"
+          # Normalize into tidy schema: (indicator, country, year, value, units, notes)
+          tidy: true
+
+  - id: "nrel_atb_2024_selected_csv"
+    name: "NREL Annual Technology Baseline (ATB) 2024 – selected summary CSV resources"
+    enabled: true
+    priority: 83
+    publisher: "U.S. Dept. of Energy / NREL"
+    data_type: "cost_curves_tabular"
+    license_profile: "permissive"
+    license_spdx_hint: "CC-BY-4.0"
+    license_evidence_url: "https://creativecommons.org/licenses/by/4.0/"
+    output_pool: "permissive"
+    download:
+      strategy: "http"
+      urls:
+        - "https://data.openei.org/files/6006/2024_v3_Model_Parameters.csv"
+        # NOTE: Add additional resource CSVs/parquet once you enumerate the OEDI data-lake prefix.
+    build:
+      - stage: "tabular_normalize"
+        config:
+          format: "csv_auto"
+          domain_tags: ["energy", "capex", "opex", "lcoe", "adoption_scenarios"]
+
+  - id: "epa_open_data_license_reference"
+    name: "US EPA Standard Open Data License (reference snapshot)"
+    enabled: true
+    priority: 70
+    publisher: "U.S. Environmental Protection Agency (EPA)"
+    data_type: "policy_reference"
+    license_profile: "permissive"
+    license_spdx_hint: "US-PUBLIC-DOMAIN"
+    license_evidence_url: "https://edg.epa.gov/epa_data_license.html"
+    output_pool: "permissive"
+    download:
+      strategy: "http"
+      urls:
+        - "https://edg.epa.gov/epa_data_license.html"
+    build:
+      - stage: "html_to_text"
+
+  # -----------------------------------
+  # YELLOW (needs review / extra gates)
+  # -----------------------------------
+
+  - id: "openml_metadata_and_docs"
+    name: "OpenML (platform metadata + documentation) – heterogeneous datasets (PII risk)"
+    enabled: false
+    priority: 60
+    publisher: "OpenML"
+    data_type: "dataset_index"
+    license_profile: "record_level"
+    license_spdx_hint: "CC-BY-4.0"
+    license_evidence_url: "https://www.openml.org"
+    output_pool: "quarantine"
+    review_required: true
+    download:
+      strategy: "http"
+      urls:
+        - "https://www.openml.org/api/v1/xml/data/list"  # listing; requires API resolver to fetch actual datasets safely
+    build:
+      - stage: "openml_index_parse"
+        config:
+          allow_only_licenses: ["CC0-1.0", "CC-BY-4.0", "ODC-ODbL-1.0", "ODC-PDDL-1.0"]
+          pii_block: true
+
+  - id: "ourworldindata_owid_catalog"
+    name: "Our World in Data – dataset catalog / repo (third-party attribution complexity)"
+    enabled: false
+    priority: 58
+    publisher: "Our World in Data (OWID)"
+    data_type: "tabular"
+    license_profile: "record_level"
+    license_spdx_hint: "CC-BY-4.0"
+    license_evidence_url: "https://ourworldindata.org"
+    output_pool: "quarantine"
+    review_required: true
+    download:
+      strategy: "git"
+      repo_url: "https://github.com/owid/owid-datasets.git"
+      depth: 1
+    build:
+      - stage: "owid_extract_only_owid_produced"
+        config:
+          require_source_field: true
+          exclude_if_upstream_restrictions_unknown: true
+
+  - id: "commonpile_pressbooks_filtered"
+    name: "CommonPile (HF): pressbooks_filtered (open textbooks; stats/econ/decision analysis)"
+    enabled: false
+    priority: 55
+    publisher: "CommonPile (curated multi-source)"
+    data_type: "textbook_corpus"
+    license_profile: "record_level"
+    license_spdx_hint: "UNKNOWN"
+    license_evidence_url: "https://huggingface.co/datasets/common-pile/pressbooks_filtered"
+    output_pool: "quarantine"
+    review_required: true
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/pressbooks_filtered"
+      splits: ["train"]
+    build:
+      - stage: "record_level_license_filter"
+        config:
+          allow_spdx: ["CC-BY-4.0", "CC-BY-SA-4.0", "CC0-1.0", "US-PUBLIC-DOMAIN"]
+      - stage: "topic_filter"
+        config:
+          include_keywords: ["econom", "statistics", "probability", "optimization", "decision", "causal", "regression"]
+
+  - id: "commonpile_arxiv_abstracts_filtered"
+    name: "CommonPile (HF): arxiv_abstracts_filtered (econ/stats/decision science research abstracts)"
+    enabled: false
+    priority: 54
+    publisher: "CommonPile (curated multi-source)"
+    data_type: "research_abstracts"
+    license_profile: "record_level"
+    license_spdx_hint: "UNKNOWN"
+    license_evidence_url: "https://huggingface.co/datasets/common-pile/arxiv_abstracts_filtered"
+    output_pool: "quarantine"
+    review_required: true
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/arxiv_abstracts_filtered"
+      splits: ["train"]
+    build:
+      - stage: "record_level_license_filter"
+        config:
+          allow_spdx: ["CC-BY-4.0", "CC0-1.0"]
+      - stage: "topic_filter"
+        config:
+          include_keywords: ["econom", "stat", "decision", "optimization", "forecast", "causal", "incentive"]
+
+  - id: "oecd_sdmx_api_placeholder"
+    name: "OECD SDMX API (placeholder; requires SDMX/CSV resolver)"
+    enabled: false
+    priority: 50
+    publisher: "OECD"
+    data_type: "sdmx_time_series"
+    license_profile: "permissive"
+    license_spdx_hint: "CC-BY-4.0"
+    license_evidence_url: "https://www.oecd.org/en/about/terms-conditions.html"
+    output_pool: "quarantine"
+    review_required: true
+    download:
+      strategy: "http"  # placeholder; will 404 unless resolver constructs valid queries
+      urls:
+        - "https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_CLI/.M.LI...AA...H?startPeriod=2010-01&dimensionAtObservation=AllDimensions&format=csvfilewithlabels"
+    build:
+      - stage: "sdmx_csv_normalize"
+        config:
+          keep_code_and_label_columns: true
+
+  - id: "faostat_bulk_index_placeholder"
+    name: "FAOSTAT bulk downloads index (placeholder; requires bulk-selector stage)"
+    enabled: false
+    priority: 48
+    publisher: "FAO (FAOSTAT)"
+    data_type: "dataset_index"
+    license_profile: "permissive"
+    license_spdx_hint: "CC-BY-4.0"
+    license_evidence_url: "https://www.fao.org/faostat/en/#data"
+    output_pool: "quarantine"
+    review_required: true
+    download:
+      strategy: "http"
+      urls:
+        - "https://bulks-faostat.fao.org/production/datasets_E.xml"
+    build:
+      - stage: "faostat_bulk_plan"
+        config:
+          include_dataset_codes: ["Production_Crops_Livestock_E", "Trade_DetailedTradeMatrix_E"]
+          download_normalized: true
+
+  # ----------------------------
+  # RED (do not ingest)
+  # ----------------------------
+
+  - id: "fred_red_disallowed"
+    name: "FRED (Federal Reserve Economic Data) – disallowed for training (Terms restrict reuse)"
+    enabled: false
+    priority: 0
+    publisher: "Federal Reserve Bank of St. Louis"
+    data_type: "time_series"
+    license_profile: "deny"
+    license_spdx_hint: "CUSTOM-RESTRICTIVE"
+    license_evidence_url: "https://fred.stlouisfed.org/legal/"
+    output_pool: "quarantine"
+    review_required: true
+    download:
+      strategy: "none"
