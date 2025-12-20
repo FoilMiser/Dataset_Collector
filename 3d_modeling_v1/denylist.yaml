@@ -1,0 +1,52 @@
+# denylist.yaml
+# v0.2 — explicit denylist patterns (v0.9 enhancements)
+#
+# The pipeline scans target id/name, license evidence URL, and download config.
+# v0.9 NEW: Structured patterns, per-pattern severity, and mandatory provenance.
+#
+# Severity levels:
+#   - hard_red: Forces RED immediately (default, backwards compatible)
+#   - force_yellow: Forces YELLOW for deeper manual review
+#
+# All patterns now require 'link' and 'rationale' fields for auditability.
+
+schema_version: "0.2"
+updated_utc: "2026-06-03"
+
+# v0.9: Domain extraction patterns (match against extracted domain from URLs)
+domain_patterns:
+  # Example:
+  # - domain: "example.com"
+  #   severity: "hard_red"
+  #   link: "https://example.com/terms"
+  #   rationale: "Terms explicitly prohibit ML training"
+
+# v0.9: Publisher/provider tags (match against publisher metadata if available)
+publisher_patterns:
+  # Example:
+  # - publisher: "Example Publisher"
+  #   severity: "force_yellow"
+  #   link: "https://publisher.example/policy"
+  #   rationale: "Unclear terms, needs manual review"
+
+patterns:
+  - type: "regex"
+    value: "(?i)noai|no ai training|no text and data mining"
+    fields: ["license_evidence_url", "download_blob", "id", "name"]
+    severity: "force_yellow"
+    link: "https://policy.local/ai-restrictions"
+    rationale: "Terms include NoAI/NoTDM restrictions; requires manual legal review before any processing."
+
+  - type: "regex"
+    value: "(?i)(weapon|firearm|gun|suppressor|receiver|knife|switchblade|ammo|bullet|grenade)"
+    fields: ["name", "id", "download_blob"]
+    severity: "force_yellow"
+    link: "https://policy.local/3d-safety"
+    rationale: "Potential weaponized 3D assets; require explicit approval and filtering."
+
+  - type: "regex"
+    value: "(?i)(disney|marvel|star wars|lego|pokemon|minecraft|halo|warhammer)"
+    fields: ["name", "id", "download_blob"]
+    severity: "force_yellow"
+    link: "https://policy.local/ip-rips"
+    rationale: "Trademarked/character IP likely present; needs manual IP review before inclusion."

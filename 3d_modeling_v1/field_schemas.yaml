@@ -1,0 +1,527 @@
+# field_schemas.yaml
+# v0.7 — Versioned field definitions for computed-only extraction
+#
+# Each schema version is immutable once released. Create a new version for changes.
+# This ensures reproducibility: you can always know exactly what fields were extracted.
+
+schema_version: "0.7"
+updated_utc: "2026-06-03"
+
+schemas:
+
+  pubchem_computed_only_v1.0.0:
+    description: "PubChem computed-only fields for safe extraction (no depositor content)"
+    version: "1.0.0"
+    created_utc: "2025-12-13"
+    source: "pubchem_compound_sdf_bulk"
+    notes: |
+      These fields are computed by NCBI/PubChem from structure data.
+      They do not contain depositor-contributed text or annotations.
+      Safe for training without record-level license concerns.
+    
+    fields:
+      PUBCHEM_COMPOUND_CID:
+        description: "PubChem Compound Identifier"
+        type: "integer"
+        required: true
+        nullable: false
+        validation:
+          min: 1
+          max: 999999999999
+        
+      PUBCHEM_CACTVS_CANONICAL_SMILES:
+        description: "CACTVS-computed canonical SMILES string"
+        type: "string"
+        required: false
+        nullable: true
+        validation:
+          max_length: 10000
+          pattern: "^[A-Za-z0-9@+\\-\\[\\]\\(\\)=#%/\\.\\\\]+$"
+        
+      PUBCHEM_CACTVS_EXTENDED_SMILES:
+        description: "CACTVS-computed extended (isomeric) SMILES string"
+        type: "string"
+        required: false
+        nullable: true
+        validation:
+          max_length: 10000
+        
+      PUBCHEM_IUPAC_INCHI:
+        description: "IUPAC InChI string"
+        type: "string"
+        required: false
+        nullable: true
+        validation:
+          pattern: "^InChI=.*$"
+          max_length: 50000
+        
+      PUBCHEM_IUPAC_INCHIKEY:
+        description: "IUPAC InChIKey (27 characters)"
+        type: "string"
+        required: false
+        nullable: true
+        validation:
+          pattern: "^[A-Z]{14}-[A-Z]{10}-[A-Z]$"
+          exact_length: 27
+        
+      PUBCHEM_MOLECULAR_FORMULA:
+        description: "Molecular formula"
+        type: "string"
+        required: false
+        nullable: true
+        validation:
+          max_length: 1000
+          pattern: "^[A-Za-z0-9\\+\\-\\(\\)\\[\\]]+$"
+        
+      PUBCHEM_MOLECULAR_WEIGHT:
+        description: "Molecular weight in g/mol"
+        type: "float"
+        required: false
+        nullable: true
+        unit: "g/mol"
+        validation:
+          min: 0.0
+          max: 100000.0
+        
+      PUBCHEM_EXACT_MASS:
+        description: "Exact mass (monoisotopic mass)"
+        type: "float"
+        required: false
+        nullable: true
+        unit: "Da"
+        validation:
+          min: 0.0
+          max: 100000.0
+        
+      PUBCHEM_MONOISOTOPIC_WEIGHT:
+        description: "Monoisotopic weight"
+        type: "float"
+        required: false
+        nullable: true
+        unit: "g/mol"
+        validation:
+          min: 0.0
+          max: 100000.0
+        
+      PUBCHEM_TOTAL_CHARGE:
+        description: "Total formal charge"
+        type: "integer"
+        required: false
+        nullable: true
+        validation:
+          min: -100
+          max: 100
+        
+      PUBCHEM_XLOGP3:
+        description: "XLogP3 computed partition coefficient"
+        type: "float"
+        required: false
+        nullable: true
+        validation:
+          min: -100.0
+          max: 100.0
+        
+      PUBCHEM_TPSA:
+        description: "Topological Polar Surface Area"
+        type: "float"
+        required: false
+        nullable: true
+        unit: "Å²"
+        validation:
+          min: 0.0
+          max: 10000.0
+        
+      PUBCHEM_HBOND_DONOR:
+        description: "Hydrogen bond donor count"
+        type: "integer"
+        required: false
+        nullable: true
+        validation:
+          min: 0
+          max: 1000
+        
+      PUBCHEM_HBOND_ACCEPTOR:
+        description: "Hydrogen bond acceptor count"
+        type: "integer"
+        required: false
+        nullable: true
+        validation:
+          min: 0
+          max: 1000
+        
+      PUBCHEM_ROTATABLE_BOND:
+        description: "Rotatable bond count"
+        type: "integer"
+        required: false
+        nullable: true
+        validation:
+          min: 0
+          max: 1000
+        
+      PUBCHEM_HEAVY_ATOM_COUNT:
+        description: "Heavy (non-hydrogen) atom count"
+        type: "integer"
+        required: false
+        nullable: true
+        validation:
+          min: 0
+          max: 10000
+
+    # Output schema: what the extracted records look like
+    output_record:
+      id_field: "cid"
+      mappings:
+        cid: "PUBCHEM_COMPOUND_CID"
+        canonical_smiles: "PUBCHEM_CACTVS_CANONICAL_SMILES"
+        isomeric_smiles: "PUBCHEM_CACTVS_EXTENDED_SMILES"
+        inchi: "PUBCHEM_IUPAC_INCHI"
+        inchikey: "PUBCHEM_IUPAC_INCHIKEY"
+        formula: "PUBCHEM_MOLECULAR_FORMULA"
+        mw: "PUBCHEM_MOLECULAR_WEIGHT"
+        exact_mass: "PUBCHEM_EXACT_MASS"
+        monoisotopic_mass: "PUBCHEM_MONOISOTOPIC_WEIGHT"
+        charge: "PUBCHEM_TOTAL_CHARGE"
+        xlogp3: "PUBCHEM_XLOGP3"
+        tpsa: "PUBCHEM_TPSA"
+        hbd: "PUBCHEM_HBOND_DONOR"
+        hba: "PUBCHEM_HBOND_ACCEPTOR"
+        rotatable_bonds: "PUBCHEM_ROTATABLE_BOND"
+        heavy_atoms: "PUBCHEM_HEAVY_ATOM_COUNT"
+
+  # Placeholder for future schemas
+  pmc_chunk_v1.0.0:
+    description: "PMC Open Access text chunk schema"
+    version: "1.0.0"
+    created_utc: "2025-12-13"
+    source: "pmc_oa_fulltext"
+    
+    fields:
+      pmcid:
+        description: "PubMed Central ID"
+        type: "string"
+        required: true
+        nullable: false
+        validation:
+          pattern: "^PMC[0-9]+$"
+        
+      doi:
+        description: "Digital Object Identifier"
+        type: "string"
+        required: false
+        nullable: true
+        
+      pmid:
+        description: "PubMed ID"
+        type: "string"
+        required: false
+        nullable: true
+        
+      license_spdx:
+        description: "Resolved SPDX license identifier"
+        type: "string"
+        required: true
+        nullable: false
+        
+      chunk_id:
+        description: "Chunk index within article"
+        type: "integer"
+        required: true
+        nullable: false
+        validation:
+          min: 0
+        
+      text:
+        description: "Chunk text content"
+        type: "string"
+        required: true
+        nullable: false
+        validation:
+          min_length: 1
+          max_length: 50000
+        
+      section_header:
+        description: "Section header (if available)"
+        type: "string"
+        required: false
+        nullable: true
+        
+      has_figure_caption:
+        description: "Whether chunk contains figure caption"
+        type: "boolean"
+        required: false
+        nullable: true
+        
+      has_table_caption:
+        description: "Whether chunk contains table caption"
+        type: "boolean"
+        required: false
+        nullable: true
+
+  mesh_record_v1.0.0:
+    description: "Normalized mesh/CAD record with geometry metadata and hashes"
+    version: "1.0.0"
+    created_utc: "2026-06-03"
+    source: "3d_modeling_v1 yellow/mesh_worker"
+    notes: |
+      Flattened fields to stay compatible with the existing validator.
+      Units default to meters unless otherwise detected.
+
+    fields:
+      source_id:
+        description: "Target/dataset identifier"
+        type: "string"
+        required: true
+        nullable: false
+
+      record_id:
+        description: "Dataset-specific record identifier"
+        type: "string"
+        required: true
+        nullable: false
+
+      source_url:
+        description: "Original download URL for the asset"
+        type: "string"
+        required: false
+        nullable: true
+
+      license_spdx:
+        description: "Resolved SPDX license identifier"
+        type: "string"
+        required: true
+        nullable: false
+
+      license_url:
+        description: "URL to license text or dataset card"
+        type: "string"
+        required: false
+        nullable: true
+
+      attribution_text:
+        description: "Attribution/credit string if required by license"
+        type: "string"
+        required: false
+        nullable: true
+
+      creator:
+        description: "Creator/author handle if available"
+        type: "string"
+        required: false
+        nullable: true
+
+      original_format:
+        description: "File extension/format of original asset"
+        type: "string"
+        required: false
+        nullable: true
+
+      normalized_format:
+        description: "Format emitted after sanitation/triangulation"
+        type: "string"
+        required: false
+        nullable: true
+
+      vertex_count:
+        description: "Number of vertices in normalized mesh"
+        type: "integer"
+        required: false
+        nullable: true
+        validation:
+          min: 0
+
+      face_count:
+        description: "Number of faces/triangles in normalized mesh"
+        type: "integer"
+        required: false
+        nullable: true
+        validation:
+          min: 0
+
+      bbox_min:
+        description: "Minimum XYZ of bounding box (comma-separated)"
+        type: "string"
+        required: false
+        nullable: true
+
+      bbox_max:
+        description: "Maximum XYZ of bounding box (comma-separated)"
+        type: "string"
+        required: false
+        nullable: true
+
+      surface_area:
+        description: "Surface area in square units"
+        type: "float"
+        required: false
+        nullable: true
+        validation:
+          min: 0.0
+
+      volume_closed:
+        description: "Closed volume (if watertight) in cubic units"
+        type: "float"
+        required: false
+        nullable: true
+        validation:
+          min: 0.0
+
+      unit_guess:
+        description: "Best-effort guess of input units (e.g., meter, millimeter)"
+        type: "string"
+        required: false
+        nullable: true
+
+      scale_applied:
+        description: "Scalar applied during normalization"
+        type: "float"
+        required: false
+        nullable: true
+
+      sha256_original:
+        description: "SHA256 of the original asset"
+        type: "string"
+        required: false
+        nullable: true
+        validation:
+          pattern: "^[a-fA-F0-9]{64}$"
+
+      sha256_normalized:
+        description: "SHA256 of the normalized mesh export"
+        type: "string"
+        required: false
+        nullable: true
+        validation:
+          pattern: "^[a-fA-F0-9]{64}$"
+
+      has_texture:
+        description: "Whether the asset ships with textures/materials"
+        type: "boolean"
+        required: false
+        nullable: true
+
+      thumbnail_path:
+        description: "Path to rendered thumbnail for QA/search"
+        type: "string"
+        required: false
+        nullable: true
+
+      point_cloud_path:
+        description: "Path to derived point cloud"
+        type: "string"
+        required: false
+        nullable: true
+
+      tags:
+        description: "Category tags or labels"
+        type: "string"
+        required: false
+        nullable: true
+
+    output_record:
+      id_field: "record_id"
+      mappings:
+        id: "record_id"
+        dataset_id: "source_id"
+        url: "source_url"
+        license: "license_spdx"
+        attribution: "attribution_text"
+        creator: "creator"
+        vertex_count: "vertex_count"
+        face_count: "face_count"
+        bbox_min: "bbox_min"
+        bbox_max: "bbox_max"
+        surface_area: "surface_area"
+        volume_closed: "volume_closed"
+        unit_guess: "unit_guess"
+        scale_applied: "scale_applied"
+        sha256_original: "sha256_original"
+        sha256_normalized: "sha256_normalized"
+        thumbnail_path: "thumbnail_path"
+        point_cloud_path: "point_cloud_path"
+
+  printing_profile_v1.0.0:
+    description: "Slicer/printer parameters for derived gcode"
+    version: "1.0.0"
+    created_utc: "2026-06-03"
+    source: "3d_modeling_v1 mesh-to-gcode step"
+    fields:
+      slicer_name:
+        description: "Name of slicer (e.g., Cura, PrusaSlicer)"
+        type: "string"
+        required: true
+        nullable: false
+
+      slicer_version:
+        description: "Slicer version string"
+        type: "string"
+        required: false
+        nullable: true
+
+      printer_profile_id:
+        description: "Identifier for printer/material profile"
+        type: "string"
+        required: false
+        nullable: true
+
+      layer_height_mm:
+        description: "Layer height in millimeters"
+        type: "float"
+        required: false
+        nullable: true
+        validation:
+          min: 0.0
+          max: 10.0
+
+      nozzle_diameter_mm:
+        description: "Nozzle diameter in millimeters"
+        type: "float"
+        required: false
+        nullable: true
+        validation:
+          min: 0.0
+          max: 10.0
+
+      hotend_temp_c:
+        description: "Nozzle temperature in Celsius"
+        type: "float"
+        required: false
+        nullable: true
+        validation:
+          min: 0.0
+          max: 400.0
+
+      bed_temp_c:
+        description: "Bed temperature in Celsius"
+        type: "float"
+        required: false
+        nullable: true
+        validation:
+          min: 0.0
+          max: 200.0
+
+      infill:
+        description: "Infill pattern or percentage"
+        type: "string"
+        required: false
+        nullable: true
+
+      gcode_path:
+        description: "Path to emitted gcode file"
+        type: "string"
+        required: false
+        nullable: true
+
+# Type conversion functions (for reference in code)
+type_converters:
+  integer:
+    python: "int"
+    null_handling: "return None if empty/invalid"
+  float:
+    python: "float"
+    null_handling: "return None if empty/invalid"
+  string:
+    python: "str"
+    null_handling: "return None if empty, strip whitespace"
+  boolean:
+    python: "bool"
+    null_handling: "return None if empty/invalid"
