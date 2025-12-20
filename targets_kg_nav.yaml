@@ -1,0 +1,631 @@
+schema_version: '0.8'
+updated_utc: '2025-12-18T07:47:07Z'
+companion_files:
+  license_map: ./license_map.yaml
+  field_schemas: ./field_schemas.yaml
+  denylist: ./denylist.yaml
+globals:
+  storage_root: /data/kg_nav
+  staging_root: /data/kg_nav/_staging
+  manifests_root: /data/kg_nav/_manifests
+  queues_root: /data/kg_nav/_queues
+  catalogs_root: /data/kg_nav/_catalogs
+  logs_root: /data/kg_nav/_logs
+  pools:
+    permissive: /data/kg_nav/pools/permissive
+    copyleft: /data/kg_nav/pools/copyleft
+    quarantine: /data/kg_nav/pools/quarantine
+  require_yellow_signoff: false
+  near_duplicate_detection:
+    enabled: false
+    method: minhash_lsh
+    num_perm: 128
+    threshold: 0.8
+    emit_duplicate_groups: true
+  parquet_output:
+    enabled: false
+    compression: snappy
+    row_group_size: 100000
+  normalization:
+    enabled: false
+  default_gates:
+  - snapshot_terms
+  - resolve_license_spdx
+  - restriction_phrase_scan
+  - emit_training_manifest
+  - emit_attribution_bundle
+  download_defaults:
+    retry_max: 3
+    retry_backoff_base: 2.0
+    retry_backoff_max: 60
+    timeout_connect: 30
+    timeout_read: 300
+    verify_checksums: true
+    enable_resume: true
+    max_concurrent_workers: 4
+    user_agent: kg-nav-pipeline/0.1
+  text_processing_defaults:
+    max_chunk_chars: 6000
+    min_chunk_chars: 500
+    drop_tables: false
+    drop_references_section: false
+    keep_citations_inline: false
+    include_section_headers: true
+    include_figure_captions: true
+    include_table_captions: true
+  statistics_defaults:
+    estimate_tokens: true
+    token_model: cl100k_base
+    collect_property_distributions: true
+    sample_size_for_distributions: 10000
+queues:
+  emit:
+  - id: green_download
+    path: /data/kg_nav/_queues/green_download.jsonl
+    criteria:
+      effective_bucket: GREEN
+      enabled: true
+  - id: yellow_pipeline
+    path: /data/kg_nav/_queues/yellow_pipeline.jsonl
+    criteria:
+      effective_bucket: YELLOW
+      enabled: true
+  - id: red_rejected
+    path: /data/kg_nav/_queues/red_rejected.jsonl
+    criteria:
+      effective_bucket: RED
+      enabled: true
+gates_catalog:
+  snapshot_terms: Save Terms/ToS + license page HTML/PDF + retrieval timestamp.
+  resolve_license_spdx: Normalize license to SPDX via license_map.yaml rules; store evidence.
+  restriction_phrase_scan: Scan terms/content for restriction phrases (no-LLM/no-TDM/etc.).
+  record_level_filter: Require per-record license metadata; keep only allowlist.
+  computed_only_extract: Extract only safe computed identifiers/descriptors; drop depositor text.
+  extract_text_chunks: Extract text into JSONL chunks using globals.text_processing_defaults unless overridden.
+  emit_training_manifest: Manifest of included files/records + checksums + license evidence.
+  emit_attribution_bundle: Generate ATTRIBUTION.md + CITATIONS.bib for included sources.
+  manual_legal_review: Human review required before training.
+  segregate_copyleft_pool: Force output into copyleft pool and keep isolated.
+  collect_statistics: Collect dataset statistics (tokens, property distributions).
+  validate_schema: Validate extracted data against field_schemas.yaml.
+  near_duplicate_detection: Run MinHash/LSH deduplication pass.
+  normalize_structures: Canonicalize SMILES/InChIKey using RDKit.
+  emit_parquet: Output schema-validated records as Parquet files.
+  split_aware_partition: Partition data respecting split_group_id for leak prevention.
+resolvers:
+  zenodo:
+    mode: record_id_or_doi
+    api: https://zenodo.org/api/records/{record_id}
+    outputs:
+    - files[*].links.self
+    - files[*].checksum
+    verify_checksum: true
+    checksum_algorithm: md5
+  figshare:
+    tool: figshare_api
+    notes: Resolve Figshare article to files, verify license, then download assets. Implement as download_worker
+      strategy handler.
+    example: GET https://api.figshare.com/v2/articles/<id>/files
+  github:
+    mode: release
+    api_base: https://api.github.com
+    rate_limit:
+      requests_per_hour: 60
+      retry_on_403: true
+      exponential_backoff: true
+    endpoints:
+      releases: /repos/{owner}/{repo}/releases
+      latest: /repos/{owner}/{repo}/releases/latest
+      assets: /repos/{owner}/{repo}/releases/{release_id}/assets
+    note: Use GITHUB_TOKEN environment variable for higher rate limits.
+  dataverse:
+    mode: persistent_id
+    note: Use Dataverse API by persistentId; capture license from metadata.
+    default_instance: https://dataverse.harvard.edu
+    configurable_instances:
+    - https://dataverse.harvard.edu
+    - https://dataverse.lib.virginia.edu
+    - https://dataverse.tdl.org
+  huggingface_datasets:
+    mode: dataset_id
+    note: Use datasets.load_dataset; capture dataset card + license field.
+  git:
+    mode: repo
+    note: Capture commit hash; store LICENSE + README as evidence.
+  ftp:
+    mode: base_url + globs
+    note: Use list + filter by glob; store directory listing snapshot.
+  api:
+    mode: base_url
+    note: Cache responses; store query params & rate limit behavior.
+  s3_sync:
+    tool: aws_cli
+    notes: Use --no-sign-request for public buckets. Prefer aws s3 sync for OpenAlex; supports incremental refresh.
+    example: aws s3 sync s3://openalex ./openalex-snapshot --no-sign-request
+  aws_requester_pays:
+    tool: aws_cli
+    notes: For Crossref public data file (Requester Pays bucket). Requires AWS account and --request-payer requester.
+    example: aws s3api get-object --bucket api-snapshots-reqpays-crossref --request-payer requester --key <KEY>
+      ./crossref.tar
+  torrent:
+    tool: aria2c
+    notes: For Crossref annual public data file via Academic Torrents. Requires .torrent / magnet input and local
+      policy approval.
+    example: aria2c --seed-time=0 <MAGNET_OR_TORRENT>
+targets:
+- enabled: true
+  id: wikidata_dumps
+  name: Wikidata JSON/RDF dumps (foundation KG)
+  domain: scientific_kg
+  data_type:
+  - knowledge_graph
+  - entities
+  - links
+  tags:
+  - kg
+  - entities
+  - links
+  - rdf
+  - json
+  license_profile: permissive
+  license_evidence:
+    spdx_hint: CC0-1.0
+    url: https://www.wikidata.org/wiki/Wikidata:Licensing
+  priority: 5
+  output:
+    pool: permissive
+    formats:
+    - bz2
+    - json
+    - ttl.bz2
+  download:
+    strategy: http
+    urls:
+    - https://dumps.wikimedia.org/wikidatawiki/entities/latest-all.json.bz2
+    - https://dumps.wikimedia.org/wikidatawiki/entities/latest-truthy.nt.bz2
+    - https://dumps.wikimedia.org/wikidatawiki/entities/latest-truthy.ttl.bz2
+    dest_subdir: wikidata
+    expected:
+      format: json/rdf dumps
+      size_hint: ~100GB+
+  statistics:
+    enabled: true
+    fields_to_analyze:
+    - P31
+    - P279
+    - P361
+    - P50
+    - P577
+- enabled: true
+  id: ror_data_dump
+  name: ROR (Research Organization Registry) data dump (org identifiers & metadata)
+  domain: scientific_kg
+  data_type:
+  - org_registry
+  - identifiers
+  - affiliations
+  tags:
+  - ror
+  - orgs
+  - identifiers
+  - scholarly
+  - affiliations
+  license_profile: permissive
+  license_evidence:
+    spdx_hint: CC0-1.0
+    url: https://ror.org/about/terms/
+  priority: 6
+  output:
+    pool: permissive
+    formats:
+    - zip
+    - json
+    - csv
+  download:
+    strategy: zenodo
+    record: 6347574
+    dest_subdir: ror
+    expected:
+      format: zip (json+csv)
+      size_hint: ~100MB
+- enabled: true
+  id: openalex_snapshot
+  name: OpenAlex monthly snapshot (works/authors/venues/concepts; scholarly graph)
+  domain: scientific_kg
+  data_type:
+  - scholarly_metadata
+  - citations
+  - entities
+  tags:
+  - openalex
+  - works
+  - citations
+  - authors
+  - institutions
+  - concepts
+  - kg
+  license_profile: permissive
+  license_evidence:
+    spdx_hint: CC0-1.0
+    url: https://docs.openalex.org/download-all-data/download-to-your-machine
+  priority: 7
+  output:
+    pool: permissive
+    formats:
+    - jsonl.gz
+  download:
+    strategy: s3_sync
+    urls:
+    - s3://openalex
+    dest_subdir: openalex
+    expected:
+      format: gzip JSONL partitions
+      size_hint: ~300GB
+- enabled: true
+  id: openalex_derived_minimal_graph
+  name: 'Derived: OpenAlex minimal graph JSONL (IDs/links only; drop titles/abstracts)'
+  domain: scientific_kg
+  data_type:
+  - scholarly_graph
+  - edges
+  - node_attributes_minimal
+  tags:
+  - derived
+  - openalex
+  - minimal
+  - no_text
+  license_profile: permissive
+  license_evidence:
+    spdx_hint: Derived
+    url: ''
+  priority: 12
+  output:
+    pool: permissive
+    formats:
+    - jsonl.gz
+  build:
+    from:
+    - openalex_snapshot
+    gate: computed_only_extract
+    field_schema_version: openalex_minimal_graph_v1.0.0
+    include_fields:
+    - id
+    - doi
+    - ids
+    - type
+    - publication_year
+    - publication_date
+    - referenced_works
+    - related_works
+    - cited_by_count
+    - authorships
+    - host_venue
+    - primary_location
+    - locations_count
+    - concepts
+    - institutions_distinct_count
+    - grants
+    - open_access
+    - biblio
+    - is_retracted
+    exclude_fields:
+    - title
+    - display_name
+    - abstract_inverted_index
+    - keywords
+    - topics
+    - mesh
+    - apc_list
+    - apc_paid
+    - best_oa_location
+    - sustainable_development_goals
+    sharding:
+      method: hash_id
+      num_shards: 2048
+  statistics:
+    enabled: true
+    fields_to_analyze:
+    - type
+    - publication_year
+    - cited_by_count
+- enabled: true
+  id: opencitations_coci
+  name: OpenCitations COCI (open DOI-to-DOI citation edges)
+  domain: scientific_kg
+  data_type:
+  - citations
+  - edges
+  - provenance
+  tags:
+  - opencitations
+  - coci
+  - citations
+  - doi
+  - edges
+  license_profile: permissive
+  license_evidence:
+    spdx_hint: CC0-1.0
+    url: https://opencitations.net/download#coci
+  priority: 8
+  output:
+    pool: permissive
+    formats:
+    - zip
+    - csv
+    - nt
+  download:
+    strategy: figshare
+    urls:
+    - https://figshare.com/articles/dataset/Crossref_Open_Citation_Index_CSV_dataset_of_all_the_citation_data/6741422
+    dest_subdir: opencitations/coci
+    expected:
+      format: zip (csv or n-triples)
+      size_hint: tens of GB compressed
+- enabled: true
+  id: crossref_public_data_file
+  name: Crossref annual public data file (DOI metadata; bulk)
+  domain: scientific_kg
+  data_type:
+  - scholarly_metadata
+  - doi_registry
+  tags:
+  - crossref
+  - doi
+  - metadata
+  - bulk
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: UNKNOWN
+    url: https://www.crossref.org/documentation/retrieve-metadata/bulk-downloads/
+  priority: 9
+  output:
+    pool: quarantine
+    formats:
+    - tar
+    - jsonl
+    - sqlite(optional)
+  download:
+    strategy: torrent_or_s3_requester_pays
+    urls:
+    - https://www.crossref.org/documentation/retrieve-metadata/bulk-downloads/
+    dest_subdir: crossref/public_data_file
+    expected:
+      format: tar (json records)
+      size_hint: ~200GB
+    notes: 'Pipeline needs a new handler: academic_torrents OR aws_requester_pays'
+- enabled: true
+  id: crossref_derived_minimal_graph
+  name: 'Derived: Crossref minimal DOI graph (no abstracts; IDs, dates, links)'
+  domain: scientific_kg
+  data_type:
+  - doi_graph
+  - edges
+  - node_attributes_minimal
+  tags:
+  - derived
+  - crossref
+  - minimal
+  - no_text
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: Derived
+    url: ''
+  priority: 13
+  output:
+    pool: quarantine
+    formats:
+    - jsonl.gz
+  build:
+    from:
+    - crossref_public_data_file
+    gate: computed_only_extract
+    field_schema_version: crossref_minimal_graph_v1.0.0
+    include_fields:
+    - DOI
+    - created
+    - published
+    - issued
+    - type
+    - container-title
+    - publisher
+    - member
+    - prefix
+    - references_count
+    - is-referenced-by-count
+    - relation
+    - subject
+    - ISBN
+    - ISSN
+    - assertion
+    exclude_fields:
+    - title
+    - subtitle
+    - abstract
+    - reference
+    - author
+    - editor
+    - translator
+    - link
+    - license
+    - content-domain
+    sharding:
+      method: doi_prefix
+      prefix_len: 2
+- enabled: true
+  id: datacite_public_data_file
+  name: DataCite Public Data File (DOI metadata + PIDGraph links)
+  domain: scientific_kg
+  data_type:
+  - scholarly_metadata
+  - pid_graph
+  - doi_registry
+  tags:
+  - datacite
+  - doi
+  - orcid
+  - ror
+  - pidgraph
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: CC0-1.0
+    url: https://support.datacite.org/docs/datacite-data-file-use-policy
+  priority: 10
+  output:
+    pool: quarantine
+    formats:
+    - tar
+    - jsonl.gz
+    - csv.gz
+  download:
+    strategy: manual_email_link
+    urls:
+    - https://datafiles.datacite.org/
+    dest_subdir: datacite/public_data_file
+    expected:
+      format: tar (jsonl.gz partitions)
+      size_hint: 20-30GiB compressed
+    notes: Requires requesting download link via email; treat as YELLOW and stash artifacts in staging.
+- enabled: true
+  id: orcid_public_data_file
+  name: ORCID Public Data File (researcher identifiers; public records)
+  domain: scientific_kg
+  data_type:
+  - person_registry
+  - identifiers
+  - links_to_works
+  tags:
+  - orcid
+  - researchers
+  - identifiers
+  - pii_risk
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: CC0-1.0
+    url: https://info.orcid.org/public-data-file-use-policy/
+  priority: 11
+  output:
+    pool: quarantine
+    formats:
+    - xml
+    - jsonl.gz
+  download:
+    strategy: figshare
+    urls:
+    - https://orcid.figshare.com/articles/online_resource/ORCID_Public_Data_File_2024/27151305
+    dest_subdir: orcid/public_data_file
+    expected:
+      format: tar/zip (xml)
+      size_hint: ~10s of GB
+    notes: Access requires ORCID agreement; MUST run PII scrubber to drop emails/biography/URLs unless needed.
+  gates_override:
+    add:
+    - pii_scrub
+    remove: []
+- enabled: true
+  id: nlm_mesh
+  name: NLM MeSH descriptors & RDF (controlled vocabulary for biomedical linking)
+  domain: scientific_kg
+  data_type:
+  - controlled_vocabulary
+  - thesaurus
+  - ontology
+  tags:
+  - mesh
+  - nlm
+  - ontology
+  - biomed
+  license_profile: copyleft
+  license_evidence:
+    spdx_hint: UNKNOWN
+    url: https://www.nlm.nih.gov/databases/download/mesh.html
+  priority: 14
+  output:
+    pool: copyleft
+    formats:
+    - zip
+    - rdf
+    - xml
+  download:
+    strategy: http
+    urls:
+    - https://www.nlm.nih.gov/databases/download/mesh.html
+    dest_subdir: mesh
+    expected:
+      format: zip (rdf/xml)
+      size_hint: <5GB
+    notes: Use the official download page; direct file URLs change yearly.
+- enabled: true
+  id: commonpile_scholarly_slice
+  name: "CommonPile (scholarly/literature subsets) \u2014 record-level screened"
+  domain: scientific_kg
+  data_type:
+  - text
+  - metadata
+  - citations
+  tags:
+  - commonpile
+  - hf
+  - mixed_licenses
+  - screen_required
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: UNKNOWN
+    url: https://huggingface.co/datasets/common-pile
+  priority: 15
+  output:
+    pool: quarantine
+    formats:
+    - arrow
+    - parquet
+    - jsonl.gz
+  download:
+    strategy: huggingface_datasets
+    repo: common-pile/common-pile
+    dest_subdir: commonpile
+    expected:
+      format: HF datasets cache (arrow)
+      size_hint: varies
+    notes: Pin exact dataset revision and run component-level license checks before emission.
+- enabled: true
+  id: kg_navigation_episodes
+  name: 'Synthetic: literature navigation & grounding episodes (KG-grounded supervision)'
+  domain: scientific_kg
+  data_type:
+  - synthetic
+  - training_tasks
+  - grounding
+  tags:
+  - synthetic
+  - navigation
+  - grounding
+  - tool_use
+  - graph_queries
+  license_profile: permissive
+  license_evidence:
+    spdx_hint: MIT
+    url: ''
+  priority: 20
+  output:
+    pool: permissive
+    formats:
+    - jsonl.gz
+  build:
+    owner: pipeline
+    from:
+    - openalex_derived_minimal_graph
+    - opencitations_coci
+    - wikidata_dumps
+    - ror_data_dump
+    gate: build_navigation_episodes
+    output_formats:
+    - jsonl.gz
+    required_fields:
+    - prompt
+    - answer
+    - evidence
+    - metadata
+  statistics:
+    enabled: true
+    fields_to_analyze:
+    - metadata.task_type
+    - metadata.difficulty
