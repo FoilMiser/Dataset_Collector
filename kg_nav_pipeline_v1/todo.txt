@@ -1,0 +1,37 @@
+================================================================================
+TODO — KG + Literature Navigation Pipeline
+================================================================================
+
+Legend:
+  [x] = Completed
+  [~] = Partial / MVP
+  [ ] = Not yet implemented
+
+================================================================================
+MVP MILESTONES
+================================================================================
+
+[~] Pipeline scaffolding
+  - [x] Copy baseline orchestration scripts and update storage roots to /data/kg_nav
+  - [x] Add download strategies for s3_sync, aws_requester_pays, torrent, figshare
+  - [~] Nav episode builder + KG normalization stubs
+  - [ ] Harden yellow transforms for record-level filtering/PII scrub in KG context
+
+[ ] Graph normalization
+  - [ ] Implement kg_worker to emit nodes/edges/provenance from OpenAlex/Wikidata/COCI/ROR
+  - [ ] Add schema validation against openalex_minimal_graph_v1.0.0, crossref_minimal_graph_v1.0.0
+  - [ ] Emit sharded JSONL + manifests with checksums
+
+[ ] PII + compliance
+  - [ ] pii_scrub_worker for ORCID/public person registries (drop emails/biographies/URLs)
+  - [ ] Update restriction phrase list for KG sources (OpenAIRE, S2ORC, etc.)
+
+[ ] Navigation supervision
+  - [ ] nav_episode_builder to stitch OpenAlex/COCI/ROR/Wikidata slices into grounded episodes
+  - [ ] Difficulty labels + hop counts + evidence lists with IDs only
+
+[ ] Tooling polish
+  - [ ] Catalog statistics tuned for graphs (edge counts, node degrees)
+  - [ ] Optional parquet output for normalized graph shards
+  - [ ] Health checks for requester-pays downloads and torrent policy gates
+
