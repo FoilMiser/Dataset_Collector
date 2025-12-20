@@ -19,7 +19,7 @@ v0.9 features:
   - Parallel downloads with configurable workers
 
 Supported strategies: http, ftp, git, zenodo, dataverse, huggingface_datasets, figshare, github_release,
-s3_public (unsigned), web_crawl (polite crawling of curated seeds)
+api (generic JSON/HTML snapshotter), s3_public (unsigned), web_crawl (polite crawling of curated seeds)
 
 Not legal advice.
 """
@@ -36,7 +36,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 from urllib.robotparser import RobotFileParser
 
 import yaml
@@ -467,6 +467,146 @@ def handle_hf_datasets(ctx: DownloaderContext, target: Dict[str, Any], out_dir: 
     return results
 
 
+def handle_api(ctx: DownloaderContext, target: Dict[str, Any], out_dir: Path) -> List[Dict[str, Any]]:
+    """
+    Generic API snapshotter.
+    - Fetches JSON/HTML responses for configured endpoints (relative to base_url).
+    - Supports simple pagination (page/page_size) and shared query params.
+    - Stores responses under _catalogs for auditability.
+    """
+    if requests is None:
+        return [{"status": "error", "error": "requests not installed"}]
+
+    dl = target.get("download", {})
+    base_url = (dl.get("base_url") or "").strip()
+    endpoints = dl.get("endpoints") or dl.get("paths") or [""]
+    shared_query = dl.get("query") or {}
+    headers = dl.get("headers") or {}
+    delay = float(dl.get("delay_seconds", 1.0))
+    default_method = (dl.get("method") or "GET").upper()
+
+    pagination = dl.get("pagination") or {}
+    default_page_param = pagination.get("page_param", "page")
+    default_page_size_param = pagination.get("page_size_param", None)
+    default_page_size = pagination.get("page_size", None)
+    default_page_start = int(pagination.get("page_start", 1))
+    default_max_pages = int(pagination.get("max_pages", dl.get("max_pages", 1)))
+    stop_on_empty = bool(pagination.get("stop_on_empty", True))
+
+    if not base_url:
+        return [{"status": "noop", "reason": "no base_url"}]
+
+    ensure_dir(out_dir)
+    catalog_dir = out_dir / "_catalogs"
+    ensure_dir(catalog_dir)
+
+    def iter_endpoints():
+        for ep in endpoints:
+            if isinstance(ep, str):
+                yield {"path": ep}
+            elif isinstance(ep, dict):
+                yield ep
+
+    if not ctx.mode.execute:
+        return [
+            {
+                "status": "planned",
+                "base_url": base_url,
+                "endpoints": list(iter_endpoints()),
+                "query": shared_query,
+            }
+        ]
+
+    results: List[Dict[str, Any]] = []
+    call_log: List[Dict[str, Any]] = []
+
+    for idx, ep in enumerate(iter_endpoints()):
+        path = ep.get("path", "")
+        name = ep.get("name") or safe_name(path or f"endpoint_{idx+1}")
+        method = (ep.get("method") or default_method).upper()
+        params = dict(shared_query)
+        params.update(ep.get("params") or {})
+
+        page_param = ep.get("page_param", default_page_param)
+        page_size_param = ep.get("page_size_param", default_page_size_param)
+        page_size = ep.get("page_size", default_page_size)
+        page_start = int(ep.get("page_start", default_page_start))
+        max_pages = int(ep.get("max_pages", default_max_pages))
+
+        url = urljoin(base_url if base_url.endswith("/") or path.startswith("/") else f"{base_url}/", path)
+        for page in range(max_pages):
+            page_num = page_start + page
+            call_params = dict(params)
+            if max_pages > 1 or page_param:
+                call_params.setdefault(page_param, page_num)
+            if page_size_param and page_size:
+                call_params.setdefault(page_size_param, page_size)
+
+            result_meta: Dict[str, Any] = {
+                "endpoint": path,
+                "url": url,
+                "params": call_params,
+                "method": method,
+                "page": page_num if max_pages > 1 or page_param else None,
+            }
+
+            try:
+                resp = requests.request(method, url, params=call_params, headers={"User-Agent": f"3d-corpus-api/{VERSION}", **headers}, timeout=30)
+                result_meta["status_code"] = resp.status_code
+                result_meta["final_url"] = resp.url
+            except Exception as e:
+                result_meta.update({"status": "error", "error": repr(e)})
+                results.append(result_meta)
+                call_log.append(result_meta)
+                continue
+
+            if resp.status_code >= 400:
+                result_meta.update({"status": "error", "error": f"status {resp.status_code}"})
+                results.append(result_meta)
+                call_log.append(result_meta)
+                if resp.status_code in {401, 403, 429}:
+                    break
+                continue
+
+            content_type = resp.headers.get("Content-Type", "").lower()
+            suffix = ".json" if "json" in content_type else ".html" if "html" in content_type else ".txt"
+            dest = out_dir / f"{name}{'' if max_pages == 1 else f'_page{page_num}'}{suffix}"
+
+            try:
+                if "json" in content_type:
+                    dest.write_text(json.dumps(resp.json(), indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+                elif "html" in content_type or "xml" in content_type:
+                    dest.write_text(resp.text, encoding="utf-8")
+                else:
+                    dest.write_bytes(resp.content)
+            except Exception:
+                dest.write_bytes(resp.content)
+
+            payload_size = dest.stat().st_size
+            result_meta.update(
+                {
+                    "status": "ok",
+                    "path": str(dest),
+                    "bytes": payload_size,
+                    "sha256": sha256_file(dest),
+                }
+            )
+            results.append(result_meta)
+            call_log.append(result_meta)
+
+            if stop_on_empty and "json" in content_type:
+                try:
+                    parsed = resp.json()
+                    if parsed == {} or (isinstance(parsed, list) and not parsed):
+                        break
+                except Exception:
+                    pass
+            time.sleep(delay)
+
+    write_json(catalog_dir / "api_calls.json", {"base_url": base_url, "results": call_log})
+    return results
+
+
 def handle_s3_public(ctx: DownloaderContext, target: Dict[str, Any], out_dir: Path) -> List[Dict[str, Any]]:
     """
     Download from a public S3 bucket using unsigned requests.
@@ -663,7 +803,7 @@ def handle_web_crawl(ctx: DownloaderContext, target: Dict[str, Any], out_dir: Pa
 STRATEGY_HANDLERS = {
     "http": handle_http, "ftp": handle_ftp, "git": handle_git,
     "zenodo": handle_zenodo, "dataverse": handle_dataverse,
-    "huggingface_datasets": handle_hf_datasets,
+    "huggingface_datasets": handle_hf_datasets, "api": handle_api,
     "s3_public": handle_s3_public,
     "web_crawl": handle_web_crawl,
 }

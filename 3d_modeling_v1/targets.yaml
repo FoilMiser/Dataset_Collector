@@ -216,7 +216,7 @@ targets:
     license_evidence: { spdx_hint: "CC0-1.0", url: "https://www.si.edu/openaccess" }
     data_type: ["3d_models", "cultural_heritage", "metadata"]
     download:
-      strategy: "s3_public"   # TODO: implement in download_worker.py
+      strategy: "s3_public"
       bucket: "smithsonian-open-access"
       include_globs:
         - "**/*3d*"
@@ -305,7 +305,7 @@ targets:
     license_evidence: { spdx_hint: "Mixed", url: "https://www.niaid.nih.gov/research/nih-3d-print-exchange" }
     data_type: ["3d_printing", "biomedical", "meshes", "metadata"]
     download:
-      strategy: "api"        # TODO: implement downloader for 3dprint.nih.gov
+      strategy: "api"
       base_url: "https://3dprint.nih.gov"
       note: "Site availability can be intermittent; mirror metadata + license fields first."
     gates_override:
@@ -406,7 +406,7 @@ targets:
     license_evidence: { spdx_hint: "CC-BY-4.0", url: "https://research.google/blog/scanned-objects-by-google-research-a-dataset-of-3d-scanned-common-household-items/" }
     data_type: ["3d_models", "meshes", "textures", "metadata"]
     download:
-      strategy: "web_crawl"   # TODO: implement; crawl only curated endpoint after you confirm it
+      strategy: "web_crawl"
       seed_urls:
         - "https://research.google/blog/scanned-objects-by-google-research-a-dataset-of-3d-scanned-common-household-items/"
     gates_override:
