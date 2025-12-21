@@ -109,56 +109,154 @@ def coerce_int(val: Any, default: int) -> int:
 def clamp_level(level: Any, default: int) -> int:
     return max(1, min(10, coerce_int(level, default)))
 
-def resolve_route(row: Dict[str, Any], diff_cfg: Dict[str, Any]) -> Dict[str, Any]:
+def _default_route(diff_cfg: Dict[str, Any]) -> Dict[str, Any]:
     g = (diff_cfg.get("globals", {}) or {})
     default_level = coerce_int(g.get("default_level", 5), 5)
-    default = {
+    return {
+        "subject": g.get("default_subject", "math"),
         "domain": g.get("default_domain", "misc"),
         "category": g.get("default_category", "misc"),
         "level": default_level,
+        "granularity": "target",
     }
 
-    domain = row.get("math_domain")
-    category = row.get("math_category")
-    level = row.get("difficulty_level")
-    if domain and category and level is not None:
-        return {"domain": domain, "category": category, "level": coerce_int(level, default_level)}
+
+def _apply_override(route: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "subject": overrides.get("subject", route.get("subject")),
+        "domain": overrides.get("domain", route.get("domain")),
+        "category": overrides.get("category", route.get("category")),
+        "level": coerce_int(overrides.get("level"), route.get("level")),
+        "granularity": overrides.get("granularity", route.get("granularity")),
+        "confidence": overrides.get("confidence", route.get("confidence")),
+        "reason": overrides.get("reason", route.get("reason")),
+    }
+
+
+def _match_keyword_rules(blob: str, rules: List[Dict[str, Any]], fallback: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    for rule in rules or []:
+        keywords = (rule.get("match_any", []) or [])
+        if any(str(k).lower() in blob for k in keywords):
+            r = (rule.get("route", {}) or {})
+            return _apply_override(
+                fallback,
+                {
+                    "subject": r.get("subject"),
+                    "domain": r.get("domain"),
+                    "category": r.get("category"),
+                    "level": r.get("level"),
+                    "granularity": r.get("granularity"),
+                    "confidence": rule.get("confidence"),
+                    "reason": r.get("reason"),
+                },
+            )
+    return None
+
+
+def resolve_route(row: Dict[str, Any], diff_cfg: Dict[str, Any]) -> Dict[str, Any]:
+    base = _default_route(diff_cfg)
+    g = (diff_cfg.get("globals", {}) or {})
+    default_level = coerce_int(g.get("default_level", 5), 5)
+
+    explicit = {
+        "subject": row.get("routing_subject"),
+        "domain": row.get("routing_domain"),
+        "category": row.get("routing_category"),
+        "level": row.get("routing_level"),
+        "granularity": row.get("routing_granularity"),
+        "confidence": row.get("routing_confidence"),
+        "reason": row.get("routing_reason"),
+    }
+    if any(explicit.values()):
+        base = _apply_override(base, explicit)
+    else:
+        legacy = {
+            "subject": "math" if any((row.get("math_domain"), row.get("math_category"), row.get("difficulty_level") is not None)) else None,
+            "domain": row.get("math_domain"),
+            "category": row.get("math_category"),
+            "level": row.get("difficulty_level"),
+            "granularity": row.get("math_granularity"),
+        }
+        if any(legacy.values()):
+            base = _apply_override(base, legacy)
 
     overrides = (diff_cfg.get("source_overrides", {}) or {})
-    if row.get("id") in overrides:
-        o = overrides[row["id"]]
-        return {
-            "domain": o.get("domain", default["domain"]),
-            "category": o.get("category", default["category"]),
-            "level": coerce_int(o.get("level", default_level), default_level),
-        }
+    subject_overrides = overrides.get(base.get("subject"), {}) if isinstance(overrides.get(base.get("subject")), dict) else overrides
+    if row.get("id") in subject_overrides:
+        base = _apply_override(base, subject_overrides[row["id"]])
 
     dt = row.get("data_type", [])
     dt_blob = " ".join(dt) if isinstance(dt, list) else str(dt or "")
     blob = f"{row.get('name', '')} {dt_blob}".lower()
-    for rule in ((diff_cfg.get("rule_sets", {}) or {}).get("keyword_rules", []) or []):
-        keywords = (rule.get("match_any", []) or [])
-        if any(str(k).lower() in blob for k in keywords):
-            r = (rule.get("route", {}) or {})
-            return {
-                "domain": r.get("domain", default["domain"]),
-                "category": r.get("category", default["category"]),
-                "level": coerce_int(r.get("level", default_level), default_level),
-            }
 
-    return default
+    rule_sets = (diff_cfg.get("rule_sets", {}) or {})
+    matched = _match_keyword_rules(blob, (rule_sets.get("global", {}) or {}).get("keyword_rules"), base)
+    if matched:
+        return matched
+
+    subject_rules = (rule_sets.get("subjects", {}) or {}).get(base.get("subject") or "math", {})
+    matched = _match_keyword_rules(blob, subject_rules.get("keyword_rules"), base)
+    if matched:
+        return matched
+
+    arxiv_map = (subject_rules.get("arxiv_primary_category_map") or {})
+    apc = row.get("arxiv_primary_category")
+    if apc and apc in arxiv_map:
+        base = _apply_override(base, arxiv_map[apc])
+
+    return {
+        "subject": base.get("subject"),
+        "domain": base.get("domain"),
+        "category": base.get("category"),
+        "level": clamp_level(base.get("level"), default_level),
+        "granularity": base.get("granularity") or "target",
+        "confidence": base.get("confidence"),
+        "reason": base.get("reason"),
+    }
+
+def _sanitize_segment(val: str, enabled: bool) -> str:
+    return safe_name(val) if enabled else (val or "")
+
 
 def resolve_output_dir(ctx: "DownloaderContext", pool_name: str, route: Dict[str, Any], target_id: str) -> Path:
     pool_name = (pool_name or "quarantine").strip().lower()
-    base = {"permissive": ctx.pools.permissive, "copyleft": ctx.pools.copyleft}.get(pool_name, ctx.pools.quarantine)
+    pool_path = {"permissive": ctx.pools.permissive, "copyleft": ctx.pools.copyleft}.get(pool_name, ctx.pools.quarantine)
 
     g = (ctx.difficulty_cfg.get("globals", {}) or {})
     level = clamp_level(route.get("level"), coerce_int(g.get("default_level", 5), 5))
-    domain = safe_name(route.get("domain") or "misc")
-    category = safe_name(route.get("category") or "misc")
-    tid = safe_name(target_id)
+    sanitize = g.get("sanitize_path_segments", True)
+    subject = _sanitize_segment(route.get("subject") or g.get("default_subject", "math"), sanitize)
+    domain = _sanitize_segment(route.get("domain") or g.get("default_domain", "misc"), sanitize)
+    category = _sanitize_segment(route.get("category") or g.get("default_category", "misc"), sanitize)
+    tid = _sanitize_segment(target_id, sanitize)
 
-    out = base / f"d{level:02d}" / domain / category / tid
+    folder_layout = g.get("folder_layout")
+    base_root = ctx.pools.root or pool_path.parent
+    if folder_layout and folder_layout.startswith("pools/") and pool_path.name in {"permissive", "copyleft", "quarantine"}:
+        try:
+            base_root = pool_path.parents[1]
+        except IndexError:
+            base_root = pool_path.parent
+
+    if folder_layout:
+        try:
+            rendered = folder_layout.format(
+                pool=pool_name,
+                pool_path=str(pool_path),
+                subject=subject,
+                level=level,
+                domain=domain,
+                category=category,
+                target_id=tid,
+            )
+            out = Path(rendered)
+            if not out.is_absolute():
+                out = base_root / out
+        except Exception:
+            out = pool_path / f"d{level:02d}" / domain / category / tid
+    else:
+        out = pool_path / f"d{level:02d}" / domain / category / tid
+
     ensure_dir(out)
     return out
 
@@ -173,6 +271,7 @@ class Pools:
     permissive: Path
     copyleft: Path
     quarantine: Path
+    root: Optional[Path] = None
 
 @dataclasses.dataclass
 class Limits:
@@ -205,18 +304,30 @@ class DownloaderContext:
     difficulty_cfg: Dict[str, Any]
 
 
-def pools_from_targets_yaml(targets_yaml: Optional[Path], fallback: Path, preloaded_cfg: Optional[Dict[str, Any]] = None) -> Pools:
+def pools_from_targets_yaml(targets_yaml: Optional[Path], fallback: Path, preloaded_cfg: Optional[Dict[str, Any]] = None, difficulty_cfg: Optional[Dict[str, Any]] = None) -> Pools:
     cfg: Dict[str, Any] = preloaded_cfg or {}
     if targets_yaml and targets_yaml.exists():
         cfg = preloaded_cfg or load_yaml(targets_yaml)
     if cfg:
         pools = cfg.get("globals", {}).get("pools", {})
+        root_path = Path(pools.get("root", fallback)).expanduser()
         return Pools(
-            permissive=Path(pools.get("permissive", fallback / "permissive")).expanduser(),
-            copyleft=Path(pools.get("copyleft", fallback / "copyleft")).expanduser(),
-            quarantine=Path(pools.get("quarantine", fallback / "quarantine")).expanduser(),
+            permissive=Path(pools.get("permissive", root_path / "permissive")).expanduser(),
+            copyleft=Path(pools.get("copyleft", root_path / "copyleft")).expanduser(),
+            quarantine=Path(pools.get("quarantine", root_path / "quarantine")).expanduser(),
+            root=root_path,
         )
-    return Pools(fallback / "permissive", fallback / "copyleft", fallback / "quarantine")
+    g = (difficulty_cfg or {}).get("globals", {}) or {}
+    root = Path(fallback)
+    try:
+        import platform
+        if "microsoft" in platform.release().lower() and g.get("destination_root_wsl"):
+            root = Path(g["destination_root_wsl"])
+        elif platform.system().lower().startswith("windows") and g.get("destination_root_windows"):
+            root = Path(g["destination_root_windows"])
+    except Exception:
+        pass
+    return Pools(root / "permissive", root / "copyleft", root / "quarantine", root=root)
 
 def log_event(ctx: DownloaderContext, event: Dict[str, Any]) -> None:
     event = dict(event)
@@ -608,7 +719,8 @@ def main() -> None:
     pools = pools_from_targets_yaml(
         targets_path,
         Path(args.pools_root).expanduser().resolve(),
-        targets_cfg
+        targets_cfg,
+        diff_cfg
     )
     logs_dir = Path(args.logs_dir).expanduser().resolve()
     ensure_dir(logs_dir)

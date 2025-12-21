@@ -245,3 +245,62 @@ schemas:
         nullable: true
         validation:
           max_length: 1000
+
+  queue_record_routing_v2.0.0:
+    description: "Standard routing fields for queue/evaluation records (subject-agnostic)"
+    version: "2.0.0"
+    created_utc: "2025-12-21"
+    source: "pipeline_driver.py"
+    notes: "Keeps backward compatibility with math_* fields while enabling subject-aware routing."
+    fields:
+      routing_subject:
+        description: "Subject for routing (math, physics, engineering, etc.)"
+        type: "string"
+        required: true
+        nullable: false
+        validation:
+          max_length: 100
+      routing_domain:
+        description: "Domain within the subject taxonomy"
+        type: "string"
+        required: false
+        nullable: true
+        validation:
+          max_length: 200
+      routing_category:
+        description: "Category within the domain"
+        type: "string"
+        required: false
+        nullable: true
+        validation:
+          max_length: 200
+      routing_level:
+        description: "Difficulty level (1-10 scale)"
+        type: "integer"
+        required: false
+        nullable: true
+        validation:
+          min: 1
+          max: 10
+      routing_granularity:
+        description: "Granularity of the routing decision"
+        type: "string"
+        required: false
+        nullable: true
+        validation:
+          enum: ["target", "record", "chunk"]
+      routing_confidence:
+        description: "Confidence score for the routing decision"
+        type: "float"
+        required: false
+        nullable: true
+        validation:
+          min: 0.0
+          max: 1.0
+      routing_reason:
+        description: "Explanation or provenance for the routing decision"
+        type: "string"
+        required: false
+        nullable: true
+        validation:
+          max_length: 500
