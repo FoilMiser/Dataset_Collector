@@ -762,6 +762,18 @@ def main() -> None:
         # v0.9: Dataset-aware splitting support
         split_group_id = str(t.get("split_group_id", "") or tid)
 
+        # Output pool selection + math routing (difficulty-aware download paths)
+        out_pool = (t.get("output", {}) or {}).get("pool")
+        if not out_pool:
+            if profile == "copyleft":
+                out_pool = "copyleft"
+            elif eff_bucket == "GREEN":
+                out_pool = "permissive"
+            else:
+                out_pool = "quarantine"
+
+        mr = t.get("math_routing", {}) or {}
+
         evaluation = {
             "id": tid,
             "name": name,
@@ -794,6 +806,13 @@ def main() -> None:
             "split_group_id": split_group_id,  # For dataset-aware splitting
             "no_fetch_missing_evidence": no_fetch_missing_evidence,
             "require_yellow_signoff": require_yellow_signoff,
+            "output_pool": out_pool,
+            "math_routing": {
+                "domain": mr.get("domain"),
+                "category": mr.get("category"),
+                "level": mr.get("level"),
+                "granularity": mr.get("granularity"),
+            },
         }
         write_json(target_manifest_dir / "evaluation.json", evaluation)
 
@@ -818,6 +837,11 @@ def main() -> None:
             "denylist_hits": dl_hits,
             "review_required": review_required,
             "license_change_detected": license_change_detected,
+            "output_pool": out_pool,
+            "math_domain": mr.get("domain"),
+            "math_category": mr.get("category"),
+            "difficulty_level": mr.get("level"),
+            "math_granularity": mr.get("granularity"),
         }
 
         if not enabled:

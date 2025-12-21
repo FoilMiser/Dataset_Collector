@@ -16,6 +16,7 @@ companion_files:
   license_map: "./license_map.yaml"
   field_schemas: "./field_schemas.yaml"
   denylist: "./denylist.yaml"
+  difficulties_map: "./difficulties_math.yaml"
 
 globals:
   storage_root: "/data/math"
@@ -197,6 +198,11 @@ targets:
       output_formats: ["jsonl"]
       required_fields: ["problem_id", "domain", "difficulty", "prompt", "answer_key", "grading_fn", "answer_format", "tags"]
       field_schema_version: "math_problem_v1.0.0"
+    math_routing:
+      domain: "math_reference"
+      category: "glossary"
+      level: 6
+      granularity: "target"
     gates_override:
       add: ["emit_training_manifest"]
 
@@ -217,6 +223,11 @@ targets:
     output:
       pool: "copyleft"
       formats: ["hf_dataset"]
+    math_routing:
+      domain: "math_reference"
+      category: "encyclopedia"
+      level: 6
+      granularity: "target"
     text_processing:
       max_chunk_chars: 6000
       min_chunk_chars: 500
@@ -240,6 +251,11 @@ targets:
     output:
       pool: "copyleft"
       formats: ["hf_dataset"]
+    math_routing:
+      domain: "math_reference"
+      category: "encyclopedia"
+      level: 6
+      granularity: "target"
     text_processing:
       max_chunk_chars: 6000
       min_chunk_chars: 500
@@ -263,6 +279,11 @@ targets:
     output:
       pool: "copyleft"
       formats: ["hf_dataset"]
+    math_routing:
+      domain: "math_reference"
+      category: "encyclopedia"
+      level: 6
+      granularity: "target"
     text_processing:
       max_chunk_chars: 6000
       min_chunk_chars: 500
@@ -286,6 +307,11 @@ targets:
     output:
       pool: "copyleft"
       formats: ["hf_dataset"]
+    math_routing:
+      domain: "math_reference"
+      category: "encyclopedia"
+      level: 7
+      granularity: "target"
     gates_override:
       add: ["record_level_filter", "domain_filter_math_stackexchange"]
     review_required: false
@@ -307,6 +333,11 @@ targets:
     output:
       pool: "quarantine"
       formats: ["hf_dataset"]
+    math_routing:
+      domain: "math_reference"
+      category: "research_papers"
+      level: 9
+      granularity: "target"
     gates_override:
       add: ["record_level_filter", "domain_filter_arxiv_math", "extract_latex_aware_chunks"]
     review_required: true
@@ -328,6 +359,11 @@ targets:
     output:
       pool: "quarantine"
       formats: ["hf_dataset"]
+    math_routing:
+      domain: "math_reference"
+      category: "encyclopedia"
+      level: 6
+      granularity: "target"
     gates_override:
       add: ["record_level_filter", "domain_filter_math_textbooks", "emit_attribution_bundle"]
     review_required: true
@@ -349,6 +385,11 @@ targets:
     output:
       pool: "quarantine"
       formats: ["hf_dataset"]
+    math_routing:
+      domain: "math_reference"
+      category: "encyclopedia"
+      level: 6
+      granularity: "target"
     gates_override:
       add: ["record_level_filter", "domain_filter_math_textbooks", "emit_attribution_bundle"]
     review_required: true
@@ -370,6 +411,11 @@ targets:
     output:
       pool: "quarantine"
       formats: ["hf_dataset"]
+    math_routing:
+      domain: "math_reference"
+      category: "encyclopedia"
+      level: 6
+      granularity: "target"
     gates_override:
       add: ["record_level_filter", "domain_filter_math_textbooks", "emit_attribution_bundle"]
     review_required: true
@@ -391,6 +437,11 @@ targets:
     output:
       pool: "quarantine"
       formats: ["hf_dataset"]
+    math_routing:
+      domain: "math_reference"
+      category: "encyclopedia"
+      level: 6
+      granularity: "target"
     gates_override:
       add: ["record_level_filter", "domain_filter_math_textbooks", "emit_attribution_bundle"]
     review_required: true
@@ -412,6 +463,11 @@ targets:
     output:
       pool: "quarantine"
       formats: ["hf_dataset"]
+    math_routing:
+      domain: "math_reference"
+      category: "encyclopedia"
+      level: 6
+      granularity: "target"
     gates_override:
       add: ["record_level_filter", "domain_filter_math_textbooks", "emit_attribution_bundle"]
     review_required: true
@@ -432,6 +488,11 @@ targets:
     output:
       pool: "permissive"
       formats: ["git_repo"]
+    math_routing:
+      domain: "formal_systems"
+      category: "metamath"
+      level: 7
+      granularity: "target"
     gates_override:
       add: ["formal_chunk_by_theorem"]
 
@@ -451,6 +512,11 @@ targets:
     output:
       pool: "permissive"
       formats: ["git_repo"]
+    math_routing:
+      domain: "formal_systems"
+      category: "lean_mathlib"
+      level: 8
+      granularity: "target"
     gates_override:
       add: ["formal_chunk_by_lemma"]
 
@@ -470,6 +536,11 @@ targets:
     output:
       pool: "permissive"
       formats: ["git_repo"]
+    math_routing:
+      domain: "formal_systems"
+      category: "lean_mathlib"
+      level: 8
+      granularity: "target"
     gates_override:
       add: ["formal_chunk_by_lemma", "emit_training_manifest"]
 
@@ -489,6 +560,11 @@ targets:
     output:
       pool: "permissive"
       formats: ["git_repo"]
+    math_routing:
+      domain: "formal_systems"
+      category: "coq_mathcomp"
+      level: 8
+      granularity: "target"
     gates_override:
       add: ["formal_chunk_by_theorem"]
 
@@ -508,6 +584,11 @@ targets:
     output:
       pool: "permissive"
       formats: ["git_repo"]
+    math_routing:
+      domain: "formal_systems"
+      category: "lean_mathlib"
+      level: 8
+      granularity: "target"
     gates_override:
       add: ["formal_chunk_by_module"]
 
@@ -527,6 +608,11 @@ targets:
     output:
       pool: "copyleft"
       formats: ["git_repo"]
+    math_routing:
+      domain: "formal_systems"
+      category: "coq_mathcomp"
+      level: 8
+      granularity: "target"
     gates_override:
       add: ["formal_chunk_by_lemma"]
 
@@ -546,6 +632,11 @@ targets:
     output:
       pool: "permissive"
       formats: ["git_repo"]
+    math_routing:
+      domain: "formal_systems"
+      category: "lean_mathlib"
+      level: 8
+      granularity: "target"
     gates_override:
       add: ["formal_chunk_by_theorem"]
 
@@ -565,6 +656,11 @@ targets:
     output:
       pool: "permissive"
       formats: ["git_repo"]
+    math_routing:
+      domain: "math_reference"
+      category: "glossary"
+      level: 6
+      granularity: "target"
     gates_override:
       add: ["code_and_docs_chunking"]
 
@@ -584,6 +680,11 @@ targets:
     output:
       pool: "quarantine"
       formats: ["git_repo"]
+    math_routing:
+      domain: "formal_systems"
+      category: "isabelle_afp"
+      level: 8
+      granularity: "target"
     gates_override:
       add: ["record_level_filter", "formal_chunk_by_entry"]
     review_required: true
@@ -604,6 +705,11 @@ targets:
     output:
       pool: "permissive"
       formats: ["pdf"]
+    math_routing:
+      domain: "algebra"
+      category: "functions_graphs"
+      level: 5
+      granularity: "target"
     gates_override:
       add: ["extract_text_chunks", "extract_latex_aware_chunks"]
 
@@ -623,6 +729,11 @@ targets:
     output:
       pool: "permissive"
       formats: ["pdf"]
+    math_routing:
+      domain: "calculus"
+      category: "calc_single_variable_1"
+      level: 6
+      granularity: "target"
     gates_override:
       add: ["extract_text_chunks", "extract_latex_aware_chunks"]
 
@@ -641,6 +752,11 @@ targets:
     output:
       pool: "copyleft"
       formats: ["html"]
+    math_routing:
+      domain: "math_reference"
+      category: "encyclopedia"
+      level: 7
+      granularity: "target"
     gates_override:
       add: ["manual_legal_review"]
     review_required: true
@@ -660,6 +776,11 @@ targets:
     output:
       pool: "copyleft"
       formats: ["html"]
+    math_routing:
+      domain: "math_reference"
+      category: "encyclopedia"
+      level: 7
+      granularity: "target"
     gates_override:
       add: ["manual_legal_review"]
     review_required: true
@@ -680,6 +801,11 @@ targets:
     output:
       pool: "quarantine"
       formats: ["git_repo"]
+    math_routing:
+      domain: "algebra"
+      category: "algebra_contest"
+      level: 6
+      granularity: "target"
     review_required: true
 
   - id: "mit_ocw_mathematics"
@@ -697,4 +823,9 @@ targets:
     output:
       pool: "quarantine"
       formats: ["html"]
+    math_routing:
+      domain: "math_reference"
+      category: "encyclopedia"
+      level: 7
+      granularity: "target"
     review_required: true

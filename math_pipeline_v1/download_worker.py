@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-download_worker.py (v0.9)
+download_worker.py (v1.0)
 
 Consumes queue JSONL emitted by pipeline_driver.py and downloads dataset payloads
 according to each row's `download` strategy.
@@ -9,10 +9,11 @@ Safe defaults:
   - DRY RUN by default (prints plan, writes manifests, does not download)
   - You must pass --execute to actually download.
 
-v0.9 features:
-  - NEW: Enhanced Figshare resolver with API support
-  - NEW: GitHub release resolver with rate limit handling
-  - NEW: Parquet output option (--emit-parquet)
+v1.0 features:
+  - NEW: Difficulty-aware routing via difficulties_math.yaml + math_routing fields
+  - Enhanced Figshare resolver with API support
+  - GitHub release resolver with rate limit handling
+  - Parquet output option (--emit-parquet)
   - Retry with exponential backoff
   - Resumable HTTP downloads (range requests)
   - Integrity verification (SHA256 + Zenodo MD5)
@@ -50,7 +51,7 @@ except ImportError:
     FTP = None
 
 
-VERSION = "0.9"
+VERSION = "1.0"
 
 
 def utc_now() -> str:
@@ -99,6 +100,68 @@ def safe_name(s: str) -> str:
 def load_yaml(path: Path) -> Dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
+def coerce_int(val: Any, default: int) -> int:
+    try:
+        return int(val)
+    except Exception:
+        return default
+
+def clamp_level(level: Any, default: int) -> int:
+    return max(1, min(10, coerce_int(level, default)))
+
+def resolve_route(row: Dict[str, Any], diff_cfg: Dict[str, Any]) -> Dict[str, Any]:
+    g = (diff_cfg.get("globals", {}) or {})
+    default_level = coerce_int(g.get("default_level", 5), 5)
+    default = {
+        "domain": g.get("default_domain", "misc"),
+        "category": g.get("default_category", "misc"),
+        "level": default_level,
+    }
+
+    domain = row.get("math_domain")
+    category = row.get("math_category")
+    level = row.get("difficulty_level")
+    if domain and category and level is not None:
+        return {"domain": domain, "category": category, "level": coerce_int(level, default_level)}
+
+    overrides = (diff_cfg.get("source_overrides", {}) or {})
+    if row.get("id") in overrides:
+        o = overrides[row["id"]]
+        return {
+            "domain": o.get("domain", default["domain"]),
+            "category": o.get("category", default["category"]),
+            "level": coerce_int(o.get("level", default_level), default_level),
+        }
+
+    dt = row.get("data_type", [])
+    dt_blob = " ".join(dt) if isinstance(dt, list) else str(dt or "")
+    blob = f"{row.get('name', '')} {dt_blob}".lower()
+    for rule in ((diff_cfg.get("rule_sets", {}) or {}).get("keyword_rules", []) or []):
+        keywords = (rule.get("match_any", []) or [])
+        if any(str(k).lower() in blob for k in keywords):
+            r = (rule.get("route", {}) or {})
+            return {
+                "domain": r.get("domain", default["domain"]),
+                "category": r.get("category", default["category"]),
+                "level": coerce_int(r.get("level", default_level), default_level),
+            }
+
+    return default
+
+def resolve_output_dir(ctx: "DownloaderContext", pool_name: str, route: Dict[str, Any], target_id: str) -> Path:
+    pool_name = (pool_name or "quarantine").strip().lower()
+    base = {"permissive": ctx.pools.permissive, "copyleft": ctx.pools.copyleft}.get(pool_name, ctx.pools.quarantine)
+
+    g = (ctx.difficulty_cfg.get("globals", {}) or {})
+    level = clamp_level(route.get("level"), coerce_int(g.get("default_level", 5), 5))
+    domain = safe_name(route.get("domain") or "misc")
+    category = safe_name(route.get("category") or "misc")
+    tid = safe_name(target_id)
+
+    out = base / f"d{level:02d}" / domain / category / tid
+    ensure_dir(out)
+    return out
+
 def run_cmd(cmd: List[str], cwd: Optional[Path] = None) -> str:
     p = subprocess.run(cmd, cwd=str(cwd) if cwd else None, check=True, 
                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -139,11 +202,14 @@ class DownloaderContext:
     limits: Limits
     mode: RunMode
     retry: RetryConfig
+    difficulty_cfg: Dict[str, Any]
 
 
-def pools_from_targets_yaml(targets_yaml: Optional[Path], fallback: Path) -> Pools:
+def pools_from_targets_yaml(targets_yaml: Optional[Path], fallback: Path, preloaded_cfg: Optional[Dict[str, Any]] = None) -> Pools:
+    cfg: Dict[str, Any] = preloaded_cfg or {}
     if targets_yaml and targets_yaml.exists():
-        cfg = load_yaml(targets_yaml)
+        cfg = preloaded_cfg or load_yaml(targets_yaml)
+    if cfg:
         pools = cfg.get("globals", {}).get("pools", {})
         return Pools(
             permissive=Path(pools.get("permissive", fallback / "permissive")).expanduser(),
@@ -151,13 +217,6 @@ def pools_from_targets_yaml(targets_yaml: Optional[Path], fallback: Path) -> Poo
             quarantine=Path(pools.get("quarantine", fallback / "quarantine")).expanduser(),
         )
     return Pools(fallback / "permissive", fallback / "copyleft", fallback / "quarantine")
-
-def resolve_pool_dir(ctx: DownloaderContext, pool_name: str, target_id: str) -> Path:
-    pool_name = (pool_name or "quarantine").strip().lower()
-    base = {"permissive": ctx.pools.permissive, "copyleft": ctx.pools.copyleft}.get(pool_name, ctx.pools.quarantine)
-    out = base / target_id
-    ensure_dir(out)
-    return out
 
 def log_event(ctx: DownloaderContext, event: Dict[str, Any]) -> None:
     event = dict(event)
@@ -475,13 +534,15 @@ STRATEGY_HANDLERS = {
 def run_target(ctx: DownloaderContext, row: Dict[str, Any]) -> Dict[str, Any]:
     tid = row["id"]
     pool = row.get("output_pool", "quarantine") or "quarantine"
+    route = resolve_route(row, ctx.difficulty_cfg)
     download = row.get("download", {})
     strat = (download.get("strategy") or "none").strip()
-    out_dir = resolve_pool_dir(ctx, pool, tid)
+    out_dir = resolve_output_dir(ctx, pool, route, tid)
 
     manifest = {
         "id": tid, "name": row.get("name", tid), "pool": pool, "strategy": strat,
         "started_at_utc": utc_now(), "pipeline_version": VERSION, "results": [],
+        "route": route, "output_dir": str(out_dir),
     }
 
     handler = STRATEGY_HANDLERS.get(strat)
@@ -505,6 +566,7 @@ def main() -> None:
     ap.add_argument("--queue", required=True, help="Queue JSONL")
     ap.add_argument("--targets-yaml", default=None, help="targets_math.yaml for pools")
     ap.add_argument("--pools-root", default="/data/math/pools", help="Fallback pools root")
+    ap.add_argument("--difficulty-yaml", default=None, help="difficulties_math.yaml (domain/category/level map)")
     ap.add_argument("--logs-dir", default="/data/math/_logs", help="Logs directory")
     ap.add_argument("--execute", action="store_true", help="Actually download")
     ap.add_argument("--overwrite", action="store_true", help="Overwrite existing")
@@ -522,10 +584,31 @@ def main() -> None:
 
     queue_path = Path(args.queue).expanduser().resolve()
     rows = read_jsonl(queue_path)
-    
+
+    targets_path = Path(args.targets_yaml).expanduser().resolve() if args.targets_yaml else None
+    targets_cfg: Dict[str, Any] = {}
+    if targets_path and targets_path.exists():
+        targets_cfg = load_yaml(targets_path) or {}
+
+    comp = (targets_cfg.get("companion_files", {}) or {})
+    diff_cfg: Dict[str, Any] = {}
+    diff_path_str = args.difficulty_yaml or comp.get("difficulties_map")
+    if diff_path_str:
+        raw_diff_path = Path(diff_path_str).expanduser()
+        candidates = [raw_diff_path.resolve()]
+        if targets_path:
+            candidates.insert(0, (targets_path.parent / raw_diff_path).resolve())
+        for diff_path in candidates:
+            if diff_path.exists():
+                diff_cfg = load_yaml(diff_path) or {}
+                break
+        else:
+            print(f"[WARN] difficulties map not found at {raw_diff_path}")
+
     pools = pools_from_targets_yaml(
-        Path(args.targets_yaml).expanduser().resolve() if args.targets_yaml else None,
-        Path(args.pools_root).expanduser().resolve()
+        targets_path,
+        Path(args.pools_root).expanduser().resolve(),
+        targets_cfg
     )
     logs_dir = Path(args.logs_dir).expanduser().resolve()
     ensure_dir(logs_dir)
@@ -536,6 +619,7 @@ def main() -> None:
         mode=RunMode(args.execute, args.overwrite, args.verify_sha256, args.verify_zenodo_md5,
                      args.enable_resume and not args.no_resume, max(1, args.workers)),
         retry=RetryConfig(args.retry_max, args.retry_backoff),
+        difficulty_cfg=diff_cfg,
     )
 
     if ctx.limits.limit_targets:
