@@ -1,4 +1,4 @@
-# Math Corpus Pipeline Prototype (v1.0)
+# Math Corpus Pipeline Prototype (v1.2)
 
 A safety-first **prototype** pipeline for building an **ethical mathematics-focused training corpus** from open datasets, open educational resources, and formal libraries. It adapts the chemistry pipeline while honoring the guidance in `MATH_PIPELINE_ADAPTATION.md`:
 
@@ -112,13 +112,13 @@ python3 catalog_builder.py --targets targets_math.yaml --output /data/math/_cata
 
 ## Repository Layout
 
-- `targets_math.yaml` - math dataset inventory + download/transform settings (schema v0.8)
+- `targets_math.yaml` - math dataset inventory + download/transform settings (schema v0.8, now emits generic routing fields)
 - `license_map.yaml` - SPDX normalization rules + gating policy tuned for math sources
 - `field_schemas.yaml` - versioned schemas for math text, formal units, and problem records
 - `denylist.yaml` - explicit denylist patterns (NoAI/NoTDM/NC/ND and paywalled publishers)
 - `pipeline_driver.py` - classifies targets (GREEN/YELLOW/RED), snapshots evidence, emits queues
 - `review_queue.py` - manual YELLOW review/signoff helper
-- `download_worker.py` - downloads GREEN items into the appropriate pool
+- `download_worker.py` - downloads GREEN items into the appropriate pool using the folder layout from `difficulties_math.yaml`
 - `yellow_scrubber.py` - stage-2 summaries for YELLOW items to drive human triage
 - `catalog_builder.py` - builds a global catalog and training manifests
 - `MATH_PIPELINE_ADAPTATION.md` - design notes for adapting chem → math (workers, chunking)

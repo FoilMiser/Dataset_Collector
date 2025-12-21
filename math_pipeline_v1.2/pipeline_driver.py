@@ -99,6 +99,34 @@ def contains_any(haystack: str, needles: List[str]) -> List[str]:
     return hits
 
 
+def coerce_int(val: Any, default: Optional[int] = None) -> Optional[int]:
+    try:
+        return int(val)
+    except Exception:
+        return default
+
+
+def resolve_routing_fields(target: Dict[str, Any]) -> Dict[str, Any]:
+    routing = (target.get("routing", {}) or {})
+    math_routing = (target.get("math_routing", {}) or {})
+
+    subject = routing.get("subject") or math_routing.get("subject") or "math"
+    domain = routing.get("domain") or math_routing.get("domain")
+    category = routing.get("category") or math_routing.get("category")
+    level = coerce_int(routing.get("level"), coerce_int(math_routing.get("level")))
+    granularity = routing.get("granularity") or math_routing.get("granularity") or "target"
+
+    return {
+        "subject": subject,
+        "domain": domain,
+        "category": category,
+        "level": level,
+        "granularity": granularity,
+        "confidence": routing.get("confidence"),
+        "reason": routing.get("reason"),
+    }
+
+
 @dataclasses.dataclass
 class LicenseMap:
     allow: List[str]
@@ -773,6 +801,7 @@ def main() -> None:
                 out_pool = "quarantine"
 
         mr = t.get("math_routing", {}) or {}
+        routing = resolve_routing_fields(t)
 
         evaluation = {
             "id": tid,
@@ -813,6 +842,7 @@ def main() -> None:
                 "level": mr.get("level"),
                 "granularity": mr.get("granularity"),
             },
+            "routing": routing,
         }
         write_json(target_manifest_dir / "evaluation.json", evaluation)
 
@@ -842,6 +872,14 @@ def main() -> None:
             "math_category": mr.get("category"),
             "difficulty_level": mr.get("level"),
             "math_granularity": mr.get("granularity"),
+            # Generic routing (v2)
+            "routing_subject": routing.get("subject"),
+            "routing_domain": routing.get("domain"),
+            "routing_category": routing.get("category"),
+            "routing_level": routing.get("level"),
+            "routing_granularity": routing.get("granularity"),
+            "routing_confidence": routing.get("confidence"),
+            "routing_reason": routing.get("reason"),
         }
 
         if not enabled:
