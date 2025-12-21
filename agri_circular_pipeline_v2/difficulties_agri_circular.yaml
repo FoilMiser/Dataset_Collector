@@ -1,0 +1,33 @@
+subjects:
+  agri_circular:
+    domains:
+      agronomy:
+        categories:
+          crop_management:
+            level: { default: 3 }
+          pest_disease:
+            level: { default: 4 }
+      soil:
+        categories:
+          soil_health:
+            level: { default: 4 }
+          nutrient_cycles:
+            level: { default: 5 }
+      waste_streams:
+        categories:
+          composting:
+            level: { default: 3 }
+          anaerobic_digestion:
+            level: { default: 6 }
+          recycling_sorting:
+            level: { default: 5 }
+      circular_bioeconomy:
+        categories:
+          biorefineries:
+            level: { default: 7 }
+          lca:
+            level: { default: 6 }
+      policy_compliance:
+        categories:
+          reporting_protocols:
+            level: { default: 6 }
