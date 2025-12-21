@@ -1,0 +1,247 @@
+# field_schemas.yaml
+# v0.7 — Versioned field definitions for math extraction
+#
+# Each schema version is immutable once released. Create a new version for changes.
+# This ensures reproducibility: you can always know exactly what fields were extracted.
+
+schema_version: "0.7"
+updated_utc: "2026-06-01"
+
+schemas:
+
+  math_text_chunk_v1.0.0:
+    description: "Math-aware text chunks (textbooks, articles, PDF extractions)"
+    version: "1.0.0"
+    created_utc: "2026-06-01"
+    source: "pdf_math_worker | hf_math_filter_worker"
+    notes: |
+      Preserve LaTeX blocks and Unicode math symbols. Chunks keep page ranges and
+      equation density to support downstream filtering.
+    fields:
+      record_id:
+        description: "Unique chunk identifier"
+        type: "string"
+        required: true
+        nullable: false
+        validation:
+          max_length: 128
+      source_id:
+        description: "Origin target id"
+        type: "string"
+        required: true
+        nullable: false
+      chunk_id:
+        description: "Chunk-local identifier"
+        type: "string"
+        required: true
+        nullable: false
+      section_header:
+        description: "Nearest section or chapter heading"
+        type: "string"
+        required: false
+        nullable: true
+        validation:
+          max_length: 500
+      page_range:
+        description: "Inclusive page range for this chunk"
+        type: "string"
+        required: false
+        nullable: true
+        validation:
+          pattern: '^[0-9]+(-[0-9]+)?$'
+      text:
+        description: "Raw text with math preserved"
+        type: "string"
+        required: true
+        nullable: false
+        validation:
+          max_length: 12000
+      math_format:
+        description: "Dominant math representation"
+        type: "string"
+        required: false
+        nullable: true
+        validation:
+          enum: ["latex_inline", "latex_block", "unicode_math", "plain"]
+      equation_density:
+        description: "Heuristic fraction of math tokens per chunk"
+        type: "float"
+        required: false
+        nullable: true
+        validation:
+          min: 0.0
+          max: 1.0
+      tokens_estimated:
+        description: "Estimated token count"
+        type: "integer"
+        required: false
+        nullable: true
+        validation:
+          min: 0
+      tags:
+        description: "Topic tags and difficulty labels"
+        type: "array"
+        required: false
+        nullable: true
+        items:
+          type: "string"
+          validation:
+            max_length: 100
+
+  formal_math_unit_v1.0.0:
+    description: "Formal math units chunked by theorem/lemma/definition"
+    version: "1.0.0"
+    created_utc: "2026-06-01"
+    source: "formal_math_worker"
+    notes: "Supports Lean/Coq/Isabelle/Agda/Metamath with statement + optional proof."
+    fields:
+      record_id:
+        description: "Unique identifier for the chunk"
+        type: "string"
+        required: true
+        nullable: false
+        validation:
+          max_length: 128
+      source_id:
+        description: "Target id / repository"
+        type: "string"
+        required: true
+        nullable: false
+      language:
+        description: "Formal language (lean, coq, isabelle, agda, metamath)"
+        type: "string"
+        required: true
+        nullable: false
+        validation:
+          enum: ["lean", "coq", "isabelle", "agda", "metamath"]
+      file_path:
+        description: "Relative path within repo"
+        type: "string"
+        required: true
+        nullable: false
+      module_path:
+        description: "Module/namespace path"
+        type: "string"
+        required: false
+        nullable: true
+        validation:
+          max_length: 500
+      theorem_name:
+        description: "Name of theorem/lemma/definition"
+        type: "string"
+        required: true
+        nullable: false
+        validation:
+          max_length: 300
+      statement_text:
+        description: "Statement rendered as text/LaTeX"
+        type: "string"
+        required: true
+        nullable: false
+        validation:
+          max_length: 8000
+      proof_text:
+        description: "Proof or tactic script"
+        type: "string"
+        required: false
+        nullable: true
+        validation:
+          max_length: 20000
+      dependencies:
+        description: "Imports or referenced lemmas"
+        type: "array"
+        required: false
+        nullable: true
+        items:
+          type: "string"
+          validation:
+            max_length: 400
+      tags:
+        description: "Topic tags (algebra, analysis, etc.)"
+        type: "array"
+        required: false
+        nullable: true
+        items:
+          type: "string"
+          validation:
+            max_length: 100
+
+  math_problem_v1.0.0:
+    description: "Math problems/exercises with answers and optional solutions"
+    version: "1.0.0"
+    created_utc: "2026-06-01"
+    source: "synthetic_math_problems | hf_math_filter_worker"
+    notes: "Supports auto-graded synthetic sets and licensed OER problem corpora."
+    fields:
+      problem_id:
+        description: "Unique identifier"
+        type: "string"
+        required: true
+        nullable: false
+        validation:
+          max_length: 128
+      domain:
+        description: "Curricular domain (arithmetic, algebra, topology, etc.)"
+        type: "string"
+        required: true
+        nullable: false
+        validation:
+          max_length: 200
+      difficulty:
+        description: "Difficulty label"
+        type: "string"
+        required: true
+        nullable: false
+        validation:
+          enum: ["basic", "intermediate", "advanced"]
+      prompt:
+        description: "Problem statement"
+        type: "string"
+        required: true
+        nullable: false
+        validation:
+          max_length: 8000
+      answer_key:
+        description: "Canonical answer"
+        type: "string"
+        required: true
+        nullable: false
+        validation:
+          max_length: 4000
+      solution_text:
+        description: "Optional worked solution"
+        type: "string"
+        required: false
+        nullable: true
+        validation:
+          max_length: 12000
+      grading_fn:
+        description: "Reference to grading function/regex"
+        type: "string"
+        required: false
+        nullable: true
+        validation:
+          max_length: 500
+      answer_format:
+        description: "Expected answer format (numeric, expression, proof, multiple_choice)"
+        type: "string"
+        required: true
+        nullable: false
+        validation:
+          enum: ["numeric", "expression", "proof", "multiple_choice", "text"]
+      tags:
+        description: "Topic tags"
+        type: "array"
+        required: false
+        nullable: true
+        items:
+          type: "string"
+          validation:
+            max_length: 100
+      source_url:
+        description: "Original URL if applicable"
+        type: "string"
+        required: false
+        nullable: true
+        validation:
+          max_length: 1000

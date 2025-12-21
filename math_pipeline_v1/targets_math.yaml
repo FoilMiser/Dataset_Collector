@@ -1,0 +1,700 @@
+# targets_math.yaml
+# v0.1 — Mathematics specialization (adapted from chem pipeline)
+# Companion files expected: ./license_map.yaml, ./field_schemas.yaml, ./denylist.yaml
+# Guidance captured from MATH_PIPELINE_ADAPTATION.md.
+#
+# Notes
+# - Keep YELLOW sources isolated in quarantine/copyleft pools until manual review.
+# - Prefer sources with machine-readable licenses (dataset cards, LICENSE files, CC deeds).
+# - Record-level sources flow through a math-aware filter worker before leaving quarantine.
+# - Share-alike sources remain in the copyleft pool with attribution bundles.
+
+schema_version: "0.8"
+updated_utc: "2026-06-01"
+
+companion_files:
+  license_map: "./license_map.yaml"
+  field_schemas: "./field_schemas.yaml"
+  denylist: "./denylist.yaml"
+
+globals:
+  storage_root: "/data/math"
+  staging_root: "/data/math/_staging"
+  manifests_root: "/data/math/_manifests"
+  queues_root: "/data/math/_queues"
+  catalogs_root: "/data/math/_catalogs"
+  logs_root: "/data/math/_logs"
+
+  pools:
+    permissive: "/data/math/pools/permissive"
+    copyleft: "/data/math/pools/copyleft"
+    quarantine: "/data/math/pools/quarantine"
+
+  # Require signoff for YELLOW items before they progress
+  require_yellow_signoff: false
+
+  near_duplicate_detection:
+    enabled: true
+    method: "minhash_lsh"   # minhash_lsh | exact_hash
+    num_perm: 128
+    threshold: 0.85
+    emit_duplicate_groups: true
+
+  parquet_output:
+    enabled: false
+    compression: "snappy"
+    row_group_size: 100000
+
+  # Math-friendly defaults for text normalization and chunking
+  normalization:
+    enabled: true
+    canonicalize_unicode: true
+    preserve_latex: true
+    normalize_whitespace: true
+    keep_math_symbols: true
+    report_coverage: true
+
+  default_gates:
+    - "snapshot_terms"
+    - "resolve_license_spdx"
+    - "restriction_phrase_scan"
+    - "emit_training_manifest"
+    - "emit_attribution_bundle"
+
+  download_defaults:
+    retry_max: 3
+    retry_backoff_base: 2.0
+    retry_backoff_max: 60
+    timeout_connect: 30
+    timeout_read: 300
+    verify_checksums: true
+    enable_resume: true
+    max_concurrent_workers: 4
+    user_agent: "math-corpus-pipeline/0.1"
+
+  text_processing_defaults:
+    max_chunk_chars: 6000
+    min_chunk_chars: 500
+    drop_tables: false
+    drop_references_section: false
+    keep_citations_inline: true
+    include_section_headers: true
+    include_figure_captions: true
+    include_table_captions: true
+    preserve_line_breaks: true
+    allow_latex_blocks: true
+    detect_equation_density: true
+
+  statistics_defaults:
+    estimate_tokens: true
+    token_model: "cl100k_base"
+    collect_property_distributions: true
+    sample_size_for_distributions: 10000
+
+queues:
+  emit:
+    - id: "green_download"
+      path: "/data/math/_queues/green_download.jsonl"
+      criteria:
+        effective_bucket: "GREEN"
+        enabled: true
+    - id: "yellow_pipeline"
+      path: "/data/math/_queues/yellow_pipeline.jsonl"
+      criteria:
+        effective_bucket: "YELLOW"
+        enabled: true
+    - id: "red_rejected"
+      path: "/data/math/_queues/red_rejected.jsonl"
+      criteria:
+        effective_bucket: "RED"
+        enabled: true
+
+gates_catalog:
+  snapshot_terms: "Save Terms/ToS + license page HTML/PDF/TXT + retrieval timestamp."
+  resolve_license_spdx: "Normalize license to SPDX via license_map.yaml rules; store evidence."
+  restriction_phrase_scan: "Scan terms/content for restriction phrases (no-LLM/no-TDM/etc.)."
+  record_level_filter: "Require per-record license metadata; keep only allowlist."
+  domain_filter_math_stackexchange: "Keep StackExchange rows limited to Math.SE/MathOverflow/CrossValidated."
+  domain_filter_arxiv_math: "Keep arXiv records where category starts with math.*."
+  domain_filter_math_textbooks: "Keep OER/open textbook rows with math subjects and visible formulas."
+  extract_text_chunks: "Extract text into JSONL chunks using globals.text_processing_defaults unless overridden."
+  extract_latex_aware_chunks: "Preserve LaTeX blocks and math symbols; keep page ranges and equation density."
+  formal_chunk_by_theorem: "Chunk formal libraries by theorem/definition with optional proof text."
+  formal_chunk_by_lemma: "Chunk formal libraries by lemma/theorem boundaries."
+  formal_chunk_by_module: "Chunk formal libraries by module/file with itemized statements."
+  formal_chunk_by_entry: "Chunk Isabelle AFP entries as standalone units with license metadata."
+  code_and_docs_chunking: "Chunk code and docs together for math software (e.g., CAS libraries)."
+  emit_training_manifest: "Manifest of included files/records + checksums + license evidence."
+  emit_attribution_bundle: "Generate ATTRIBUTION.md + CITATIONS.bib for included sources."
+  manual_legal_review: "Human review required before training."
+  segregate_copyleft_pool: "Force output into copyleft pool and keep isolated."
+  near_duplicate_detection: "Run MinHash/LSH deduplication pass."
+  split_aware_partition: "Partition data respecting split_group_id for leak prevention."
+
+resolvers:
+  github:
+    mode: "release"
+    api_base: "https://api.github.com"
+    rate_limit:
+      requests_per_hour: 60
+      retry_on_403: true
+      exponential_backoff: true
+    endpoints:
+      releases: "/repos/{owner}/{repo}/releases"
+      latest: "/repos/{owner}/{repo}/releases/latest"
+      assets: "/repos/{owner}/{repo}/releases/{release_id}/assets"
+    note: "Use GITHUB_TOKEN env var for higher rate limits."
+  huggingface_datasets:
+    mode: "dataset_id"
+    note: "Use datasets.load_dataset; capture dataset card + license field."
+  git:
+    mode: "repo"
+    note: "Capture commit hash; store LICENSE + README as evidence."
+  http:
+    mode: "direct_url"
+    note: "Direct file download with resume."
+  ftp:
+    mode: "base_url + globs"
+    note: "List + filter by glob; store directory listing snapshot."
+  zenodo:
+    mode: "record_id_or_doi"
+    api: "https://zenodo.org/api/records/{record_id}"
+    outputs:
+      - "files[*].links.self"
+      - "files[*].checksum"
+    verify_checksum: true
+    checksum_algorithm: "md5"
+  dataverse:
+    mode: "persistent_id"
+    default_instance: "https://dataverse.harvard.edu"
+
+# ---------------------------------------------------------------------
+# TARGETS
+# ---------------------------------------------------------------------
+# Conventions:
+# - license_profile:
+#     permissive  -> intended GREEN if SPDX resolves to allow
+#     copyleft    -> intended YELLOW (segregate pool)
+#     record_level-> intended YELLOW (must filter per record)
+#     deny        -> intended RED
+# - spdx_hint SHOULD be "UNKNOWN" unless you are 100% sure.
+#   Provide license_evidence.url so pipeline_driver can snapshot and normalize.
+
+targets:
+  - id: "synthetic_math_problems"
+    name: "Deterministic generated math problems (arithmetic→analysis; auto-graded)"
+    enabled: true
+    priority: 1
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "CC0-1.0"
+      url: ""
+    data_type: ["synthetic", "math", "problems", "equations", "word_problems"]
+    download:
+      strategy: "none"
+    build:
+      owner: "you"
+      output_formats: ["jsonl"]
+      required_fields: ["problem_id", "domain", "difficulty", "prompt", "answer_key", "grading_fn", "answer_format", "tags"]
+      field_schema_version: "math_problem_v1.0.0"
+    gates_override:
+      add: ["emit_training_manifest"]
+
+  - id: "common-pile_wikipedia"
+    name: "Common Pile: Wikipedia (math-heavy articles; CC BY-SA via Wikimedia)"
+    enabled: true
+    priority: 2
+    license_profile: "copyleft"
+    license_evidence:
+      spdx_hint: "CC-BY-SA-4.0"
+      url: "https://creativecommons.org/licenses/by-sa/4.0/"
+    data_type: ["text", "math", "reference", "wikimedia"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/wikipedia"
+      config: null
+      splits: ["train"]
+    output:
+      pool: "copyleft"
+      formats: ["hf_dataset"]
+    text_processing:
+      max_chunk_chars: 6000
+      min_chunk_chars: 500
+      drop_references_section: false
+      keep_citations_inline: true
+
+  - id: "common-pile_wikibooks"
+    name: "Common Pile: Wikibooks (open textbooks; CC BY-SA)"
+    enabled: true
+    priority: 2
+    license_profile: "copyleft"
+    license_evidence:
+      spdx_hint: "CC-BY-SA-4.0"
+      url: "https://creativecommons.org/licenses/by-sa/4.0/"
+    data_type: ["text", "math", "reference", "wikimedia"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/wikibooks"
+      config: null
+      splits: ["train"]
+    output:
+      pool: "copyleft"
+      formats: ["hf_dataset"]
+    text_processing:
+      max_chunk_chars: 6000
+      min_chunk_chars: 500
+      drop_references_section: false
+      keep_citations_inline: true
+
+  - id: "common-pile_wikiversity"
+    name: "Common Pile: Wikiversity (course notes; CC BY-SA)"
+    enabled: true
+    priority: 2
+    license_profile: "copyleft"
+    license_evidence:
+      spdx_hint: "CC-BY-SA-4.0"
+      url: "https://creativecommons.org/licenses/by-sa/4.0/"
+    data_type: ["text", "math", "reference", "wikimedia"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/wikiversity"
+      config: null
+      splits: ["train"]
+    output:
+      pool: "copyleft"
+      formats: ["hf_dataset"]
+    text_processing:
+      max_chunk_chars: 6000
+      min_chunk_chars: 500
+      drop_references_section: false
+      keep_citations_inline: true
+
+  - id: "common_pile_stackexchange_math"
+    name: "Common Pile: StackExchange (filter to Math.SE, MathOverflow, CrossValidated; CC BY-SA)"
+    enabled: true
+    priority: 3
+    license_profile: "copyleft"
+    license_evidence:
+      spdx_hint: "CC-BY-SA-4.0"
+      url: "https://creativecommons.org/licenses/by-sa/4.0/"
+    data_type: ["qa", "math", "stackexchange"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/stackexchange"
+      config: null
+      splits: ["train"]
+    output:
+      pool: "copyleft"
+      formats: ["hf_dataset"]
+    gates_override:
+      add: ["record_level_filter", "domain_filter_math_stackexchange"]
+    review_required: false
+
+  - id: "common_pile_arxiv_papers_math"
+    name: "Common Pile: arXiv papers (CC subset only; filter to math categories; record-level license)"
+    enabled: true
+    priority: 4
+    license_profile: "record_level"
+    license_evidence:
+      spdx_hint: "CC-BY-4.0"
+      url: "https://huggingface.co/datasets/common-pile/arxiv_papers"
+    data_type: ["papers", "math", "latex", "arxiv"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/arxiv_papers"
+      config: null
+      splits: ["train"]
+    output:
+      pool: "quarantine"
+      formats: ["hf_dataset"]
+    gates_override:
+      add: ["record_level_filter", "domain_filter_arxiv_math", "extract_latex_aware_chunks"]
+    review_required: true
+
+  - id: "common-pile_oercommons_math"
+    name: "Common Pile: OERCommons (mixed CC; filter math; record-level license)"
+    enabled: true
+    priority: 5
+    license_profile: "record_level"
+    license_evidence:
+      spdx_hint: "UNKNOWN"
+      url: "https://huggingface.co/datasets/common-pile/oercommons"
+    data_type: ["text", "math", "oer", "books"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/oercommons"
+      config: null
+      splits: ["train"]
+    output:
+      pool: "quarantine"
+      formats: ["hf_dataset"]
+    gates_override:
+      add: ["record_level_filter", "domain_filter_math_textbooks", "emit_attribution_bundle"]
+    review_required: true
+
+  - id: "common-pile_libretexts_math"
+    name: "Common Pile: LibreTexts (mixed CC; filter math; record-level license)"
+    enabled: true
+    priority: 5
+    license_profile: "record_level"
+    license_evidence:
+      spdx_hint: "UNKNOWN"
+      url: "https://huggingface.co/datasets/common-pile/libretexts"
+    data_type: ["text", "math", "oer", "books"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/libretexts"
+      config: null
+      splits: ["train"]
+    output:
+      pool: "quarantine"
+      formats: ["hf_dataset"]
+    gates_override:
+      add: ["record_level_filter", "domain_filter_math_textbooks", "emit_attribution_bundle"]
+    review_required: true
+
+  - id: "common-pile_pressbooks_math"
+    name: "Common Pile: Pressbooks (mixed CC; filter math; record-level license)"
+    enabled: true
+    priority: 5
+    license_profile: "record_level"
+    license_evidence:
+      spdx_hint: "UNKNOWN"
+      url: "https://huggingface.co/datasets/common-pile/pressbooks"
+    data_type: ["text", "math", "oer", "books"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/pressbooks"
+      config: null
+      splits: ["train"]
+    output:
+      pool: "quarantine"
+      formats: ["hf_dataset"]
+    gates_override:
+      add: ["record_level_filter", "domain_filter_math_textbooks", "emit_attribution_bundle"]
+    review_required: true
+
+  - id: "common-pile_doab_math"
+    name: "Common Pile: DOAB (open access books; record-level license)"
+    enabled: true
+    priority: 5
+    license_profile: "record_level"
+    license_evidence:
+      spdx_hint: "UNKNOWN"
+      url: "https://huggingface.co/datasets/common-pile/doab"
+    data_type: ["text", "math", "oer", "books"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/doab"
+      config: null
+      splits: ["train"]
+    output:
+      pool: "quarantine"
+      formats: ["hf_dataset"]
+    gates_override:
+      add: ["record_level_filter", "domain_filter_math_textbooks", "emit_attribution_bundle"]
+    review_required: true
+
+  - id: "common-pile_project_gutenberg_math"
+    name: "Common Pile: Project Gutenberg (public domain focus; record-level rights)"
+    enabled: true
+    priority: 5
+    license_profile: "record_level"
+    license_evidence:
+      spdx_hint: "UNKNOWN"
+      url: "https://huggingface.co/datasets/common-pile/project_gutenberg"
+    data_type: ["text", "math", "oer", "books"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/project_gutenberg"
+      config: null
+      splits: ["train"]
+    output:
+      pool: "quarantine"
+      formats: ["hf_dataset"]
+    gates_override:
+      add: ["record_level_filter", "domain_filter_math_textbooks", "emit_attribution_bundle"]
+    review_required: true
+
+  - id: "metamath_setmm"
+    name: "Metamath set.mm database (CC0 / public domain-like)"
+    enabled: true
+    priority: 2
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "CC0-1.0"
+      url: "https://us.metamath.org/#license"
+    data_type: ["formal_math", "proofs", "metamath"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/metamath/set.mm"
+      checkout: "master"
+    output:
+      pool: "permissive"
+      formats: ["git_repo"]
+    gates_override:
+      add: ["formal_chunk_by_theorem"]
+
+  - id: "lean4_core"
+    name: "Lean 4 core (Apache-2.0)"
+    enabled: true
+    priority: 3
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "Apache-2.0"
+      url: "https://github.com/leanprover/lean4"
+    data_type: ["formal_math", "proofs", "lean", "code"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/leanprover/lean4"
+      checkout: "master"
+    output:
+      pool: "permissive"
+      formats: ["git_repo"]
+    gates_override:
+      add: ["formal_chunk_by_lemma"]
+
+  - id: "mathlib4"
+    name: "Lean mathlib4 (Apache-2.0)"
+    enabled: true
+    priority: 1
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "Apache-2.0"
+      url: "https://github.com/leanprover-community/mathlib4"
+    data_type: ["formal_math", "proofs", "lean", "mathlib"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/leanprover-community/mathlib4"
+      checkout: "master"
+    output:
+      pool: "permissive"
+      formats: ["git_repo"]
+    gates_override:
+      add: ["formal_chunk_by_lemma", "emit_training_manifest"]
+
+  - id: "unimath"
+    name: "UniMath (MIT)"
+    enabled: true
+    priority: 4
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "MIT"
+      url: "https://github.com/UniMath/UniMath"
+    data_type: ["formal_math", "proofs", "coq", "unimath"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/UniMath/UniMath"
+      checkout: "master"
+    output:
+      pool: "permissive"
+      formats: ["git_repo"]
+    gates_override:
+      add: ["formal_chunk_by_theorem"]
+
+  - id: "agda_stdlib"
+    name: "Agda standard library (MIT)"
+    enabled: true
+    priority: 6
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "MIT"
+      url: "https://github.com/agda/agda-stdlib"
+    data_type: ["formal_math", "proofs", "agda"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/agda/agda-stdlib"
+      checkout: "master"
+    output:
+      pool: "permissive"
+      formats: ["git_repo"]
+    gates_override:
+      add: ["formal_chunk_by_module"]
+
+  - id: "coq"
+    name: "Coq (LGPL-2.1) — includes standard library; formal proofs"
+    enabled: true
+    priority: 6
+    license_profile: "copyleft"
+    license_evidence:
+      spdx_hint: "LGPL-2.1"
+      url: "https://github.com/coq/coq"
+    data_type: ["formal_math", "proofs", "coq"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/coq/coq"
+      checkout: "master"
+    output:
+      pool: "copyleft"
+      formats: ["git_repo"]
+    gates_override:
+      add: ["formal_chunk_by_lemma"]
+
+  - id: "hol_light"
+    name: "HOL Light (BSD-style) — formal proofs"
+    enabled: true
+    priority: 6
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "BSD-2-Clause"
+      url: "https://github.com/jrh13/hol-light"
+    data_type: ["formal_math", "proofs", "hol_light"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/jrh13/hol-light"
+      checkout: "master"
+    output:
+      pool: "permissive"
+      formats: ["git_repo"]
+    gates_override:
+      add: ["formal_chunk_by_theorem"]
+
+  - id: "sympy"
+    name: "SymPy (BSD-3-Clause) — symbolic algebra code + docs"
+    enabled: true
+    priority: 5
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "BSD-3-Clause"
+      url: "https://github.com/sympy/sympy/blob/master/LICENSE"
+    data_type: ["math", "cas", "code", "docs"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/sympy/sympy"
+      checkout: "master"
+    output:
+      pool: "permissive"
+      formats: ["git_repo"]
+    gates_override:
+      add: ["code_and_docs_chunking"]
+
+  - id: "isabelle_afp"
+    name: "Isabelle Archive of Formal Proofs (mixed/record-level licenses)"
+    enabled: true
+    priority: 7
+    license_profile: "record_level"
+    license_evidence:
+      spdx_hint: "BSD-2-Clause"
+      url: "https://www.isa-afp.org/"
+    data_type: ["formal_math", "proofs", "isabelle"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/isabelle-prover/afp-devel"
+      checkout: "main"
+    output:
+      pool: "quarantine"
+      formats: ["git_repo"]
+    gates_override:
+      add: ["record_level_filter", "formal_chunk_by_entry"]
+    review_required: true
+
+  - id: "openstax_college_algebra_pdf"
+    name: "OpenStax: College Algebra (PDF; CC BY)"
+    enabled: true
+    priority: 4
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "CC-BY-4.0"
+      url: "https://openstax.org/license/"
+    data_type: ["textbook", "math", "algebra"]
+    download:
+      strategy: "http"
+      urls:
+        - "https://assets.openstax.org/oscms-prodcms/media/documents/CollegeAlgebra-OP.pdf"
+    output:
+      pool: "permissive"
+      formats: ["pdf"]
+    gates_override:
+      add: ["extract_text_chunks", "extract_latex_aware_chunks"]
+
+  - id: "openstax_calculus_v1_pdf"
+    name: "OpenStax: Calculus Volume 1 (PDF; CC BY)"
+    enabled: true
+    priority: 4
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "CC-BY-4.0"
+      url: "https://openstax.org/license/"
+    data_type: ["textbook", "math", "calculus"]
+    download:
+      strategy: "http"
+      urls:
+        - "https://assets.openstax.org/oscms-prodcms/media/documents/Calculus_Volume_1_-_WEB_68M1Z5W.pdf"
+    output:
+      pool: "permissive"
+      formats: ["pdf"]
+    gates_override:
+      add: ["extract_text_chunks", "extract_latex_aware_chunks"]
+
+  - id: "proofwiki"
+    name: "ProofWiki (CC BY-SA) — needs wiki dump or respectful crawler"
+    enabled: false
+    priority: 9
+    license_profile: "copyleft"
+    license_evidence:
+      spdx_hint: "CC-BY-SA-3.0"
+      url: "https://proofwiki.org/wiki/ProofWiki:Copyrights"
+    data_type: ["math", "reference", "proofs"]
+    download:
+      strategy: "http"
+      urls: []
+    output:
+      pool: "copyleft"
+      formats: ["html"]
+    gates_override:
+      add: ["manual_legal_review"]
+    review_required: true
+
+  - id: "planetmath"
+    name: "PlanetMath (CC BY-SA) — needs crawler or site export"
+    enabled: false
+    priority: 9
+    license_profile: "copyleft"
+    license_evidence:
+      spdx_hint: "CC-BY-SA-3.0"
+      url: "https://planetmath.org/terms"
+    data_type: ["math", "encyclopedia"]
+    download:
+      strategy: "http"
+      urls: []
+    output:
+      pool: "copyleft"
+      formats: ["html"]
+    gates_override:
+      add: ["manual_legal_review"]
+    review_required: true
+
+  - id: "webwork_open_problem_library"
+    name: "WeBWorK Open Problem Library (CC BY-NC-SA) — NOT allowed for commercial training"
+    enabled: false
+    priority: 10
+    license_profile: "deny"
+    license_evidence:
+      spdx_hint: "CC-BY-NC-SA-3.0"
+      url: "https://github.com/openwebwork/webwork-open-problem-library/blob/main/OPL_LICENSE"
+    data_type: ["problems", "math", "homework"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/openwebwork/webwork-open-problem-library"
+      checkout: "main"
+    output:
+      pool: "quarantine"
+      formats: ["git_repo"]
+    review_required: true
+
+  - id: "mit_ocw_mathematics"
+    name: "MIT OpenCourseWare mathematics (CC BY-NC-SA) — NOT allowed for commercial training"
+    enabled: false
+    priority: 10
+    license_profile: "deny"
+    license_evidence:
+      spdx_hint: "CC-BY-NC-SA-4.0"
+      url: "https://ocw.mit.edu/terms/"
+    data_type: ["courseware", "math", "lecture_notes"]
+    download:
+      strategy: "http"
+      urls: []
+    output:
+      pool: "quarantine"
+      formats: ["html"]
+    review_required: true
