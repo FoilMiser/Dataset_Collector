@@ -3,7 +3,7 @@ updated_utc: '2025-12-21 04:18:12Z'
 globals:
   destination_root_windows: E:/AI-Research/datasets/Natural/math
   destination_root_wsl: /mnt/e/AI-Research/datasets/Natural/math
-  folder_layout: pools/{pool}/{subject}/d{level:02d}/{domain}/{category}/{target_id}
+  folder_layout: final/{license_pool}/d{level:02d}/{subject}/{domain}/{category}
   sanitize_path_segments: true
   default_subject: math
   default_domain: misc

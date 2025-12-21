@@ -22,7 +22,7 @@ What it does (safe by default):
   - Allows controlled evidence fetching for license-gated/dynamic pages via custom headers
   - Computes effective bucket based on profile + SPDX allow/conditional/deny + restriction phrase hits
 
-It does NOT download giant dataset payloads; that's download_worker.py.
+It does NOT download giant dataset payloads; that's handled by acquire_worker.py.
 
 v1.0 changes:
   - License confidence scoring with configurable minimum threshold
@@ -586,8 +586,8 @@ def generate_dry_run_report(
         "NEXT STEPS",
         "-" * 40,
         "  1. Review this summary for any unexpected classifications",
-        "  2. Run download_worker.py with --execute to download GREEN targets",
-        "  3. Run yellow_scrubber.py for YELLOW targets requiring transforms",
+        "  2. Run acquire_worker.py with --execute to download GREEN and YELLOW targets",
+        "  3. Run yellow_screen_worker.py, merge_worker.py, and difficulty_worker.py per PIPELINE_V2_REWORK_PLAN.md",
         "",
         "=" * 70,
     ])
@@ -822,6 +822,7 @@ def main() -> None:
             "restriction_hits": restriction_hits,
             "gates": gates,
             "effective_bucket": eff_bucket,
+            "queue_bucket": eff_bucket,
             "license_evidence_url": evidence_url,
             "evidence_snapshot": evidence_snapshot,
             "evidence_headers_used": headers,
@@ -850,6 +851,7 @@ def main() -> None:
             "id": tid,
             "name": name,
             "effective_bucket": eff_bucket,
+            "queue_bucket": eff_bucket,
             "license_profile": profile,
             "resolved_spdx": resolved,
             "resolved_spdx_confidence": resolved_confidence,

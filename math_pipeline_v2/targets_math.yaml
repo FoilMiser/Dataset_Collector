@@ -6,67 +6,47 @@ companion_files:
   denylist: ./denylist.yaml
   difficulties_map: ./difficulties_math.yaml
 globals:
-  storage_root: /data/math
-  staging_root: /data/math/_staging
+  raw_root: /data/math/raw
+  screened_yellow_root: /data/math/screened_yellow
+  combined_root: /data/math/combined
+  final_root: /data/math/final
+  ledger_root: /data/math/_ledger
+  pitches_root: /data/math/_pitches
   manifests_root: /data/math/_manifests
   queues_root: /data/math/_queues
   catalogs_root: /data/math/_catalogs
   logs_root: /data/math/_logs
-  pools:
-    permissive: /data/math/pools/permissive
-    copyleft: /data/math/pools/copyleft
-    quarantine: /data/math/pools/quarantine
   require_yellow_signoff: false
-  near_duplicate_detection:
-    enabled: true
-    method: minhash_lsh
-    num_perm: 128
-    threshold: 0.85
-    emit_duplicate_groups: true
-  parquet_output:
-    enabled: false
-    compression: snappy
-    row_group_size: 100000
-  normalization:
-    enabled: true
-    canonicalize_unicode: true
-    preserve_latex: true
-    normalize_whitespace: true
-    keep_math_symbols: true
-    report_coverage: true
+  sharding:
+    max_records_per_shard: 50000
+    compression: gzip
+  screening:
+    min_chars: 200
+    max_chars: 12000
+    text_field_candidates:
+    - text
+    - content
+    - body
+    record_license_field_candidates:
+    - license
+    - license_spdx
+    require_record_license: false
+    allow_spdx:
+    - CC-BY-4.0
+    - CC0-1.0
+    - MIT
+    - Apache-2.0
+    - CC-BY-SA-4.0
+    deny_phrases:
+    - noai
+    - "no tdm"
+    - "no machine learning"
   default_gates:
   - snapshot_terms
   - resolve_license_spdx
   - restriction_phrase_scan
   - emit_training_manifest
   - emit_attribution_bundle
-  download_defaults:
-    retry_max: 3
-    retry_backoff_base: 2.0
-    retry_backoff_max: 60
-    timeout_connect: 30
-    timeout_read: 300
-    verify_checksums: true
-    enable_resume: true
-    max_concurrent_workers: 4
-    user_agent: math-corpus-pipeline/0.1
-  text_processing_defaults:
-    max_chunk_chars: 6000
-    min_chunk_chars: 500
-    drop_tables: false
-    drop_references_section: false
-    keep_citations_inline: true
-    include_section_headers: true
-    include_figure_captions: true
-    include_table_captions: true
-    preserve_line_breaks: true
-    allow_latex_blocks: true
-    detect_equation_density: true
-  statistics_defaults:
-    estimate_tokens: true
-    token_model: cl100k_base
-    collect_property_distributions: true
-    sample_size_for_distributions: 10000
 queues:
   emit:
   - id: green_download
