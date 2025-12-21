@@ -1,0 +1,567 @@
+# targets_agri_circular.yaml
+# v0.1 — agriculture + waste streams + circular bioeconomy dataset inventory
+# Companion files: ./license_map.yaml, ./field_schemas.yaml, ./denylist.yaml, ./difficulties_agri_circular.yaml
+#
+# Notes:
+#   - GREEN: permissive/public-domain sources (auto-ingest)
+#   - YELLOW: record-level or copyleft sources (manual/automated screening required)
+#   - RED: denylisted / high-risk (kept as disabled documentation)
+#
+schema_version: "0.8"
+updated_utc: "2025-12-17T19:00:00Z"
+companion_files:
+  license_map: "./license_map.yaml"
+  field_schemas: "./field_schemas.yaml"
+  denylist: "./denylist.yaml"
+  difficulties_map: "./difficulties_agri_circular.yaml"
+
+globals:
+  raw_root: "/data/agri_circular/raw"
+  screened_yellow_root: "/data/agri_circular/screened_yellow"
+  combined_root: "/data/agri_circular/combined"
+  final_root: "/data/agri_circular/final"
+
+  ledger_root: "/data/agri_circular/_ledger"
+  pitches_root: "/data/agri_circular/_pitches"
+  manifests_root: "/data/agri_circular/_manifests"
+  queues_root: "/data/agri_circular/_queues"
+  catalogs_root: "/data/agri_circular/_catalogs"
+  logs_root: "/data/agri_circular/_logs"
+
+  require_yellow_signoff: false
+
+  sharding:
+    max_records_per_shard: 50000
+    compression: gzip
+
+  screening:
+    min_chars: 200
+    max_chars: 12000
+    text_field_candidates: ["text", "content", "body"]
+    record_license_field_candidates: ["license", "license_spdx"]
+    require_record_license: false
+    allow_spdx: ["CC-BY-4.0", "CC0-1.0", "MIT", "Apache-2.0", "CC-BY-SA-4.0"]
+    deny_phrases:
+      - noai
+      - "no tdm"
+      - "no machine learning"
+  default_gates:
+    - "snapshot_terms"
+    - "resolve_license_spdx"
+    - "restriction_phrase_scan"
+    - "emit_training_manifest"
+    - "emit_attribution_bundle"
+
+queues:
+  emit:
+    - id: "green_download"
+      path: "/data/agri_circular/_queues/green_download.jsonl"
+      criteria:
+        effective_bucket: "GREEN"
+        enabled: true
+    - id: "yellow_pipeline"
+      path: "/data/agri_circular/_queues/yellow_pipeline.jsonl"
+      criteria:
+        effective_bucket: "YELLOW"
+        enabled: true
+    - id: "red_rejected"
+      path: "/data/agri_circular/_queues/red_rejected.jsonl"
+      criteria:
+        effective_bucket: "RED"
+        enabled: true
+
+gates_catalog:
+  snapshot_terms: "Save Terms/ToS + license page HTML/PDF + retrieval timestamp."
+  resolve_license_spdx: "Normalize license to SPDX via license_map.yaml rules; store evidence."
+  restriction_phrase_scan: "Scan terms/content for restriction phrases (no-LLM/no-TDM/etc.)."
+  record_level_filter: "Require per-record license metadata; keep only allowlist."
+  computed_only_extract: "Extract only safe computed identifiers/descriptors; drop depositor text."
+  extract_text_chunks: "Extract text into JSONL chunks using globals.text_processing_defaults unless overridden."
+  emit_training_manifest: "Manifest of included files/records + checksums + license evidence."
+  emit_attribution_bundle: "Generate ATTRIBUTION.md + CITATIONS.bib for included sources."
+  manual_legal_review: "Human review required before training."
+  segregate_copyleft_pool: "Force output into copyleft pool and keep isolated."
+  # v0.6: new gates
+  collect_statistics: "Collect dataset statistics (tokens, property distributions)."
+  validate_schema: "Validate extracted data against field_schemas.yaml."
+  # v0.9: new gates
+  near_duplicate_detection: "Run MinHash/LSH deduplication pass."
+  normalize_structures: "Canonicalize SMILES/InChIKey using RDKit."
+  emit_parquet: "Output schema-validated records as Parquet files."
+  split_aware_partition: "Partition data respecting split_group_id for leak prevention."
+
+resolvers:
+  zenodo:
+    mode: "record_id_or_doi"
+    api: "https://zenodo.org/api/records/{record_id}"
+    outputs:
+      - "files[*].links.self"
+      - "files[*].checksum"
+    # v0.6: checksum verification
+    verify_checksum: true
+    checksum_algorithm: "md5"
+  figshare:
+    mode: "article_url"
+    note: "Prefer Figshare API if available; otherwise manual download from article page."
+    api_base: "https://api.figshare.com/v2"
+    # v0.9: Enhanced Figshare resolver
+    api_version: "2"
+    rate_limit:
+      requests_per_minute: 60
+      retry_on_429: true
+    endpoints:
+      article: "/articles/{article_id}"
+      files: "/articles/{article_id}/files"
+      download: "/articles/{article_id}/files/{file_id}"
+  github:
+    # v0.9: NEW GitHub release resolver
+    mode: "release"
+    api_base: "https://api.github.com"
+    rate_limit:
+      requests_per_hour: 60  # Unauthenticated limit
+      retry_on_403: true
+      exponential_backoff: true
+    endpoints:
+      releases: "/repos/{owner}/{repo}/releases"
+      latest: "/repos/{owner}/{repo}/releases/latest"
+      assets: "/repos/{owner}/{repo}/releases/{release_id}/assets"
+    note: "Use GITHUB_TOKEN environment variable for higher rate limits."
+  dataverse:
+    mode: "persistent_id"
+    note: "Use Dataverse API by persistentId; capture license from metadata."
+    default_instance: "https://dataverse.harvard.edu"
+    configurable_instances:
+      - "https://dataverse.harvard.edu"
+      - "https://dataverse.lib.virginia.edu"
+      - "https://dataverse.tdl.org"
+  huggingface_datasets:
+    mode: "dataset_id"
+    note: "Use datasets.load_dataset; capture dataset card + license field."
+  git:
+    mode: "repo"
+    note: "Capture commit hash; store LICENSE + README as evidence."
+  ftp:
+    mode: "base_url + globs"
+    note: "Use list + filter by glob; store directory listing snapshot."
+  api:
+    mode: "base_url"
+    note: "Cache responses; store query params & rate limit behavior."
+
+targets:
+  # =========================
+  # GREEN — auto-ingest
+  # =========================
+
+  - id: "epa_echo_frs_downloads"
+    name: "EPA ECHO Facility Registry Service (FRS) downloads (bulk zip)"
+    enabled: true
+    priority: 10
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://echo.epa.gov/resources/echo-data/about-the-data"
+      notes: "EPA ECHO bulk downloads; U.S. federal government data."
+    data_type: ["tabular", "registry", "facility", "waste", "water", "air"]
+    download:
+      strategy: "http"
+      out_subdir: "us_gov/epa/echo"
+      urls:
+        - "https://echo.epa.gov/files/echodownloads/frs_downloads.zip"
+    output:
+      pool: "permissive"
+      formats: ["zip"]
+
+
+
+  - id: "epa_echo_echo_exporter"
+    name: "EPA ECHO Exporter (flattened tables; bulk zip)"
+    enabled: true
+    priority: 8
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://echo.epa.gov/files/echodownloads/"
+      notes: "Convenient flattened exports for analytics/joins."
+    data_type: ["tabular", "facility", "compliance"]
+    download:
+      strategy: "http"
+      out_subdir: "us_gov/epa/echo"
+      urls:
+        - "https://echo.epa.gov/files/echodownloads/echo_exporter.zip"
+        - "https://echo.epa.gov/files/echodownloads/echo_exporter_columns.xlsx"
+    output:
+      pool: "permissive"
+      formats: ["zip", "xlsx"]
+
+  - id: "epa_echo_air_pollution"
+    name: "EPA ECHO air program + pollutant releases (bulk zips)"
+    enabled: true
+    priority: 7
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://echo.epa.gov/files/echodownloads/"
+      notes: "Air program compliance + combined emissions reports; useful for ag burning/industrial bioeconomy."
+    data_type: ["tabular", "air", "emissions", "regulatory"]
+    download:
+      strategy: "http"
+      out_subdir: "us_gov/epa/echo"
+      urls:
+        - "https://echo.epa.gov/files/echodownloads/ICIS-AIR_downloads.zip"
+        - "https://echo.epa.gov/files/echodownloads/POLL_RPT_COMBINED_EMISSIONS.zip"
+        - "https://echo.epa.gov/files/echodownloads/pipeline_caa_downloads.zip"
+        - "https://echo.epa.gov/files/echodownloads/AIR_STATE_METRIC_FACTS.csv"
+    output:
+      pool: "permissive"
+      formats: ["zip", "csv"]
+
+  - id: "epa_echo_tri_crosswalks"
+    name: "EPA ECHO TRI crosswalks (point source categories)"
+    enabled: true
+    priority: 5
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://echo.epa.gov/files/echodownloads/"
+      notes: "Crosswalks help map facilities to industry categories; not the full TRI release."
+    data_type: ["tabular", "emissions", "industry_codes"]
+    download:
+      strategy: "http"
+      out_subdir: "us_gov/epa/echo"
+      urls:
+        - "https://echo.epa.gov/files/echodownloads/TRI_Point_Source_Category_Crosswalk.zip"
+        - "https://echo.epa.gov/files/echodownloads/TRI_ELG_Point_Source_Category_Crosswalk.zip"
+    output:
+      pool: "permissive"
+      formats: ["zip"]
+
+  - id: "epa_echo_state_metrics"
+    name: "EPA ECHO state metric facts (CWA/RCRA/AIR/allfacts)"
+    enabled: true
+    priority: 4
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://echo.epa.gov/files/echodownloads/"
+      notes: "State-level aggregates useful for trend modeling; low PII risk."
+    data_type: ["tabular", "aggregates", "policy"]
+    download:
+      strategy: "http"
+      out_subdir: "us_gov/epa/echo"
+      urls:
+        - "https://echo.epa.gov/files/echodownloads/CWA_STATE_METRIC_FACTS.csv"
+        - "https://echo.epa.gov/files/echodownloads/RCRA_STATE_METRIC_FACTS.csv"
+        - "https://echo.epa.gov/files/echodownloads/AIR_STATE_METRIC_FACTS.csv"
+        - "https://echo.epa.gov/files/echodownloads/allfacts_downloads.zip"
+    output:
+      pool: "permissive"
+      formats: ["csv", "zip"]
+
+  - id: "epa_echo_environmental_justice_demographics"
+    name: "EPA ECHO demographics exports (ACS-linked)"
+    enabled: false
+    priority: 3
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://echo.epa.gov/files/echodownloads/"
+      notes: "Large files; keep disabled until you implement downsampling + aggregation to reduce re-identification risk."
+    data_type: ["tabular", "demographics", "environmental_justice"]
+    download:
+      strategy: "http"
+      out_subdir: "us_gov/epa/echo"
+      urls:
+        - "https://echo.epa.gov/files/echodownloads/echo_demographics.zip"
+        - "https://echo.epa.gov/files/echodownloads/echoacs2023_demographics.zip"
+    output:
+      pool: "permissive"
+      formats: ["zip"]
+
+  - id: "epa_echo_pipeline_rcra_downloads"
+    name: "EPA ECHO RCRAInfo pipeline extracts (bulk zip)"
+    enabled: true
+    priority: 10
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://echo.epa.gov/files/echodownloads/"
+      notes: "Contains RCRA hazardous waste handler / program tables via ECHO."
+    data_type: ["tabular", "waste", "hazardous_waste", "regulatory"]
+    download:
+      strategy: "http"
+      out_subdir: "us_gov/epa/echo"
+      urls:
+        - "https://echo.epa.gov/files/echodownloads/pipeline_rcra_downloads.zip"
+        - "https://echo.epa.gov/files/echodownloads/rcra_downloads.zip"
+        - "https://echo.epa.gov/files/echodownloads/RCRA_STATE_METRIC_FACTS.csv"
+    output:
+      pool: "permissive"
+      formats: ["zip", "csv"]
+
+  - id: "epa_echo_npdes_downloads"
+    name: "EPA ECHO NPDES permits + compliance downloads (bulk zip)"
+    enabled: true
+    priority: 9
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://echo.epa.gov/files/echodownloads/"
+      notes: "NPDES permits, outfalls, enforcement/compliance tables."
+    data_type: ["tabular", "water", "wastewater", "regulatory"]
+    download:
+      strategy: "http"
+      out_subdir: "us_gov/epa/echo"
+      urls:
+        - "https://echo.epa.gov/files/echodownloads/npdes_downloads.zip"
+        - "https://echo.epa.gov/files/echodownloads/npdes_biosolids_downloads.zip"
+        - "https://echo.epa.gov/files/echodownloads/npdes_attains_downloads.zip"
+        - "https://echo.epa.gov/files/echodownloads/npdes_eff_downloads.zip"
+        - "https://echo.epa.gov/files/echodownloads/npdes_limits.zip"
+        - "https://echo.epa.gov/files/echodownloads/npdes_outfalls_layer.zip"
+    output:
+      pool: "permissive"
+      formats: ["zip"]
+
+  - id: "epa_echo_dmr_downloads"
+    name: "EPA ECHO DMR and DMR crosswalks (bulk zips)"
+    enabled: true
+    priority: 8
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://echo.epa.gov/files/echodownloads/"
+      notes: "Discharge Monitoring Reports: HTF and annual FY zips."
+    data_type: ["tabular", "water_quality", "wastewater"]
+    download:
+      strategy: "http"
+      out_subdir: "us_gov/epa/echo"
+      urls:
+        - "https://echo.epa.gov/files/echodownloads/DMR_HTF_Downloads.zip"
+        - "https://echo.epa.gov/files/echodownloads/DMR_ELG_Point_Source_Category_Crosswalk.zip"
+        - "https://echo.epa.gov/files/echodownloads/DMR_Point_Source_Category_Crosswalk.zip"
+        - "https://echo.epa.gov/files/echodownloads/npdes_dmrs_fy2024.zip"
+        - "https://echo.epa.gov/files/echodownloads/npdes_dmrs_fy2025.zip"
+    output:
+      pool: "permissive"
+      formats: ["zip"]
+
+  - id: "epa_echo_sdwa_latest"
+    name: "EPA ECHO SDWA latest downloads (bulk zip)"
+    enabled: true
+    priority: 7
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://echo.epa.gov/files/echodownloads/"
+      notes: "Safe Drinking Water Act compliance tables; useful for circular water systems."
+    data_type: ["tabular", "water", "drinking_water", "regulatory"]
+    download:
+      strategy: "http"
+      out_subdir: "us_gov/epa/echo"
+      urls:
+        - "https://echo.epa.gov/files/echodownloads/SDWA_latest_downloads.zip"
+        - "https://echo.epa.gov/files/echodownloads/sdwa_violations.csv.zip"
+        - "https://echo.epa.gov/files/echodownloads/sdwa_enforcement.csv.zip"
+    output:
+      pool: "permissive"
+      formats: ["zip"]
+
+
+
+  - id: "epa_echo_attains_pfas"
+    name: "EPA ATTAINS PFAS datasets (JSON exports)"
+    enabled: true
+    priority: 5
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://echo.epa.gov/files/echodownloads/"
+      notes: "PFAS-related ATTAINS JSON exports for water impairment analysis."
+    data_type: ["json", "water_quality", "pfas"]
+    download:
+      strategy: "http"
+      out_subdir: "us_gov/epa/echo"
+      urls:
+        - "https://echo.epa.gov/files/echodownloads/attains_pfas_v3.json"
+        - "https://echo.epa.gov/files/echodownloads/attains_pfas.json"
+    output:
+      pool: "permissive"
+      formats: ["json"]
+
+  - id: "epa_echo_cso_ssos"
+    name: "EPA ECHO sewer overflow & collection systems tables"
+    enabled: true
+    priority: 6
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://echo.epa.gov/files/echodownloads/"
+      notes: "Combined sewer overflows and sanitary sewer overflows; waste stream infrastructure."
+    data_type: ["tabular", "wastewater", "infrastructure"]
+    download:
+      strategy: "http"
+      out_subdir: "us_gov/epa/echo"
+      urls:
+        - "https://echo.epa.gov/files/echodownloads/current_sewer_overflow_and_collection_systems_tables.zip"
+        - "https://echo.epa.gov/files/echodownloads/all_sewer_overflow_and_collection_systems_tables.zip"
+        - "https://echo.epa.gov/files/echodownloads/ALL_CSO_downloads.zip"
+    output:
+      pool: "permissive"
+      formats: ["zip"]
+
+  - id: "epa_echo_enforcement_cases"
+    name: "EPA ECHO enforcement cases downloads (bulk zip)"
+    enabled: true
+    priority: 6
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://echo.epa.gov/files/echodownloads/"
+      notes: "Enforcement cases and related tables."
+    data_type: ["tabular", "regulatory", "enforcement"]
+    download:
+      strategy: "http"
+      out_subdir: "us_gov/epa/echo"
+      urls:
+        - "https://echo.epa.gov/files/echodownloads/case_downloads.zip"
+    output:
+      pool: "permissive"
+      formats: ["zip"]
+
+  # =========================
+  # YELLOW — screening required
+  # =========================
+
+  - id: "fao_agrovoc_latest"
+    name: "FAO AGROVOC multilingual thesaurus (latest dumps)"
+    enabled: true
+    priority: 8
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "CC-BY-3.0-IGO"
+      url: "https://www.fao.org/agrovoc/"
+      notes: "Use for normalization/ontology; ensure attribution requirements in downstream artifacts."
+    data_type: ["ontology", "taxonomy", "text"]
+    download:
+      strategy: "http"
+      out_subdir: "intl/fao/agrovoc"
+      urls:
+        - "https://agrovoc.fao.org/latestAgrovoc/agrovoc_core.nt.zip"
+        - "https://agrovoc.fao.org/latestAgrovoc/agrovoc_core.rdf.zip"
+        - "https://agrovoc.fao.org/latestAgrovoc/agrovoc_lod.nt.zip"
+        - "https://agrovoc.fao.org/latestAgrovoc/agrovoc_lod.nq.zip"
+    output:
+      pool: "permissive"
+      formats: ["zip"]
+
+  - id: "openfoodfacts_products"
+    name: "Open Food Facts product database (CSV export)"
+    enabled: false
+    priority: 5
+    license_profile: "copyleft"
+    license_evidence:
+      spdx_hint: "ODbL-1.0"
+      url: "https://world.openfoodfacts.org/data"
+      notes: "ODbL share-alike; keep in copyleft pool and avoid mixing with permissive pools."
+    data_type: ["tabular", "food", "nutrition", "packaging"]
+    download:
+      strategy: "http"
+      out_subdir: "community/openfoodfacts"
+      urls:
+        - "https://static.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz"
+    output:
+      pool: "copyleft"
+      formats: ["csv.gz"]
+
+  - id: "commonpile_candidate"
+    name: "CommonPile (candidate: agriculture/circular subset; streaming download recommended)"
+    enabled: false
+    priority: 2
+    license_profile: "record_level"
+    license_evidence:
+      spdx_hint: "MIXED"
+      url: "https://huggingface.co/collections/common-pile/common-pile-v01-6724f18a787781ca9ae25749"
+      notes: "CommonPile is large and heterogeneous; implement streaming + per-component license filters before enabling."
+    data_type: ["text", "web", "scientific", "policy"]
+    download:
+      strategy: "huggingface_datasets"
+      out_subdir: "commonpile"
+      dataset_id: "common-pile/common-pile"
+      configs: []
+    output:
+      pool: "quarantine"
+      formats: ["hf_dataset_cache"]
+
+  - id: "gbif_occurrences_candidate"
+    name: "GBIF occurrence records (candidate; per-record license filtering required)"
+    enabled: false
+    priority: 2
+    license_profile: "record_level"
+    license_evidence:
+      spdx_hint: "CC0-1.0 OR CC-BY-4.0 OR CC-BY-NC-4.0"
+      url: "https://www.gbif.org/"
+      notes: "Filter out non-commercial (BY-NC) records; retain CC0/BY only. Requires custom download worker."
+    data_type: ["tabular", "biodiversity", "geospatial"]
+    download:
+      strategy: "none"
+      out_subdir: "intl/gbif"
+      notes: "Implement gbif_worker.py (API-based download + per-record license filter)."
+    output:
+      pool: "quarantine"
+      formats: ["csv", "parquet"]
+
+  - id: "faostat_candidate"
+    name: "FAOSTAT (candidate; terms/attribution review required)"
+    enabled: false
+    priority: 1
+    license_profile: "record_level"
+    license_evidence:
+      spdx_hint: "TERMS-REVIEW"
+      url: "https://www.fao.org/faostat/"
+      notes: "Prefer official bulk downloads and capture citation/attribution requirements."
+    data_type: ["tabular", "agriculture", "trade", "emissions"]
+    download:
+      strategy: "none"
+      out_subdir: "intl/fao/faostat"
+      notes: "Implement faostat_worker.py (API/bulk export)."
+    output:
+      pool: "quarantine"
+      formats: ["csv", "parquet"]
+
+  # =========================
+  # RED — deny / high-risk (disabled)
+  # =========================
+
+  - id: "ecoinvent_red"
+    name: "ecoinvent LCI database (proprietary; do not ingest)"
+    enabled: false
+    priority: 0
+    license_profile: "deny"
+    license_evidence:
+      spdx_hint: "PROPRIETARY"
+      url: "https://ecoinvent.org/"
+      notes: "Commercial license; not suitable for training corpora ingestion."
+    data_type: ["lca", "proprietary"]
+    download:
+      strategy: "none"
+      out_subdir: "denylisted/ecoinvent"
+    output:
+      pool: "quarantine"
+      formats: []
+
+  - id: "gabi_red"
+    name: "GaBi LCA database (proprietary; do not ingest)"
+    enabled: false
+    priority: 0
+    license_profile: "deny"
+    license_evidence:
+      spdx_hint: "PROPRIETARY"
+      url: "https://gabi.sphera.com/"
+      notes: "Commercial license; not suitable for training corpora ingestion."
+    data_type: ["lca", "proprietary"]
+    download:
+      strategy: "none"
+      out_subdir: "denylisted/gabi"
+    output:
+      pool: "quarantine"
+      formats: []
