@@ -1,0 +1,70 @@
+================================================================================
+TODO — Math Corpus Pipeline
+================================================================================
+
+Legend:
+  [x] = Completed
+  [~] = Partially addressed / MVP landed
+  [ ] = Not yet implemented
+
+================================================================================
+VERSION HISTORY (math adaptation)
+================================================================================
+
+v0.9 -> v1.0 Completed:
+  [x] Adapted pipeline_driver + targets to math inventory (targets_math.yaml)
+  [x] Math-focused license_map, field_schemas, and denylist skeletons
+  [x] Added math-specific queues/gates (copyleft segregation, record-level filters)
+  [x] Preserved LaTeX-aware defaults for text chunking
+
+================================================================================
+v1.0 -> v1.1 — WHAT NEEDS TO CHANGE / BE UPDATED
+================================================================================
+
+HIGH PRIORITY (Production readiness)
+------------------------------------
+1) Math-focused ingestion workers
+   [ ] hf_math_filter_worker.py for Common Pile math subsets with record-level routing
+   [ ] formal_math_worker.py for Lean/Coq/Agda/Isabelle/Metamath chunking
+   [ ] pdf_math_worker.py to preserve equations + page ranges
+   [ ] Hook workers into yellow stage after review approval
+
+2) Manual review UX
+   [~] YELLOW review plan export (yellow_scrubber.py)
+   [ ] CLI to assign reviewers + notes per target
+   [ ] Optional dashboard for approvals with evidence previews
+
+3) Testing + CI
+   [ ] Unit tests for math restriction scans and SPDX normalization
+   [ ] Sample queue fixtures for math targets
+   [ ] Smoke test classify -> download -> catalog on tiny math fixtures
+
+MEDIUM PRIORITY (Quality + coverage)
+------------------------------------
+4) License handling and safety gates
+   [ ] Implement record-level license checks for OER/StackExchange filters
+   [ ] Expand restriction phrase library for NoAI/NoTDM language
+   [ ] Enforce copyleft segregation in download outputs + catalogs
+
+5) Data normalization
+   [ ] Unicode + LaTeX normalization per worker
+   [ ] Split-aware partitioning with split_group_id for exercises
+   [ ] Near-duplicate detection tuned for math text/equations
+
+LOW PRIORITY (Ergonomics + future-proofing)
+-------------------------------------------
+6) Packaging + deployment
+   [ ] Dockerfile for math pipeline + example volume mounts
+   [ ] Example orchestration (cron/Argo) for recurring runs
+   [ ] Publish pinned requirements/lockfile
+
+7) Observability
+   [ ] Metrics on queue sizes, download throughput, and review turnaround
+   [ ] Alerts for missing license evidence or stalled downloads
+
+================================================================================
+Notes for next iteration
+================================================================================
+- Keep synthetic/owned problem sets clearly marked and licensed (CC0 preferred).
+- For OER/Pressbooks/LibreTexts, require per-record license metadata before release.
+- Preserve LaTeX/math symbols end-to-end; avoid ASCII-fying equations during transforms.
