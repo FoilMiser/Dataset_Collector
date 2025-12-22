@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+#
+# run_pipeline.sh (chem v2.0)
+#
+# Wrapper for the Chemistry Corpus Pipeline v2 stages.
+#
+set -euo pipefail
+
+VERSION="2.0"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+TARGETS=""
+STAGE="all"
+EXECUTE=""
+LIMIT_TARGETS=""
+LIMIT_FILES=""
+WORKERS="4"
+
+usage() {
+  cat << EOF
+Chemistry Corpus Pipeline v${VERSION}
+
+Required:
+  --targets FILE          Path to targets_chem.yaml
+
+Options:
+  --execute               Perform actions (default is dry-run/plan only)
+  --stage STAGE           Stage to run: all, classify, acquire_green, acquire_yellow, screen_yellow, merge, difficulty, catalog
+  --limit-targets N       Limit number of queue rows processed
+  --limit-files N         Limit files per target during acquisition
+  --workers N             Parallel workers for acquisition (default: 4)
+  -h, --help              Show this help
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --targets) TARGETS="$2"; shift 2 ;;
+    --stage) STAGE="$2"; shift 2 ;;
+    --execute) EXECUTE="--execute"; shift ;;
+    --limit-targets) LIMIT_TARGETS="--limit-targets $2"; shift 2 ;;
+    --limit-files) LIMIT_FILES="--limit-files $2"; shift 2 ;;
+    --workers) WORKERS="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo -e "${RED}Unknown option: $1${NC}"; usage; exit 1 ;;
+  esac
+done
+
+if [[ -z "$TARGETS" ]]; then
+  echo -e "${RED}--targets is required${NC}"
+  usage
+  exit 1
+fi
+
+if [[ ! -f "$TARGETS" ]]; then
+  echo -e "${RED}targets file not found: $TARGETS${NC}"
+  exit 1
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+QUEUES_ROOT=$(python - << PY
+import yaml, sys, pathlib
+cfg = yaml.safe_load(open("${TARGETS}"))
+print(cfg.get("globals", {}).get("queues_root", "/data/chem/_queues"))
+PY
+)
+
+run_classify() {
+  echo -e "${BLUE}== Stage: classify ==${NC}"
+  local no_fetch=""
+  if [[ -z "$EXECUTE" ]]; then
+    no_fetch="--no-fetch"
+  fi
+  python "$SCRIPT_DIR/pipeline_driver.py" --targets "$TARGETS" $no_fetch
+}
+
+run_acquire() {
+  local bucket="$1"
+  local queue_file="$QUEUES_ROOT/${bucket}_download.jsonl"
+  if [[ "$bucket" == "yellow" ]]; then
+    queue_file="$QUEUES_ROOT/yellow_pipeline.jsonl"
+  fi
+  if [[ ! -f "$queue_file" ]]; then
+    echo -e "${RED}Queue not found: $queue_file${NC}"
+    exit 1
+  fi
+  echo -e "${BLUE}== Stage: acquire_${bucket} ==${NC}"
+  python "$SCRIPT_DIR/acquire_worker.py" \
+    --queue "$queue_file" \
+    --targets-yaml "$TARGETS" \
+    --bucket "$bucket" \
+    --workers "$WORKERS" \
+    $EXECUTE \
+    $LIMIT_TARGETS \
+    $LIMIT_FILES
+}
+
+run_screen_yellow() {
+  local queue_file="$QUEUES_ROOT/yellow_pipeline.jsonl"
+  if [[ ! -f "$queue_file" ]]; then
+    echo -e "${RED}Queue not found: $queue_file${NC}"
+    exit 1
+  fi
+  echo -e "${BLUE}== Stage: screen_yellow ==${NC}"
+  python "$SCRIPT_DIR/yellow_screen_worker.py" \
+    --targets "$TARGETS" \
+    --queue "$queue_file" \
+    $EXECUTE
+}
+
+run_merge() {
+  echo -e "${BLUE}== Stage: merge ==${NC}"
+  python "$SCRIPT_DIR/merge_worker.py" --targets "$TARGETS" $EXECUTE
+}
+
+run_difficulty() {
+  echo -e "${BLUE}== Stage: difficulty ==${NC}"
+  python "$SCRIPT_DIR/difficulty_worker.py" --targets "$TARGETS" $EXECUTE
+}
+
+run_catalog() {
+  echo -e "${BLUE}== Stage: catalog ==${NC}"
+  python "$SCRIPT_DIR/catalog_builder.py" --targets "$TARGETS"
+}
+
+case "$STAGE" in
+  all)
+    run_classify
+    run_acquire green
+    run_acquire yellow
+    run_screen_yellow
+    run_merge
+    run_difficulty
+    run_catalog
+    ;;
+  classify) run_classify ;;
+  acquire_green) run_acquire green ;;
+  acquire_yellow) run_acquire yellow ;;
+  screen_yellow) run_screen_yellow ;;
+  merge) run_merge ;;
+  difficulty) run_difficulty ;;
+  catalog) run_catalog ;;
+  *) echo -e "${RED}Unknown stage: $STAGE${NC}"; usage; exit 1 ;;
+esac
