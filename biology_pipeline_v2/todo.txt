@@ -1,0 +1,51 @@
+================================================================================
+Backlog — Biology Corpus Pipeline v2
+================================================================================
+
+Legend:
+  [x] = Completed
+  [~] = Partially addressed / MVP landed
+  [ ] = Not yet implemented
+
+================================================================================
+Post-v2 adaptation punch list
+================================================================================
+
+HIGH PRIORITY (Parity + routing)
+--------------------------------
+1) Acquisition + screening hooks
+   [ ] Wire PMC OA acquisition as a first-class acquire_worker strategy.
+   [ ] Move PubChem computed-only transform into yellow_screen_worker plugins.
+   [ ] Add record-level license validation hooks for GBIF/iNaturalist when enabled.
+
+2) Difficulty + routing coverage
+   [ ] Expand difficulties_biology.yaml with more domains/categories.
+   [ ] Add regression fixtures ensuring routing fields are present in queues.
+
+3) Testing + CI
+   [ ] Unit tests for restriction phrase scans and SPDX normalization.
+   [ ] Smoke test classify → acquire → screen_yellow → merge → difficulty on small fixtures.
+
+MEDIUM PRIORITY (Quality + safety)
+----------------------------------
+4) Screening enhancements
+   [ ] Add PHI/PII scanning stubs for clinical/human-subjects buckets.
+   [ ] Implement denylist enrichments for biosecurity-sensitive content.
+
+5) Catalog + observability
+   [ ] Extend catalog_builder to surface raw/screened_yellow stats and token estimates.
+   [ ] Emit metrics on queue sizes, download throughput, and review turnaround.
+
+LOW PRIORITY (Ergonomics)
+------------------------
+6) Tooling
+   [ ] CLI to assign reviewers + notes per target (plugs into review_queue).
+   [ ] Dockerfile + example volume mounts for end-to-end runs.
+   [ ] Publish pinned requirements/lockfile.
+
+================================================================================
+Notes for next iteration
+================================================================================
+- Keep synthetic/owned problem sets clearly marked and licensed (CC0 preferred).
+- Use routing fields consistently for difficulty + downstream sampling.
+- Preserve attribution bundles and evidence snapshots for reproducibility.
