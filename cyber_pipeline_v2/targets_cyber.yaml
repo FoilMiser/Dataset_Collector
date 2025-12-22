@@ -1,0 +1,602 @@
+# Cybersecurity + Industrial Threat Modeling dataset targets (ethically + legally cleared)
+# Companion files: ./license_map.yaml, ./field_schemas.yaml, ./denylist.yaml, ./difficulties_cyber.yaml
+#
+# Notes:
+# - Strategies align to acquire_worker.py: http|ftp|git|zenodo|dataverse|huggingface_datasets|none
+# - Several targets are intentionally YELLOW because their licensing is "Terms of Use" (non-SPDX) or because dual-use risk requires extra filtering.
+# - CommonPile targets are included but DISABLED by default because the exact HF dataset IDs/configs should be verified before running.
+#
+schema_version: "0.8"
+updated_utc: "2026-06-01"
+
+companion_files:
+  license_map: "./license_map.yaml"
+  field_schemas: "./field_schemas.yaml"
+  denylist: "./denylist.yaml"
+  difficulties_map: "./difficulties_cyber.yaml"
+
+globals:
+  raw_root: "/data/cyber/raw"
+  screened_yellow_root: "/data/cyber/screened_yellow"
+  combined_root: "/data/cyber/combined"
+  final_root: "/data/cyber/final"
+  ledger_root: "/data/cyber/_ledger"
+  pitches_root: "/data/cyber/_pitches"
+  manifests_root: "/data/cyber/_manifests"
+  queues_root: "/data/cyber/_queues"
+  catalogs_root: "/data/cyber/_catalogs"
+  logs_root: "/data/cyber/_logs"
+
+  require_yellow_signoff: false
+
+  sharding:
+    max_records_per_shard: 50000
+    compression: gzip
+
+  screening:
+    text_field_candidates: ["text", "content", "body", "summary"]
+    record_license_field_candidates: ["license", "license_spdx", "spdx"]
+    require_record_license: false
+    min_chars: 200
+    max_chars: 12000
+    deny_phrases:
+      - "noai"
+      - "no tdm"
+      - "no machine learning"
+
+  default_gates:
+    - "snapshot_terms"
+    - "resolve_license_spdx"
+    - "restriction_phrase_scan"
+    - "emit_training_manifest"
+    - "emit_attribution_bundle"
+    # Cyber-specific gates (planned; requires small code additions in pipeline_driver.py / yellow_scrubber.py)
+    - "secret_scan"
+    - "pii_scan"
+    - "dual_use_instruction_scan"
+    - "exploit_code_scan"
+
+  download_defaults:
+    retry_max: 3
+    retry_backoff_base: 2.0
+    retry_backoff_max: 60
+    timeout_connect: 30
+    timeout_read: 600
+    verify_checksums: true
+    enable_resume: true
+    max_concurrent_workers: 4
+    user_agent: "cyber-corpus-pipeline/2.0"
+
+queues:
+  emit:
+    - id: "green_download"
+      path: "/data/cyber/_queues/green_download.jsonl"
+      criteria:
+        effective_bucket: "GREEN"
+        enabled: true
+    - id: "yellow_pipeline"
+      path: "/data/cyber/_queues/yellow_pipeline.jsonl"
+      criteria:
+        effective_bucket: "YELLOW"
+        enabled: true
+    - id: "red_rejected"
+      path: "/data/cyber/_queues/red_rejected.jsonl"
+      criteria:
+        effective_bucket: "RED"
+        enabled: true
+
+gates_catalog:
+  snapshot_terms: "Save Terms/ToS + license page HTML/PDF + retrieval timestamp (and optional keyword snapshots)."
+  resolve_license_spdx: "Normalize license to SPDX via license_map.yaml rules; store evidence."
+  restriction_phrase_scan: "Scan terms/content for restriction phrases (no-LLM/no-TDM/etc.)."
+  emit_training_manifest: "Manifest of included files/records + checksums + license evidence."
+  emit_attribution_bundle: "Generate ATTRIBUTION.md + CITATIONS.bib for included sources."
+  secret_scan: "Detect and redact secrets (API keys/tokens/private keys) before emitting training text."
+  pii_scan: "Detect and redact PII (emails/phones/SSNs/IPs where appropriate) for privacy compliance."
+  dual_use_instruction_scan: "Detect and route to quarantine content that meaningfully enables wrongdoing (offensive step-by-step)."
+  exploit_code_scan: "Detect and route exploit payloads / weaponized PoCs / malware code to quarantine."
+
+targets:
+
+  # 0) Synthetic (safe) - your generator / curated defensive tasks
+  - id: "synthetic_cyber_threatmodeling_problems"
+    name: "Synthetic defensive cybersecurity problems (threat modeling, triage, remediation) — auto-graded"
+    enabled: true
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "Proprietary", url: "" }
+    data_type: ["synthetic", "defensive", "threat_modeling", "incident_response", "triage"]
+    download:
+      strategy: "none"
+    build:
+      owner: "you"
+      output_formats: ["jsonl"]
+      required_fields:
+        - "problem_id"
+        - "domain"
+        - "difficulty"
+        - "prompt"
+        - "answer_key"
+        - "grading_fn"
+        - "rubric"
+        - "safety_tags"
+    gates_override:
+      add: ["emit_training_manifest"]
+
+  # A) Vulnerability + asset vocabularies (GREEN)
+
+  - id: "nvd_cve_2_0_delta"
+    name: "NIST NVD CVE JSON 2.0 feeds (recent + modified + metadata)"
+    enabled: true
+    priority: 5
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://nvd.nist.gov/vuln/data-feeds"
+    data_type: ["vulnerabilities", "cve", "json", "nvd"]
+    download:
+      strategy: "http"
+      urls:
+        - "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-modified.json.gz"
+        - "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-modified.meta"
+        - "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-recent.json.gz"
+        - "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-recent.meta"
+    output:
+      pool: "raw"
+      formats: ["json", "jsonl", "gz", "meta"]
+
+  - id: "nvd_cve_2_0_year_2025"
+    name: "NIST NVD CVE JSON 2.0 feed — year 2025"
+    enabled: true
+    priority: 6
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://nvd.nist.gov/vuln/data-feeds"
+    data_type: ["vulnerabilities", "cve", "json", "nvd", "yearly"]
+    download:
+      strategy: "http"
+      urls:
+        - "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2025.json.gz"
+        - "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2025.meta"
+    output:
+      pool: "raw"
+      formats: ["json", "gz", "meta"]
+
+  - id: "nvd_cve_2_0_year_2024"
+    name: "NIST NVD CVE JSON 2.0 feed — year 2024"
+    enabled: true
+    priority: 7
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://nvd.nist.gov/vuln/data-feeds"
+    data_type: ["vulnerabilities", "cve", "json", "nvd", "yearly"]
+    download:
+      strategy: "http"
+      urls:
+        - "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2024.json.gz"
+        - "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2024.meta"
+    output:
+      pool: "raw"
+      formats: ["json", "gz", "meta"]
+
+  - id: "nvd_cve_2_0_year_2023"
+    name: "NIST NVD CVE JSON 2.0 feed — year 2023"
+    enabled: true
+    priority: 8
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://nvd.nist.gov/vuln/data-feeds"
+    data_type: ["vulnerabilities", "cve", "json", "nvd", "yearly"]
+    download:
+      strategy: "http"
+      urls:
+        - "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2023.json.gz"
+        - "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2023.meta"
+    output:
+      pool: "raw"
+      formats: ["json", "gz", "meta"]
+
+  - id: "nvd_cpe_dictionary_2_0"
+    name: "NIST NVD CPE Dictionary 2.0"
+    enabled: true
+    priority: 9
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://nvd.nist.gov/vuln/data-feeds"
+    data_type: ["assets", "cpe", "dictionary", "nvd"]
+    download:
+      strategy: "http"
+      urls:
+        - "https://nvd.nist.gov/feeds/json/cpe/2.0/nvdcpes_2.0.tar.gz"
+        - "https://nvd.nist.gov/feeds/json/cpe/2.0/nvdcpes_2.0.meta"
+    output:
+      pool: "raw"
+      formats: ["tar.gz", "meta"]
+
+  - id: "nvd_cpe_match_2_0"
+    name: "NIST NVD CPE Match 2.0"
+    enabled: true
+    priority: 10
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://nvd.nist.gov/vuln/data-feeds"
+    data_type: ["assets", "cpe", "match", "nvd"]
+    download:
+      strategy: "http"
+      urls:
+        - "https://nvd.nist.gov/feeds/json/cpematch/2.0/nvdcpematch_2.0.tar.gz"
+        - "https://nvd.nist.gov/feeds/json/cpematch/2.0/nvdcpematch_2.0.meta"
+    output:
+      pool: "raw"
+      formats: ["tar.gz", "meta"]
+
+  - id: "cisa_kev_data"
+    name: "CISA KEV (Known Exploited Vulnerabilities) — open data repository"
+    enabled: true
+    priority: 11
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "CC0-1.0"
+      url: "https://github.com/cisagov/kev-data"
+    data_type: ["vulnerabilities", "kev", "cisa", "json", "csv"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/cisagov/kev-data.git"
+      checkout: "main"
+    output:
+      pool: "raw"
+      formats: ["json", "csv", "md", "txt"]
+
+  - id: "cisa_vulnrichment"
+    name: "CISA Vulnrichment — enrichment data for CVEs (CC0)"
+    enabled: true
+    priority: 12
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "CC0-1.0"
+      url: "https://github.com/cisagov/vulnrichment"
+    data_type: ["vulnerabilities", "enrichment", "ssvc", "cisa", "json"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/cisagov/vulnrichment.git"
+      checkout: "main"
+    output:
+      pool: "raw"
+      formats: ["json", "md", "csv", "txt"]
+
+  - id: "github_advisory_database"
+    name: "GitHub Advisory Database (GHSA) — advisories + affected ranges"
+    enabled: true
+    priority: 13
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "CC-BY-4.0"
+      url: "https://github.com/github/advisory-database"
+    data_type: ["vulnerabilities", "advisories", "packages", "ecosystems", "yaml", "json"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/github/advisory-database.git"
+      checkout: "main"
+    output:
+      pool: "raw"
+      formats: ["yaml", "json", "md"]
+
+  - id: "misp_taxonomies"
+    name: "MISP Taxonomies (threat intel labels/tags)"
+    enabled: true
+    priority: 14
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "CC0-1.0"
+      url: "https://github.com/MISP/misp-taxonomies"
+    data_type: ["threat_intel", "taxonomy", "misp", "json"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/MISP/misp-taxonomies.git"
+      checkout: "main"
+    output:
+      pool: "raw"
+      formats: ["json", "md", "txt"]
+
+  - id: "misp_galaxy"
+    name: "MISP Galaxy (clusters: threat actors, tools, malware families, etc.)"
+    enabled: true
+    priority: 15
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "CC0-1.0"
+      url: "https://github.com/MISP/misp-galaxy"
+    data_type: ["threat_intel", "clusters", "misp", "json"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/MISP/misp-galaxy.git"
+      checkout: "main"
+    output:
+      pool: "raw"
+      formats: ["json", "md", "txt"]
+
+  - id: "misp_objects"
+    name: "MISP Objects (structured object templates for intel exchange)"
+    enabled: true
+    priority: 16
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "CC0-1.0"
+      url: "https://github.com/MISP/misp-objects"
+    data_type: ["threat_intel", "objects", "misp", "json", "yaml"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/MISP/misp-objects.git"
+      checkout: "main"
+    output:
+      pool: "raw"
+      formats: ["json", "yaml", "md", "txt"]
+
+  - id: "oasis_stix2_json_schemas"
+    name: "OASIS STIX 2.x JSON Schemas"
+    enabled: true
+    priority: 17
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "BSD-3-Clause"
+      url: "https://github.com/oasis-open/cti-stix2-json-schemas"
+    data_type: ["standards", "stix", "schemas", "json"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/oasis-open/cti-stix2-json-schemas.git"
+      checkout: "master"
+    output:
+      pool: "raw"
+      formats: ["json", "md", "txt"]
+
+  - id: "oasis_taxii2_json_schemas"
+    name: "OASIS TAXII 2.x JSON Schemas"
+    enabled: true
+    priority: 18
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "BSD-3-Clause"
+      url: "https://github.com/oasis-open/cti-taxii2-json-schemas"
+    data_type: ["standards", "taxii", "schemas", "json"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/oasis-open/cti-taxii2-json-schemas.git"
+      checkout: "master"
+    output:
+      pool: "raw"
+      formats: ["json", "md", "txt"]
+
+  - id: "ossf_osv_schema"
+    name: "OpenSSF OSV Schema (format definitions for vulnerability data)"
+    enabled: true
+    priority: 19
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "Apache-2.0"
+      url: "https://github.com/ossf/osv-schema"
+    data_type: ["vulnerabilities", "schema", "osv", "json"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/ossf/osv-schema.git"
+      checkout: "main"
+    output:
+      pool: "raw"
+      formats: ["json", "md", "txt"]
+
+  # B) Threat modeling frameworks + adversary behavior knowledge bases (YELLOW by default due to ToU)
+
+  - id: "mitre_attack_stix_data"
+    name: "MITRE ATT&CK STIX (Enterprise/Mobile/ICS) — attack-stix-data"
+    enabled: true
+    priority: 30
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "UNKNOWN"
+      url: "https://attack.mitre.org/resources/legal-and-branding/terms-of-use/"
+    data_type: ["threat_modeling", "attack_framework", "stix", "mitre", "enterprise", "ics", "mobile"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/mitre-attack/attack-stix-data.git"
+      checkout: "master"
+    output:
+      pool: "raw"
+      formats: ["json", "md", "txt"]
+
+  - id: "mitre_cti_stix2_0"
+    name: "MITRE CTI (ATT&CK + CAPEC in STIX 2.0)"
+    enabled: true
+    priority: 31
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "UNKNOWN"
+      url: "https://attack.mitre.org/resources/legal-and-branding/terms-of-use/"
+    data_type: ["threat_intel", "attack_framework", "capec", "stix", "mitre", "ics"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/mitre/cti.git"
+      checkout: "master"
+    output:
+      pool: "raw"
+      formats: ["json", "md", "txt"]
+
+  - id: "mitre_d3fend_ontology"
+    name: "MITRE D3FEND ontology / defensive techniques"
+    enabled: true
+    priority: 32
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "UNKNOWN"
+      url: "https://d3fend.mitre.org"
+    data_type: ["defense_framework", "ontology", "mitre", "json", "rdf", "ttl"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/mitre/d3fend-ontology.git"
+      checkout: "main"
+    output:
+      pool: "raw"
+      formats: ["json", "ttl", "rdf", "md", "txt"]
+
+  - id: "cwe_terms_only_reference"
+    name: "CWE Terms of Use reference (NO BULK DOWNLOAD; for license evidence only)"
+    enabled: false
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "UNKNOWN"
+      url: "https://cwe.mitre.org/about/termsofuse.html"
+    data_type: ["license_evidence_only"]
+    download:
+      strategy: "none"
+
+  - id: "cve_cvelistv5"
+    name: "Official CVE List (CVE JSON 5) — CVEProject/cvelistV5"
+    enabled: true
+    priority: 33
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "UNKNOWN"
+      url: "https://www.cve.org/Legal/TermsOfUse"
+    data_type: ["vulnerabilities", "cve", "json", "cveproject"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/CVEProject/cvelistV5.git"
+      checkout: "main"
+    output:
+      pool: "raw"
+      formats: ["json"]
+
+  - id: "sigma_rules"
+    name: "Sigma detection rules (DRL 1.1 / custom license)"
+    enabled: true
+    priority: 34
+    license_profile: "quarantine"
+    license_evidence:
+      spdx_hint: "UNKNOWN"
+      url: "https://github.com/SigmaHQ/sigma"
+    data_type: ["detections", "rules", "sigma", "yaml"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/SigmaHQ/sigma.git"
+      checkout: "master"
+    output:
+      pool: "raw"
+      formats: ["yml", "yaml", "md", "txt"]
+
+  - id: "mordor_security_datasets"
+    name: "OTRF Security-Datasets (Mordor) — detection logs (GPL-3.0)"
+    enabled: false
+    priority: 35
+    license_profile: "copyleft"
+    license_evidence:
+      spdx_hint: "GPL-3.0-only"
+      url: "https://github.com/OTRF/Security-Datasets"
+    data_type: ["detections", "logs", "telemetry", "json", "csv"]
+    download:
+      strategy: "git"
+      repo: "https://github.com/OTRF/Security-Datasets.git"
+      checkout: "master"
+    output:
+      pool: "raw"
+      formats: ["json", "csv", "md", "txt"]
+
+  - id: "epss_current_scores"
+    name: "EPSS (Exploit Prediction Scoring System) — current daily scores"
+    enabled: true
+    priority: 36
+    license_profile: "quarantine"
+    license_evidence:
+      spdx_hint: "UNKNOWN"
+      url: "https://www.first.org/epss/"
+    data_type: ["risk_scoring", "epss", "csv", "gz"]
+    download:
+      strategy: "http"
+      urls:
+        - "https://epss.empiricalsecurity.com/epss_scores-current.csv.gz"
+    output:
+      pool: "raw"
+      formats: ["csv", "gz"]
+
+  # C) CommonPile (broad corpora) — DISABLED until HF IDs/configs are confirmed.
+  #     Once enabled, plan to add a domain-keyword filter step so you only keep cyber-relevant slices.
+
+  - id: "commonpile_usgpo_filtered_sample"
+    name: "CommonPile — USGPO (filtered) SAMPLE slice (verify HF repo_id/config before enabling)"
+    enabled: false
+    priority: 80
+    license_profile: "quarantine"
+    license_evidence:
+      spdx_hint: "CC-BY-4.0"
+      url: "https://huggingface.co/datasets"
+    data_type: ["commonpile", "government_docs", "policy", "reports"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/usgpo_filtered"
+      config: null
+      splits:
+        - "train[:5000]"
+      output_format: "jsonl"
+
+  - id: "commonpile_regulations_sample"
+    name: "CommonPile — Regulations SAMPLE slice (verify HF repo_id/config before enabling)"
+    enabled: false
+    priority: 81
+    license_profile: "quarantine"
+    license_evidence:
+      spdx_hint: "CC-BY-4.0"
+      url: "https://huggingface.co/datasets"
+    data_type: ["commonpile", "regulations", "compliance", "risk"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/regulations"
+      config: null
+      splits:
+        - "train[:5000]"
+      output_format: "jsonl"
+
+  - id: "commonpile_arxiv_abstracts_sample"
+    name: "CommonPile — arXiv abstracts SAMPLE slice (verify HF repo_id/config before enabling)"
+    enabled: false
+    priority: 82
+    license_profile: "quarantine"
+    license_evidence:
+      spdx_hint: "CC-BY-4.0"
+      url: "https://huggingface.co/datasets"
+    data_type: ["commonpile", "research", "papers", "abstracts"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/arxiv_abstracts"
+      config: null
+      splits:
+        - "train[:5000]"
+      output_format: "jsonl"
+
+  # D) RED / excluded (kept as documentation; disabled)
+  - id: "exploitdb_excluded"
+    name: "Exploit-DB (exploit PoCs) — EXCLUDED"
+    enabled: false
+    license_profile: "quarantine"
+    license_evidence: { spdx_hint: "UNKNOWN", url: "https://www.exploit-db.com" }
+    data_type: ["exploit_code", "poc", "dual_use"]
+    download:
+      strategy: "none"
+
+  - id: "metasploit_excluded"
+    name: "Metasploit Framework exploit modules — EXCLUDED"
+    enabled: false
+    license_profile: "quarantine"
+    license_evidence: { spdx_hint: "UNKNOWN", url: "https://github.com/rapid7/metasploit-framework" }
+    data_type: ["exploit_code", "dual_use"]
+    download:
+      strategy: "none"
+
+  - id: "malware_samples_excluded"
+    name: "Malware binaries/source corpora — EXCLUDED"
+    enabled: false
+    license_profile: "quarantine"
+    license_evidence: { spdx_hint: "UNKNOWN", url: "" }
+    data_type: ["malware", "samples", "dual_use"]
+    download:
+      strategy: "none"

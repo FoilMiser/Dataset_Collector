@@ -1,0 +1,168 @@
+# field_schemas.yaml
+# v1.0 — Cybersecurity/ICS normalization schemas
+#
+# Each schema version is immutable once released. Create a new version for changes.
+# This ensures reproducibility for computed-only extraction and structured-to-text transforms.
+
+schema_version: "1.0"
+updated_utc: "2026-01-15"
+
+schemas:
+
+  nvd_cve_v2.0.0:
+    description: "Normalized fields extracted from NVD CVE JSON 2.0 feeds"
+    version: "2.0.0"
+    created_utc: "2026-01-15"
+    source: "nvd_cve_2_0"
+    notes: |
+      Captures the core vulnerability metadata needed for downstream threat modeling
+      and patch prioritization. Keep references/affected ranges for grounding.
+    fields:
+      cve_id:
+        description: "CVE identifier"
+        type: "string"
+        required: true
+        nullable: false
+        validation:
+          pattern: "^CVE-\\d{4}-\\d{4,}$"
+      published:
+        description: "Original publication timestamp"
+        type: "string"
+        required: true
+        nullable: false
+      last_modified:
+        description: "Last modified timestamp"
+        type: "string"
+        required: true
+        nullable: false
+      cvss_base_score:
+        description: "Base CVSS score (v3.x)"
+        type: "float"
+        required: false
+        nullable: true
+        validation:
+          min: 0.0
+          max: 10.0
+      cvss_vector:
+        description: "CVSS vector string"
+        type: "string"
+        required: false
+        nullable: true
+        validation:
+          max_length: 128
+      cwes:
+        description: "List of CWE identifiers"
+        type: "string"
+        required: false
+        nullable: true
+      cpe_matches:
+        description: "Flattened affected product CPEs"
+        type: "string"
+        required: false
+        nullable: true
+      description:
+        description: "Primary vulnerability description"
+        type: "string"
+        required: true
+        nullable: false
+      references:
+        description: "Reference URLs"
+        type: "string"
+        required: false
+        nullable: true
+      known_exploited:
+        description: "Boolean flag if present in KEV or other exploitation feeds"
+        type: "boolean"
+        required: false
+        nullable: true
+
+  github_advisory_v1.0.0:
+    description: "Normalized GitHub Advisory (GHSA) YAML entries"
+    version: "1.0.0"
+    created_utc: "2026-01-15"
+    source: "github_advisory_database"
+    notes: "Captures package ecosystem details, affected ranges, severity, and references."
+    fields:
+      ghsa_id:
+        description: "GitHub Security Advisory identifier"
+        type: "string"
+        required: true
+        nullable: false
+      package_name:
+        description: "Affected package name"
+        type: "string"
+        required: true
+        nullable: false
+      ecosystem:
+        description: "Package ecosystem (npm, pypi, maven, etc.)"
+        type: "string"
+        required: true
+        nullable: false
+      severity:
+        description: "GHSA severity rating"
+        type: "string"
+        required: false
+        nullable: true
+      summary:
+        description: "Advisory summary"
+        type: "string"
+        required: true
+        nullable: false
+      vulnerable_ranges:
+        description: "Semver ranges affected"
+        type: "string"
+        required: false
+        nullable: true
+      patched_versions:
+        description: "Patched versions"
+        type: "string"
+        required: false
+        nullable: true
+      references:
+        description: "Reference URLs"
+        type: "string"
+        required: false
+        nullable: true
+      cve_ids:
+        description: "Linked CVE identifiers"
+        type: "string"
+        required: false
+        nullable: true
+
+  stix_bundle_summary_v1.0.0:
+    description: "Human-readable summaries distilled from STIX 2.x bundles"
+    version: "1.0.0"
+    created_utc: "2026-01-15"
+    source: "stix_worker"
+    notes: "Summaries of STIX domain objects and relationships for text-oriented corpora."
+    fields:
+      stix_id:
+        description: "Primary object ID"
+        type: "string"
+        required: true
+        nullable: false
+      object_type:
+        description: "STIX domain object type (e.g., attack-pattern, malware, campaign)"
+        type: "string"
+        required: true
+        nullable: false
+      name:
+        description: "Object name"
+        type: "string"
+        required: true
+        nullable: false
+      description:
+        description: "Normalized, cleaned description"
+        type: "string"
+        required: false
+        nullable: true
+      relationships:
+        description: "Textualized relationships to other objects"
+        type: "string"
+        required: false
+        nullable: true
+      external_references:
+        description: "Flattened citation list"
+        type: "string"
+        required: false
+        nullable: true
