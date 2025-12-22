@@ -1,0 +1,7 @@
+# TODO — Code Corpus Pipeline v2
+
+- [ ] Expand code_worker language coverage (tree-sitter/AST-aware chunking).
+- [ ] Add optional minhash duplicate reporting in merge_worker.
+- [ ] Harden secrets scanning with detect-secrets patterns.
+- [ ] Integrate Parquet output once schema stabilizes.
+- [ ] Add regression fixtures for yellow_screen_worker strict pitch behavior.

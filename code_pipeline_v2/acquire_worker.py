@@ -1,0 +1,603 @@
+#!/usr/bin/env python3
+"""
+acquire_worker.py (v2.0)
+
+Replaces download_worker.py with the v2 raw layout:
+  raw/{green|yellow}/{license_pool}/{target_id}/...
+
+Reads queue rows emitted by pipeline_driver.py and downloads payloads using the
+configured strategy. Dry-run by default; pass --execute to write files. After a
+successful run it writes a per-target `acquire_done.json` under the manifests
+root.
+"""
+
+from __future__ import annotations
+
+import argparse
+import dataclasses
+import hashlib
+import json
+import os
+import subprocess
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
+
+import yaml
+
+try:
+    import requests
+except ImportError:  # pragma: no cover - optional dependency
+    requests = None
+
+try:
+    from ftplib import FTP
+except ImportError:  # pragma: no cover - optional dependency
+    FTP = None
+
+
+VERSION = "2.0"
+
+
+def utc_now() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def ensure_dir(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+
+
+def read_jsonl(path: Path) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    with path.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                rows.append(json.loads(line))
+    return rows
+
+
+def write_json(path: Path, obj: Dict[str, Any]) -> None:
+    ensure_dir(path.parent)
+    path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def safe_name(s: str) -> str:
+    import re
+    s = re.sub(r"[^a-zA-Z0-9._-]+", "_", (s or "").strip())
+    return s[:200] if s else "file"
+
+
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def md5_file(path: Path) -> str:
+    h = hashlib.md5()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def run_cmd(cmd: List[str], cwd: Optional[Path] = None) -> str:
+    p = subprocess.run(cmd, cwd=str(cwd) if cwd else None, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    return p.stdout.decode("utf-8", errors="ignore")
+
+
+@dataclasses.dataclass
+class Roots:
+    raw_root: Path
+    manifests_root: Path
+    logs_root: Path
+
+
+@dataclasses.dataclass
+class Limits:
+    limit_targets: Optional[int]
+    limit_files: Optional[int]
+    max_bytes_per_target: Optional[int]
+
+
+@dataclasses.dataclass
+class RunMode:
+    execute: bool
+    overwrite: bool
+    verify_sha256: bool
+    verify_zenodo_md5: bool
+    enable_resume: bool
+    workers: int
+
+
+@dataclasses.dataclass
+class RetryConfig:
+    max_attempts: int = 3
+    backoff_base: float = 2.0
+    backoff_max: float = 60.0
+
+
+@dataclasses.dataclass
+class AcquireContext:
+    roots: Roots
+    limits: Limits
+    mode: RunMode
+    retry: RetryConfig
+    cfg: Dict[str, Any]
+
+
+# ---------------------------------
+# Strategy handlers
+# ---------------------------------
+
+def _http_download_with_resume(ctx: AcquireContext, url: str, out_path: Path, expected_size: Optional[int] = None) -> Dict[str, Any]:
+    if requests is None:
+        raise RuntimeError("requests is required for http downloads")
+    ensure_dir(out_path.parent)
+    headers = {}
+    mode = "wb"
+    existing = out_path.stat().st_size if out_path.exists() else 0
+    if existing and ctx.mode.enable_resume:
+        headers["Range"] = f"bytes={existing}-"
+        mode = "ab"
+    with requests.get(url, stream=True, headers=headers, timeout=(15, 300)) as r:
+        r.raise_for_status()
+        with out_path.open(mode) as f:
+            for chunk in r.iter_content(chunk_size=1024 * 1024):
+                if chunk:
+                    f.write(chunk)
+    result: Dict[str, Any] = {"status": "ok", "path": str(out_path)}
+    if ctx.mode.verify_sha256 and expected_size and out_path.stat().st_size != expected_size:
+        result = {"status": "error", "error": "size_mismatch"}
+    elif ctx.mode.verify_sha256:
+        result["sha256"] = sha256_file(out_path)
+    return result
+
+
+def handle_http(ctx: AcquireContext, row: Dict[str, Any], out_dir: Path) -> List[Dict[str, Any]]:
+    download = row.get("download", {}) or {}
+    urls: List[str] = []
+    if download.get("url"):
+        urls.append(download["url"])
+    urls.extend([u for u in download.get("urls") or [] if u])
+    if not urls:
+        return [{"status": "error", "error": "missing url"}]
+    results: List[Dict[str, Any]] = []
+    filenames: List[str] = download.get("filenames") or []
+    for idx, url in enumerate(urls):
+        if ctx.limits.limit_files and idx >= ctx.limits.limit_files:
+            break
+        filename = (
+            (filenames[idx] if idx < len(filenames) else None)
+            or download.get("filename")
+            or safe_name(urlparse(url).path.split("/")[-1])
+            or f"payload_{idx}.bin"
+        )
+        out_path = out_dir / filename
+        if out_path.exists() and not ctx.mode.overwrite:
+            results.append({"status": "ok", "path": str(out_path), "cached": True})
+            continue
+        if not ctx.mode.execute:
+            results.append({"status": "noop", "path": str(out_path)})
+            continue
+        results.append(_http_download_with_resume(ctx, url, out_path, download.get("expected_size")))
+    return results
+
+
+def handle_ftp(ctx: AcquireContext, row: Dict[str, Any], out_dir: Path) -> List[Dict[str, Any]]:
+    download = row.get("download", {}) or {}
+    base = download.get("base_url")
+    globs = download.get("globs", ["*"])
+    if FTP is None:
+        return [{"status": "error", "error": "ftplib missing"}]
+    if not base:
+        return [{"status": "error", "error": "missing base_url"}]
+    url = urlparse(base)
+    results: List[Dict[str, Any]] = []
+    if not ctx.mode.execute:
+        return [{"status": "noop", "path": str(out_dir)}]
+    with FTP(url.hostname) as ftp:
+        ftp.login()
+        ftp.cwd(url.path)
+        for g in globs:
+            files = ftp.nlst(g)
+            for fname in files[: ctx.limits.limit_files or len(files)]:
+                local = out_dir / fname
+                ensure_dir(local.parent)
+                with local.open("wb") as f:
+                    ftp.retrbinary(f"RETR {fname}", f.write)
+                results.append({"status": "ok", "path": str(local)})
+    return results
+
+
+def handle_git(ctx: AcquireContext, row: Dict[str, Any], out_dir: Path) -> List[Dict[str, Any]]:
+    download = row.get("download", {}) or {}
+    repo = download.get("repo") or download.get("repo_url")
+    branch = download.get("branch")
+    if not repo:
+        return [{"status": "error", "error": "missing repo"}]
+    if out_dir.exists() and any(out_dir.iterdir()) and not ctx.mode.overwrite:
+        return [{"status": "ok", "path": str(out_dir), "cached": True}]
+    if not ctx.mode.execute:
+        return [{"status": "noop", "path": str(out_dir)}]
+    ensure_dir(out_dir)
+    cmd = ["git", "clone"]
+    if branch:
+        cmd += ["-b", branch]
+    cmd += [repo, str(out_dir)]
+    log = run_cmd(cmd)
+    return [{"status": "ok", "path": str(out_dir), "log": log}]
+
+
+def handle_zenodo(ctx: AcquireContext, row: Dict[str, Any], out_dir: Path) -> List[Dict[str, Any]]:
+    download = row.get("download", {}) or {}
+    api_url = download.get("api") or download.get("record_url")
+    if not api_url:
+        return [{"status": "error", "error": "missing api/record_url"}]
+    if requests is None:
+        return [{"status": "error", "error": "requests missing"}]
+    if not ctx.mode.execute:
+        return [{"status": "noop", "path": str(out_dir)}]
+    resp = requests.get(api_url, timeout=60)
+    resp.raise_for_status()
+    data = resp.json()
+    results: List[Dict[str, Any]] = []
+    files = data.get("files", []) or data.get("hits", {}).get("hits", [{}])[0].get("files", [])
+    for f in files[: ctx.limits.limit_files or len(files)]:
+        link = f.get("links", {}).get("self") or f.get("link")
+        if not link:
+            continue
+        filename = f.get("key") or f.get("name") or safe_name(link)
+        out_path = out_dir / filename
+        ensure_dir(out_path.parent)
+        r = _http_download_with_resume(ctx, link, out_path)
+        if ctx.mode.verify_zenodo_md5 and f.get("checksum", "").startswith("md5:"):
+            expected_md5 = f["checksum"].split(":", 1)[1]
+            if md5_file(out_path) != expected_md5:
+                r = {"status": "error", "error": "md5_mismatch"}
+        results.append(r)
+    return results or [{"status": "noop", "reason": "no files"}]
+
+
+def handle_dataverse(ctx: AcquireContext, row: Dict[str, Any], out_dir: Path) -> List[Dict[str, Any]]:
+    download = row.get("download", {}) or {}
+    pid = download.get("persistent_id") or download.get("pid")
+    instance = download.get("instance") or "https://dataverse.harvard.edu"
+    if not pid:
+        return [{"status": "error", "error": "missing persistent_id"}]
+    if requests is None:
+        return [{"status": "error", "error": "requests missing"}]
+    if not ctx.mode.execute:
+        return [{"status": "noop", "path": str(out_dir)}]
+    url = f"{instance}/api/access/dvobject/{pid}"
+    resp = requests.get(url, allow_redirects=True, timeout=60)
+    resp.raise_for_status()
+    filename = safe_name(urlparse(resp.url).path.split("/")[-1] or pid)
+    out_path = out_dir / filename
+    ensure_dir(out_path.parent)
+    with out_path.open("wb") as f:
+        f.write(resp.content)
+    return [{"status": "ok", "path": str(out_path)}]
+
+
+def handle_figshare(ctx: AcquireContext, row: Dict[str, Any], out_dir: Path) -> List[Dict[str, Any]]:
+    if requests is None:
+        return [{"status": "error", "error": "requests missing"}]
+    download = row.get("download", {}) or {}
+    article_id = download.get("article_id")
+    if not article_id and download.get("article_url"):
+        try:
+            article_id = int(str(download["article_url"]).rstrip("/").split("/")[-1])
+        except Exception:
+            article_id = None
+    if not article_id:
+        return [{"status": "error", "error": "missing article_id"}]
+    api_base = (download.get("api_base") or "https://api.figshare.com/v2").rstrip("/")
+    endpoint = f"{api_base}/articles/{article_id}"
+    if not ctx.mode.execute:
+        return [{"status": "noop", "article_id": article_id, "path": str(out_dir)}]
+    resp = requests.get(endpoint, timeout=60)
+    resp.raise_for_status()
+    meta = resp.json()
+    files = meta.get("files", []) or []
+    results: List[Dict[str, Any]] = []
+    for idx, fmeta in enumerate(files):
+        if ctx.limits.limit_files and idx >= ctx.limits.limit_files:
+            break
+        download_url = fmeta.get("download_url") or (fmeta.get("links") or {}).get("download")
+        if not download_url:
+            results.append({"status": "error", "error": "missing_download_url", "file": fmeta.get("name")})
+            continue
+        fname = safe_name(fmeta.get("name") or fmeta.get("id") or f"figshare_file_{idx}")
+        expected_size = fmeta.get("size")
+        results.append(_http_download_with_resume(ctx, download_url, out_dir / fname, expected_size))
+    write_json(out_dir / "figshare_article.json", meta)
+    return results
+
+
+def handle_github_release(ctx: AcquireContext, row: Dict[str, Any], out_dir: Path) -> List[Dict[str, Any]]:
+    if requests is None:
+        return [{"status": "error", "error": "requests missing"}]
+    download = row.get("download", {}) or {}
+    owner = download.get("owner")
+    repo = download.get("repo") or download.get("repository")
+    if repo and "/" in repo and not owner:
+        owner, repo = repo.split("/", 1)
+    tag = download.get("tag")
+    release_id = download.get("release_id")
+    if not owner or not repo:
+        return [{"status": "error", "error": "missing owner/repo"}]
+    headers = {"User-Agent": f"code-corpus-acquire/{VERSION}"}
+    token = (download.get("github_token") or os.environ.get("GITHUB_TOKEN") or "").strip()
+    token_file = Path.home() / ".github_token"
+    if not token and token_file.exists():
+        try:
+            token = token_file.read_text().strip()
+        except Exception:
+            token = ""
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    base = f"https://api.github.com/repos/{owner}/{repo}/releases"
+    if release_id:
+        url = f"{base}/{release_id}"
+    elif tag:
+        url = f"{base}/tags/{tag}"
+    else:
+        url = f"{base}/latest"
+    if not ctx.mode.execute:
+        return [{"status": "noop", "release_url": url, "path": str(out_dir)}]
+    resp = requests.get(url, headers=headers, timeout=60)
+    resp.raise_for_status()
+    meta = resp.json()
+    assets = meta.get("assets", []) or []
+    results: List[Dict[str, Any]] = []
+    for idx, asset in enumerate(assets):
+        if ctx.limits.limit_files and idx >= ctx.limits.limit_files:
+            break
+        download_url = asset.get("browser_download_url") or asset.get("url")
+        if not download_url:
+            results.append({"status": "error", "error": "missing_download_url", "asset": asset.get("name")})
+            continue
+        fname = safe_name(asset.get("name") or f"{repo}_asset_{idx}")
+        results.append(_http_download_with_resume(ctx, download_url, out_dir / fname, asset.get("size")))
+    write_json(out_dir / "github_release.json", meta)
+    return results
+
+
+def handle_hf_datasets(ctx: AcquireContext, row: Dict[str, Any], out_dir: Path) -> List[Dict[str, Any]]:
+    download = row.get("download", {}) or {}
+    dataset_id = download.get("dataset_id")
+    if not dataset_id:
+        return [{"status": "error", "error": "missing dataset_id"}]
+    splits = download.get("splits")
+    load_kwargs = download.get("load_kwargs", {}) or {}
+    if not ctx.mode.execute:
+        return [{"status": "noop", "path": str(out_dir)}]
+    try:
+        from datasets import load_dataset  # type: ignore
+    except Exception as e:  # pragma: no cover - optional dep
+        return [{"status": "error", "error": f"datasets import failed: {e}"}]
+
+    results: List[Dict[str, Any]] = []
+    ensure_dir(out_dir)
+    if splits:
+        for sp in splits:
+            ds = load_dataset(dataset_id, split=sp, **load_kwargs)
+            sp_dir = out_dir / f"split_{safe_name(sp)}"
+            ds.save_to_disk(str(sp_dir))
+            results.append({"status": "ok", "dataset_id": dataset_id, "split": sp})
+    else:
+        ds = load_dataset(dataset_id, **load_kwargs)
+        ds.save_to_disk(str(out_dir / "hf_dataset"))
+        results.append({"status": "ok", "dataset_id": dataset_id})
+    return results
+
+
+STRATEGY_HANDLERS = {
+    "http": handle_http,
+    "ftp": handle_ftp,
+    "git": handle_git,
+    "zenodo": handle_zenodo,
+    "dataverse": handle_dataverse,
+    "figshare": handle_figshare,
+    "github_release": handle_github_release,
+    "huggingface_datasets": handle_hf_datasets,
+}
+
+
+def should_run_code_worker(row: Dict[str, Any]) -> bool:
+    data_types = row.get("data_type") or row.get("data_types") or []
+    if isinstance(data_types, str):
+        data_types = [data_types]
+    flags = row.get("code_worker", {}) or {}
+    return "code" in [str(t).lower() for t in data_types] or bool(flags.get("enabled", False))
+
+
+def run_code_worker(ctx: AcquireContext, row: Dict[str, Any], out_dir: Path, bucket: str) -> Dict[str, Any]:
+    try:
+        from code_worker import run_extraction  # type: ignore
+    except Exception as exc:  # pragma: no cover - optional dependency
+        return {"status": "error", "error": f"code_worker_import_failed: {exc}"}
+
+    globals_cfg = ctx.cfg.get("globals", {}) if isinstance(ctx.cfg, dict) else {}
+    processing_defaults = globals_cfg.get("code_processing_defaults", {}) or {}
+    target_cfg: Dict[str, Any] = {}
+    for t in ctx.cfg.get("targets", []) if isinstance(ctx.cfg, dict) else []:
+        if t.get("id") == row.get("id"):
+            target_cfg = t
+            break
+    processing_overrides = target_cfg.get("code_processing", {}) if isinstance(target_cfg, dict) else {}
+    if processing_overrides:
+        processing_defaults = {**processing_defaults, **processing_overrides}
+    sharding_cfg = globals_cfg.get("sharding", {}) or {}
+    routing = row.get("routing") or row.get("code_routing") or target_cfg.get("routing") or {}
+    download_cfg = row.get("download", {}) or {}
+    source_url = download_cfg.get("repo") or download_cfg.get("repo_url") or download_cfg.get("url")
+    license_spdx = row.get("resolved_spdx") or (row.get("license_evidence", {}) or {}).get("spdx_hint")
+    pitches_root = globals_cfg.get("pitches_root")
+
+    summary = run_extraction(
+        input_dir=out_dir,
+        output_dir=out_dir / "shards",
+        target_id=row["id"],
+        license_profile=resolve_license_pool(row),
+        license_spdx=license_spdx,
+        bucket=bucket,
+        routing=routing,
+        processing_defaults=processing_defaults,
+        sharding=sharding_cfg,
+        source_url=source_url,
+        pitches_root=Path(pitches_root) if pitches_root else None,
+    )
+    return {"status": "ok", "path": str(out_dir), "code_worker": summary}
+
+
+def resolve_license_pool(row: Dict[str, Any]) -> str:
+    lp = str(row.get("license_profile") or row.get("license_pool") or "quarantine").lower()
+    if lp not in {"permissive", "copyleft", "quarantine"}:
+        lp = "quarantine"
+    return lp
+
+
+def resolve_output_dir(ctx: AcquireContext, bucket: str, pool: str, target_id: str) -> Path:
+    bucket = (bucket or "yellow").strip().lower()
+    pool = (pool or "quarantine").strip().lower()
+    out = ctx.roots.raw_root / bucket / pool / safe_name(target_id)
+    ensure_dir(out)
+    return out
+
+
+def write_done_marker(ctx: AcquireContext, target_id: str, bucket: str, status: str) -> None:
+    marker = ctx.roots.manifests_root / safe_name(target_id) / "acquire_done.json"
+    write_json(marker, {"target_id": target_id, "bucket": bucket, "status": status, "written_at_utc": utc_now(), "version": VERSION})
+
+
+def run_target(ctx: AcquireContext, bucket: str, row: Dict[str, Any]) -> Dict[str, Any]:
+    tid = row["id"]
+    pool = resolve_license_pool(row)
+    strat = (row.get("download", {}) or {}).get("strategy", "none")
+    out_dir = resolve_output_dir(ctx, bucket, pool, tid)
+    manifest = {
+        "id": tid,
+        "name": row.get("name", tid),
+        "bucket": bucket,
+        "license_pool": pool,
+        "strategy": strat,
+        "started_at_utc": utc_now(),
+        "pipeline_version": VERSION,
+        "output_dir": str(out_dir),
+        "results": [],
+    }
+
+    handler = STRATEGY_HANDLERS.get(strat)
+    if not handler or strat in {"none", ""}:
+        manifest["results"] = [{"status": "noop", "reason": f"unsupported: {strat}"}]
+    else:
+        try:
+            manifest["results"] = handler(ctx, row, out_dir)
+        except Exception as e:
+            manifest["results"] = [{"status": "error", "error": repr(e)}]
+
+    post_processors: Dict[str, Any] = {}
+    if ctx.mode.execute and should_run_code_worker(row) and any(r.get("status") == "ok" for r in manifest["results"]):
+        post_processors["code_worker"] = run_code_worker(ctx, row, out_dir, bucket)
+        manifest["post_processors"] = post_processors
+
+    manifest["finished_at_utc"] = utc_now()
+    write_json(out_dir / "download_manifest.json", manifest)
+
+    status = "ok" if any(r.get("status") == "ok" for r in manifest["results"]) else manifest["results"][0].get("status", "error")
+    if post_processors:
+        for proc in post_processors.values():
+            if isinstance(proc, dict) and proc.get("status") not in {"ok", "noop"}:
+                status = proc.get("status", status)
+    if ctx.mode.execute:
+        write_done_marker(ctx, tid, bucket, status)
+    return {"id": tid, "status": status, "bucket": bucket, "license_pool": pool, "strategy": strat}
+
+
+def load_roots(cfg: Dict[str, Any], overrides: argparse.Namespace) -> Roots:
+    g = (cfg.get("globals", {}) or {})
+    raw_root = Path(overrides.raw_root or g.get("raw_root", "/data/code/raw"))
+    manifests_root = Path(overrides.manifests_root or g.get("manifests_root", "/data/code/_manifests"))
+    logs_root = Path(overrides.logs_root or g.get("logs_root", "/data/code/_logs"))
+    return Roots(raw_root=raw_root.expanduser().resolve(), manifests_root=manifests_root.expanduser().resolve(), logs_root=logs_root.expanduser().resolve())
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description=f"Acquire Worker v{VERSION}")
+    ap.add_argument("--queue", required=True, help="Queue JSONL emitted by pipeline_driver.py")
+    ap.add_argument("--targets-yaml", default=None, help="Path to targets_code.yaml for roots")
+    ap.add_argument("--bucket", required=True, choices=["green", "yellow"], help="Bucket being processed")
+    ap.add_argument("--raw-root", default=None, help="Override raw root")
+    ap.add_argument("--manifests-root", default=None, help="Override manifests root")
+    ap.add_argument("--logs-root", default=None, help="Override logs root")
+    ap.add_argument("--execute", action="store_true", help="Perform downloads")
+    ap.add_argument("--overwrite", action="store_true", help="Overwrite existing outputs")
+    ap.add_argument("--verify-sha256", action="store_true", help="Compute sha256 for http downloads")
+    ap.add_argument("--verify-zenodo-md5", action="store_true", help="Verify Zenodo md5")
+    ap.add_argument("--enable-resume", action="store_true", default=True)
+    ap.add_argument("--no-resume", action="store_true")
+    ap.add_argument("--limit-targets", type=int, default=None)
+    ap.add_argument("--limit-files", type=int, default=None)
+    ap.add_argument("--max-bytes-per-target", type=int, default=None)
+    ap.add_argument("--workers", type=int, default=1)
+    ap.add_argument("--retry-max", type=int, default=3)
+    ap.add_argument("--retry-backoff", type=float, default=2.0)
+    args = ap.parse_args()
+
+    queue_path = Path(args.queue).expanduser().resolve()
+    rows = read_jsonl(queue_path)
+
+    targets_path = Path(args.targets_yaml).expanduser().resolve() if args.targets_yaml else None
+    cfg: Dict[str, Any] = {}
+    if targets_path and targets_path.exists():
+        cfg = yaml.safe_load(targets_path.read_text(encoding="utf-8")) or {}
+    roots = load_roots(cfg, args)
+    ensure_dir(roots.logs_root)
+
+    ctx = AcquireContext(
+        roots=roots,
+        limits=Limits(args.limit_targets, args.limit_files, args.max_bytes_per_target),
+        mode=RunMode(args.execute, args.overwrite, args.verify_sha256, args.verify_zenodo_md5, args.enable_resume and not args.no_resume, max(1, args.workers)),
+        retry=RetryConfig(args.retry_max, args.retry_backoff),
+        cfg=cfg,
+    )
+
+    if ctx.limits.limit_targets:
+        rows = rows[: ctx.limits.limit_targets]
+    rows = [r for r in rows if r.get("enabled", True) and r.get("id")]
+
+    summary = {
+        "run_at_utc": utc_now(),
+        "pipeline_version": VERSION,
+        "queue": str(queue_path),
+        "bucket": args.bucket,
+        "execute": ctx.mode.execute,
+        "results": [],
+    }
+
+    if ctx.mode.workers > 1 and ctx.mode.execute:
+        with ThreadPoolExecutor(max_workers=ctx.mode.workers) as ex:
+            futures = {ex.submit(run_target, ctx, args.bucket, row): row for row in rows}
+            for fut in as_completed(futures):
+                try:
+                    res = fut.result()
+                except Exception as e:
+                    res = {"id": futures[fut].get("id"), "status": "error", "error": repr(e)}
+                summary["results"].append(res)
+    else:
+        for row in rows:
+            res = run_target(ctx, args.bucket, row)
+            summary["results"].append(res)
+
+    write_json(roots.logs_root / f"acquire_summary_{args.bucket}.json", summary)
+
+
+if __name__ == "__main__":
+    main()
