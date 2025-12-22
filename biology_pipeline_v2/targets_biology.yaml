@@ -97,9 +97,9 @@ gates_catalog:
   record_level_filter: "Require per-record license metadata; keep only allowlist."
   computed_only_extract: "Extract only safe computed identifiers/structured fields; drop depositor free text."
   extract_text_chunks: "Extract text into JSONL chunks using globals.text_processing_defaults unless overridden."
-  pii_phi_scan: "Scan extracted text/metadata for PII/PHI; quarantine or drop on hit (hook not yet enabled by default)."
-  human_subjects_policy_scan: "Detect human-subject/patient-level datasets; require explicit permissions (hook not yet enabled by default)."
-  biosecurity_policy_scan: "Flag/remove clearly misuse-oriented procedural content (hook not yet enabled by default)."
+  pii_phi_scan: "Scan extracted text/metadata for PII/PHI; quarantine or drop on hit. (TODO)"
+  human_subjects_policy_scan: "Detect human-subject/patient-level datasets; require explicit permissions. (TODO)"
+  biosecurity_policy_scan: "Flag/remove clearly misuse-oriented procedural content. (TODO)"
   emit_training_manifest: "Manifest of included files/records + checksums + license evidence."
   emit_attribution_bundle: "Generate ATTRIBUTION.md + CITATIONS.bib for included sources."
   manual_legal_review: "Human review required before training."
@@ -159,7 +159,7 @@ resolvers:
     note: "Use list + filter by glob; store directory listing snapshot."
   api:
     mode: "base_url"
-    note: "Cache responses; store query params & rate limit behavior. Add an api strategy to the downloader before enabling."
+    note: "Cache responses; store query params & rate limit behavior. (TODO: add api strategy to downloader)"
 
 targets:
 
@@ -326,7 +326,7 @@ targets:
 
   - id: "opentree_taxonomy"
     name: "OpenTree of Life taxonomy"
-    enabled: false  # Disabled until github_release strategy or static artifact workflow is added
+    enabled: false  # TODO: implement github_release strategy in download_worker or switch to a static HTTP artifact
     priority: 7
     license_profile: "permissive"
     license_evidence: { spdx_hint: "CC0-1.0", url: "https://github.com/OpenTreeOfLife/opentree/wiki/Open-Tree-of-Life-data-use-policy" }
@@ -511,7 +511,7 @@ targets:
 
   - id: "openstax_biology"
     name: "OpenStax Biology (OER textbook)"
-    enabled: false  # Disabled until an OpenStax exporter/crawler is added; current HTTP strategy only grabs a landing page
+    enabled: false  # TODO: implement OpenStax book exporter/crawler; current HTTP strategy only grabs a landing page
     priority: 6
     license_profile: "permissive"
     license_evidence: { spdx_hint: "CC-BY-4.0", url: "https://openstax.org/details/books/biology-2e" }
@@ -530,7 +530,7 @@ targets:
 
   - id: "openstax_anatomy_physiology"
     name: "OpenStax Anatomy & Physiology (OER textbook)"
-    enabled: false  # Disabled until an OpenStax exporter/crawler is added; current HTTP strategy only grabs a landing page
+    enabled: false  # TODO: implement OpenStax book exporter/crawler; current HTTP strategy only grabs a landing page
     priority: 6
     license_profile: "permissive"
     license_evidence: { spdx_hint: "CC-BY-4.0", url: "https://openstax.org/details/books/anatomy-and-physiology-2e" }
@@ -553,7 +553,7 @@ targets:
 
   - id: "us_gov_cdc_eid_journal"
     name: "CDC Emerging Infectious Diseases journal (public domain/open)"
-    enabled: false  # Disabled until a crawler/bulk exporter is added; current HTTP strategy only grabs a landing page
+    enabled: false  # TODO: add crawler/bulk exporter; current HTTP strategy only grabs a landing page
     priority: 6
     license_profile: "permissive"
     license_evidence: { spdx_hint: "US-PUBLIC-DOMAIN", url: "https://wwwnc.cdc.gov/eid/page/copyright-and-disclaimer" }
@@ -673,7 +673,7 @@ targets:
       domain: "biodiversity"
       category: "occurrence_records"
     download:
-      strategy: "none"  # Manual ingestion placeholder until GBIF download API workflow + record-level license filter is added
+      strategy: "none"  # TODO: implement GBIF download API workflow + record-level license filter
     gates_override:
       add: ["record_level_filter", "manual_legal_review"]
     output:
@@ -692,7 +692,7 @@ targets:
       domain: "biodiversity"
       category: "observations"
     download:
-      strategy: "none"  # Manual ingestion placeholder until export + per-record license selection (CC0/CC-BY only) is added
+      strategy: "none"  # TODO: implement export + per-record license selection (CC0/CC-BY only)
     gates_override:
       add: ["record_level_filter", "manual_legal_review", "pii_phi_scan"]
     output:
