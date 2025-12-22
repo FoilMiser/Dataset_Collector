@@ -1,0 +1,110 @@
+schema_version: "2.0"
+updated_utc: "2026-06-01T00:00:00Z"
+
+globals:
+  default_subject: code
+  default_domain: multi
+  default_category: misc
+  default_level: 5
+  folder_layout: final/{license_pool}/d{level:02d}/{subject}/{domain}/{category}
+
+rubric:
+  scale:
+    min: 1
+    max: 10
+    name: "Difficulty 1–10"
+  levels:
+    1: {label: Foundations, description: "Hello world, syntax primers, and language introductions."}
+    3: {label: Beginner, description: "Small scripts, simple data wrangling, and basic APIs."}
+    5: {label: Intermediate, description: "Multi-file projects, idiomatic patterns, and standard libraries."}
+    8: {label: Advanced, description: "Systems work, high-performance code, or complex frameworks."}
+    10: {label: Expert, description: "Cutting-edge systems, heavy optimization, or research-quality code."}
+
+subjects:
+  code:
+    name: Code
+    domains:
+      python:
+        name: Python
+        categories:
+          basics:            {level: {default: 2, min: 1, max: 3}}
+          algorithms:        {level: {default: 5, min: 3, max: 7}}
+          data_structures:   {level: {default: 5, min: 3, max: 7}}
+          web_backend:       {level: {default: 5, min: 3, max: 7}}
+          ml:                {level: {default: 6, min: 4, max: 8}}
+          devops:            {level: {default: 6, min: 4, max: 8}}
+          security:          {level: {default: 7, min: 5, max: 9}}
+      javascript:
+        name: JavaScript
+        categories:
+          basics:            {level: {default: 2, min: 1, max: 3}}
+          web_frontend:      {level: {default: 4, min: 2, max: 6}}
+          web_backend:       {level: {default: 5, min: 3, max: 7}}
+          data_structures:   {level: {default: 4, min: 3, max: 6}}
+          security:          {level: {default: 6, min: 4, max: 8}}
+      typescript:
+        name: TypeScript
+        categories:
+          web_frontend:      {level: {default: 5, min: 3, max: 7}}
+          web_backend:       {level: {default: 5, min: 3, max: 7}}
+          data_structures:   {level: {default: 4, min: 3, max: 6}}
+      java:
+        name: Java
+        categories:
+          basics:            {level: {default: 3, min: 2, max: 4}}
+          data_structures:   {level: {default: 5, min: 3, max: 7}}
+          web_backend:       {level: {default: 5, min: 3, max: 7}}
+          enterprise:        {level: {default: 6, min: 4, max: 8}}
+          security:          {level: {default: 6, min: 4, max: 8}}
+      cpp:
+        name: C/C++
+        categories:
+          basics:            {level: {default: 4, min: 3, max: 5}}
+          systems:           {level: {default: 7, min: 5, max: 9}}
+          graphics:          {level: {default: 7, min: 5, max: 9}}
+          embedded:          {level: {default: 6, min: 4, max: 8}}
+      rust:
+        name: Rust
+        categories:
+          basics:            {level: {default: 4, min: 3, max: 5}}
+          systems:           {level: {default: 7, min: 5, max: 9}}
+          embedded:          {level: {default: 7, min: 5, max: 9}}
+      go:
+        name: Go
+        categories:
+          basics:            {level: {default: 3, min: 2, max: 4}}
+          web_backend:       {level: {default: 5, min: 3, max: 7}}
+          systems:           {level: {default: 6, min: 4, max: 8}}
+          devops:            {level: {default: 6, min: 4, max: 8}}
+      csharp:
+        name: C#
+        categories:
+          basics:            {level: {default: 3, min: 2, max: 4}}
+          web_backend:       {level: {default: 5, min: 3, max: 7}}
+          graphics:          {level: {default: 6, min: 4, max: 8}}
+      sql:
+        name: SQL
+        categories:
+          basics:            {level: {default: 3, min: 2, max: 4}}
+          analytics:         {level: {default: 4, min: 3, max: 6}}
+          systems:           {level: {default: 5, min: 4, max: 7}}
+      shell:
+        name: Shell / Bash
+        categories:
+          basics:            {level: {default: 2, min: 1, max: 3}}
+          devops:            {level: {default: 5, min: 3, max: 7}}
+          security:          {level: {default: 6, min: 4, max: 8}}
+      multi:
+        name: Multi-language / mixed
+        categories:
+          basics:            {level: {default: 3, min: 1, max: 4}}
+          algorithms:        {level: {default: 5, min: 3, max: 7}}
+          data_structures:   {level: {default: 5, min: 3, max: 7}}
+          web_backend:       {level: {default: 5, min: 3, max: 7}}
+          web_frontend:      {level: {default: 5, min: 3, max: 7}}
+          systems:           {level: {default: 6, min: 4, max: 8}}
+          ml:                {level: {default: 6, min: 4, max: 8}}
+          devops:            {level: {default: 6, min: 4, max: 8}}
+          security:          {level: {default: 7, min: 5, max: 9}}
+          graphics:          {level: {default: 6, min: 4, max: 8}}
+          embedded:          {level: {default: 6, min: 4, max: 8}}
