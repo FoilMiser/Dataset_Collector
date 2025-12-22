@@ -1,0 +1,45 @@
+schema_version: "2.0"
+updated_utc: "2026-01-01T00:00:00Z"
+
+globals:
+  default_subject: chem
+  default_domain: misc
+  default_category: misc
+  default_level: 5
+  folder_layout: final/{license_pool}/d{level:02d}/{subject}/{domain}/{category}
+
+rubric:
+  scale:
+    min: 1
+    max: 10
+    name: "Difficulty 1–10"
+  levels:
+    1: {label: Foundations, description: "Atoms, molecules, units, simple stoichiometry.", signals: ["single-step", "definitions"]}
+    5: {label: Undergraduate core, description: "P-chem/ochem/analytical core concepts.", signals: ["multi-step", "equilibria", "mechanisms"]}
+    10: {label: Research frontier, description: "Specialized papers / advanced theory.", signals: ["research", "dense jargon"]}
+
+subjects:
+  chem:
+    name: Chemistry
+    domains:
+      general_chem:
+        name: General chemistry
+        categories:
+          stoichiometry:
+            level: {default: 2, min: 1, max: 3}
+          thermodynamics:
+            level: {default: 5, min: 4, max: 6}
+      organic:
+        name: Organic chemistry
+        categories:
+          reactions_mechanisms:
+            level: {default: 6, min: 5, max: 7}
+          spectroscopy:
+            level: {default: 5, min: 4, max: 7}
+      materials:
+        name: Materials chemistry
+        categories:
+          polymers:
+            level: {default: 6, min: 4, max: 8}
+          solid_state:
+            level: {default: 6, min: 5, max: 8}

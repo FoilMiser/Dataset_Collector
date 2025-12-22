@@ -1,0 +1,40 @@
+===============================================================================
+TODO — Chemistry Corpus Pipeline v2
+===============================================================================
+
+Legend:
+  [x] = Completed
+  [~] = Partially addressed / MVP landed
+  [ ] = Not yet implemented
+
+===============================================================================
+CURRENT STATE
+===============================================================================
+
+v2 skeleton (based on math v2) landed:
+  [x] Stage flow and scripts copied and renamed for chemistry
+  [x] Chem-specific routing defaults in pipeline_driver.py
+  [x] Acquisition strategies include Figshare and GitHub releases
+  [x] YELLOW screening plugins for PubChem computed-only and PMC OA
+
+===============================================================================
+NEAR-TERM IMPROVEMENTS
+===============================================================================
+
+1) Chemistry plugins and inputs
+   [ ] Add MoNA/GNPS record-level filters with license-aware routing
+   [ ] Tighten PMC OA handling with per-article license evidence
+   [ ] Expand PubChem plugin field schemas and validation coverage
+
+2) Safety and routing
+   [ ] Enforce record-level license checks when require_record_license is true
+   [ ] Add deny phrase coverage for common chemistry publisher terms
+   [ ] Wire chem_routing into merge/difficulty fallbacks everywhere
+
+3) Testing + fixtures
+   [ ] Tiny end-to-end dry-run fixture (classify->acquire->screen) for CI
+   [ ] Sample raw inputs for PubChem/PMC plugin regression tests
+
+4) Observability and docs
+   [ ] Lightweight metrics: shard counts/bytes per stage
+   [ ] How-to guides for adding new chemistry targets and screening modes
