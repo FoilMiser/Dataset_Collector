@@ -1,0 +1,271 @@
+schema_version: '0.8'
+updated_utc: '2026-06-15T00:00:00Z'
+companion_files:
+  license_map: ./license_map.yaml
+  field_schemas: ./field_schemas.yaml
+  denylist: ./denylist.yaml
+  difficulties_map: ./difficulties_kg_nav.yaml
+globals:
+  raw_root: /data/kg_nav/raw
+  screened_yellow_root: /data/kg_nav/screened_yellow
+  combined_root: /data/kg_nav/combined
+  final_root: /data/kg_nav/final
+  ledger_root: /data/kg_nav/_ledger
+  pitches_root: /data/kg_nav/_pitches
+  manifests_root: /data/kg_nav/_manifests
+  queues_root: /data/kg_nav/_queues
+  catalogs_root: /data/kg_nav/_catalogs
+  logs_root: /data/kg_nav/_logs
+
+  sharding:
+    max_records_per_shard: 50000
+    compression: gzip
+
+  screening:
+    min_chars: 200
+    max_chars: 12000
+    text_field_candidates: [text]
+    record_license_field_candidates: [license, license_spdx]
+    require_record_license: false
+    allow_spdx: [CC0-1.0, CC-BY-4.0, MIT, Apache-2.0, CC-BY-SA-4.0]
+    deny_phrases: ["noai", "no tdm", "no machine learning"]
+
+  require_yellow_signoff: false
+
+default_gates:
+  - snapshot_terms
+  - resolve_license_spdx
+  - restriction_phrase_scan
+  - emit_training_manifest
+  - emit_attribution_bundle
+
+queues:
+  emit:
+    - id: green_download
+      path: /data/kg_nav/_queues/green_download.jsonl
+      criteria:
+        effective_bucket: GREEN
+        enabled: true
+    - id: yellow_pipeline
+      path: /data/kg_nav/_queues/yellow_pipeline.jsonl
+      criteria:
+        effective_bucket: YELLOW
+        enabled: true
+    - id: red_rejected
+      path: /data/kg_nav/_queues/red_rejected.jsonl
+      criteria:
+        effective_bucket: RED
+        enabled: true
+
+gates_catalog:
+  snapshot_terms: Save Terms/ToS + license page HTML/PDF/TXT + retrieval timestamp.
+  resolve_license_spdx: Normalize license to SPDX via license_map.yaml rules; store evidence.
+  restriction_phrase_scan: Scan terms/content for restriction phrases (no-LLM/no-TDM/etc.).
+  computed_only_extract: Extract only safe computed identifiers/descriptors; drop depositor text.
+  emit_training_manifest: Manifest of included files/records + checksums + license evidence.
+  emit_attribution_bundle: Generate ATTRIBUTION.md + CITATIONS.bib for included sources.
+  manual_legal_review: Human review required before training.
+  segregate_copyleft_pool: Force output into copyleft pool and keep isolated.
+  record_level_filter: Require per-record license metadata; keep only allowlist.
+  near_duplicate_detection: Run MinHash/LSH deduplication pass.
+
+resolvers:
+  http:
+    mode: direct_url
+    note: Direct file download with resume.
+  ftp:
+    mode: base_url + globs
+    note: List + filter by glob; store directory listing snapshot.
+  zenodo:
+    mode: record_id_or_doi
+    api: https://zenodo.org/api/records/{record_id}
+    outputs:
+      - files[*].links.self
+      - files[*].checksum
+    verify_checksum: true
+    checksum_algorithm: md5
+  figshare:
+    mode: article_id
+    api: https://api.figshare.com/v2/articles/{article_id}/files
+    notes: Resolve article to files, verify license, then download assets.
+  s3_sync:
+    mode: bucket_sync
+    notes: Use aws s3 sync with optional --no-sign-request.
+  aws_requester_pays:
+    mode: s3_requester_pays
+    notes: For Crossref public data file requester-pays buckets.
+  torrent:
+    mode: torrent_or_magnet
+    notes: Requires aria2c; prefer verified torrents only.
+
+# Targets carry routing to align with difficulty + folder layout
+# routing fields: subject, domain, category, level, granularity
+
+targets:
+  - id: wikidata_dumps
+    name: Wikidata JSON/RDF dumps (truthy + full)
+    enabled: true
+    priority: 5
+    license_profile: permissive
+    license_evidence:
+      spdx_hint: CC0-1.0
+      url: https://www.wikidata.org/wiki/Wikidata:Licensing
+    output:
+      pool: permissive
+      formats: [bz2, json, ttl.bz2]
+    download:
+      strategy: http
+      urls:
+        - https://dumps.wikimedia.org/wikidatawiki/entities/latest-all.json.bz2
+        - https://dumps.wikimedia.org/wikidatawiki/entities/latest-truthy.nt.bz2
+        - https://dumps.wikimedia.org/wikidatawiki/entities/latest-truthy.ttl.bz2
+      dest_subdir: wikidata
+      expected:
+        format: json/rdf dumps
+        size_hint: ~100GB+
+    yellow_screen:
+      adapter: wikidata_truthy_edges
+    routing:
+      subject: kg_nav
+      domain: scientific_kg
+      category: wikidata_truthy_edges
+      level: null
+      granularity: target
+
+  - id: openalex_snapshot
+    name: OpenAlex monthly snapshot (scholarly graph)
+    enabled: true
+    priority: 7
+    license_profile: permissive
+    license_evidence:
+      spdx_hint: CC0-1.0
+      url: https://docs.openalex.org/download-all-data/download-to-your-machine
+    output:
+      pool: permissive
+      formats: [jsonl.gz]
+    download:
+      strategy: s3_sync
+      urls: [s3://openalex]
+      dest_subdir: openalex
+      expected:
+        format: jsonl.gz shards
+        size_hint: ~2TB
+    yellow_screen:
+      adapter: openalex_minimal_graph
+    routing:
+      subject: kg_nav
+      domain: scientific_kg
+      category: openalex_minimal_graph
+      level: null
+      granularity: target
+
+  - id: crossref_public_data_file
+    name: Crossref public data file (DOI metadata)
+    enabled: true
+    priority: 6
+    license_profile: permissive
+    license_evidence:
+      spdx_hint: CC0-1.0
+      url: https://www.crossref.org/documentation/retrieve-metadata/rest-api/
+    output:
+      pool: permissive
+      formats: [tar.gz]
+    download:
+      strategy: aws_requester_pays
+      bucket: api-snapshots-reqpays-crossref
+      key: current/public-datafile.tar.gz
+      dest_subdir: crossref
+      expected:
+        format: tar.gz
+        size_hint: ~1TB
+    yellow_screen:
+      adapter: crossref_minimal_graph
+    routing:
+      subject: kg_nav
+      domain: scientific_kg
+      category: crossref_minimal_graph
+      level: null
+      granularity: target
+
+  - id: opencitations_coci
+    name: OpenCitations COCI (citation edges)
+    enabled: true
+    priority: 5
+    license_profile: permissive
+    license_evidence:
+      spdx_hint: CC0-1.0
+      url: https://opencitations.net/index/coci
+    output:
+      pool: permissive
+      formats: [csv.gz]
+    download:
+      strategy: http
+      urls:
+        - https://opencitations.net/download/coci/csv
+      dest_subdir: coci
+      expected:
+        format: csv.gz
+        size_hint: ~50GB
+    yellow_screen:
+      adapter: opencitations_coci_edges
+    routing:
+      subject: kg_nav
+      domain: scientific_kg
+      category: opencitations_coci_edges
+      level: null
+      granularity: target
+
+  - id: orcid_public_data_file
+    name: ORCID public data file (identifier surface)
+    enabled: true
+    priority: 4
+    license_profile: permissive
+    license_evidence:
+      spdx_hint: CC-BY-4.0
+      url: https://info.orcid.org/documentation/data-corrections-and-data-license/
+    output:
+      pool: permissive
+      formats: [xml.gz, json.gz]
+    download:
+      strategy: figshare
+      article_id: 22739310
+      dest_subdir: orcid
+      expected:
+        format: json.gz
+        size_hint: ~40GB
+    yellow_screen:
+      adapter: orcid_scrub_minimal
+    routing:
+      subject: kg_nav
+      domain: identifier_resolution
+      category: orcid_scrub_minimal
+      level: null
+      granularity: target
+
+  - id: mesh_json
+    name: NLM MeSH descriptors and qualifiers (structured concepts)
+    enabled: true
+    priority: 3
+    license_profile: permissive
+    license_evidence:
+      spdx_hint: CC0-1.0
+      url: https://www.nlm.nih.gov/databases/download/terms_and_conditions.html
+    output:
+      pool: permissive
+      formats: [json, xml]
+    download:
+      strategy: http
+      urls:
+        - https://nlmpubs.nlm.nih.gov/projects/mesh/MESH_FILES/json/meSH.json
+      dest_subdir: mesh
+      expected:
+        format: json
+        size_hint: ~500MB
+    yellow_screen:
+      adapter: nlm_mesh_minimal
+    routing:
+      subject: kg_nav
+      domain: concept_navigation
+      category: nlm_mesh_minimal
+      level: null
+      granularity: target
