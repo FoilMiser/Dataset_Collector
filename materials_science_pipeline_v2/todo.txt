@@ -1,0 +1,70 @@
+================================================================================
+TODO — Materials Science Corpus Pipeline
+================================================================================
+
+Legend:
+  [x] = Completed
+  [~] = Partially addressed / MVP landed
+  [ ] = Not yet implemented
+
+================================================================================
+VERSION HISTORY (materials adaptation)
+================================================================================
+
+v1 -> v2 Completed:
+  [x] Ported pipeline_driver + targets to materials inventory (targets_materials.yaml)
+  [x] Materials-focused license_map, field_schemas, and denylist skeletons
+  [x] Added materials queues/gates (copyleft segregation, record-level filters)
+  [x] Preserved schema-aware defaults for structure/property/text records
+
+================================================================================
+v1.0 -> v1.1 — WHAT NEEDS TO CHANGE / BE UPDATED
+================================================================================
+
+HIGH PRIORITY (Production readiness)
+------------------------------------
+1) Materials-focused ingestion workers
+   [ ] hf_materials_filter_worker.py for Common Pile materials subsets with record-level routing
+   [ ] structure_worker.py for crystallography/structure dumps with schema validation
+   [ ] pdf_materials_worker.py to preserve formulas + figures + page ranges
+   [ ] Hook workers into yellow stage after review approval
+
+2) Manual review UX
+   [~] YELLOW review plan export (yellow_scrubber.py)
+   [ ] CLI to assign reviewers + notes per target
+   [ ] Optional dashboard for approvals with evidence previews
+
+3) Testing + CI
+   [ ] Unit tests for materials restriction scans and SPDX normalization
+   [ ] Sample queue fixtures for materials targets
+   [ ] Smoke test classify -> acquire -> merge -> difficulty on tiny materials fixtures
+
+MEDIUM PRIORITY (Quality + coverage)
+------------------------------------
+4) License handling and safety gates
+   [ ] Implement record-level license checks for OER/StackExchange filters
+   [ ] Expand restriction phrase library for NoAI/NoTDM language
+   [ ] Enforce copyleft segregation in download outputs + catalogs
+
+5) Data normalization
+   [ ] Unicode + LaTeX normalization per worker
+   [ ] Split-aware partitioning with split_group_id for structure/property splits
+   [ ] Near-duplicate detection tuned for materials text and structure fingerprints
+
+LOW PRIORITY (Ergonomics + future-proofing)
+-------------------------------------------
+6) Packaging + deployment
+   [ ] Dockerfile for materials pipeline + example volume mounts
+   [ ] Example orchestration (cron/Argo) for recurring runs
+   [ ] Publish pinned requirements/lockfile
+
+7) Observability
+   [ ] Metrics on queue sizes, download throughput, and review turnaround
+   [ ] Alerts for missing license evidence or stalled downloads
+
+================================================================================
+Notes for next iteration
+================================================================================
+- Keep synthetic/owned problem sets clearly marked and licensed (CC0 preferred).
+- For OER/Pressbooks/LibreTexts, require per-record license metadata before release.
+- Preserve technical symbols (LaTeX/math/chem) end-to-end; avoid ASCII-fying equations during transforms.
