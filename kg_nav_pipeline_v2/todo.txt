@@ -1,0 +1,43 @@
+================================================================================
+TODO — KG + Literature Navigation Pipeline (v2)
+================================================================================
+
+Legend:
+  [x] = Completed
+  [~] = Partially addressed / MVP landed
+  [ ] = Not yet implemented
+
+================================================================================
+MIGRATION STATUS (v1 -> v2 flow)
+================================================================================
+
+[~] Stage wrappers
+  - [x] Add v2 run wrapper (classify → acquire → screen_yellow → merge → difficulty → catalog)
+  - [x] Acquire worker parity with v1 (http/git/ftp/zenodo/dataverse/HF + figshare/s3_sync/requester_pays/torrent/manual-link plans)
+  - [ ] Wire optional legacy download_worker parity tests against the new raw layout
+
+[ ] Screening + difficulty
+  - [ ] Implement yellow_screen_worker filters for KG/literature mixes (record-level license checks + computed-only routing)
+  - [ ] Add schema validation hooks for openalex_minimal_graph_v1.0.0, crossref_minimal_graph_v1.0.0, nav_episode_v1.0.0
+  - [ ] Populate difficulty-ledger samples for each nav_routing category (identifiers, graph_structures, navigation_supervision, literature_grounding)
+
+[ ] Domain workers
+  - [ ] Implement kg_worker.py to normalize Wikidata/OpenAlex/COCI/ROR into node/edge/provenance shards
+  - [ ] Implement pii_scrub_worker.py for ORCID-like registries (strip emails/biographies/URLs; emit audit report)
+  - [ ] Flesh out nav_episode_builder.py to synthesize grounded episodes (IDs only; provenance lists; hop counts)
+
+[ ] Catalog + QA
+  - [ ] Expand catalog_builder to surface per-stage byte/count totals for each license pool
+  - [ ] Add near-duplicate detection (optional) using MinHash/LSH for combined/final shards
+  - [ ] Add smoke tests covering: classify outputs, acquire done markers, screened shard shape, difficulty shard routing
+
+[ ] Documentation
+  - [ ] Write a short “KG Nav v2 quickstart” walkthrough with sample commands
+  - [ ] Add data retention + compliance notes for requester-pays/torrent sources
+  - [ ] Document how to plug nav_routing + difficulties_kg_nav.yaml into downstream curriculum builders
+
+Notes:
+- RED items stay out of manifests, even if downloaded locally.
+- Default posture is computed-only for derived graph slices; keep copyleft isolated.
+- Snapshot license/terms evidence before large refreshes (OpenAlex/Wikidata/COCI/ROR).
+- Use split_group_id to prevent leakage across navigation episodes.
