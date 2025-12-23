@@ -1,0 +1,460 @@
+schema_version: "0.8"
+updated_utc: "2026-06-01"
+companion_files:
+  license_map: ./license_map.yaml
+  field_schemas: ./field_schemas_materials.yaml
+  denylist: ./denylist.yaml
+  domain_allowlist: ./domain_allowlist.yaml
+  phrase_denylist: ./phrase_denylist.yaml
+  difficulties_map: ./difficulties_materials.yaml
+globals:
+  raw_root: /data/materials/raw
+  screened_yellow_root: /data/materials/screened_yellow
+  combined_root: /data/materials/combined
+  final_root: /data/materials/final
+  ledger_root: /data/materials/_ledger
+  pitches_root: /data/materials/_pitches
+  manifests_root: /data/materials/_manifests
+  queues_root: /data/materials/_queues
+  catalogs_root: /data/materials/_catalogs
+  logs_root: /data/materials/_logs
+  require_yellow_signoff: false
+  sharding:
+    max_records_per_shard: 50000
+    compression: gzip
+  screening:
+    min_chars: 200
+    max_chars: 20000
+    text_field_candidates:
+    - text
+    - content
+    - body
+    - abstract
+    record_license_field_candidates:
+    - license
+    - license_spdx
+    require_record_license: true
+    allow_spdx:
+    - CC-BY-4.0
+    - CC0-1.0
+    - MIT
+    - Apache-2.0
+    - CC-BY-SA-4.0
+    deny_phrases:
+    - noai
+    - "no tdm"
+    - "no machine learning"
+    - "no commercial use"
+    - "non-commercial"
+    - "no text mining"
+    - "no redistribution"
+queues:
+  emit:
+  - id: green_download
+    path: /data/materials/_queues/green_download.jsonl
+    criteria:
+      effective_bucket: GREEN
+      enabled: true
+  - id: yellow_pipeline
+    path: /data/materials/_queues/yellow_pipeline.jsonl
+    criteria:
+      effective_bucket: YELLOW
+      enabled: true
+  - id: red_rejected
+    path: /data/materials/_queues/red_rejected.jsonl
+    criteria:
+      effective_bucket: RED
+      enabled: true
+gates_catalog:
+  snapshot_terms: Save Terms/ToS + license page HTML/PDF/TXT + retrieval timestamp.
+  resolve_license_spdx: Normalize license to SPDX via license_map.yaml rules; store evidence.
+  restriction_phrase_scan: Scan terms/content for restriction phrases (no-LLM/no-TDM/etc.).
+  record_level_filter: Require per-record license metadata; keep only allowlist.
+  domain_allowlist_filter: Keep only domains in allowlist (for web-derived corpora).
+  extract_records: Extract raw records (structures, properties, text) into normalized intermediate JSONL.
+  normalize_materials_schema: Map fields to field_schemas_materials.yaml (composition/structure/properties/provenance).
+  dedupe_minhash: Near-duplicate removal.
+  quality_filter: Drop boilerplate, invalid structures, empty records, etc.
+  emit_training_manifest: Manifest of included files/records + checksums + license evidence pointers.
+  emit_attribution_bundle: Generate attribution file(s) for CC BY / ODC-By sources.
+  manual_legal_review: Human review required before training.
+  segregate_copyleft_pool: Force output into copyleft pool and keep isolated.
+resolvers:
+  github:
+    mode: release
+    api_base: https://api.github.com
+    rate_limit:
+      requests_per_hour: 60
+      retry_on_403: true
+      exponential_backoff: true
+    endpoints:
+      releases: /repos/{owner}/{repo}/releases
+      latest: /repos/{owner}/{repo}/releases/latest
+      assets: /repos/{owner}/{repo}/releases/{release_id}/assets
+    note: Use GITHUB_TOKEN env var for higher rate limits.
+  huggingface_datasets:
+    mode: dataset_id
+    note: Use datasets.load_dataset; capture dataset card + license field.
+  git:
+    mode: repo
+    note: Capture commit hash; store LICENSE + README as evidence.
+  http:
+    mode: direct_url
+    note: Direct file download with resume.
+  ftp:
+    mode: base_url + globs
+    note: List + filter by glob; store directory listing snapshot.
+  zenodo:
+    mode: record_id_or_doi
+    api: https://zenodo.org/api/records/{record_id}
+    outputs:
+    - files[*].links.self
+    - files[*].checksum
+    verify_checksum: true
+    checksum_algorithm: md5
+  dataverse:
+    mode: persistent_id
+    default_instance: https://dataverse.harvard.edu
+targets:
+- id: jarvis_dft_figshare
+  name: "JARVIS-DFT (NIST) — bulk datasets (Figshare)"
+  enabled: true
+  priority: 1
+  license_profile: attribution
+  license_evidence:
+    url: https://jarvis.nist.gov/
+    spdx_hint: CC-BY-4.0 (confirm per release)
+  data_type: [materials, structures, properties, dft]
+  download:
+    strategy: http
+    urls: []
+    note: Fill urls with specific Figshare download links for the releases you want.
+  output:
+    pool: permissive
+    formats: [jsonl.gz, parquet]
+  routing:
+    subject: materials_science
+    domain: computational_materials
+    category: dft_databases
+    level: 7
+    granularity: target
+- id: open_catalyst_oc20_oc22
+  name: "Open Catalyst Project (OC20/OC22)"
+  enabled: true
+  priority: 1
+  license_profile: attribution
+  license_evidence:
+    url: https://opencatalystproject.org/
+    spdx_hint: CC-BY-4.0 (confirm per dataset release)
+  data_type: [materials, catalysis, surfaces, properties]
+  download:
+    strategy: http
+    urls: []
+    note: Prefer official download mirrors (often on Zenodo/HF); store checksums.
+  output:
+    pool: permissive
+    formats: [jsonl.gz, parquet]
+  routing:
+    subject: materials_science
+    domain: surfaces_corrosion
+    category: corrosion
+    level: 8
+    granularity: target
+- id: matbench_benchmarks
+  name: "Matbench — benchmark tasks + featurized datasets"
+  enabled: true
+  priority: 2
+  license_profile: permissive_code
+  license_evidence:
+    url: https://github.com/materialsproject/matbench
+    spdx_hint: MIT (repo); verify each embedded dataset license
+  data_type: [materials, benchmarks, ml]
+  download:
+    strategy: git
+    repo_url: https://github.com/materialsproject/matbench.git
+    ref: main
+  output:
+    pool: permissive
+    formats: [jsonl.gz, parquet]
+  gates_override:
+    add: [manual_legal_review]
+  routing:
+    subject: materials_science
+    domain: materials_ml
+    category: benchmarks
+    level: 6
+    granularity: target
+- id: matbench_discovery
+  name: "Matbench Discovery — candidate materials screening benchmark"
+  enabled: true
+  priority: 2
+  license_profile: attribution
+  license_evidence:
+    url: https://matbench-discovery.materialsproject.org/
+    spdx_hint: CC-BY-4.0 (confirm)
+  data_type: [materials, ml, screening]
+  download:
+    strategy: http
+    urls: []
+    note: Fill with discovery dataset links; keep checksums.
+  output:
+    pool: permissive
+    formats: [jsonl.gz, parquet]
+  routing:
+    subject: materials_science
+    domain: materials_ml
+    category: screening_benchmarks
+    level: 7
+    granularity: target
+- id: usgs_critical_minerals_aux
+  name: "USGS Critical Minerals — auxiliary stats"
+  enabled: true
+  priority: 1
+  license_profile: permissive
+  license_evidence:
+    url: https://www.usgs.gov/special-topics/critical-minerals
+    spdx_hint: US-PUBLIC-DOMAIN (confirm)
+  data_type: [auxiliary, supply_chain, stats]
+  download:
+    strategy: http
+    urls: []
+  output:
+    pool: permissive
+    formats: [jsonl.gz, parquet]
+  routing:
+    subject: auxiliary
+    domain: supply_chain
+    category: commodity_stats
+    level: 4
+    granularity: target
+- id: epa_egrid_aux
+  name: "EPA eGRID — emissions factors (auxiliary)"
+  enabled: true
+  priority: 1
+  license_profile: permissive
+  license_evidence:
+    url: https://www.epa.gov/egrid
+    spdx_hint: US-PUBLIC-DOMAIN (confirm)
+  data_type: [auxiliary, environment, emissions]
+  download:
+    strategy: http
+    urls: []
+  output:
+    pool: permissive
+    formats: [jsonl.gz, parquet]
+  routing:
+    subject: auxiliary
+    domain: environment
+    category: emissions_factors
+    level: 3
+    granularity: target
+- id: materials_project_api
+  name: "Materials Project API"
+  enabled: true
+  priority: 1
+  license_profile: attribution
+  license_evidence:
+    url: https://materialsproject.org/about
+    spdx_hint: Custom-Restrictive (treat as YELLOW)
+  data_type: [materials, api, structures, properties]
+  download:
+    strategy: api
+    note: Requires API key; capture ToS snapshot.
+  output:
+    pool: quarantine
+    formats: [jsonl.gz]
+  routing:
+    subject: materials_science
+    domain: computational_materials
+    category: structures_properties_api
+    level: 7
+    granularity: target
+- id: nomad_api
+  name: "NOMAD Repository API"
+  enabled: true
+  priority: 1
+  license_profile: mixed_record_level
+  license_evidence:
+    url: https://nomad-lab.eu/
+    spdx_hint: mixed; record-level licensing
+  data_type: [materials, repository, archive]
+  download:
+    strategy: api
+    note: Treat as YELLOW; capture record-level license if available.
+  output:
+    pool: quarantine
+    formats: [jsonl.gz]
+  routing:
+    subject: materials_science
+    domain: computational_materials
+    category: repository_archive
+    level: 8
+    granularity: target
+- id: oqmd_api_or_dump
+  name: "OQMD — API or database dumps"
+  enabled: true
+  priority: 1
+  license_profile: mixed_record_level
+  license_evidence:
+    url: https://oqmd.org/
+    spdx_hint: mixed; confirm ToS
+  data_type: [materials, thermo, phase, database]
+  download:
+    strategy: api
+    note: Treat as YELLOW until clarified.
+  output:
+    pool: quarantine
+    formats: [jsonl.gz]
+  routing:
+    subject: materials_science
+    domain: computational_materials
+    category: thermo_phase_database
+    level: 8
+    granularity: target
+- id: pmc_oa_materials_text
+  name: "PMC OA — materials/physics filtered full text"
+  enabled: true
+  priority: 1
+  license_profile: mixed_record_level
+  license_evidence:
+    url: https://pmc.ncbi.nlm.nih.gov/tools/openftlist/
+    spdx_hint: mixed; record-level licenses
+  data_type: [materials, literature, oa, text]
+  download:
+    strategy: pmc_oa
+    note: Prefer record-level license capture; shard under shards/.
+  output:
+    pool: quarantine
+    formats: [jsonl.gz]
+  routing:
+    subject: materials_science
+    domain: materials_literature
+    category: oa_fulltext
+    level: 6
+    granularity: record
+- id: arxiv_materials_text
+  name: "arXiv — materials/cond-mat filtered text"
+  enabled: true
+  priority: 1
+  license_profile: mixed_record_level
+  license_evidence:
+    url: https://info.arxiv.org/help/license/index.html
+    spdx_hint: mixed; record-level
+  data_type: [materials, preprints, text]
+  download:
+    strategy: http
+    urls: []
+  output:
+    pool: quarantine
+    formats: [jsonl.gz]
+  routing:
+    subject: materials_science
+    domain: materials_literature
+    category: preprints
+    level: 7
+    granularity: record
+- id: aflowlib
+  name: "AFLOWLIB — high-throughput repository"
+  enabled: true
+  priority: 1
+  license_profile: mixed_record_level
+  license_evidence:
+    url: http://www.aflowlib.org/
+    spdx_hint: Custom-Restrictive (confirm)
+  data_type: [materials, dft, repository]
+  download:
+    strategy: http
+    urls: []
+  output:
+    pool: quarantine
+    formats: [jsonl.gz]
+  routing:
+    subject: materials_science
+    domain: computational_materials
+    category: high_throughput_repository
+    level: 8
+    granularity: target
+- id: zenodo_materials_collections
+  name: "Zenodo collections — materials bundles"
+  enabled: true
+  priority: 1
+  license_profile: mixed_record_level
+  license_evidence:
+    url: https://zenodo.org/
+    spdx_hint: mixed; per-record
+  data_type: [materials, mixed, zenodo]
+  download:
+    strategy: zenodo
+    record_ids: []
+  output:
+    pool: quarantine
+    formats: [jsonl.gz]
+  routing:
+    subject: materials_science
+    domain: materials_literature
+    category: mixed_zenodo
+    level: 6
+    granularity: record
+- id: wikipedia_materials_text
+  name: "Wikipedia — materials science pages"
+  enabled: true
+  priority: 1
+  license_profile: copyleft
+  license_evidence:
+    url: https://creativecommons.org/licenses/by-sa/4.0/
+    spdx_hint: CC-BY-SA-4.0
+  data_type: [materials, reference, wikipedia]
+  download:
+    strategy: huggingface_datasets
+    dataset_id: common-pile/wikipedia
+    splits: [train]
+  output:
+    pool: copyleft
+    formats: [hf_dataset]
+  routing:
+    subject: materials_science
+    domain: materials_reference
+    category: encyclopedia
+    level: 3
+    granularity: record
+- id: osm_geodata
+  name: "OpenStreetMap — geodata overlays (aux)"
+  enabled: true
+  priority: 1
+  license_profile: copyleft
+  license_evidence:
+    url: https://www.openstreetmap.org/copyright
+    spdx_hint: ODbL-1.0
+  data_type: [auxiliary, geodata, osm]
+  download:
+    strategy: http
+    urls: []
+  output:
+    pool: copyleft
+    formats: [jsonl.gz]
+  routing:
+    subject: auxiliary
+    domain: geodata
+    category: osm
+    level: 4
+    granularity: target
+- id: proprietary_lca_databases
+  name: "Proprietary LCA databases (red-listed)"
+  enabled: false
+  priority: 0
+  license_profile: proprietary
+  license_evidence:
+    url: ""
+    spdx_hint: Proprietary
+  data_type: [auxiliary, environment, lca]
+  download:
+    strategy: none
+  output:
+    pool: quarantine
+    formats: [jsonl.gz]
+  routing:
+    subject: auxiliary
+    domain: environment
+    category: lca_public
+    level: 5
+    granularity: target

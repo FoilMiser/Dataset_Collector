@@ -1,0 +1,6 @@
+# domain_allowlist.yaml
+# Materials/physics-specific allowlist for web-derived corpora (v0.1)
+# Populate with domains that have been vetted for permissive licensing.
+allow_domains:
+  - example.gov
+  - example.edu
