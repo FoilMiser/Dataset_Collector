@@ -1,0 +1,612 @@
+schema_version: '0.8'
+updated_utc: '2026-06-15'
+companion_files:
+  license_map: ./license_map.yaml
+  field_schemas: ./field_schemas.yaml
+  denylist: ./denylist.yaml
+  difficulties_map: ./difficulties_engineering.yaml
+globals:
+  raw_root: /data/engineering/raw
+  screened_yellow_root: /data/engineering/screened_yellow
+  combined_root: /data/engineering/combined
+  final_root: /data/engineering/final
+  ledger_root: /data/engineering/_ledger
+  pitches_root: /data/engineering/_pitches
+  manifests_root: /data/engineering/_manifests
+  queues_root: /data/engineering/_queues
+  catalogs_root: /data/engineering/_catalogs
+  logs_root: /data/engineering/_logs
+  require_yellow_signoff: true
+  sharding:
+    max_records_per_shard: 50000
+    compression: gzip
+  screening:
+    min_chars: 200
+    max_chars: 12000
+    text_field_candidates:
+    - text
+    - content
+    - body
+    - abstract
+    - description
+    - markdown
+    record_license_field_candidates:
+    - license
+    - license_spdx
+    - rights
+    require_record_license: false
+    allow_spdx:
+    - CC0-1.0
+    - MIT
+    - Apache-2.0
+    - CC-BY-4.0
+    - CC-BY-SA-4.0
+    deny_phrases:
+    - noai
+    - "no tdm"
+    - "no machine learning"
+  default_gates:
+  - snapshot_terms
+  - resolve_license_spdx
+  - restriction_phrase_scan
+  - emit_training_manifest
+  - emit_attribution_bundle
+queues:
+  emit:
+  - id: green_download
+    path: /data/engineering/_queues/green_download.jsonl
+    criteria:
+      effective_bucket: GREEN
+      enabled: true
+  - id: yellow_pipeline
+    path: /data/engineering/_queues/yellow_pipeline.jsonl
+    criteria:
+      effective_bucket: YELLOW
+      enabled: true
+  - id: red_rejected
+    path: /data/engineering/_queues/red_rejected.jsonl
+    criteria:
+      effective_bucket: RED
+      enabled: true
+gates_catalog:
+  snapshot_terms: Save Terms/ToS + license page HTML/PDF/TXT + retrieval timestamp.
+  resolve_license_spdx: Normalize license to SPDX via license_map.yaml rules; store evidence.
+  restriction_phrase_scan: Scan terms/content for restriction phrases (no-LLM/no-TDM/etc.).
+  emit_training_manifest: Manifest of included files/records + checksums + license evidence.
+  emit_attribution_bundle: Generate ATTRIBUTION.md + CITATIONS.bib for included sources.
+resolvers:
+  huggingface_datasets:
+    mode: dataset_id
+    note: Use datasets.load_dataset; capture dataset card + license field.
+  git:
+    mode: repo
+    note: Capture commit hash; store LICENSE + README as evidence.
+  http:
+    mode: direct_url
+    note: Direct file download with resume.
+targets:
+- id: commonpile_uspto_filtered
+  name: "CommonPile: USPTO patents (filtered)"
+  enabled: true
+  priority: 10
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: MIXED
+    url: https://huggingface.co/datasets/common-pile/uspto_filtered
+  data_type: text
+  download:
+    strategy: huggingface_datasets
+    dataset_id: common-pile/uspto_filtered
+    splits: [train]
+  output:
+    pool: record_level
+  routing:
+    subject: engineering
+    domain: safety_standards
+    category: patents
+    level: 6
+    granularity: target
+- id: commonpile_regulations_filtered
+  name: "CommonPile: Regulations (filtered)"
+  enabled: true
+  priority: 20
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: MIXED
+    url: https://huggingface.co/datasets/common-pile/regulations_filtered
+  data_type: text
+  download:
+    strategy: huggingface_datasets
+    dataset_id: common-pile/regulations_filtered
+    splits: [train]
+  output:
+    pool: record_level
+  routing:
+    subject: engineering
+    domain: safety_standards
+    category: regulations
+    level: 5
+    granularity: target
+- id: commonpile_usgpo_filtered
+  name: "CommonPile: US Government Publishing Office (filtered)"
+  enabled: true
+  priority: 30
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: MIXED
+    url: https://huggingface.co/datasets/common-pile/usgpo_filtered
+  data_type: text
+  download:
+    strategy: huggingface_datasets
+    dataset_id: common-pile/usgpo_filtered
+    splits: [train]
+  output:
+    pool: record_level
+  routing:
+    subject: engineering
+    domain: safety_standards
+    category: compliance_docs
+    level: 5
+    granularity: target
+- id: commonpile_arxiv_papers_filtered
+  name: "CommonPile: arXiv papers (filtered)"
+  enabled: true
+  priority: 40
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: MIXED
+    url: https://huggingface.co/datasets/common-pile/arxiv_papers_filtered
+  data_type: text
+  download:
+    strategy: huggingface_datasets
+    dataset_id: common-pile/arxiv_papers_filtered
+    splits: [train]
+  output:
+    pool: record_level
+  routing:
+    subject: engineering
+    domain: research
+    category: research_papers
+    level: 8
+    granularity: target
+- id: commonpile_arxiv_abstracts_filtered
+  name: "CommonPile: arXiv abstracts (filtered)"
+  enabled: true
+  priority: 50
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: MIXED
+    url: https://huggingface.co/datasets/common-pile/arxiv_abstracts_filtered
+  data_type: text
+  download:
+    strategy: huggingface_datasets
+    dataset_id: common-pile/arxiv_abstracts_filtered
+    splits: [train]
+  output:
+    pool: record_level
+  routing:
+    subject: engineering
+    domain: research
+    category: research_abstracts
+    level: 6
+    granularity: target
+- id: commonpile_stackexchange_filtered
+  name: "CommonPile: StackExchange (filtered)"
+  enabled: true
+  priority: 60
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: CC-BY-SA-4.0
+    url: https://huggingface.co/datasets/common-pile/stackexchange_filtered
+  data_type: text
+  download:
+    strategy: huggingface_datasets
+    dataset_id: common-pile/stackexchange_filtered
+    splits: [train]
+  output:
+    pool: copyleft
+  routing:
+    subject: engineering
+    domain: reference
+    category: community_qna
+    level: 4
+    granularity: target
+- id: commonpile_github_archive_filtered
+  name: "CommonPile: GitHub Archive (filtered)"
+  enabled: true
+  priority: 70
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: MIXED
+    url: https://huggingface.co/datasets/common-pile/github_archive_filtered
+  data_type: code
+  download:
+    strategy: huggingface_datasets
+    dataset_id: common-pile/github_archive_filtered
+    splits: [train]
+  output:
+    pool: record_level
+  routing:
+    subject: engineering
+    domain: software_engineering
+    category: engineering_software
+    level: 6
+    granularity: target
+- id: uspto_odp_bulk_api_catalog
+  name: "USPTO Open Data Portal (ODP): Bulk Datasets API catalog"
+  enabled: true
+  priority: 80
+  license_profile: public_domain
+  license_evidence:
+    spdx_hint: CC-PDDC
+    url: https://catalog.data.gov/dataset/open-data-portal-odp-bulk-datasets-api-search-product-data-and-download
+  data_type: metadata
+  download:
+    strategy: http
+    urls:
+    - https://catalog.data.gov/dataset/open-data-portal-odp-bulk-datasets-api-search-product-data-and-download
+  output:
+    pool: public_domain
+  routing:
+    subject: engineering
+    domain: safety_standards
+    category: patents
+    level: 6
+    granularity: target
+- id: uspto_patent_grant_fulltext_odp
+  name: "USPTO (ODP): Patent Grant Full Text (1976–present)"
+  enabled: false
+  priority: 81
+  license_profile: public_domain
+  license_evidence:
+    spdx_hint: US-PUBLIC-DOMAIN
+    url: https://catalog.data.gov/dataset/patent-grant-full-text-1976-present-154b8
+  data_type: text
+  download:
+    strategy: http
+    urls:
+    - https://catalog.data.gov/dataset/patent-grant-full-text-1976-present-154b8
+  output:
+    pool: public_domain
+  routing:
+    subject: engineering
+    domain: safety_standards
+    category: patents
+    level: 6
+    granularity: target
+- id: patentsview_patentsearch_api_docs
+  name: "PatentsView: PatentSearch API docs (license evidence)"
+  enabled: true
+  priority: 90
+  license_profile: permissive
+  license_evidence:
+    spdx_hint: CC-BY-4.0
+    url: https://search.patentsview.org/docs/
+  data_type: metadata
+  download:
+    strategy: http
+    urls:
+    - https://search.patentsview.org/docs/
+  output:
+    pool: permissive
+  routing:
+    subject: engineering
+    domain: safety_standards
+    category: patents
+    level: 5
+    granularity: target
+- id: patentsview_bulk_tables
+  name: "PatentsView: bulk tables (planned downloader / mirror)"
+  enabled: false
+  priority: 91
+  license_profile: permissive
+  license_evidence:
+    spdx_hint: CC-BY-4.0
+    url: https://search.patentsview.org/docs/
+  data_type: table
+  download:
+    strategy: http
+    urls:
+    - https://patentsview.org/download/data-download-tables
+  output:
+    pool: permissive
+  routing:
+    subject: engineering
+    domain: safety_standards
+    category: patents
+    level: 5
+    granularity: target
+- id: openalex_snapshot_docs
+  name: "OpenAlex: snapshot docs (CC0)"
+  enabled: true
+  priority: 100
+  license_profile: public_domain
+  license_evidence:
+    spdx_hint: CC0-1.0
+    url: https://docs.openalex.org/additional-help/faq
+  data_type: metadata
+  download:
+    strategy: http
+    urls:
+    - https://docs.openalex.org/additional-help/faq
+  output:
+    pool: public_domain
+  routing:
+    subject: engineering
+    domain: research
+    category: metadata_reference
+    level: 4
+    granularity: target
+- id: openalex_snapshot_full
+  name: "OpenAlex: full snapshot (planned S3 downloader)"
+  enabled: false
+  priority: 101
+  license_profile: public_domain
+  license_evidence:
+    spdx_hint: CC0-1.0
+    url: https://registry.opendata.aws/openalex/
+  data_type: table
+  download:
+    strategy: http
+    urls:
+    - https://registry.opendata.aws/openalex/
+  output:
+    pool: public_domain
+  routing:
+    subject: engineering
+    domain: research
+    category: metadata_reference
+    level: 4
+    granularity: target
+- id: wikidata_dump_cc0
+  name: "Wikidata: JSON dump (CC0)"
+  enabled: true
+  priority: 110
+  license_profile: public_domain
+  license_evidence:
+    spdx_hint: CC0-1.0
+    url: https://www.wikidata.org/wiki/Wikidata:Licensing
+  data_type: graph
+  download:
+    strategy: http
+    urls:
+    - https://dumps.wikimedia.org/wikidatawiki/entities/latest-all.json.bz2
+  output:
+    pool: public_domain
+  routing:
+    subject: engineering
+    domain: reference
+    category: knowledge_graph
+    level: 4
+    granularity: target
+- id: data_gov_policy_anchor
+  name: "Data.gov: policies/terms (license evidence anchor)"
+  enabled: true
+  priority: 200
+  license_profile: public_domain
+  license_evidence:
+    spdx_hint: US-PUBLIC-DOMAIN
+    url: https://data.gov/privacy-policy/
+  data_type: metadata
+  download:
+    strategy: http
+    urls:
+    - https://data.gov/privacy-policy/
+  output:
+    pool: public_domain
+  routing:
+    subject: engineering
+    domain: safety_standards
+    category: compliance_docs
+    level: 4
+    granularity: target
+- id: usgs_copyrights_and_credits
+  name: "USGS: Copyrights & Credits (license evidence anchor)"
+  enabled: true
+  priority: 210
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: US-PUBLIC-DOMAIN
+    url: https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits
+  data_type: metadata
+  download:
+    strategy: http
+    urls:
+    - https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits
+  output:
+    pool: record_level
+  routing:
+    subject: engineering
+    domain: safety_standards
+    category: government_reference
+    level: 4
+    granularity: target
+- id: nasa_media_guidelines
+  name: "NASA: Images and media usage guidelines (license evidence anchor)"
+  enabled: true
+  priority: 220
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: US-PUBLIC-DOMAIN
+    url: https://www.nasa.gov/nasa-brand-center/images-and-media/
+  data_type: metadata
+  download:
+    strategy: http
+    urls:
+    - https://www.nasa.gov/nasa-brand-center/images-and-media/
+  output:
+    pool: record_level
+  routing:
+    subject: engineering
+    domain: safety_standards
+    category: government_reference
+    level: 4
+    granularity: target
+- id: nist_open_license_anchor
+  name: "NIST: Open license / reuse statements (evidence anchor)"
+  enabled: true
+  priority: 230
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: US-PUBLIC-DOMAIN
+    url: https://www.nist.gov/open/license
+  data_type: metadata
+  download:
+    strategy: http
+    urls:
+    - https://www.nist.gov/open/license
+  output:
+    pool: record_level
+  routing:
+    subject: engineering
+    domain: safety_standards
+    category: government_reference
+    level: 4
+    granularity: target
+- id: riscv_isa_specs
+  name: "RISC-V ISA Specs (Git repo)"
+  enabled: true
+  priority: 300
+  license_profile: permissive
+  license_evidence:
+    spdx_hint: CC-BY-4.0
+    url: https://github.com/riscv/riscv-isa-manual
+  data_type: text
+  download:
+    strategy: git
+    repo: https://github.com/riscv/riscv-isa-manual.git
+    depth: 1
+  output:
+    pool: permissive
+  routing:
+    subject: engineering
+    domain: software_engineering
+    category: hardware_architecture
+    level: 7
+    granularity: target
+- id: opentitan_docs
+  name: "OpenTitan docs/specs (Git repo)"
+  enabled: true
+  priority: 310
+  license_profile: permissive
+  license_evidence:
+    spdx_hint: Apache-2.0
+    url: https://github.com/lowRISC/opentitan
+  data_type: text
+  download:
+    strategy: git
+    repo: https://github.com/lowRISC/opentitan.git
+    depth: 1
+  output:
+    pool: permissive
+  routing:
+    subject: engineering
+    domain: software_engineering
+    category: hardware_security
+    level: 7
+    granularity: target
+- id: openfoam_docs_and_code
+  name: "OpenFOAM (copyleft engineering simulation)"
+  enabled: true
+  priority: 320
+  license_profile: copyleft
+  license_evidence:
+    spdx_hint: GPL-3.0-only
+    url: https://www.openfoam.com/legal
+  data_type: code
+  download:
+    strategy: git
+    repo: https://github.com/OpenFOAM/OpenFOAM-dev.git
+    depth: 1
+  output:
+    pool: copyleft
+  routing:
+    subject: engineering
+    domain: software_engineering
+    category: simulation_tools
+    level: 7
+    granularity: target
+- id: openstax_engineering_textbooks
+  name: "OpenStax (open textbooks; CC BY 4.0) — curated subset"
+  enabled: false
+  priority: 330
+  license_profile: permissive
+  license_evidence:
+    spdx_hint: CC-BY-4.0
+    url: https://openstax.org/license
+  data_type: text
+  download:
+    strategy: http
+    urls:
+    - https://openstax.org/subjects/science
+  output:
+    pool: permissive
+  routing:
+    subject: engineering
+    domain: education
+    category: undergraduate_textbooks
+    level: 5
+    granularity: target
+- id: ieee_xplore
+  name: "IEEE Xplore (restricted)"
+  enabled: true
+  priority: 900
+  license_profile: deny
+  license_evidence:
+    spdx_hint: Custom-Restrictive
+    url: https://ieeexplore.ieee.org/Xplorehelp/overview-of-ieee-xplore/ieee-xplore-terms-of-use
+  data_type: text
+  download:
+    strategy: http
+    urls:
+    - https://ieeexplore.ieee.org/Xplorehelp/overview-of-ieee-xplore/ieee-xplore-terms-of-use
+  output:
+    pool: rejected
+  routing:
+    subject: engineering
+    domain: safety_standards
+    category: restricted_refs
+    level: 8
+    granularity: target
+- id: asme_digital_collection
+  name: "ASME Digital Collection (restricted)"
+  enabled: true
+  priority: 901
+  license_profile: deny
+  license_evidence:
+    spdx_hint: Custom-Restrictive
+    url: https://asmedigitalcollection.asme.org/terms-of-use
+  data_type: text
+  download:
+    strategy: http
+    urls:
+    - https://asmedigitalcollection.asme.org/terms-of-use
+  output:
+    pool: rejected
+  routing:
+    subject: engineering
+    domain: safety_standards
+    category: restricted_refs
+    level: 8
+    granularity: target
+- id: astm_standards
+  name: "ASTM standards (restricted)"
+  enabled: true
+  priority: 902
+  license_profile: deny
+  license_evidence:
+    spdx_hint: Custom-Restrictive
+    url: https://www.astm.org/terms-of-use
+  data_type: text
+  download:
+    strategy: http
+    urls:
+    - https://www.astm.org/terms-of-use
+  output:
+    pool: rejected
+  routing:
+    subject: engineering
+    domain: safety_standards
+    category: restricted_refs
+    level: 8
+    granularity: target
