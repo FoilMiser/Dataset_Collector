@@ -1,0 +1,113 @@
+# license_map.yaml
+# v0.2 — companion file for earth targets (schema v0.8) and pipeline scripts
+#
+# This is NOT legal advice. It is a conservative policy tuned for Earth Systems data:
+# - "allow" = generally permissive / public-domain friendly
+# - "conditional" = usable with attribution/share-alike segregation or record-level licenses
+# - "deny_prefixes" = hard reject (NonCommercial/NoDerivatives/proprietary/no-AI statements)
+#
+# The pipeline stores evidence snapshots so you can audit every decision.
+
+schema_version: "0.2"
+updated_utc: "2026-06-10"
+
+spdx:
+  allow:
+    - "CC0-1.0"
+    - "CC-BY-4.0"
+    - "CC-BY-3.0"
+    - "CC-BY-2.0"
+    - "MIT"
+    - "Apache-2.0"
+    - "BSD-2-Clause"
+    - "BSD-3-Clause"
+    - "ISC"
+    - "Unlicense"
+    - "US-PUBLIC-DOMAIN"
+    - "OGL-UK-3.0"
+    - "OGL-Canada-2.0"
+    - "PDDL-1.0"
+
+  conditional:
+    - "CC-BY-SA-4.0"
+    - "CC-BY-SA-3.0"
+    - "ODbL-1.0"
+    - "COPERNICUS-SENTINEL-LEGAL-NOTICE"
+    - "GNU-FDL-1.3"
+    - "LGPL-3.0-only"
+    - "LGPL-3.0-or-later"
+
+  deny_prefixes:
+    - "CC-BY-NC"
+    - "CC-BY-ND"
+    - "CC-BY-NC-SA"
+    - "CC-BY-NC-ND"
+    - "Proprietary"
+    - "Custom-Restrictive"
+    - "NOAI"
+    - "NOAI-"
+    - "NO-TDM"
+    - "NON-COMMERCIAL"
+    - "NO-DERIVATIVES"
+
+non_spdx:
+  allow:
+    - "Public Domain"
+    - "Open Government Licence"
+    - "Open Data Commons Public Domain Dedication and License"
+  conditional:
+    - "ShareAlike"
+    - "Copernicus data policy"
+  deny:
+    - "All rights reserved"
+    - "For non-commercial use only"
+    - "No derivatives"
+    - "NoAI"
+    - "No AI"
+    - "No training"
+    - "No text and data mining"
+
+license_profiles:
+  permissive:
+    default_bucket: "GREEN"
+    allow_conditional: false
+  copyleft:
+    default_bucket: "YELLOW"
+    segregate_pool: true
+    require_attribution_bundle: true
+  record_level:
+    default_bucket: "YELLOW"
+    require_per_record_license: true
+  quarantine:
+    default_bucket: "YELLOW"
+  deny:
+    default_bucket: "RED"
+
+restriction_scan:
+  phrases:
+    - "no ai"
+    - "no machine learning"
+    - "no text and data mining"
+    - "non-commercial"
+    - "no derivatives"
+    - "no redistribution"
+    - "no training"
+
+normalization:
+  rules:
+    - match_any: ["public domain", "us public domain", "us-pd"]
+      spdx: "US-PUBLIC-DOMAIN"
+    - match_any: ["copernicus sentinel", "sentinel data", "copernicus marine service"]
+      spdx: "COPERNICUS-SENTINEL-LEGAL-NOTICE"
+    - match_any: ["open government licence", "ogl uk"]
+      spdx: "OGL-UK-3.0"
+    - match_any: ["ogl canada", "open government license - canada"]
+      spdx: "OGL-Canada-2.0"
+    - match_any: ["pddl", "open data commons pddl"]
+      spdx: "PDDL-1.0"
+
+  gating:
+  unknown_spdx_bucket: "YELLOW"
+  deny_spdx_bucket: "RED"
+  conditional_spdx_bucket: "YELLOW"
+  restriction_phrase_bucket: "YELLOW"
