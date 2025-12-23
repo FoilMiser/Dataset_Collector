@@ -1,0 +1,196 @@
+schema_version: '0.8'
+updated_utc: '2026-06-01'
+companion_files:
+  license_map: ./license_map.yaml
+  field_schemas: ./field_schemas.yaml
+  denylist: ./denylist.yaml
+  difficulties_map: ./difficulties_econ_stats_decision.yaml
+
+globals:
+  raw_root: /data/econ/raw
+  screened_yellow_root: /data/econ/screened_yellow
+  combined_root: /data/econ/combined
+  final_root: /data/econ/final
+
+  ledger_root: /data/econ/_ledger
+  pitches_root: /data/econ/_pitches
+  manifests_root: /data/econ/_manifests
+  queues_root: /data/econ/_queues
+  catalogs_root: /data/econ/_catalogs
+  logs_root: /data/econ/_logs
+
+  require_yellow_signoff: true
+  sharding:
+    max_records_per_shard: 25000
+    compression: gzip
+  screening:
+    min_chars: 150
+    max_chars: 16000
+    text_field_candidates:
+      - text
+      - content
+      - body
+    record_license_field_candidates:
+      - license
+      - license_spdx
+    require_record_license: false
+    allow_spdx:
+      - CC-BY-4.0
+      - CC0-1.0
+      - US-PUBLIC-DOMAIN
+      - PDDL-1.0
+    deny_phrases:
+      - noai
+      - 'no tdm'
+      - 'no machine learning'
+      - 'no llm'
+
+  default_gates:
+    - snapshot_terms
+    - resolve_license_spdx
+    - restriction_phrase_scan
+    - emit_training_manifest
+    - emit_attribution_bundle
+
+queues:
+  emit:
+    - id: green_download
+      path: /data/econ/_queues/green_download.jsonl
+      criteria:
+        effective_bucket: GREEN
+        enabled: true
+    - id: yellow_pipeline
+      path: /data/econ/_queues/yellow_pipeline.jsonl
+      criteria:
+        effective_bucket: YELLOW
+        enabled: true
+    - id: red_rejected
+      path: /data/econ/_queues/red_rejected.jsonl
+      criteria:
+        effective_bucket: RED
+        enabled: true
+
+gates_catalog:
+  snapshot_terms: Save Terms/ToS + license page HTML/PDF/TXT + retrieval timestamp.
+  resolve_license_spdx: Normalize license to SPDX via license_map.yaml rules; store evidence.
+  restriction_phrase_scan: Scan terms/content for restriction phrases (no-LLM/no-TDM/etc.).
+  emit_training_manifest: Manifest of included files/records + checksums + license evidence.
+  emit_attribution_bundle: Generate ATTRIBUTION.md + CITATIONS.bib for included sources.
+  manual_legal_review: Human review required before training.
+  segregate_copyleft_pool: Force output into copyleft pool and keep isolated.
+  near_duplicate_detection: Run MinHash/LSH deduplication pass.
+  split_aware_partition: Partition data respecting split_group_id for leak prevention.
+
+resolvers:
+  http:
+    mode: direct_url
+    note: Direct file download with resume.
+  ftp:
+    mode: base_url + globs
+    note: List + filter by glob; store directory listing snapshot.
+  dataverse:
+    mode: persistent_id
+    default_instance: https://dataverse.harvard.edu
+    note: Capture dataset metadata + license field.
+  zenodo:
+    mode: record_id_or_doi
+    api: https://zenodo.org/api/records/{record_id}
+    outputs:
+      - files[*].links.self
+      - files[*].checksum
+    verify_checksum: true
+    checksum_algorithm: md5
+  huggingface_datasets:
+    mode: dataset_id
+    note: Use datasets.load_dataset; capture dataset card + license field.
+
+
+# ----------------------------
+# Targets (initial v2 seed)
+# ----------------------------
+
+targets:
+  - id: bls_cpi_time_series
+    name: "BLS time series: CPI (CU) flat files"
+    enabled: true
+    priority: 95
+    publisher: "U.S. Bureau of Labor Statistics (BLS)"
+    data_type: [time_series_tabular]
+    license_profile: permissive
+    license_evidence:
+      spdx_hint: US-PUBLIC-DOMAIN
+      url: https://www.bls.gov/opub/copyright-information.htm
+    routing:
+      subject: econ
+      domain: data_and_measurement
+      category: official_statistics_overview
+      level: 4
+    download:
+      strategy: http
+      urls:
+        - https://download.bls.gov/pub/time.series/cu/cu.data.0.Current
+        - https://download.bls.gov/pub/time.series/cu/cu.series
+        - https://download.bls.gov/pub/time.series/cu/cu.item
+        - https://download.bls.gov/pub/time.series/cu/cu.area
+        - https://download.bls.gov/pub/time.series/cu/cu.period
+        - https://download.bls.gov/pub/time.series/cu/cu.base
+        - https://download.bls.gov/pub/time.series/cu/cu.footnote
+    yellow_screen:
+      adapter: csv_chunked
+      chunk_rows: 1500
+
+  - id: bls_laus_time_series
+    name: "BLS time series: Local Area Unemployment Statistics (LAUS)"
+    enabled: true
+    priority: 92
+    publisher: "U.S. Bureau of Labor Statistics (BLS)"
+    data_type: [time_series_tabular]
+    license_profile: permissive
+    license_evidence:
+      spdx_hint: US-PUBLIC-DOMAIN
+      url: https://www.bls.gov/opub/copyright-information.htm
+    routing:
+      subject: econ
+      domain: data_and_measurement
+      category: labor_statistics
+      level: 4
+    download:
+      strategy: http
+      urls:
+        - https://download.bls.gov/pub/time.series/la/la.data.0.CurrentU00-04
+        - https://download.bls.gov/pub/time.series/la/la.data.0.CurrentU05-09
+        - https://download.bls.gov/pub/time.series/la/la.data.0.CurrentU10-14
+        - https://download.bls.gov/pub/time.series/la/la.data.0.CurrentU15-19
+        - https://download.bls.gov/pub/time.series/la/la.data.0.CurrentU20-24
+        - https://download.bls.gov/pub/time.series/la/la.series
+        - https://download.bls.gov/pub/time.series/la/la.area
+        - https://download.bls.gov/pub/time.series/la/la.period
+        - https://download.bls.gov/pub/time.series/la/la.measure
+        - https://download.bls.gov/pub/time.series/la/la.area_type
+    yellow_screen:
+      adapter: csv_chunked
+      chunk_rows: 1200
+
+  - id: bea_regional_cainc30
+    name: "BEA Regional Economic Accounts – CAINC30 (county personal income)"
+    enabled: true
+    priority: 86
+    publisher: "U.S. Bureau of Economic Analysis (BEA)"
+    data_type: [tabular]
+    license_profile: permissive
+    license_evidence:
+      spdx_hint: US-PUBLIC-DOMAIN
+      url: https://www.bea.gov/help/faq/145
+    routing:
+      subject: econ
+      domain: data_and_measurement
+      category: national_accounts
+      level: 5
+    download:
+      strategy: http
+      urls:
+        - https://apps.bea.gov/regional/zip/CAINC30.zip
+    yellow_screen:
+      adapter: zip_bundle
+      inner_adapter: csv_chunked
+      chunk_rows: 1000

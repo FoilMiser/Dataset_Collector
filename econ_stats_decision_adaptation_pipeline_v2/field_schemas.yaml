@@ -1,0 +1,43 @@
+# field_schemas.yaml
+# v2.0 — Canonical record schema for econ/stats/decision pipeline (v2 layout)
+
+schema_version: "2.0"
+updated_utc: "2026-06-01"
+
+schemas:
+  canonical_record_v2:
+    description: "Minimal canonical record emitted by yellow_screen_worker and downstream stages."
+    version: "2.0.0"
+    created_utc: "2026-06-01"
+    source: "econ_stats_decision_adaptation_pipeline_v2"
+    fields:
+      record_id: {type: string, required: true, nullable: false}
+      text: {type: string, required: true, nullable: false}
+      source:
+        type: object
+        required: true
+        nullable: false
+        fields:
+          target_id: {type: string, required: true, nullable: false}
+          origin: {type: string, required: false, nullable: true}
+          source_url: {type: string, required: false, nullable: true}
+          artifact_path: {type: string, required: false, nullable: true}
+          license_spdx: {type: string, required: false, nullable: true}
+          license_profile: {type: string, required: false, nullable: true}
+          retrieved_at_utc: {type: string, required: false, nullable: true}
+      routing:
+        type: object
+        required: false
+        nullable: true
+        fields:
+          subject: {type: string, required: false, nullable: true}
+          domain: {type: string, required: false, nullable: true}
+          category: {type: string, required: false, nullable: true}
+          level: {type: integer, required: false, nullable: true}
+          granularity: {type: string, required: false, nullable: true}
+      hash:
+        type: object
+        required: true
+        nullable: false
+        fields:
+          content_sha256: {type: string, required: true, nullable: false}
