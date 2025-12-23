@@ -1,0 +1,15 @@
+EARTH PIPELINE V2 TODO
+======================
+
+Near-term follow-ups:
+- [ ] Add acquisition handlers for stac_catalog, thredds_opendap, and api_tabular strategies.
+- [ ] Flesh out targets_earth.yaml with additional NASA/NOAA/USGS collections and richer routing.
+- [ ] Create tiny fixture queues to smoke-test classify → acquire → screen → merge → difficulty locally.
+- [ ] Wire schema validation for earth_canonical_record_v1.0.0 in yellow_screen_worker.
+- [ ] Add sensitivity scrubbing hooks (geo coarsening, PII trimming) before merge.
+- [ ] Build Dockerfile + example volume mounts for /data/earth roots.
+
+Nice-to-haves:
+- [ ] Optional near-duplicate detection pass tuned for geo/temporal text.
+- [ ] Metrics dashboard from _ledger files (counts, bytes, pitch reasons).
+- [ ] Example notebooks demonstrating catalog exploration and shard sampling.

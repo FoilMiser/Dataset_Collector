@@ -1,0 +1,257 @@
+# field_schemas.yaml
+# v1.1 — Versioned field definitions for environmental / Earth systems ingestion
+#
+# Each schema version is immutable once released. Create a new version for changes.
+
+schema_version: "1.1"
+updated_utc: "2026-06-10"
+
+schemas:
+
+  earth_dataset_card_v1.0.0:
+    description: "Dataset-card style summary for Earth observation / environmental resources"
+    version: "1.0.0"
+    created_utc: "2025-12-17"
+    source: "dataset_cards|metadata_catalogs|docs"
+    fields:
+      dataset_id:
+        description: "Stable identifier for the dataset or collection"
+        type: "string"
+        required: true
+        nullable: false
+      title:
+        description: "Human-readable title"
+        type: "string"
+        required: true
+        nullable: false
+      description:
+        description: "Concise description of what the dataset contains"
+        type: "string"
+        required: true
+        nullable: false
+      provider:
+        description: "Publishing organization (e.g., NASA, NOAA, USGS, ECMWF)"
+        type: "string"
+        required: true
+        nullable: false
+      collection_platform:
+        description: "Platform or sensor family (satellite, in situ, model, survey, citizen science)"
+        type: "string"
+        required: false
+        nullable: true
+      spatial_scope:
+        description: "Spatial coverage notes (global, regional, watershed, station network)"
+        type: "string"
+        required: false
+        nullable: true
+      temporal_coverage:
+        description: "Time span or resolution (e.g., 1980-present, hourly, monthly)"
+        type: "string"
+        required: false
+        nullable: true
+      update_frequency:
+        description: "How often the dataset refreshes"
+        type: "string"
+        required: false
+        nullable: true
+      license_spdx:
+        description: "Resolved SPDX license identifier or policy tag"
+        type: "string"
+        required: true
+        nullable: false
+      access_level:
+        description: "Open/public domain/attribution-only/conditional"
+        type: "string"
+        required: false
+        nullable: true
+      landing_page:
+        description: "Primary landing page or DOI"
+        type: "string"
+        required: false
+        nullable: true
+      documentation_url:
+        description: "Documentation or user guide link"
+        type: "string"
+        required: false
+        nullable: true
+      data_formats:
+        description: "List of file formats available (NetCDF, GeoTIFF, CSV, JSON, GRIB, Parquet)"
+        type: "list[string]"
+        required: false
+        nullable: true
+      keywords:
+        description: "Topical keywords or GCMD-style tags"
+        type: "list[string]"
+        required: false
+        nullable: true
+      citation:
+        description: "Suggested citation text"
+        type: "string"
+        required: false
+        nullable: true
+      governance_notes:
+        description: "License caveats, attribution wording, or sensitive content notes"
+        type: "string"
+        required: false
+        nullable: true
+
+  stac_item_metadata_v1.0.0:
+    description: "Minimal metadata for STAC-like item summaries without raster payloads"
+    version: "1.0.0"
+    created_utc: "2025-12-17"
+    source: "stac_catalogs|collection_api"
+    fields:
+      item_id:
+        description: "Unique STAC item id"
+        type: "string"
+        required: true
+        nullable: false
+      collection:
+        description: "Parent collection or mission"
+        type: "string"
+        required: true
+        nullable: false
+      title:
+        description: "Readable title"
+        type: "string"
+        required: false
+        nullable: true
+      description:
+        description: "Short abstract pulled from the STAC item"
+        type: "string"
+        required: false
+        nullable: true
+      datetime:
+        description: "Central timestamp for the scene/observation"
+        type: "string"
+        required: false
+        nullable: true
+      start_datetime:
+        description: "Start of temporal extent"
+        type: "string"
+        required: false
+        nullable: true
+      end_datetime:
+        description: "End of temporal extent"
+        type: "string"
+        required: false
+        nullable: true
+      bbox:
+        description: "Bounding box as [west, south, east, north]"
+        type: "list[float]"
+        required: false
+        nullable: true
+      instruments:
+        description: "List of sensors/instruments"
+        type: "list[string]"
+        required: false
+        nullable: true
+      platforms:
+        description: "Platform identifiers (spacecraft, aircraft, in situ)"
+        type: "list[string]"
+        required: false
+        nullable: true
+      assets_summary:
+        description: "Lightweight summary of asset types (e.g., thumbnail, metadata, quicklook)"
+        type: "list[string]"
+        required: false
+        nullable: true
+      license_spdx:
+        description: "Resolved SPDX license identifier or collection policy tag"
+        type: "string"
+        required: true
+        nullable: false
+      keywords:
+        description: "Topical tags"
+        type: "list[string]"
+        required: false
+        nullable: true
+
+  indicator_table_schema_v1.0.0:
+    description: "Schema for structured indicator/metric tables (climate indices, hydrology stats, biodiversity counts)"
+    version: "1.0.0"
+    created_utc: "2025-12-17"
+    source: "tabular_api|csv_feeds"
+    fields:
+      indicator_name:
+        description: "Name of the indicator (e.g., SPI, NDVI, GHG concentration)"
+        type: "string"
+        required: true
+        nullable: false
+      variable_name:
+        description: "Column variable name in the source table"
+        type: "string"
+        required: true
+        nullable: false
+      units:
+        description: "Units for the measurement"
+        type: "string"
+        required: false
+        nullable: true
+      methodology:
+        description: "Computation or aggregation method summary"
+        type: "string"
+        required: false
+        nullable: true
+      geography:
+        description: "Spatial granularity (global, country, basin, station)"
+        type: "string"
+        required: false
+        nullable: true
+      temporal_resolution:
+        description: "Resolution (hourly, daily, monthly, seasonal)"
+        type: "string"
+        required: false
+        nullable: true
+      license_spdx:
+        description: "Resolved SPDX license"
+        type: "string"
+        required: true
+        nullable: false
+      citation:
+        description: "Preferred citation"
+        type: "string"
+        required: false
+        nullable: true
+      source_url:
+        description: "API or landing page"
+        type: "string"
+        required: false
+        nullable: true
+
+  earth_canonical_record_v1.0.0:
+    description: "Canonical JSONL record emitted by yellow_screen_worker.py for Earth pipeline v2"
+    version: "1.0.0"
+    created_utc: "2026-06-10"
+    source: "yellow_screen_worker"
+    fields:
+      record_id:
+        description: "Unique record identifier for the shard"
+        type: "string"
+        required: true
+        nullable: false
+      text:
+        description: "Primary textual content"
+        type: "string"
+        required: true
+        nullable: false
+      routing:
+        description: "Routing metadata (subject/domain/category/level/granularity)"
+        type: "object"
+        required: true
+        nullable: false
+      source:
+        description: "Source metadata including licensing"
+        type: "object"
+        required: true
+        nullable: false
+      hash:
+        description: "Content hashes for deduplication"
+        type: "object"
+        required: true
+        nullable: false
+      earth_meta:
+        description: "Optional Earth-specific metadata (geo extent, variables, units, sensitivity flags)"
+        type: "object"
+        required: false
+        nullable: true
