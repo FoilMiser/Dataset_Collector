@@ -1,0 +1,55 @@
+schema_version: '2.0'
+updated_utc: '2026-06-30T00:00:00Z'
+globals:
+  default_subject: kg_nav
+  default_domain: navigation_supervision
+  default_category: single_hop_nav
+  default_level: 6
+rubric:
+  scale: { min: 1, max: 10, name: "Difficulty 1–10" }
+  levels:
+    1: { label: "Identifiers only", description: "Pure identifier/registry records with minimal fields; no prose." }
+    2: { label: "Light metadata", description: "Short metadata rows with a few attributes; trivial normalization." }
+    3: { label: "Structured vocab", description: "Controlled vocabularies and descriptors with limited hierarchy." }
+    4: { label: "Registry with relationships", description: "Org/person registries with links and provenance." }
+    5: { label: "Graph slices", description: "Computed graph slices or minimal attribute sets; no prose." }
+    6: { label: "Bulk graph ingestion", description: "Large KG dumps or bulk metadata requiring validation and sharding." }
+    7: { label: "Screened literature grounding", description: "Full-text/abstract grounding with license/PII screening." }
+    8: { label: "Navigation supervision (multi-hop)", description: "Multi-hop navigation or reasoning across KG + literature evidence." }
+    9: { label: "Expert navigation tasks", description: "Dense provenance chains, ambiguous entity resolution, or policy-heavy routing." }
+    10: { label: "Frontier research navigation", description: "Highly specialized, research-frontier navigation with novel entities and sparse signals." }
+subjects:
+  kg_nav:
+    name: Knowledge graph + literature navigation
+    domains:
+      identifiers:
+        name: Identifier registries & vocabularies
+        categories:
+          ror_registry: { level: { default: 4, min: 3, max: 5 } }
+          doi_registry_bulk: { level: { default: 6, min: 5, max: 7 } }
+          person_registry_pii: { level: { default: 7, min: 6, max: 8 } }
+          controlled_vocab: { level: { default: 5, min: 4, max: 6 } }
+      graph_structures:
+        name: Graph structure + edge corpora
+        categories:
+          wikidata_truthy: { level: { default: 6, min: 5, max: 7 } }
+          openalex_full_graph: { level: { default: 6, min: 5, max: 7 } }
+          minimal_graphs: { level: { default: 5, min: 4, max: 6 } }
+          citation_edges: { level: { default: 6, min: 5, max: 7 } }
+      navigation_supervision:
+        name: Navigation supervision & episodes
+        categories:
+          single_hop_nav: { level: { default: 6, min: 5, max: 7 } }
+          multi_hop_nav: { level: { default: 8, min: 7, max: 9 } }
+          synthetic_policy_nav: { level: { default: 7, min: 6, max: 8 } }
+      literature_grounding:
+        name: Literature text + grounding
+        categories:
+          abstracts_only: { level: { default: 5, min: 4, max: 6 } }
+          fulltext_grounded: { level: { default: 7, min: 6, max: 8 } }
+          mixed_license_corpus: { level: { default: 7, min: 6, max: 8 } }
+      compliance:
+        name: Compliance & screening
+        categories:
+          pii_scrub: { level: { default: 7, min: 6, max: 8 } }
+          license_screen: { level: { default: 6, min: 5, max: 7 } }
