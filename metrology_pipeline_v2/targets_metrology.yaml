@@ -1,0 +1,487 @@
+schema_version: "0.8"
+updated_utc: "2025-12-23"
+
+companion_files:
+  license_map: "./license_map.yaml"
+  field_schemas: "./field_schemas.yaml"
+  denylist: "./denylist.yaml"
+  difficulties_map: "./difficulties_metrology.yaml"
+
+globals:
+  raw_root: "/data/metrology/raw"
+  screened_yellow_root: "/data/metrology/screened_yellow"
+  combined_root: "/data/metrology/combined"
+  final_root: "/data/metrology/final"
+  ledger_root: "/data/metrology/_ledger"
+  pitches_root: "/data/metrology/_pitches"
+  manifests_root: "/data/metrology/_manifests"
+  queues_root: "/data/metrology/_queues"
+  catalogs_root: "/data/metrology/_catalogs"
+  logs_root: "/data/metrology/_logs"
+
+  require_yellow_signoff: false
+
+  sharding:
+    max_records_per_shard: 50000
+    compression: gzip
+
+  screening:
+    min_chars: 200
+    max_chars: 12000
+    text_field_candidates: [text, content, body]
+    record_license_field_candidates: [license, license_spdx]
+    require_record_license: false
+    allow_spdx:
+      - CC0-1.0
+      - CC-BY-4.0
+      - MIT
+      - Apache-2.0
+      - CC-BY-SA-4.0
+      - US-PUBLIC-DOMAIN
+    deny_phrases:
+      - noai
+      - "no tdm"
+      - "no machine learning"
+
+  record_defaults:
+    text_field_candidates: [text, content, body]
+    record_license_field_candidates: [license, license_spdx]
+    require_record_license: false
+    allow_spdx:
+      - CC0-1.0
+      - CC-BY-4.0
+      - MIT
+      - Apache-2.0
+      - CC-BY-SA-4.0
+      - US-PUBLIC-DOMAIN
+
+  text_processing_defaults:
+    max_chunk_chars: 7000
+    min_chunk_chars: 600
+    drop_tables: false
+    drop_references_section: false
+    keep_citations_inline: true
+    include_section_headers: true
+    include_figure_captions: true
+    include_table_captions: true
+
+  default_gates:
+    - snapshot_terms
+    - resolve_license_spdx
+    - restriction_phrase_scan
+    - emit_training_manifest
+    - emit_attribution_bundle
+
+queues:
+  emit:
+    - id: green
+      path: /data/metrology/_queues/green.jsonl
+      criteria:
+        effective_bucket: GREEN
+        enabled: true
+    - id: yellow
+      path: /data/metrology/_queues/yellow.jsonl
+      criteria:
+        effective_bucket: YELLOW
+        enabled: true
+    - id: red
+      path: /data/metrology/_queues/red.jsonl
+      criteria:
+        effective_bucket: RED
+        enabled: true
+
+resolvers:
+  http:
+    mode: "urls"
+    note: "Direct URLs to files (PDF/zip/txt)."
+  ftp:
+    mode: "base_url + globs"
+    note: "List + filter by glob; store directory listing snapshot."
+  git:
+    mode: "repo"
+    note: "Capture commit hash; store LICENSE + README as evidence."
+  zenodo:
+    mode: "record_id"
+    note: "Download Zenodo record; store record JSON as evidence."
+  dataverse:
+    mode: "persistent_id"
+    note: "Download Dataverse dataset zip via persistentId."
+  huggingface_datasets:
+    mode: "dataset_id"
+    note: "Use datasets.load_dataset; store dataset card + license field."
+  api:
+    mode: "base_url"
+    note: "TODO: implement API harvester with paging + evidence snapshots."
+  ntrs_openapi:
+    mode: "base_url"
+    note: "TODO: implement NASA NTRS OpenAPI harvester -> citations + fulltext PDFs."
+  usgs_pubs_warehouse:
+    mode: "base_url"
+    note: "TODO: implement USGS Pubs Warehouse REST harvester -> records + fulltext."
+  noaa_ir_json:
+    mode: "base_url"
+    note: "TODO: implement NOAA IR JSON API harvester -> records + PDFs."
+  faa_ac_crawl:
+    mode: "index_url"
+    note: "TODO: crawl FAA Advisory Circular listing -> PDF URLs + metadata."
+
+targets:
+  - id: "bipm_si_brochure_latest"
+    name: "BIPM SI Brochure (International System of Units) — CC BY 4.0"
+    enabled: true
+    priority: 1
+    publisher: "BIPM"
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "CC-BY-4.0"
+      url: "https://www.bipm.org/en/publications/si-brochure"
+    data_type: ["metrology", "units", "standards_guidance", "technical_report"]
+    download:
+      strategy: "http"
+      urls:
+        - "https://www.bipm.org/documents/20126/41483022/SI-Brochure-9-EN.pdf"
+    output:
+      pool: "permissive"
+      formats: ["pdf"]
+    routing:
+      subject: metrology
+      domain: si_units
+      category: si_brochure
+    gates_override:
+      add: ["extract_text_chunks", "emit_training_manifest", "emit_attribution_bundle"]
+
+  - id: "nist_sp_330_si_brochure_us"
+    name: "NIST SP 330-2019: The International System of Units (SI), 2019 Edition (US adaptation)"
+    enabled: true
+    priority: 2
+    publisher: "NIST"
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://www.nist.gov/open/license"
+    data_type: ["metrology", "units", "standards_guidance", "technical_report"]
+    download:
+      strategy: "http"
+      urls:
+        - "https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.330-2019.pdf"
+    output:
+      pool: "permissive"
+      formats: ["pdf"]
+    routing:
+      subject: metrology
+      domain: si_units
+      category: si_brochure
+    gates_override:
+      add: ["extract_text_chunks", "emit_training_manifest", "emit_attribution_bundle"]
+
+  - id: "nist_rdaf_sp_1500_18r2_html"
+    name: "NIST Research Data Framework (SP 1500-18r2) — HTML landing (for 'how NIST writes guidance')"
+    enabled: true
+    priority: 3
+    publisher: "NIST"
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://www.nist.gov/open/license"
+    data_type: ["policy_guidance", "research_data", "technical_report", "nist_style"]
+    download:
+      strategy: "http"
+      urls:
+        - "https://nvlpubs.nist.gov/nistpubs/SpecialPublications/1500-18/NIST.SP.1500-18r2.html"
+    output:
+      pool: "permissive"
+      formats: ["html"]
+    routing:
+      subject: metrology
+      domain: standards_regulatory
+      category: terminology_definitions
+    gates_override:
+      add: ["extract_text_chunks", "emit_training_manifest", "emit_attribution_bundle"]
+
+  - id: "nist_technical_series_publication_metadata"
+    name: "NIST Technical Series Publication Metadata (Crossref exports) — monthly updated"
+    enabled: true
+    priority: 5
+    publisher: "NIST"
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://catalog.data.gov/dataset/nist-technical-series-publication-metadata"
+    data_type: ["metadata", "catalog", "nist_tech_series", "dois"]
+    download:
+      strategy: "http"
+      urls:
+        - "https://data.nist.gov/od/ds/mds2-2192/DOIMETADATA_MASTER.txt"
+        - "https://data.nist.gov/od/ds/mds2-2192/allrecords.xml"
+        - "https://data.nist.gov/od/ds/mds2-2192/readme.txt"
+    output:
+      pool: "permissive"
+      formats: ["txt", "xml"]
+    routing:
+      subject: metrology
+      domain: standards_regulatory
+      category: reporting_templates
+    gates_override:
+      add: ["emit_training_manifest", "emit_attribution_bundle"]
+
+  - id: "nist_nvlpubs_fulltext_harvest"
+    name: "NIST NVL PubS full-text harvest (SP/TN/NISTIR/HB/etc) — TODO implement"
+    enabled: false
+    priority: 6
+    publisher: "NIST"
+    license_profile: "record_level"
+    review_required: true
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://www.nist.gov/open/license"
+    data_type: ["technical_report", "nist_style", "metrology", "measurement_uncertainty", "calibration"]
+    download:
+      strategy: "api"
+      base_url: "https://nvlpubs.nist.gov/"
+      note: "Harvest using metadata (DOI/report IDs) -> download PDFs/HTML. Respect robots/terms and store evidence."
+    routing:
+      subject: metrology
+      domain: calibration_traceability
+      category: traceability_chain
+    gates_override:
+      add: ["manual_legal_review", "record_level_filter", "extract_text_chunks", "near_duplicate_detection"]
+    output:
+      pool: "quarantine"
+      formats: ["jsonl.gz", "parquet"]
+
+  - id: "nasa_ntrs_openapi_public_harvest"
+    name: "NASA STI Repository (NTRS) OpenAPI — PUBLIC + unclassified harvest (TODO implement)"
+    enabled: false
+    priority: 8
+    publisher: "NASA"
+    license_profile: "record_level"
+    review_required: true
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://sti.nasa.gov/harvesting-data-from-ntrs/"
+    data_type: ["technical_report", "nasa_style", "engineering", "test_reports", "handbooks", "ntrs"]
+    download:
+      strategy: "ntrs_openapi"
+      base_url: "https://ntrs.nasa.gov/api"
+      query_defaults:
+        distribution: "PUBLIC"
+        disseminated: "DOCUMENT_AND_METADATA"
+    routing:
+      subject: metrology
+      domain: instrumentation
+      category: sensors_basic
+    gates_override:
+      add: ["manual_legal_review", "distribution_statement_scan", "record_level_filter", "extract_text_chunks", "near_duplicate_detection"]
+    output:
+      pool: "quarantine"
+      formats: ["jsonl.gz", "parquet"]
+
+  - id: "usgs_pubs_warehouse_harvest"
+    name: "USGS Publications Warehouse (REST web services) — TODO implement"
+    enabled: false
+    priority: 10
+    publisher: "USGS"
+    license_profile: "record_level"
+    review_required: true
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://pubs.usgs.gov/documentation/web_service_documentation"
+    data_type: ["technical_report", "methods", "measurement", "instrumentation", "calibration", "uncertainty"]
+    download:
+      strategy: "usgs_pubs_warehouse"
+      base_url: "https://pubs.usgs.gov/"
+      query_defaults:
+        format: "json"
+    routing:
+      subject: metrology
+      domain: instrumentation
+      category: sensors_basic
+    gates_override:
+      add: ["manual_legal_review", "record_level_filter", "extract_text_chunks", "near_duplicate_detection"]
+    output:
+      pool: "quarantine"
+      formats: ["jsonl.gz", "parquet"]
+
+  - id: "noaa_ir_json_api_harvest"
+    name: "NOAA Institutional Repository (NOAA IR) JSON API — TODO implement"
+    enabled: false
+    priority: 12
+    publisher: "NOAA"
+    license_profile: "record_level"
+    review_required: true
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://github.com/NOAA-Central-Library-NCL/NOAA_IR"
+    data_type: ["technical_report", "noaa_style", "methods", "instrumentation"]
+    download:
+      strategy: "noaa_ir_json"
+      base_url: "https://repository.library.noaa.gov/"
+    routing:
+      subject: metrology
+      domain: standards_regulatory
+      category: reporting_templates
+    gates_override:
+      add: ["manual_legal_review", "record_level_filter", "extract_text_chunks", "near_duplicate_detection"]
+    output:
+      pool: "quarantine"
+      formats: ["jsonl.gz", "parquet"]
+
+  - id: "noaa_seed_tech_memos"
+    name: "NOAA Technical Memorandum seed PDF (small sample for smoke test)"
+    enabled: false
+    priority: 13
+    publisher: "NOAA"
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://library.noaa.gov/author-publishing/NOAA-Publications"
+    data_type: ["technical_report", "noaa_style", "methods"]
+    download:
+      strategy: "http"
+      urls:
+        - "https://www.arl.noaa.gov/documents/reports/arl-230.pdf"
+    output:
+      pool: "permissive"
+      formats: ["pdf"]
+    routing:
+      subject: metrology
+      domain: standards_regulatory
+      category: reporting_templates
+    gates_override:
+      add: ["extract_text_chunks", "emit_training_manifest", "emit_attribution_bundle"]
+
+  - id: "ntsb_aviation_accident_data_census"
+    name: "NTSB Aviation Accident Data Census (ZIP) + coding manuals (data engineering + rigor)"
+    enabled: false
+    priority: 20
+    publisher: "NTSB"
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://data.ntsb.gov/avdata"
+    data_type: ["datasets", "coding_manuals", "data_definitions", "safety"]
+    download:
+      strategy: "http"
+      urls:
+        - "https://data.ntsb.gov/avdata/avall.zip"
+        - "https://data.ntsb.gov/avdata/PRE1982.zip"
+        - "https://data.ntsb.gov/avdata/Pre2008.zip"
+        - "https://data.ntsb.gov/avdata/eadmspub.pdf"
+        - "https://data.ntsb.gov/avdata/MDB_Release_Notes.pdf"
+    output:
+      pool: "permissive"
+      formats: ["zip", "pdf"]
+    routing:
+      subject: metrology
+      domain: instrumentation
+      category: sensors_basic
+    gates_override:
+      add: ["extract_text_chunks", "emit_training_manifest", "emit_attribution_bundle"]
+
+  - id: "faa_advisory_circulars_harvest"
+    name: "FAA Advisory Circulars (AC) — TODO implement crawler (many PDFs)"
+    enabled: false
+    priority: 22
+    publisher: "FAA"
+    license_profile: "record_level"
+    review_required: true
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://www.faa.gov/regulations_policies/advisory_circulars/"
+    data_type: ["technical_guidance", "procedures", "safety", "standards"]
+    download:
+      strategy: "faa_ac_crawl"
+      index_url: "https://www.faa.gov/regulations_policies/advisory_circulars/index.cfm/go/document.list"
+    routing:
+      subject: metrology
+      domain: standards_regulatory
+      category: reporting_templates
+    gates_override:
+      add: ["manual_legal_review", "record_level_filter", "extract_text_chunks", "near_duplicate_detection"]
+    output:
+      pool: "quarantine"
+      formats: ["jsonl.gz", "parquet"]
+
+  - id: "common_pile_arxiv_abstracts"
+    name: "Common Pile v0.1 — arXiv abstracts (background scientific writing)"
+    enabled: false
+    priority: 50
+    publisher: "Common Pile"
+    license_profile: "record_level"
+    review_required: true
+    license_evidence:
+      spdx_hint: "Derived"
+      url: "https://huggingface.co/datasets/common-pile/arxiv_abstracts"
+    data_type: ["commonpile", "scientific_writing", "background"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/arxiv_abstracts"
+      splits: ["train"]
+    output:
+      pool: "quarantine"
+      formats: ["hf_dataset"]
+    routing:
+      subject: metrology
+      domain: misc
+      category: misc
+    gates_override:
+      add: ["manual_legal_review", "record_level_filter", "near_duplicate_detection"]
+
+  - id: "common_pile_doab"
+    name: "Common Pile v0.1 — DOAB (open access books; useful but broad)"
+    enabled: false
+    priority: 51
+    publisher: "Common Pile"
+    license_profile: "record_level"
+    review_required: true
+    license_evidence:
+      spdx_hint: "Derived"
+      url: "https://huggingface.co/datasets/common-pile/doab"
+    data_type: ["commonpile", "books", "background"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/doab"
+      splits: ["train"]
+    output:
+      pool: "quarantine"
+      formats: ["hf_dataset"]
+    routing:
+      subject: metrology
+      domain: misc
+      category: misc
+    gates_override:
+      add: ["manual_legal_review", "record_level_filter", "near_duplicate_detection"]
+
+  - id: "iso_standards_paywalled"
+    name: "ISO/IEC standards text (paywalled / restrictive) — DO NOT INGEST"
+    enabled: false
+    priority: 99
+    publisher: "ISO/IEC"
+    license_profile: "deny"
+    license_evidence:
+      spdx_hint: "All-Rights-Reserved"
+      url: ""
+    data_type: ["standards", "restricted"]
+    download:
+      strategy: "none"
+    routing:
+      subject: metrology
+      domain: standards_regulatory
+      category: iso_17025
+
+  - id: "ieee_standards_paywalled"
+    name: "IEEE standards text (paywalled / restrictive) — DO NOT INGEST"
+    enabled: false
+    priority: 99
+    publisher: "IEEE"
+    license_profile: "deny"
+    license_evidence:
+      spdx_hint: "All-Rights-Reserved"
+      url: ""
+    data_type: ["standards", "restricted"]
+    download:
+      strategy: "none"
+    routing:
+      subject: metrology
+      domain: standards_regulatory
+      category: iso_17025
