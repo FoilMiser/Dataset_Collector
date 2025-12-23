@@ -1,0 +1,75 @@
+schema_version: "2.0"
+updated_utc: "2025-12-16 00:00:00Z"
+
+globals:
+  destination_root_windows: E:/AI-Research/datasets/Natural/nlp
+  destination_root_wsl: /mnt/e/AI-Research/datasets/Natural/nlp
+  folder_layout: final/{license_pool}/d{level:02d}/{subject}/{domain}/{category}
+  sanitize_path_segments: true
+  default_subject: nlp
+  default_domain: misc
+  default_category: misc
+  default_level: 5
+
+rubric:
+  scale: { min: 1, max: 10, name: "Difficulty 1–10" }
+  meaning:
+    d01: "Very simple language; short; minimal jargon; basic instructions/children's"
+    d03: "Everyday prose; short articles; simple reports"
+    d05: "Standard nonfiction/news; moderate length; some structure"
+    d07: "Technical or policy writing; sustained argument; domain jargon"
+    d09: "Legal/regulatory dense text; heavy cross-references; formal standards"
+    d10: "Highly technical standards / research monographs; extreme density"
+
+subjects:
+  nlp:
+    name: "General NLP (English)"
+    domains:
+      gov:
+        name: "Government / public sector"
+        categories:
+          press_releases: { level: { default: 4, min: 3, max: 5 } }
+          guidance_policy: { level: { default: 6, min: 5, max: 7 } }
+          reports: { level: { default: 6, min: 5, max: 8 } }
+          regulations: { level: { default: 9, min: 8, max: 10 } }
+          legislation: { level: { default: 8, min: 7, max: 10 } }
+      legal:
+        name: "Case law / legal text"
+        categories:
+          case_law: { level: { default: 9, min: 8, max: 10 } }
+          contracts: { level: { default: 8, min: 7, max: 10 } }
+      scientific:
+        name: "Scientific literature"
+        categories:
+          abstracts: { level: { default: 7, min: 6, max: 8 } }
+          full_papers: { level: { default: 8, min: 7, max: 10 } }
+      technical:
+        name: "Technical documentation"
+        categories:
+          patents: { level: { default: 8, min: 7, max: 10 } }
+          specs: { level: { default: 7, min: 6, max: 9 } }
+          manuals: { level: { default: 6, min: 5, max: 8 } }
+      education:
+        name: "Education / OER"
+        categories:
+          textbooks: { level: { default: 6, min: 4, max: 8 } }
+          lessons: { level: { default: 5, min: 3, max: 7 } }
+      literature:
+        name: "Fiction / longform"
+        categories:
+          fiction: { level: { default: 5, min: 3, max: 7 } }
+          nonfiction: { level: { default: 6, min: 4, max: 8 } }
+
+rule_sets:
+  - id: "readability_easy"
+    when:
+      flesch_kincaid_grade_max: 5
+    set:
+      level: 2
+      confidence: 0.7
+  - id: "readability_hard"
+    when:
+      flesch_kincaid_grade_min: 14
+    set:
+      level: 8
+      confidence: 0.7
