@@ -1,0 +1,91 @@
+schema_version: "2.0"
+updated_utc: "2025-12-22 00:00:00Z"
+
+globals:
+  destination_root_windows: "E:\\AI-Research\\datasets\\Natural\\logic"
+  destination_root_wsl: "/data/logic"
+  folder_layout: "final/{license_pool}/d{level:02d}/shards"
+  sanitize_path_segments: true
+  default_subject: "logic"
+  default_domain: "informal_reasoning"
+  default_category: "fallacies"
+  default_level: 4
+
+rubric:
+  scale: "1-10"
+  levels:
+    1: { label: "Everyday logic", description: "Simple arguments, basic fallacies, short contexts.", signals: ["single-step", "informal"] }
+    2: { label: "Propositional fundamentals", description: "Connectives, basic equivalences, small truth tables.", signals: ["truth table", "∨ ∧ → ¬"] }
+    3: { label: "Propositional techniques", description: "CNF/DNF, multi-step rewrites, SAT intro intuition.", signals: ["CNF", "DNF", "normal form"] }
+    4: { label: "FOL intro", description: "Quantifiers, translation, simple semantics and models.", signals: ["∀", "∃", "translation"] }
+    5: { label: "FOL proofs", description: "Natural deduction/tableaux with moderate proof length.", signals: ["ND", "tableau", "derivation"] }
+    6: { label: "Automated reasoning foundations", description: "Skolemization, unification, resolution basics.", signals: ["Skolem", "unification", "resolution"] }
+    7: { label: "SAT/SMT + modal/temporal entry", description: "Benchmarks and basic modal/temporal logic.", signals: ["SMT-LIB", "SAT", "Kripke", "LTL"] }
+    8: { label: "Computability + harder ATP/proofs", description: "Reductions/undecidability; harder ATP sets; formal proofs.", signals: ["undecidable", "reduction", "TPTP"] }
+    9: { label: "Advanced proof/model theory", description: "Cut elimination/compactness depth; tactic traces.", signals: ["cut elimination", "compactness", "tactics"] }
+    10: { label: "Research-tier logic/set theory", description: "Forcing/large cardinals; very technical corpora.", signals: ["forcing", "large cardinal"] }
+
+subjects:
+  logic:
+    name: "Logic"
+    domains:
+      informal_reasoning:
+        categories:
+          fallacies: { level: { default: 1, min: 1, max: 2 }, notes: "Basic fallacies, argument ID." }
+          validity_soundness: { level: { default: 2, min: 1, max: 3 }, notes: "Validity vs soundness, simple formalization." }
+
+      propositional_logic:
+        categories:
+          truth_tables: { level: { default: 2, min: 1, max: 3 }, notes: "Truth-table evaluation/validity." }
+          equivalences_rewrites: { level: { default: 3, min: 2, max: 4 }, notes: "Equivalence transformations." }
+          normal_forms_cnf_dnf: { level: { default: 3, min: 3, max: 5 }, notes: "CNF/DNF conversions." }
+
+      first_order_logic:
+        categories:
+          translation_quantifiers: { level: { default: 4, min: 3, max: 5 }, notes: "NL→FOL translation." }
+          models_countermodels: { level: { default: 5, min: 4, max: 6 }, notes: "Model building and countermodels." }
+          natural_deduction: { level: { default: 5, min: 4, max: 6 }, notes: "ND proofs, intro." }
+
+      automated_reasoning:
+        categories:
+          skolem_resolution_unification: { level: { default: 6, min: 5, max: 7 }, notes: "Skolemization, resolution, unification." }
+          sat_benchmarks: { level: { default: 7, min: 6, max: 8 }, notes: "SAT competition suites." }
+          smt_benchmarks: { level: { default: 7, min: 6, max: 8 }, notes: "SMT-LIB benchmarks." }
+          tptp_atp: { level: { default: 8, min: 7, max: 9 }, notes: "TPTP ATP problems." }
+
+      proof_assistants:
+        categories:
+          lean_formal_proofs: { level: { default: 8, min: 7, max: 9 }, notes: "Lean mathlib4 theorem/proof corpora." }
+          metamath_formal_proofs: { level: { default: 8, min: 7, max: 9 }, notes: "Metamath set.mm theorems/proofs." }
+
+      ai_reasoning_benchmarks:
+        categories:
+          rule_taker: { level: { default: 6, min: 5, max: 7 }, notes: "Rule-based entailment datasets." }
+          proofwriter: { level: { default: 6, min: 5, max: 7 }, notes: "ProofWriter-style reasoning." }
+          folio: { level: { default: 5, min: 4, max: 6 }, notes: "FOLIO-style reasoning." }
+
+      philosophy_logic:
+        categories:
+          sep_logic: { level: { default: 6, min: 5, max: 7 }, notes: "SEP logic-related articles (license permitting)." }
+
+rule_sets:
+  global:
+    keyword_rules: []
+  subjects:
+    logic:
+      keyword_rules: []
+
+source_overrides:
+  targets:
+    synthetic_logic_problems: { subject: logic, domain: propositional_logic, category: truth_tables }
+    lean_mathlib4: { subject: logic, domain: proof_assistants, category: lean_formal_proofs }
+    metamath_setmm: { subject: logic, domain: proof_assistants, category: metamath_formal_proofs }
+    open_logic_project: { subject: logic, domain: first_order_logic, category: translation_quantifiers }
+    forallx_calgarystyle: { subject: logic, domain: first_order_logic, category: translation_quantifiers }
+    smtlib_benchmarks: { subject: logic, domain: automated_reasoning, category: smt_benchmarks }
+    sat_competition_benchmarks: { subject: logic, domain: automated_reasoning, category: sat_benchmarks }
+    rule_taker: { subject: logic, domain: ai_reasoning_benchmarks, category: rule_taker }
+    proofwriter: { subject: logic, domain: ai_reasoning_benchmarks, category: proofwriter }
+    folio: { subject: logic, domain: ai_reasoning_benchmarks, category: folio }
+    tptp_problem_library: { subject: logic, domain: automated_reasoning, category: tptp_atp }
+    sep_stanford_encyclopedia_of_philosophy: { subject: logic, domain: philosophy_logic, category: sep_logic }
