@@ -1,0 +1,91 @@
+schema_version: "2.0"
+updated_utc: "2026-06-15T00:00:00Z"
+
+globals:
+  default_subject: kg_nav
+  default_domain: misc
+  default_category: misc
+  default_level: 5
+  folder_layout: "final/{license_pool}/d{level:02d}/{subject}/{domain}/{category}"
+  sanitize_path_segments: true
+
+rubric:
+  scale: { name: "Difficulty 1–10", min: 1, max: 10 }
+  levels:
+    1:
+      label: "Single-hop lookup"
+      description: "One entity lookup, minimal ambiguity, one evidence edge."
+      signals: ["H=1", "candidate_counts<=1", "evidence=1"]
+    2:
+      label: "Normalization"
+      description: "ID hygiene/validation plus a single hop (e.g., DOI normalization)."
+      signals: ["format checks", "checksum validation", "single hop"]
+    3:
+      label: "Simple navigation"
+      description: "1–2 hops with small evidence set and no branching."
+      signals: ["H<=2", "E<=2", "B<=1"]
+    4:
+      label: "Crosswalk or short proof"
+      description: "Adds a cross-namespace step or light provenance (2–3 steps)."
+      signals: ["X>=1", "P>=2", "constraint<=1"]
+    5:
+      label: "Disambiguation with constraint"
+      description: "3–4 hops with moderate candidate sets requiring one constraint."
+      signals: ["H>=3", "K>=5", "C>=1"]
+    6:
+      label: "Multi-hop chain with joins"
+      description: "4–5 hops with joins across entity types; evidence 3–5."
+      signals: ["H>=4", "J>=1", "E>=3"]
+    7:
+      label: "Constrained navigation"
+      description: "Adds time/venue/concept filters or affiliation windows."
+      signals: ["C>=2", "time slicing", "branch_factor>=3"]
+    8:
+      label: "Crosswalk joins + robustness"
+      description: "Multiple crosswalks with branching; handles missing edges/fallbacks."
+      signals: ["X>=2", "B>=3", "join_count>=2"]
+    9:
+      label: "Multi-source reconciliation"
+      description: "Conflicts across sources resolved with explicit provenance."
+      signals: ["requires_reconciliation", "P>=4", "E>=5"]
+    10:
+      label: "Audit-grade navigation plan"
+      description: "Long, branching, provable plan with reconciliation and audit trace."
+      signals: ["P>=5", "branching", "multi-constraint"]
+
+subjects:
+  kg_nav:
+    domains:
+      identifier_resolution:
+        categories:
+          doi_normalization: { level: { default: 2 } }
+          id_crosswalk: { level: { default: 4 } }
+          entity_disambiguation: { level: { default: 5 } }
+      scientific_kg:
+        categories:
+          openalex_minimal_graph: { level: { default: 4 } }
+          crossref_minimal_graph: { level: { default: 4 } }
+          wikidata_truthy_edges: { level: { default: 5 } }
+          opencitations_coci_edges: { level: { default: 5 } }
+      citation_navigation:
+        categories:
+          direct_citation_lookup: { level: { default: 3 } }
+          multi_hop_citation_chain: { level: { default: 6 } }
+          influence_pathfinding: { level: { default: 8 } }
+      affiliation_navigation:
+        categories:
+          org_lookup_ror: { level: { default: 3 } }
+          author_affiliation_time_slice: { level: { default: 7 } }
+      concept_navigation:
+        categories:
+          mesh_concept_lookup: { level: { default: 3 } }
+          concept_lineage_wikidata: { level: { default: 8 } }
+          nlm_mesh_minimal: { level: { default: 3 } }
+      provenance_grounding:
+        categories:
+          single_source_proof: { level: { default: 4 } }
+          multi_source_reconciliation: { level: { default: 9 } }
+      graph_query_planning:
+        categories:
+          multi_step_plan: { level: { default: 8 } }
+          audit_trace_plan: { level: { default: 10 } }
