@@ -1,0 +1,612 @@
+# targets_nlp.yaml
+# NLP + Government (English) — targets inventory (v2)
+# Generated: 2025-12-16
+# Goal: proprietary-friendly general language backbone with traceable licensing.
+#
+# Notes:
+# - Primary backbone comes from Common Pile v0.1 *filtered* components (Hugging Face).
+# - CC-BY-SA sources (e.g., Wikimedia / StackExchange) are included as RED+disabled reminders; keep them excluded.
+# - Some international government licences may not map cleanly to SPDX in your current license_map.yaml.
+#   Keep those targets disabled until you add mappings (or treat as YELLOW + manual review).
+
+schema_version: "0.8"
+updated_utc: "2025-12-16"
+
+companion_files:
+  license_map: "./license_map.yaml"
+  field_schemas: "./field_schemas.yaml"
+  denylist: "./denylist.yaml"
+  difficulties_map: "./difficulties_nlp.yaml"
+
+globals:
+  raw_root: "/data/nlp/raw"
+  screened_yellow_root: "/data/nlp/screened_yellow"
+  combined_root: "/data/nlp/combined"
+  final_root: "/data/nlp/final"
+
+  queues_root: "/data/nlp/_queues"
+  manifests_root: "/data/nlp/_manifests"
+  ledger_root: "/data/nlp/_ledger"
+  pitches_root: "/data/nlp/_pitches"
+  logs_root: "/data/nlp/_logs"
+  catalogs_root: "/data/nlp/_catalogs"
+
+  sharding:
+    compression: gzip
+    max_records_per_shard: 50000
+
+  screening:
+    min_chars: 300
+    max_chars: 12000
+    text_field_candidates: ["text", "content", "body"]
+    record_license_field_candidates: ["license", "license_spdx", "spdx"]
+    require_record_license: false
+    allow_spdx: ["CC0-1.0", "MIT", "Apache-2.0", "CC-BY-4.0"]
+    deny_phrases: ["noai", "no tdm", "no machine learning"]
+
+  # Apply your own language-ID filter in the extractor/chunker stage.
+  text_processing_defaults:
+    max_chunk_chars: 6000
+    min_chunk_chars: 500
+    drop_tables: false
+    drop_references_section: true
+    keep_citations_inline: false
+    include_section_headers: true
+    normalize_whitespace: true
+    force_language: "en"
+
+  default_gates:
+    - "snapshot_terms"
+    - "resolve_license_spdx"
+    - "restriction_phrase_scan"
+    - "emit_training_manifest"
+    - "emit_attribution_bundle"
+
+queues:
+  emit:
+    - id: "green_download"
+      path: "/data/nlp/_queues/green_download.jsonl"
+      criteria:
+        effective_bucket: "GREEN"
+        enabled: true
+    - id: "yellow_pipeline"
+      path: "/data/nlp/_queues/yellow_pipeline.jsonl"
+      criteria:
+        effective_bucket: "YELLOW"
+        enabled: true
+    - id: "red_rejected"
+      path: "/data/nlp/_queues/red_rejected.jsonl"
+      criteria:
+        effective_bucket: "RED"
+        enabled: true
+
+gates_catalog:
+  snapshot_terms: "Save Terms/ToS + license page HTML/PDF + retrieval timestamp."
+  resolve_license_spdx: "Normalize license to SPDX via license_map.yaml rules; store evidence."
+  restriction_phrase_scan: "Scan terms/content for restriction phrases (no-LLM/no-TDM/etc.)."
+  record_level_filter: "Require per-record license metadata; keep only allowlist."
+  extract_text_chunks: "Extract text into JSONL chunks using globals.text_processing_defaults unless overridden."
+  emit_training_manifest: "Manifest of included files/records + checksums + license evidence."
+  emit_attribution_bundle: "Generate ATTRIBUTION.md + CITATIONS.bib for included sources."
+  manual_legal_review: "Human review required before training."
+  segregate_copyleft_pool: "Force output into copyleft pool and keep isolated."
+  collect_statistics: "Collect dataset statistics (tokens, property distributions)."
+  validate_schema: "Validate extracted data against field_schemas.yaml."
+
+resolvers:
+  huggingface_datasets:
+    mode: "dataset_id"
+    note: "Uses datasets.load_dataset; stores dataset card + viewer snapshot as evidence."
+
+  # Planned resolvers (not implemented in v0.7 prototype):
+  ckan_portal:
+    mode: "api/3/action/package_search -> resource URLs"
+    note: "Implement with a new ckan_worker.py (pagination + license filtering + resource download)."
+
+  sitemap_crawl:
+    mode: "sitemap.xml -> URL crawl"
+    note: "Implement with a new crawler worker; must respect robots.txt and rate limits."
+
+targets:
+  # -------------------------------------------------------------------
+  # A) Common Pile (Filtered) — recommended GREEN backbone
+  # -------------------------------------------------------------------
+
+  - id: "cp_usgpo_filtered"
+    name: "Common Pile: USGPO / GovInfo plain-text documents (filtered)"
+    enabled: true
+    priority: 10
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://huggingface.co/datasets/common-pile/usgpo_filtered"
+    data_type: ["nlp", "english", "government", "reports", "law", "policy"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/usgpo_filtered"
+    output:
+      pool: "permissive"
+      formats: ["hf_disk"]
+    routing:
+      subject: "nlp"
+      domain: "gov"
+      category: "reports"
+      granularity: "target"
+      confidence: 0.8
+      reason: "source_default"
+    notes: "High-value general NLP for procedural/formal writing; huge corpus."
+
+  - id: "cp_regulations_filtered"
+    name: "Common Pile: Regulations.gov regulatory documents (filtered)"
+    enabled: true
+    priority: 11
+    license_profile: "record_level"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://huggingface.co/datasets/common-pile/regulations_filtered"
+    data_type: ["nlp", "english", "government", "regulation", "rulemaking"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/regulations_filtered"
+    output:
+      pool: "permissive"
+      formats: ["hf_disk"]
+    gates_override:
+      add: ["manual_legal_review"]
+    routing:
+      subject: "nlp"
+      domain: "gov"
+      category: "regulations"
+      granularity: "target"
+      confidence: 0.8
+      reason: "source_default"
+    notes: "Treat as record-level until you confirm license uniformity + comment text policy."
+
+  - id: "cp_caselaw_access_project_filtered"
+    name: "Common Pile: Caselaw Access Project + CourtListener (filtered)"
+    enabled: true
+    priority: 12
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://huggingface.co/datasets/common-pile/caselaw_access_project"
+    data_type: ["nlp", "english", "government", "law", "judicial_opinions"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/caselaw_access_project_filtered"
+    output:
+      pool: "permissive"
+      formats: ["hf_disk"]
+    routing:
+      subject: "nlp"
+      domain: "legal"
+      category: "case_law"
+      granularity: "target"
+      confidence: 0.8
+      reason: "source_default"
+    notes: "Excellent for long-form reasoning and citation-style prose."
+
+  - id: "cp_uspto_filtered"
+    name: "Common Pile: USPTO patents (filtered)"
+    enabled: true
+    priority: 13
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "CC-BY-4.0"
+      url: "https://huggingface.co/datasets/common-pile/uspto_filtered"
+    data_type: ["nlp", "english", "patents", "engineering", "technical_writing"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/uspto_filtered"
+    output:
+      pool: "permissive"
+      formats: ["hf_disk"]
+    routing:
+      subject: "nlp"
+      domain: "technical"
+      category: "patents"
+      granularity: "target"
+      confidence: 0.8
+      reason: "source_default"
+    notes: "Strong technical disclosure style; keep separate evals due to patentese."
+
+  - id: "cp_libretexts_filtered"
+    name: "Common Pile: LibreTexts OER textbooks (filtered)"
+    enabled: true
+    priority: 14
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "CC-BY-4.0"
+      url: "https://huggingface.co/datasets/common-pile/libretexts_filtered"
+    data_type: ["nlp", "english", "education", "textbooks", "explanations"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/libretexts_filtered"
+    output:
+      pool: "permissive"
+      formats: ["hf_disk"]
+    routing:
+      subject: "nlp"
+      domain: "education"
+      category: "textbooks"
+      granularity: "target"
+      confidence: 0.8
+      reason: "source_default"
+    notes: "High-quality explanatory writing; great for 'agent' communication."
+
+  - id: "cp_pressbooks_filtered"
+    name: "Common Pile: Pressbooks (filtered)"
+    enabled: true
+    priority: 15
+    license_profile: "record_level"
+    license_evidence:
+      spdx_hint: "CC-BY-4.0"
+      url: "https://huggingface.co/datasets/common-pile/pressbooks_filtered"
+    data_type: ["nlp", "english", "open_books", "education"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/pressbooks_filtered"
+    output:
+      pool: "permissive"
+      formats: ["hf_disk"]
+    gates_override:
+      add: ["manual_legal_review"]
+    routing:
+      subject: "nlp"
+      domain: "education"
+      category: "textbooks"
+      granularity: "target"
+      confidence: 0.8
+      reason: "source_default"
+    notes: "Often CC BY, but licenses can vary by book; treat as record-level allowlist."
+
+  - id: "cp_oercommons_filtered"
+    name: "Common Pile: OER Commons (filtered)"
+    enabled: true
+    priority: 16
+    license_profile: "record_level"
+    license_evidence:
+      spdx_hint: "UNKNOWN"
+      url: "https://huggingface.co/datasets/common-pile/oercommons_filtered"
+    data_type: ["nlp", "english", "education", "lesson_plans", "open_education"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/oercommons_filtered"
+    output:
+      pool: "permissive"
+      formats: ["hf_disk"]
+    gates_override:
+      add: ["record_level_filter", "manual_legal_review"]
+    routing:
+      subject: "nlp"
+      domain: "education"
+      category: "lessons"
+      granularity: "target"
+      confidence: 0.8
+      reason: "source_default"
+    notes: "Keep only PD/CC0/CC-BY records via metadata. Quarantine unknown/no-license."
+
+  - id: "cp_pubmed_filtered"
+    name: "Common Pile: PubMed OA subset (filtered)"
+    enabled: true
+    priority: 17
+    license_profile: "record_level"
+    license_evidence:
+      spdx_hint: "CC-BY-4.0"
+      url: "https://huggingface.co/datasets/common-pile/pubmed_filtered"
+    data_type: ["nlp", "english", "science", "biomed", "papers"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/pubmed_filtered"
+    output:
+      pool: "permissive"
+      formats: ["hf_disk"]
+    gates_override:
+      add: ["record_level_filter", "manual_legal_review"]
+    routing:
+      subject: "nlp"
+      domain: "scientific"
+      category: "full_papers"
+      granularity: "target"
+      confidence: 0.8
+      reason: "source_default"
+    notes: "Use only records with explicit CC licenses; exclude non-open abstracts/fulltext."
+
+  - id: "cp_python_peps_filtered"
+    name: "Common Pile: Python Enhancement Proposals (filtered)"
+    enabled: true
+    priority: 18
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://huggingface.co/datasets/common-pile/python_enhancement_proposals_filtered"
+    data_type: ["nlp", "english", "technical_specs", "software_design"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/python_enhancement_proposals_filtered"
+    output:
+      pool: "permissive"
+      formats: ["hf_disk"]
+    routing:
+      subject: "nlp"
+      domain: "technical"
+      category: "specs"
+      granularity: "target"
+      confidence: 0.8
+      reason: "source_default"
+    notes: "Polished technical writing + mild code; good for instruction/spec comprehension."
+
+  - id: "cp_library_of_congress_filtered"
+    name: "Common Pile: Library of Congress (filtered)"
+    enabled: true
+    priority: 19
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://huggingface.co/datasets/common-pile/library_of_congress_filtered"
+    data_type: ["nlp", "english", "government", "archives", "historical"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/library_of_congress_filtered"
+    output:
+      pool: "permissive"
+      formats: ["hf_disk"]
+    routing:
+      subject: "nlp"
+      domain: "gov"
+      category: "reports"
+      granularity: "target"
+      confidence: 0.8
+      reason: "source_default"
+    notes: "Useful for broad background prose; may be older style."
+
+  # Optional stylistic long-form (public domain): enable only if you want older prose.
+  - id: "cp_project_gutenberg_filtered"
+    name: "Common Pile: Project Gutenberg (filtered, public domain books)"
+    enabled: false
+    priority: 30
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://huggingface.co/datasets/common-pile/project_gutenberg_filtered"
+    data_type: ["nlp", "english", "books", "public_domain"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/project_gutenberg_filtered"
+    output:
+      pool: "permissive"
+      formats: ["hf_disk"]
+    routing:
+      subject: "nlp"
+      domain: "literature"
+      category: "fiction"
+      granularity: "target"
+      confidence: 0.8
+      reason: "source_default"
+    notes: "Can skew tone archaic; consider later-stage only."
+
+  - id: "cp_pre_1929_books_filtered"
+    name: "Common Pile: Pre-1929 Books (filtered, OCR)"
+    enabled: false
+    priority: 31
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "US-PUBLIC-DOMAIN"
+      url: "https://huggingface.co/datasets/common-pile/pre_1929_books_filtered"
+    data_type: ["nlp", "english", "books", "public_domain", "ocr"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/pre_1929_books_filtered"
+    output:
+      pool: "permissive"
+      formats: ["hf_disk"]
+    routing:
+      subject: "nlp"
+      domain: "literature"
+      category: "nonfiction"
+      granularity: "target"
+      confidence: 0.8
+      reason: "source_default"
+    notes: "OCR noise + archaic style; only if you want extra long-form capacity."
+
+  # -------------------------------------------------------------------
+  # B) International government sources (planned crawls / portals)
+  #     Keep DISABLED until you implement api/sitemap workers and license mappings.
+  # -------------------------------------------------------------------
+
+  - id: "uk_govuk_policy_ogl"
+    name: "UK GOV.UK policy/guidance pages (OGL v3.0) — sitemap crawl"
+    enabled: false
+    priority: 100
+    license_profile: "unknown"
+    license_evidence:
+      spdx_hint: "LicenseRef-OGL-UK-3.0"
+      url: "https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/"
+    data_type: ["nlp", "english", "government", "policy", "guidance", "uk"]
+    download:
+      strategy: "api"
+      base_url: "https://www.gov.uk/sitemap.xml"
+      note: "Implement sitemap_crawl resolver; restrict to /guidance and /government/publications."
+    output:
+      pool: "permissive"
+      formats: ["html", "jsonl.gz"]
+    gates_override:
+      add: ["manual_legal_review"]
+    routing:
+      subject: "nlp"
+      domain: "gov"
+      category: "guidance_policy"
+      granularity: "target"
+      confidence: 0.8
+      reason: "source_default"
+    notes: "Add LicenseRef-OGL-UK-3.0 mapping in license_map.yaml to treat as GREEN."
+
+  - id: "can_open_gov_portal_ckan"
+    name: "Canada Open Government Portal datasets + narrative resources (CKAN)"
+    enabled: false
+    priority: 110
+    license_profile: "unknown"
+    license_evidence:
+      spdx_hint: "OGL-Canada-2.0"
+      url: "https://open.canada.ca/en/open-government-licence-canada"
+    data_type: ["nlp", "english", "government", "canada", "open_data"]
+    download:
+      strategy: "api"
+      base_url: "https://open.canada.ca/data/en/api/3/action"
+      note: "Implement ckan_portal resolver; prefer distributions in HTML/PDF/TXT; skip pure geodata."
+      query:
+        fq: "res_format:(PDF OR HTML OR TXT)"
+    output:
+      pool: "permissive"
+      formats: ["pdf", "html", "jsonl.gz"]
+    gates_override:
+      add: ["manual_legal_review"]
+    routing:
+      subject: "nlp"
+      domain: "gov"
+      category: "reports"
+      granularity: "target"
+      confidence: 0.8
+      reason: "source_default"
+    notes: "OGL-Canada-2.0 is an SPDX license; add to allowlist if acceptable."
+
+  - id: "au_datagov_ckan_ccby"
+    name: "Australia data.gov.au (CKAN) — focus on reports/publications with CC BY 4.0"
+    enabled: false
+    priority: 120
+    license_profile: "record_level"
+    license_evidence:
+      spdx_hint: "CC-BY-4.0"
+      url: "https://www.data.gov.au/"
+    data_type: ["nlp", "english", "government", "australia", "open_data"]
+    download:
+      strategy: "api"
+      base_url: "https://data.gov.au/data/api/3/action"
+      note: "Implement ckan_portal resolver; filter license_id=cc-by-4.0; prefer narrative PDFs/HTML."
+      query:
+        fq: "license_id:cc-by-4.0 AND res_format:(PDF OR HTML OR TXT)"
+    output:
+      pool: "permissive"
+      formats: ["pdf", "html", "jsonl.gz"]
+    gates_override:
+      add: ["record_level_filter"]
+    routing:
+      subject: "nlp"
+      domain: "gov"
+      category: "reports"
+      granularity: "target"
+      confidence: 0.8
+      reason: "source_default"
+    notes: "Default licence signals are strong, but dataset-level licences still vary; filter by license_id."
+
+  - id: "nz_datagov_ccby"
+    name: "New Zealand data.govt.nz (CKAN) — CC BY 4.0 site; dataset licences vary"
+    enabled: false
+    priority: 130
+    license_profile: "record_level"
+    license_evidence:
+      spdx_hint: "CC-BY-4.0"
+      url: "https://data.govt.nz/copyright"
+    data_type: ["nlp", "english", "government", "new_zealand", "open_data"]
+    download:
+      strategy: "api"
+      base_url: "https://catalogue.data.govt.nz/api/3/action"
+      note: "Implement ckan_portal resolver; require per-dataset license; prefer PDFs/HTML/TXT."
+      query:
+        fq: "res_format:(PDF OR HTML OR TXT)"
+    output:
+      pool: "permissive"
+      formats: ["pdf", "html", "jsonl.gz"]
+    gates_override:
+      add: ["record_level_filter", "manual_legal_review"]
+    routing:
+      subject: "nlp"
+      domain: "gov"
+      category: "reports"
+      granularity: "target"
+      confidence: 0.8
+      reason: "source_default"
+    notes: "data.govt.nz site text is CC BY 4.0, but datasets can differ—enforce license at record level."
+
+  - id: "eu_commission_ccby_site"
+    name: "European Commission websites (CC BY 4.0) — curated crawl (English only)"
+    enabled: false
+    priority: 140
+    license_profile: "record_level"
+    license_evidence:
+      spdx_hint: "CC-BY-4.0"
+      url: "https://commission.europa.eu/legal-notice_en"
+    data_type: ["nlp", "english", "government", "eu", "policy", "reports"]
+    download:
+      strategy: "api"
+      base_url: "https://commission.europa.eu/"
+      note: "Implement sitemap_crawl; crawl English pages only; exclude sites with special notices (e.g., Eurostat exceptions)."
+    output:
+      pool: "permissive"
+      formats: ["html", "jsonl.gz"]
+    gates_override:
+      add: ["record_level_filter", "manual_legal_review"]
+    routing:
+      subject: "nlp"
+      domain: "gov"
+      category: "guidance_policy"
+      granularity: "target"
+      confidence: 0.8
+      reason: "source_default"
+    notes: "Some EU sub-sites have additional restrictions; require per-page copyright notice check."
+
+  # -------------------------------------------------------------------
+  # C) Explicit exclusions (copyleft / share-alike) — keep disabled
+  # -------------------------------------------------------------------
+
+  - id: "cp_wikimedia_filtered_EXCLUDE"
+    name: "Common Pile: Wikimedia (filtered) — CC BY-SA (EXCLUDE for proprietary)"
+    enabled: false
+    priority: 900
+    license_profile: "copyleft"
+    license_evidence:
+      spdx_hint: "CC-BY-SA-4.0"
+      url: "https://huggingface.co/datasets/common-pile/wikimedia_filtered"
+    data_type: ["nlp", "english", "encyclopedia", "copyleft"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/wikimedia_filtered"
+    output:
+      pool: "copyleft"
+      formats: ["hf_disk"]
+    gates_override:
+      add: ["segregate_copyleft_pool", "manual_legal_review"]
+    routing:
+      subject: "nlp"
+      domain: "misc"
+      category: "excluded"
+      granularity: "target"
+      confidence: 0.8
+      reason: "source_default"
+    notes: "Do not mix into permissive pool; keep excluded unless you change your licensing posture."
+
+  - id: "cp_stackexchange_filtered_EXCLUDE"
+    name: "Common Pile: StackExchange (filtered) — CC BY-SA (EXCLUDE for proprietary)"
+    enabled: false
+    priority: 901
+    license_profile: "copyleft"
+    license_evidence:
+      spdx_hint: "CC-BY-SA-4.0"
+      url: "https://huggingface.co/datasets/common-pile/stackexchange_filtered"
+    data_type: ["nlp", "english", "qa_forums", "copyleft"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "common-pile/stackexchange_filtered"
+    output:
+      pool: "copyleft"
+      formats: ["hf_disk"]
+    gates_override:
+      add: ["segregate_copyleft_pool", "manual_legal_review"]
+    routing:
+      subject: "nlp"
+      domain: "misc"
+      category: "excluded"
+      granularity: "target"
+      confidence: 0.8
+      reason: "source_default"
+    notes: "Exclude by default. If ever used, keep fully isolated and consult counsel."
