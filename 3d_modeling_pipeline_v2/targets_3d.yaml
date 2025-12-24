@@ -1,0 +1,501 @@
+# targets_3d_modeling.yaml
+# v0.1 — Ethical + legally-cleared targets for 3D modeling / 3D printing
+#
+# This file intentionally matches the prototype schema in chem_pipeline_v1/targets.yaml
+# so pipeline_driver.py can parse it without code changes.
+#
+# Guiding rules
+# - Prefer CC0 / public-domain for meshes, CAD, materials, and docs when possible.
+# - Treat any community-upload repository as RECORD-LEVEL and keep only allowlisted licenses.
+# - Isolate copyleft (CC-BY-SA / GPL/AGPL) into its own pool and don’t mix it into permissive training.
+# - Default-deny “NC”, “ND”, “NoAI”, or “unknown” licenses; also filter obvious trademark/character rips.
+
+schema_version: "0.8"
+updated_utc: "2026-06-03"
+
+companion_files:
+  license_map: "./license_map.yaml"
+  field_schemas: "./field_schemas.yaml"
+  denylist: "./denylist.yaml"
+  difficulties_map: "./difficulties_3d.yaml"
+
+globals:
+  raw_root: /data/3d/raw
+  screened_yellow_root: /data/3d/screened_yellow
+  combined_root: /data/3d/combined
+  final_root: /data/3d/final
+  ledger_root: /data/3d/_ledger
+  pitches_root: /data/3d/_pitches
+  manifests_root: /data/3d/_manifests
+  queues_root: /data/3d/_queues
+  catalogs_root: /data/3d/_catalogs
+  logs_root: /data/3d/_logs
+  require_yellow_signoff: true
+  sharding:
+    max_records_per_shard: 50000
+    compression: gzip
+  screening:
+    min_chars: 0
+    max_chars: 12000
+    text_field_candidates: [text, description, caption, title]
+    record_license_field_candidates: [license, license_spdx, spdx, license_id]
+    require_record_license: true
+    allow_spdx: [CC0-1.0, CC-BY-4.0, MIT, Apache-2.0, BSD-3-Clause, CC-BY-SA-4.0]
+    deny_phrases: [noai, "no tdm", "no machine learning", "noncommercial", "no derivatives", "nd", "nc"]
+  default_gates:
+    - "snapshot_terms"
+    - "resolve_license_spdx"
+    - "restriction_phrase_scan"
+    - "emit_training_manifest"
+    - "emit_attribution_bundle"
+
+queues:
+  emit:
+    - id: "green_download"
+      path: "/data/3d/_queues/green_download.jsonl"
+      criteria:
+        effective_bucket: "GREEN"
+        enabled: true
+    - id: "yellow_pipeline"
+      path: "/data/3d/_queues/yellow_pipeline.jsonl"
+      criteria:
+        effective_bucket: "YELLOW"
+        enabled: true
+    - id: "red_rejected"
+      path: "/data/3d/_queues/red_rejected.jsonl"
+      criteria:
+        effective_bucket: "RED"
+        enabled: true
+
+gates_catalog:
+  snapshot_terms: "Save Terms/ToS + license page HTML/PDF + retrieval timestamp."
+  resolve_license_spdx: "Normalize license to SPDX via license_map.yaml rules; store evidence."
+  restriction_phrase_scan: "Scan terms/content for restriction phrases (no-LLM/no-TDM/NoAI/etc.)."
+  record_level_filter: "Require per-record license metadata; keep only allowlist."
+  emit_training_manifest: "Manifest of included files/records + checksums + license evidence."
+  emit_attribution_bundle: "Generate ATTRIBUTION.md + CITATIONS.bib for included sources."
+  manual_legal_review: "Human review required before training."
+  segregate_copyleft_pool: "Force output into copyleft pool and keep isolated."
+
+  # 3D-specific gates to implement when adapting the code
+  mesh_validate: "Validate mesh files (parseable, sane bounds, no NaNs; optional watertight check)."
+  mesh_sanitize: "Strip embedded metadata; normalize units; drop degenerate faces; enforce triangle-only output."
+  mesh_extract_metadata: "Compute vertex/face counts, bbox, scale, unit guess, manifolds, surface area, volume."
+  mesh_render_thumbnails: "Render standardized multi-view thumbnails for dataset QA and search."
+  mesh_geometry_dedupe: "Geometry-aware fingerprinting (e.g., light field descriptors) to group near-duplicates."
+  weapon_trademark_filter: "Filter obvious weapon designs + trademarked/character rips (policy + legal risk)."
+  gcode_generate: "Optionally slice safe meshes into gcode with a fixed open profile; store settings."
+  collect_statistics: "Emit dataset-level statistics (counts, token estimates, geometry histograms)."
+
+resolvers:
+  zenodo:
+    mode: "record_id_or_doi"
+    api: "https://zenodo.org/api/records/{record_id}"
+    outputs: ["files[*].links.self", "files[*].checksum"]
+    verify_checksum: true
+    checksum_algorithm: "md5"
+  figshare:
+    mode: "article_url"
+    api_base: "https://api.figshare.com/v2"
+    api_version: "2"
+    rate_limit: { requests_per_minute: 60, retry_on_429: true }
+    endpoints:
+      article: "/articles/{article_id}"
+      files: "/articles/{article_id}/files"
+      download: "/articles/{article_id}/files/{file_id}"
+  github:
+    mode: "release"
+    api_base: "https://api.github.com"
+    rate_limit: { requests_per_hour: 60, retry_on_403: true, exponential_backoff: true }
+    endpoints:
+      releases: "/repos/{owner}/{repo}/releases"
+      latest: "/repos/{owner}/{repo}/releases/latest"
+      assets: "/repos/{owner}/{repo}/releases/{release_id}/assets"
+    note: "Use GITHUB_TOKEN env var for higher rate limits."
+  huggingface_datasets:
+    mode: "dataset_id"
+    note: "Use datasets.load_dataset; capture dataset card + license field."
+  git:
+    mode: "repo"
+    note: "Capture commit hash; store LICENSE + README as evidence."
+  ftp:
+    mode: "base_url + globs"
+    note: "Use list + filter by glob; store directory listing snapshot."
+  api:
+    mode: "base_url"
+    note: "Cache responses; store query params & rate limit behavior."
+
+  # Proposed new resolvers you’ll add in the adaptation step
+  s3_public:
+    mode: "public_bucket"
+    note: "For public S3 buckets (no-sign-request). Capture listing snapshot + object etags."
+  web_crawl:
+    mode: "seed_urls"
+    note: "Polite crawler for curated seed pages; must snapshot ToS + respect robots + rate limits."
+
+targets:
+
+  # 0) Your own synthetic corpus (best source for "how to" paired with known-correct outputs)
+  - id: "synthetic_cad_printing_problems"
+    name: "Synthetic CAD/3D-printing tasks: prompts + step plans + constrained outputs"
+    enabled: true
+    priority: 10
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "Proprietary", url: "" }
+    data_type: ["synthetic", "instruction", "cad", "3d_printing"]
+    download: { strategy: "none" }
+    build:
+      owner: "you"
+      output_formats: ["jsonl"]
+      required_fields:
+        - "task_id"
+        - "tool"                # blender/freecad/openscad/other
+        - "difficulty"
+        - "prompt"
+        - "steps"
+        - "expected_artifacts"   # e.g., stl path, gcode, screenshots, params
+        - "verification"         # render hash, param checks, etc.
+    gates_override:
+      add: ["emit_training_manifest"]
+    three_d_routing:
+      domain: cad_parametric
+      category: part_design
+      level: 4
+      granularity: target
+    routing:
+      subject: 3d
+      domain: cad_parametric
+      category: part_design
+      level: 4
+      granularity: target
+
+  # 1) GREEN: CC0 / public-domain 3D assets
+  - id: "smithsonian_open_access_3d"
+    name: "Smithsonian Open Access — 3D models (CC0)"
+    enabled: true
+    priority: 10
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "CC0-1.0", url: "https://www.si.edu/openaccess" }
+    data_type: ["3d_models", "cultural_heritage", "metadata"]
+    download:
+      strategy: "s3_public"
+      bucket: "smithsonian-open-access"
+      include_globs:
+        - "**/*3d*"
+        - "**/*.glb"
+        - "**/*.gltf"
+        - "**/*.obj"
+        - "**/*.stl"
+      emit_index: true
+    gates_override:
+      add: ["mesh_validate", "mesh_sanitize", "mesh_extract_metadata", "mesh_render_thumbnails"]
+    output:
+      pool: "permissive"
+      formats: ["glb", "gltf", "obj", "stl", "jsonl"]
+    three_d_routing:
+      domain: scanning_reconstruction
+      category: photogrammetry_basics
+      level: 5
+      granularity: target
+    routing:
+      subject: 3d
+      domain: scanning_reconstruction
+      category: photogrammetry_basics
+      level: 5
+      granularity: target
+
+  - id: "blender_education"
+    name: "Blender Education — open lessons (CC0)"
+    enabled: true
+    priority: 9
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "CC0-1.0", url: "https://www.blender.org/education/" }
+    data_type: ["tutorial_text", "lessons", "3d_modeling"]
+    download:
+      strategy: "git"
+      repo_url: "https://github.com/blender/education"
+    gates_override:
+      add: ["extract_text_chunks"]
+    output:
+      pool: "permissive"
+      formats: ["jsonl.gz"]
+    three_d_routing:
+      domain: modeling_mesh
+      category: primitives_transforms
+      level: 1
+      granularity: target
+    routing:
+      subject: 3d
+      domain: modeling_mesh
+      category: primitives_transforms
+      level: 1
+      granularity: target
+
+  # 2) YELLOW: record-level / mixed-license 3D printing datasets
+  - id: "thingi10k_raw"
+    name: "Thingi10K — 10k Thingiverse models (mixed CC; record-level)"
+    enabled: true
+    priority: 9
+    license_profile: "record_level"
+    license_evidence: { spdx_hint: "Mixed", url: "https://huggingface.co/datasets/Thingi10K/Thingi10K" }
+    data_type: ["3d_printing", "meshes", "metadata"]
+    download:
+      strategy: "http"
+      urls:
+        - "https://huggingface.co/datasets/Thingi10K/Thingi10K/resolve/main/Thingi10K.tar.gz"
+      integrity:
+        verify_size: true
+        compute_sha256: true
+    gates_override:
+      add:
+        - "manual_legal_review"
+        - "record_level_filter"
+        - "mesh_validate"
+        - "mesh_sanitize"
+        - "mesh_extract_metadata"
+        - "weapon_trademark_filter"
+    record_level_policy:
+      # For a commercial model: CC0 + CC-BY are typical safe defaults.
+      allow_spdx: ["CC0-1.0", "CC-BY-4.0", "CC-BY-3.0"]
+      deny_if_contains_phrases: ["NonCommercial", "NoDerivatives", "NoAI"]
+    output:
+      pool: "quarantine"
+      formats: ["stl", "obj", "jsonl"]
+    three_d_routing:
+      domain: modeling_mesh
+      category: modifiers_basics
+      level: 3
+      granularity: target
+    routing:
+      subject: 3d
+      domain: modeling_mesh
+      category: modifiers_basics
+      level: 3
+      granularity: target
+
+  - id: "thingi10k_safe_cc0_ccby"
+    name: "Derived: Thingi10K (CC0/CC-BY only) normalized meshes + metadata"
+    enabled: true
+    priority: 9
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "Derived", url: "" }
+    data_type: ["3d_printing", "meshes", "metadata", "derived"]
+    build:
+      from: ["thingi10k_raw"]
+      gate: "record_level_filter"
+      field_schema_version: "mesh_record_v1.0.0"
+      sharding:
+        method: "hash_prefix"
+        prefix_chars: 2
+    gates_override:
+      add: ["mesh_geometry_dedupe", "collect_statistics"]
+    output:
+      pool: "permissive"
+      formats: ["glb", "stl", "jsonl.gz"]
+    three_d_routing:
+      domain: modeling_mesh
+      category: modifiers_basics
+      level: 3
+      granularity: target
+    routing:
+      subject: 3d
+      domain: modeling_mesh
+      category: modifiers_basics
+      level: 3
+      granularity: target
+
+  - id: "nih_3d_print_exchange"
+    name: "NIH 3D Print Exchange (record-level licenses; requires API resolver)"
+    enabled: false
+    priority: 8
+    license_profile: "record_level"
+    license_evidence: { spdx_hint: "Mixed", url: "https://www.niaid.nih.gov/research/nih-3d-print-exchange" }
+    data_type: ["3d_printing", "biomedical", "meshes", "metadata"]
+    download:
+      strategy: "api"
+      base_url: "https://3dprint.nih.gov"
+      note: "Site availability can be intermittent; mirror metadata + license fields first."
+    gates_override:
+      add: ["manual_legal_review", "record_level_filter", "mesh_validate", "mesh_sanitize", "weapon_trademark_filter"]
+    output:
+      pool: "quarantine"
+      formats: ["stl", "obj", "jsonl"]
+    three_d_routing:
+      domain: three_d_printing
+      category: printer_setup_slicer_basics
+      level: 2
+      granularity: target
+    routing:
+      subject: 3d
+      domain: three_d_printing
+      category: printer_setup_slicer_basics
+      level: 2
+      granularity: target
+
+  # 3) Text + codebases that explain how to model / slice / print
+  - id: "blender_manual"
+    name: "Blender Manual (CC-BY-SA) — tutorials + reference"
+    enabled: true
+    priority: 7
+    license_profile: "copyleft"
+    license_evidence: { spdx_hint: "CC-BY-SA-4.0", url: "https://docs.blender.org/manual/en/latest/about/license.html" }
+    data_type: ["documentation", "tutorial_text", "3d_modeling"]
+    download:
+      strategy: "git"
+      repo_url: "https://github.com/blender/blender-manual"
+    gates_override:
+      add: ["extract_text_chunks", "segregate_copyleft_pool"]
+    output:
+      pool: "copyleft"
+      formats: ["jsonl.gz"]
+    three_d_routing:
+      domain: modeling_mesh
+      category: modifiers_basics
+      level: 3
+      granularity: target
+    routing:
+      subject: 3d
+      domain: modeling_mesh
+      category: modifiers_basics
+      level: 3
+      granularity: target
+
+  - id: "curaengine"
+    name: "CuraEngine (AGPL) — slicing internals + docs"
+    enabled: true
+    priority: 6
+    license_profile: "copyleft"
+    license_evidence: { spdx_hint: "AGPL-3.0-only", url: "https://github.com/Ultimaker/CuraEngine" }
+    data_type: ["code", "documentation", "3d_printing", "slicing"]
+    download:
+      strategy: "git"
+      repo_url: "https://github.com/Ultimaker/CuraEngine"
+    gates_override:
+      add: ["segregate_copyleft_pool"]
+    output:
+      pool: "copyleft"
+      formats: ["code", "text"]
+    three_d_routing:
+      domain: three_d_printing
+      category: printer_setup_slicer_basics
+      level: 2
+      granularity: target
+    routing:
+      subject: 3d
+      domain: three_d_printing
+      category: printer_setup_slicer_basics
+      level: 2
+      granularity: target
+
+  - id: "ultimaker_fdm_materials"
+    name: "UltiMaker fdm_materials (CC0) — material definitions used by Cura"
+    enabled: true
+    priority: 6
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "CC0-1.0", url: "https://github.com/Ultimaker/fdm_materials" }
+    data_type: ["materials", "3d_printing", "profiles"]
+    download:
+      strategy: "git"
+      repo_url: "https://github.com/Ultimaker/fdm_materials"
+    output:
+      pool: "permissive"
+      formats: ["xml", "jsonl"]
+    three_d_routing:
+      domain: three_d_printing
+      category: calibration_troubleshooting
+      level: 5
+      granularity: target
+    routing:
+      subject: 3d
+      domain: three_d_printing
+      category: calibration_troubleshooting
+      level: 5
+      granularity: target
+
+  # 4) Optional: large-scale 3D asset corpora for general modeling (requires strict license filtering)
+  - id: "objaverse"
+    name: "Objaverse (metadata + CC assets; record-level filtering required)"
+    enabled: false
+    priority: 5
+    license_profile: "record_level"
+    license_evidence: { spdx_hint: "ODC-By-1.0", url: "https://huggingface.co/datasets/allenai/objaverse" }
+    data_type: ["3d_models", "meshes", "metadata"]
+    download:
+      strategy: "huggingface_datasets"
+      dataset_id: "allenai/objaverse"
+      split: "train"
+    gates_override:
+      add: ["manual_legal_review", "record_level_filter", "mesh_validate", "mesh_sanitize", "weapon_trademark_filter"]
+    record_level_policy:
+      allow_spdx: ["CC0-1.0", "CC-BY-4.0", "CC-BY-3.0"]
+      deny_if_contains_phrases: ["NonCommercial", "NoDerivatives", "NoAI"]
+    output:
+      pool: "quarantine"
+      formats: ["glb", "obj", "jsonl"]
+    three_d_routing:
+      domain: modeling_mesh
+      category: retopo_basics
+      level: 5
+      granularity: target
+    routing:
+      subject: 3d
+      domain: modeling_mesh
+      category: retopo_basics
+      level: 5
+      granularity: target
+
+  - id: "objaverse_safe_cc0_ccby"
+    name: "Derived: Objaverse (CC0/CC-BY only) normalized meshes + metadata"
+    enabled: false
+    priority: 5
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "Derived", url: "" }
+    data_type: ["3d_models", "meshes", "metadata", "derived"]
+    build:
+      from: ["objaverse"]
+      gate: "record_level_filter"
+      field_schema_version: "mesh_record_v1.0.0"
+    output:
+      pool: "permissive"
+      formats: ["glb", "jsonl.gz"]
+    three_d_routing:
+      domain: modeling_mesh
+      category: retopo_basics
+      level: 5
+      granularity: target
+    routing:
+      subject: 3d
+      domain: modeling_mesh
+      category: retopo_basics
+      level: 5
+      granularity: target
+
+  # 5) Optional: Google Scanned Objects (CC-BY) — distribution endpoint may change over time
+  - id: "google_scanned_objects"
+    name: "Google Scanned Objects (CC-BY 4.0) — verify current download endpoint"
+    enabled: false
+    priority: 5
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "CC-BY-4.0", url: "https://research.google/blog/scanned-objects-by-google-research-a-dataset-of-3d-scanned-common-household-items/" }
+    data_type: ["3d_models", "meshes", "textures", "metadata"]
+    download:
+      strategy: "web_crawl"
+      seed_urls:
+        - "https://research.google/blog/scanned-objects-by-google-research-a-dataset-of-3d-scanned-common-household-items/"
+      emit_index: true
+    gates_override:
+      add: ["manual_legal_review", "mesh_validate", "mesh_sanitize", "mesh_extract_metadata"]
+    output:
+      pool: "permissive"
+      formats: ["obj", "png", "jsonl"]
+    three_d_routing:
+      domain: scanning_reconstruction
+      category: photogrammetry_basics
+      level: 5
+      granularity: target
+    routing:
+      subject: 3d
+      domain: scanning_reconstruction
+      category: photogrammetry_basics
+      level: 5
+      granularity: target
