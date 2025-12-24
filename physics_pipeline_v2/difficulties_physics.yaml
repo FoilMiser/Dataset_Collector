@@ -1,0 +1,177 @@
+schema_version: "2.0"
+updated_utc: "2026-02-15"
+
+globals:
+  destination_root_windows: E:/AI-Research/datasets/Natural/physics
+  destination_root_wsl: /mnt/e/AI-Research/datasets/Natural/physics
+  folder_layout: final/{license_pool}/d{level:02d}/{subject}/{domain}/{category}
+  sanitize_path_segments: true
+  default_subject: physics
+  default_domain: misc
+  default_category: misc
+  default_level: 5
+
+rubric:
+  scale:
+    min: 1
+    max: 10
+    name: Difficulty 1–10
+  levels:
+    1:
+      label: Pre-physics / units
+      description: Unit conversion, dimensional analysis, single-step arithmetic in context.
+      signals: [unit_conversion, dimensional_analysis, single_step]
+    2:
+      label: Early algebra physics
+      description: Plug-and-chug with one equation; constant velocity/force; Ohm's law basics.
+      signals: [single_equation, constant_velocity, basic_circuits]
+    3:
+      label: High-school physics
+      description: Newton's laws with components, energy/momentum basics, simple circuits, wave basics.
+      signals: [newton_laws, energy_momentum, basic_waves]
+    4:
+      label: AP/IB algebra-based
+      description: Rotation/torque, gravitation, electrostatics, optics, thermodynamics basics.
+      signals: [rotation_torque, gravitation, electrostatics]
+    5:
+      label: Intro calc-based
+      description: Derivatives/integrals for motion, work/energy via integrals, basic differential equations.
+      signals: [calc_motion, work_integrals, basic_odes]
+    6:
+      label: Intermediate undergrad
+      description: E&M with Gauss/Ampere/Faraday, vector calculus intro, thermo with partial derivatives.
+      signals: [gauss_law, vector_calculus, thermo_partials]
+    7:
+      label: Upper-division undergrad
+      description: Lagrangian/Hamiltonian mechanics, QM operators, PDE/ODE methods, EM differential form.
+      signals: [lagrangian, qm_operators, pde_methods]
+    8:
+      label: Early graduate
+      description: Perturbation theory, scattering, ensembles, GR fundamentals, advanced EM/radiation.
+      signals: [perturbation, scattering, gr_basics]
+    9:
+      label: Graduate core
+      description: QFT, GR at depth, many-body, advanced condensed matter/particle, multi-stage derivations.
+      signals: [qft, gr_advanced, many_body]
+    10:
+      label: Research/specialist
+      description: Niche subfields, cutting-edge methods, highly technical derivations.
+      signals: [research_frontier, niche_methods, specialized_derivations]
+
+subjects:
+  physics:
+    name: Physics
+    domains:
+      units_metrology:
+        name: Units & Metrology
+        categories:
+          dimensional_analysis:
+            level: { default: 1, min: 1, max: 2 }
+          measurement_uncertainty:
+            level: { default: 2, min: 1, max: 3 }
+      mechanics:
+        name: Mechanics
+        categories:
+          kinematics_1d:
+            level: { default: 2, min: 1, max: 3 }
+          newton_laws:
+            level: { default: 3, min: 2, max: 4 }
+          rotation_torque:
+            level: { default: 4, min: 3, max: 5 }
+          oscillations_shm:
+            level: { default: 4, min: 3, max: 5 }
+          lagrangian_hamiltonian:
+            level: { default: 7, min: 6, max: 8 }
+          turbulence_simulation:
+            level: { default: 7, min: 6, max: 8 }
+      electromagnetism:
+        name: Electromagnetism
+        categories:
+          electrostatics:
+            level: { default: 4, min: 3, max: 5 }
+          circuits_basic:
+            level: { default: 2, min: 2, max: 3 }
+          maxwell_equations:
+            level: { default: 6, min: 5, max: 7 }
+      waves_optics:
+        name: Waves & Optics
+        categories:
+          wave_basics:
+            level: { default: 3, min: 2, max: 4 }
+          optics_geometric:
+            level: { default: 4, min: 3, max: 5 }
+          optics_physical:
+            level: { default: 5, min: 4, max: 6 }
+      thermo_statmech:
+        name: Thermodynamics & Stat Mech
+        categories:
+          thermo_basics:
+            level: { default: 4, min: 3, max: 5 }
+          statistical_ensembles:
+            level: { default: 8, min: 7, max: 9 }
+      quantum:
+        name: Quantum
+        categories:
+          quantum_intro:
+            level: { default: 6, min: 5, max: 7 }
+          schrodinger_operators:
+            level: { default: 7, min: 6, max: 8 }
+          perturbation_scattering:
+            level: { default: 8, min: 7, max: 9 }
+          qft:
+            level: { default: 9, min: 8, max: 10 }
+          hep_literature:
+            level: { default: 8, min: 7, max: 9 }
+      relativity_cosmology:
+        name: Relativity & Cosmology
+        categories:
+          gr_fundamentals:
+            level: { default: 8, min: 7, max: 9 }
+          cosmology:
+            level: { default: 8, min: 7, max: 9 }
+      astro:
+        name: Astronomy & Astrophysics
+        categories:
+          gravitational_waves:
+            level: { default: 7, min: 6, max: 8 }
+          sky_surveys:
+            level: { default: 6, min: 5, max: 7 }
+          stellar_catalogs:
+            level: { default: 7, min: 6, max: 8 }
+          neutrino_observations:
+            level: { default: 7, min: 6, max: 8 }
+          space_telescope_archive:
+            level: { default: 7, min: 6, max: 8 }
+          astronomy_archive:
+            level: { default: 6, min: 5, max: 7 }
+          space_agency_materials:
+            level: { default: 5, min: 4, max: 6 }
+      condensed_matter:
+        name: Condensed Matter & Materials
+        categories:
+          materials_databases:
+            level: { default: 6, min: 5, max: 7 }
+          interatomic_models:
+            level: { default: 7, min: 6, max: 8 }
+          catalysis_ml:
+            level: { default: 7, min: 6, max: 8 }
+      computational_experimental:
+        name: Computational & Experimental Data
+        categories:
+          particle_data:
+            level: { default: 7, min: 6, max: 8 }
+          hep_tables:
+            level: { default: 7, min: 6, max: 8 }
+          geoscience_data:
+            level: { default: 5, min: 4, max: 6 }
+          geoscience_maps:
+            level: { default: 4, min: 3, max: 5 }
+          weather_time_series:
+            level: { default: 4, min: 3, max: 5 }
+          literature_metadata:
+            level: { default: 7, min: 6, max: 8 }
+      misc:
+        name: Miscellaneous
+        categories:
+          misc:
+            level: { default: 5, min: 3, max: 7 }

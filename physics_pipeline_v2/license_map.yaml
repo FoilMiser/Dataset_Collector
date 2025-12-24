@@ -1,0 +1,93 @@
+# license_map.yaml
+# v0.2 — companion file for physics targets (schema v0.8) and pipeline scripts
+#
+# This is NOT legal advice. It is a conservative, automation-friendly policy layer tailored for the physics corpus pipeline:
+# - "allow" = generally permissive / OK for model training
+# - "conditional" = often OK but requires careful handling (attribution, share-alike segregation)
+# - "deny_prefixes" = hard reject (NonCommercial, NoDerivatives, proprietary, NoAI/TDM statements)
+#
+# The pipeline stores evidence snapshots so you can audit every decision.
+
+schema_version: "0.2"
+updated_utc: "2026-06-01"
+
+spdx:
+  # GREEN: typically OK for training
+  allow:
+    - "CC0-1.0"
+    - "CC-BY-4.0"
+    - "CC-BY-3.0"
+    - "MIT"
+    - "Apache-2.0"
+    - "BSD-2-Clause"
+    - "BSD-3-Clause"
+    - "ISC"
+    - "Unlicense"
+    - "US-PUBLIC-DOMAIN"
+    - "PDDL-1.0"
+
+  # YELLOW by default: allowed only with constraints (e.g., attribution bundles, share-alike segregation)
+  conditional:
+    - "CC-BY-SA-4.0"
+    - "CC-BY-SA-3.0"
+    - "GPL-3.0-only"
+    - "GPL-3.0-or-later"
+    - "GPL-2.0-only"
+    - "GPL-2.0-or-later"
+    - "LGPL-3.0-only"
+    - "LGPL-3.0-or-later"
+    - "LGPL-2.1-only"
+    - "LGPL-2.1-or-later"
+    - "FDL-1.3"          # GNU Free Documentation License (common on wikis)
+
+  # Hard RED by default: explicitly incompatible with training or redistribution
+  deny_prefixes:
+    - "CC-BY-NC"         # NonCommercial variants
+    - "CC-BY-ND"         # NoDerivatives variants
+    - "CC-BY-NC-SA"
+    - "CC-BY-NC-ND"
+    - "CC-BY-NC-4.0"
+    - "Proprietary"
+    - "Custom-Restrictive"
+    - "NOAI"
+    - "NOAI-"
+    - "NO-TDM"
+    - "NON-COMMERCIAL"
+    - "NO-DERIVATIVES"
+
+non_spdx:
+  # Strings that often indicate permissive terms even if not mapped to SPDX
+  allow:
+    - "Public Domain"
+    - "Creative Commons Attribution"
+    - "Open Access (CC BY)"
+    - "BSD-style"
+
+  conditional:
+    - "ShareAlike"
+    - "GNU Free Documentation License"
+    - "Copyleft"
+
+  deny:
+    - "All rights reserved"
+    - "For non-commercial use only"
+    - "No derivatives"
+    - "NoAI"
+    - "No AI"
+    - "No training"
+    - "No text and data mining"
+
+# License profile defaults (used by pipeline_driver to pick initial bucket)
+license_profiles:
+  permissive:
+    default_bucket: "GREEN"
+    allow_conditional: false
+  copyleft:
+    default_bucket: "YELLOW"
+    segregate_pool: true
+    require_attribution_bundle: true
+  record_level:
+    default_bucket: "YELLOW"
+    require_per_record_license: true
+  deny:
+    default_bucket: "RED"
