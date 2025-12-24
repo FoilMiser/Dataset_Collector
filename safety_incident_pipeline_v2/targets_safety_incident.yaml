@@ -1,0 +1,1298 @@
+schema_version: '0.8'
+updated_utc: '2026-01-15'
+companion_files:
+  license_map: ./license_map.yaml
+  field_schemas: ./field_schemas_safety_incident.yaml
+  denylist: ./denylist.yaml
+  difficulties_map: ./difficulties_safety_incident.yaml
+globals:
+  raw_root: /data/safety/raw
+  screened_yellow_root: /data/safety/screened_yellow
+  combined_root: /data/safety/combined
+  final_root: /data/safety/final
+  ledger_root: /data/safety/_ledger
+  pitches_root: /data/safety/_pitches
+  manifests_root: /data/safety/_manifests
+  queues_root: /data/safety/_queues
+  catalogs_root: /data/safety/_catalogs
+  logs_root: /data/safety/_logs
+  require_yellow_signoff: true
+  sharding:
+    max_records_per_shard: 50000
+    compression: gzip
+  screening:
+    min_chars: 200
+    max_chars: 12000
+    text_field_candidates:
+      - text
+      - content
+      - body
+      - report
+      - narrative
+      - summary
+    record_license_field_candidates:
+      - license
+      - license_spdx
+      - rights
+      - license_url
+    require_record_license: false
+    allow_spdx:
+      - CC-BY-4.0
+      - CC0-1.0
+      - MIT
+      - Apache-2.0
+      - CC-BY-SA-4.0
+    deny_phrases:
+      - noai
+      - "no tdm"
+      - "no machine learning"
+  download_defaults:
+    retry_max: 3
+    retry_backoff_base: 2.0
+    retry_backoff_max: 60
+    timeout_connect: 30
+    timeout_read: 300
+    verify_checksums: true
+    enable_resume: true
+    max_concurrent_workers: 4
+    user_agent: safety-incident-pipeline/2.0
+  default_gates:
+    - snapshot_terms
+    - resolve_license_spdx
+    - restriction_phrase_scan
+    - emit_training_manifest
+    - emit_attribution_bundle
+queues:
+  emit:
+    - id: green_download
+      path: /data/safety/_queues/green_download.jsonl
+      criteria:
+        effective_bucket: GREEN
+        enabled: true
+    - id: yellow_pipeline
+      path: /data/safety/_queues/yellow_pipeline.jsonl
+      criteria:
+        effective_bucket: YELLOW
+        enabled: true
+    - id: red_rejected
+      path: /data/safety/_queues/red_rejected.jsonl
+      criteria:
+        effective_bucket: RED
+        enabled: true
+gates_catalog:
+  snapshot_terms: Save Terms/ToS + license page HTML/PDF/TXT + retrieval timestamp.
+  resolve_license_spdx: Normalize license to SPDX via license_map.yaml rules; store evidence.
+  restriction_phrase_scan: Scan terms/content for restriction phrases (no-LLM/no-TDM/etc.).
+  record_level_filter: Require per-record license metadata; keep only allowlist.
+  pii_redaction: Remove emails/phones/addresses; coarsen location and redact named entities.
+  privacy_screen: Drop records with precise coordinates or personal medical details.
+  emit_training_manifest: Manifest of included files/records + checksums + license evidence.
+  emit_attribution_bundle: Generate ATTRIBUTION.md + CITATIONS.bib for included sources.
+  manual_legal_review: Human review required before training.
+  segregate_copyleft_pool: Force output into copyleft pool and keep isolated.
+resolvers:
+  github:
+    mode: release
+    api_base: https://api.github.com
+    rate_limit:
+      requests_per_hour: 60
+      retry_on_403: true
+      exponential_backoff: true
+    endpoints:
+      releases: /repos/{owner}/{repo}/releases
+      latest: /repos/{owner}/{repo}/releases/latest
+      assets: /repos/{owner}/{repo}/releases/{release_id}/assets
+    note: Use GITHUB_TOKEN env var for higher rate limits.
+  huggingface_datasets:
+    mode: dataset_id
+    note: Use datasets.load_dataset; capture dataset card + license field.
+  git:
+    mode: repo
+    note: Capture commit hash; store LICENSE + README as evidence.
+  http:
+    mode: direct_url
+    note: Direct file download with resume.
+  ftp:
+    mode: base_url + globs
+    note: List + filter by glob; store directory listing snapshot.
+
+targets:
+- id: ntsb_aviation_census_zip
+  name: NTSB Aviation Accident Census (1962–present) – PRE1982.zip + avall.zip
+  enabled: true
+  priority: 10
+  license_profile: permissive
+  license_evidence:
+    spdx_hint: US-PUBLIC-DOMAIN
+    url: https://www.ntsb.gov/safety/data/Pages/Data_Stats.aspx
+  data_type:
+  - events
+  - aviation
+  - accident_database
+  - structured
+  download:
+    strategy: http
+    urls:
+    - https://www.ntsb.gov/safety/data/Documents/PRE1982.zip
+    - https://www.ntsb.gov/safety/data/Documents/avall.zip
+  output:
+    pool: permissive
+    formats:
+    - zip
+  routing:
+    subject: safety_incident
+    domain: incident_tables
+    category: aviation_occurrence
+    level: 4
+    granularity: target
+    confidence: 0.9
+    reason: Structured aviation occurrence tables.
+- id: phmsa_pipeline_incident_zips
+  name: PHMSA Pipeline Incidents (Gas + Hazardous Liquid) – zipped XLSX
+  enabled: true
+  priority: 9
+  license_profile: permissive
+  license_evidence:
+    spdx_hint: US-PUBLIC-DOMAIN
+    url: https://www.phmsa.dot.gov/data-and-statistics/pipeline/source-data
+  data_type:
+  - events
+  - pipeline
+  - hazmat
+  - structured
+  download:
+    strategy: http
+    urls:
+    - https://www.phmsa.dot.gov/sites/phmsa.dot.gov/files/2024-01/Gas_Transmission_Gathering_Incident_Data.xlsx.zip
+    - https://www.phmsa.dot.gov/sites/phmsa.dot.gov/files/2024-01/Gas_Distribution_Incident_Data.xlsx.zip
+    - https://www.phmsa.dot.gov/sites/phmsa.dot.gov/files/2024-01/Haz_Liq_Accident_Data.xlsx.zip
+    - https://www.phmsa.dot.gov/sites/phmsa.dot.gov/files/2024-01/Haz_Liq_Incident_Data.xlsx.zip
+  output:
+    pool: permissive
+    formats:
+    - zip
+  routing:
+    subject: safety_incident
+    domain: incident_tables
+    category: pipelines_hazmat
+    level: 3
+    granularity: target
+    confidence: 0.9
+    reason: Pipeline incident tables with low narrative content.
+- id: msha_accident_injuries_opengov
+  name: MSHA Accident Injuries Data Set (Open Government datasets)
+  enabled: true
+  priority: 8
+  license_profile: permissive
+  license_evidence:
+    spdx_hint: US-PUBLIC-DOMAIN
+    url: https://catalog.data.gov/dataset/msha-accident-injuries-data-set
+  data_type:
+  - events
+  - mining
+  - occupational_safety
+  - structured
+  download:
+    strategy: http
+    urls:
+    - https://www.msha.gov/data-and-reports/mine-data-retrieval-system
+  output:
+    pool: permissive
+    formats:
+    - html
+  routing:
+    subject: safety_incident
+    domain: incident_tables
+    category: mining_occurrence
+    level: 4
+    granularity: target
+    confidence: 0.8
+    reason: Structured mining accident tables.
+- id: msha_fatality_reports
+  name: MSHA Fatality Reports (investigation narratives)
+  enabled: true
+  priority: 7
+  license_profile: permissive
+  license_evidence:
+    spdx_hint: US-PUBLIC-DOMAIN
+    url: https://www.msha.gov/data-and-reports/fatality-reports/search
+  data_type:
+  - reports
+  - mining
+  - incident_investigation
+  - pdf
+  download:
+    strategy: http
+    urls:
+    - https://www.msha.gov/data-and-reports/fatality-reports/search
+  output:
+    pool: permissive
+    formats:
+    - pdf
+    - html
+  gates_override:
+    add:
+    - pdf_extract
+    - pii_scan_and_redact
+  routing:
+    subject: safety_incident
+    domain: incident_reports
+    category: investigations_root_cause
+    level: 6
+    granularity: target
+    confidence: 0.8
+    reason: Investigation narratives with causal analysis.
+- id: fra_form57_grade_crossing
+  name: FRA Form 57 – Highway-Rail Grade Crossing Incident Data (DOT Open Data)
+  enabled: true
+  priority: 7
+  license_profile: permissive
+  license_evidence:
+    spdx_hint: US-PUBLIC-DOMAIN
+    url: https://data.transportation.gov/Railroads/Highway-Rail-Grade-Crossing-Incident-Data-Form-57-/7wn6-i5b9
+  data_type:
+  - events
+  - rail
+  - transport_safety
+  - structured
+  download:
+    strategy: http
+    urls:
+    - https://data.transportation.gov/Railroads/Highway-Rail-Grade-Crossing-Incident-Data-Form-57-/7wn6-i5b9
+  output:
+    pool: permissive
+    formats:
+    - html
+  routing:
+    subject: safety_incident
+    domain: incident_tables
+    category: rail_occurrence
+    level: 4
+    granularity: target
+    confidence: 0.8
+    reason: Structured rail crossing incidents.
+- id: fra_form54_rail_equipment
+  name: FRA Form 54 – Rail Equipment Accident/Incident Data (DOT Open Data)
+  enabled: true
+  priority: 7
+  license_profile: permissive
+  license_evidence:
+    spdx_hint: US-PUBLIC-DOMAIN
+    url: https://data.transportation.gov/Railroads/Rail-Equipment-Accident-Incident-Data-Form-54-/85tf-25kj
+  data_type:
+  - events
+  - rail
+  - transport_safety
+  - structured
+  download:
+    strategy: http
+    urls:
+    - https://data.transportation.gov/Railroads/Rail-Equipment-Accident-Incident-Data-Form-54-/85tf-25kj
+  output:
+    pool: permissive
+    formats:
+    - html
+  routing:
+    subject: safety_incident
+    domain: incident_tables
+    category: rail_occurrence
+    level: 4
+    granularity: target
+    confidence: 0.8
+    reason: Structured rail equipment incidents.
+- id: noaa_incidentnews_incidents_csv
+  name: NOAA OR&R IncidentNews raw incidents.csv
+  enabled: true
+  priority: 6
+  license_profile: permissive
+  license_evidence:
+    spdx_hint: US-PUBLIC-DOMAIN
+    url: https://incidentnews.noaa.gov/raw/index
+  data_type:
+  - events
+  - spills
+  - response
+  - structured
+  download:
+    strategy: http
+    urls:
+    - https://incidentnews.noaa.gov/raw/incidents.csv
+  output:
+    pool: permissive
+    formats:
+    - csv
+  routing:
+    subject: safety_incident
+    domain: incident_tables
+    category: environmental_spill
+    level: 4
+    granularity: target
+    confidence: 0.8
+    reason: Structured spill incident tables.
+- id: faa_asias_prelim_accidents_csv
+  name: FAA ASIAS Preliminary Accident & Incident Notices (CSV export)
+  enabled: false
+  priority: 5
+  license_profile: permissive
+  license_evidence:
+    spdx_hint: US-PUBLIC-DOMAIN
+    url: 'https://www.asias.faa.gov/apex/f?p=100:93::NO:::'
+  data_type:
+  - events
+  - aviation
+  - preliminary
+  - structured
+  download:
+    strategy: http
+    urls:
+    - 'https://www.asias.faa.gov/apex/f?p=100:93::NO:::'
+  output:
+    pool: permissive
+    formats:
+    - csv
+  routing:
+    subject: safety_incident
+    domain: incident_tables
+    category: aviation_occurrence
+    level: 4
+    granularity: target
+    confidence: 0.8
+    reason: Preliminary aviation occurrence data.
+- id: nasa_llis
+  name: NASA Lessons Learned (LLIS) – public lessons
+  enabled: true
+  priority: 6
+  license_profile: permissive
+  license_evidence:
+    spdx_hint: US-PUBLIC-DOMAIN
+    url: https://data.nasa.gov/dataset/nasa-engineering-network-lessons-learned
+  data_type:
+  - lessons_learned
+  - aerospace
+  - safety_management
+  - text
+  download:
+    strategy: http
+    urls:
+    - https://llis.nasa.gov/
+  output:
+    pool: permissive
+    formats:
+    - html
+  gates_override:
+    add:
+    - html_crawl
+    - pii_scan_and_redact
+  routing:
+    subject: safety_incident
+    domain: incident_reports
+    category: lessons_learned
+    level: 5
+    granularity: target
+    confidence: 0.8
+    reason: Lessons learned narratives for safety management.
+- id: nhtsa_fars_ftp
+  name: NHTSA FARS (Fatality Analysis Reporting System) – FTP bulk
+  enabled: false
+  priority: 4
+  license_profile: permissive
+  license_evidence:
+    spdx_hint: US-PUBLIC-DOMAIN
+    url: https://www.nhtsa.gov/research-data/fatality-analysis-reporting-system-fars
+  data_type:
+  - events
+  - road_safety
+  - structured
+  download:
+    strategy: ftp
+    ftp:
+      base_url: ftp://ftp.nhtsa.dot.gov/FARS/
+      include_globs:
+      - '**/*.zip'
+      - '**/*.csv'
+      - '**/*.dbf'
+      exclude_globs:
+      - '**/*.exe'
+  output:
+    pool: permissive
+    formats:
+    - zip
+  routing:
+    subject: safety_incident
+    domain: incident_tables
+    category: road_vehicle_occurrence
+    level: 4
+    granularity: target
+    confidence: 0.8
+    reason: Road safety fatality event tables.
+    - csv
+    - dbf
+  gates_override:
+    add:
+    - pii_scan_and_redact
+- id: osha_enforcement_data_portal
+  name: DOL/OSHA Enforcement Data portal (inspections + accident narratives)
+  enabled: false
+  priority: 6
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: MIXED
+    url: https://enforcedata.dol.gov/views/data_catalogs.php
+  data_type:
+  - workplace_safety
+  - inspections
+  - incidents
+  - mixed
+  download:
+    strategy: http
+    urls:
+    - https://enforcedata.dol.gov/views/data_catalogs.php
+  output:
+    pool: quarantine
+    formats:
+    - html
+  gates_override:
+    add:
+    - pii_scan_and_redact_strict
+  routing:
+    subject: safety_incident
+    domain: incident_reports
+    category: lessons_learned
+    level: 5
+    granularity: target
+    confidence: 0.7
+    reason: De-identified incident narratives for safety reporting.
+  routing:
+    subject: safety_incident
+    domain: incident_tables
+    category: occupational_enforcement
+    level: 4
+    granularity: target
+    confidence: 0.7
+    reason: Enforcement incident summaries and citations.
+- id: csb_completed_investigations
+  name: US Chemical Safety Board Completed Investigations (PDF/HTML)
+  enabled: true
+  priority: 7
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: MIXED
+    url: https://www.csb.gov/investigations/completed-investigations/
+  data_type:
+  - reports
+  - process_safety
+  - chemical
+  - incident_investigation
+  download:
+    strategy: http
+    urls:
+    - https://www.csb.gov/investigations/completed-investigations/
+  output:
+    pool: quarantine
+    formats:
+    - pdf
+    - html
+  gates_override:
+    add:
+    - pdf_extract
+    - strip_third_party_media
+    - pii_scan_and_redact
+  routing:
+    subject: safety_incident
+    domain: incident_reports
+    category: investigations_root_cause
+    level: 6
+    granularity: target
+    confidence: 0.8
+    reason: UK rail investigation reports.
+  routing:
+    subject: safety_incident
+    domain: incident_reports
+    category: investigations_root_cause
+    level: 6
+    granularity: target
+    confidence: 0.8
+    reason: Detailed investigation reports with causal analysis.
+- id: uk_aaib_reports
+  name: UK AAIB Reports (GOV.UK) – aviation investigations
+  enabled: true
+  priority: 6
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: OGL-3.0
+    url: https://www.gov.uk/aaib-reports
+  data_type:
+  - reports
+  - aviation
+  - incident_investigation
+  download:
+    strategy: http
+    urls:
+    - https://www.gov.uk/aaib-reports
+  output:
+    pool: quarantine
+    formats:
+    - pdf
+    - html
+  gates_override:
+    add:
+    - pdf_extract
+    - strip_third_party_media
+    - pii_scan_and_redact
+  routing:
+    subject: safety_incident
+    domain: incident_reports
+    category: investigations_root_cause
+    level: 6
+    granularity: target
+    confidence: 0.8
+    reason: UK aviation investigation reports.
+- id: uk_raib_reports
+  name: UK RAIB Reports (GOV.UK) – rail investigations
+  enabled: true
+  priority: 6
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: OGL-3.0
+    url: https://www.gov.uk/raib-reports
+  data_type:
+  - reports
+  - rail
+  - incident_investigation
+  download:
+    strategy: http
+    urls:
+    - https://www.gov.uk/raib-reports
+  output:
+    pool: quarantine
+    formats:
+    - pdf
+    - html
+  gates_override:
+    add:
+    - pdf_extract
+    - strip_third_party_media
+    - pii_scan_and_redact
+- id: uk_maib_reports
+  name: UK MAIB Reports (GOV.UK) – marine investigations
+  enabled: false
+  priority: 5
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: OGL-3.0
+    url: https://www.gov.uk/maib-reports
+  data_type:
+  - reports
+  - maritime
+  - incident_investigation
+  download:
+    strategy: http
+    urls:
+    - https://www.gov.uk/maib-reports
+  output:
+    pool: quarantine
+    formats:
+    - pdf
+    - html
+  gates_override:
+    add:
+    - pdf_extract
+    - strip_third_party_media
+    - pii_scan_and_redact_strict
+  routing:
+    subject: safety_incident
+    domain: incident_reports
+    category: investigations_root_cause
+    level: 6
+    granularity: target
+    confidence: 0.8
+    reason: UK maritime investigation reports.
+- id: ntsb_open_page
+  name: NTSB Open Government / Docket pointers (reading room + dockets)
+  enabled: false
+  priority: 4
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: MIXED
+    url: https://www.ntsb.gov/Pages/Open.aspx
+  data_type:
+  - reports
+  - transport
+  - dockets
+  - mixed
+  download:
+    strategy: http
+    urls:
+    - https://www.ntsb.gov/Pages/Open.aspx
+  output:
+    pool: quarantine
+    formats:
+    - html
+  gates_override:
+    add:
+    - pdf_extract
+    - pii_scan_and_redact
+  routing:
+    subject: safety_incident
+    domain: incident_reports
+    category: investigations_root_cause
+    level: 6
+    granularity: target
+    confidence: 0.8
+    reason: NTSB investigation reports and dockets.
+- id: nasa_asrs
+  name: NASA ASRS (Aviation Safety Reporting System) – de-identified narratives
+  enabled: false
+  priority: 6
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: MIXED
+    url: https://asrs.arc.nasa.gov/search/database.html
+  data_type:
+  - reports
+  - aviation
+  - near_miss
+  - narratives
+  download:
+    strategy: none
+    note: Requires query-slicing export automation; respect per-query limits; run
+      strict PII scan/redaction.
+  output:
+    pool: quarantine
+    formats:
+    - jsonl
+  gates_override:
+    add:
+    - pii_scan_and_redact_strict
+- id: commonpile_regulations_filtered
+  name: 'Common Pile (filtered): regulations_filtered'
+  enabled: true
+  priority: 5
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: MIXED
+    url: https://huggingface.co/datasets/common-pile/regulations_filtered
+  data_type:
+  - regulation
+  - compliance
+  - safety_management
+  - text
+  download:
+    strategy: huggingface_datasets
+    dataset_id: common-pile/regulations_filtered
+  output:
+    pool: quarantine
+    formats:
+    - jsonl
+  gates_override:
+    add:
+    - license_metadata_validate
+    - pii_scan_and_redact
+  routing:
+    subject: safety_incident
+    domain: incident_tables
+    category: industrial_hazard_incidents
+    level: 4
+    granularity: target
+    confidence: 0.7
+    reason: Industrial accident database entries.
+  routing:
+    subject: safety_incident
+    domain: regulations
+    category: usgpo_regulations
+    level: 6
+    granularity: target
+    confidence: 0.7
+    reason: Filtered regulatory corpus from CommonPile.
+  routing:
+    subject: safety_incident
+    domain: regulations
+    category: usgpo_regulations
+    level: 6
+    granularity: target
+    confidence: 0.7
+    reason: Filtered regulatory corpus from CommonPile.
+- id: commonpile_usgpo_filtered
+  name: 'Common Pile (filtered): usgpo_filtered (GovInfo/GPO docs)'
+  enabled: true
+  priority: 5
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: MIXED
+    url: https://huggingface.co/datasets/common-pile/usgpo_filtered
+  data_type:
+  - government_reports
+  - safety_policy
+  - text
+  download:
+    strategy: huggingface_datasets
+    dataset_id: common-pile/usgpo_filtered
+  output:
+    pool: quarantine
+    formats:
+    - jsonl
+  gates_override:
+    add:
+    - license_metadata_validate
+    - pii_scan_and_redact
+  routing:
+    subject: safety_incident
+    domain: incident_tables
+    category: industrial_hazard_incidents
+    level: 4
+    granularity: target
+    confidence: 0.7
+    reason: Major accident reporting system records.
+- id: eu_emars
+  name: EU eMARS (Major Accident Reporting System) – Seveso accidents/near-misses
+  enabled: false
+  priority: 4
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: UNKNOWN
+    url: https://emars.jrc.ec.europa.eu/
+  data_type:
+  - process_safety
+  - seveso
+  - reports
+  download:
+    strategy: none
+    note: Access may require EU Login/2FA; verify legal notice and export rules.
+  output:
+    pool: quarantine
+    formats:
+    - jsonl
+  gates_override:
+    add:
+    - license_metadata_validate
+    - pii_scan_and_redact
+- id: fr_aria
+  name: France BARPI ARIA accident database (industrial incidents)
+  enabled: false
+  priority: 4
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: UNKNOWN
+    url: https://www.aria.developpement-durable.gouv.fr/the-barpi/the-aria-database/?lang=en
+  data_type:
+  - process_safety
+  - industrial_accidents
+  - reports
+  download:
+    strategy: none
+    note: Exports may require authentication/portal export; verify re-use license
+      and limits.
+  output:
+    pool: quarantine
+    formats:
+    - jsonl
+  gates_override:
+    add:
+    - license_metadata_validate
+    - pii_scan_and_redact
+- id: fda_maude
+  name: FDA MAUDE adverse event reports (medical devices)
+  enabled: false
+  priority: 3
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: US-PUBLIC-DOMAIN
+    url: https://www.fda.gov/medical-devices/medical-device-reporting-mdr/how-access-maude-data
+  data_type:
+  - medical_device_safety
+  - adverse_events
+  - structured
+  download:
+    strategy: http
+    urls:
+    - https://www.fda.gov/medical-devices/medical-device-reporting-mdr/how-access-maude-data
+  output:
+    pool: quarantine
+    formats:
+    - html
+  gates_override:
+    add:
+    - pii_scan_and_redact_strict
+  routing:
+    subject: safety_incident
+    domain: incident_tables
+    category: medical_device_incidents
+    level: 4
+    granularity: target
+    confidence: 0.7
+    reason: Medical device adverse event reports.
+- id: iso_iec_standards
+  name: ISO/IEC functional safety & risk management standards (IEC 61508, ISO 45001,
+    etc.)
+  enabled: false
+  priority: 1
+  license_profile: restricted
+  license_evidence:
+    spdx_hint: Proprietary
+    url: ''
+  data_type:
+  - standards
+  - functional_safety
+  - restricted
+  download:
+    strategy: none
+  output:
+    pool: quarantine
+    formats:
+    - pdf
+  routing:
+    subject: safety_incident
+    domain: standards
+    category: iso_management_systems
+    level: 7
+    granularity: target
+    confidence: 0.6
+    reason: Functional safety and risk management standards.
+- id: nfpa_codes
+  name: NFPA codes & standards (e.g., NFPA 70/70E) – paywalled
+  enabled: false
+  priority: 1
+  license_profile: restricted
+  license_evidence:
+    spdx_hint: Proprietary
+    url: ''
+  data_type:
+  - standards
+  - electrical_safety
+  - restricted
+  download:
+    strategy: none
+  output:
+    pool: quarantine
+    formats:
+    - pdf
+  routing:
+    subject: safety_incident
+    domain: standards
+    category: nfpa_process_safety
+    level: 8
+    granularity: target
+    confidence: 0.6
+    reason: NFPA codes and standards.
+- id: commercial_accident_databases
+  name: Commercial accident databases (FACTS/TAD, etc.)
+  enabled: false
+  priority: 1
+  license_profile: restricted
+  license_evidence:
+    spdx_hint: Proprietary
+    url: ''
+  data_type:
+  - commercial_db
+  - restricted
+  download:
+    strategy: none
+  output:
+    pool: quarantine
+    formats:
+    - db
+  routing:
+    subject: safety_incident
+    domain: incident_tables
+    category: proprietary_incident_db
+    level: 6
+    granularity: target
+    confidence: 0.5
+    reason: Proprietary incident databases with mixed licensing.
+- id: news_archives
+  name: Copyrighted news archives of incidents (Reuters/AP/paid publishers)
+  enabled: false
+  priority: 1
+  license_profile: restricted
+  license_evidence:
+    spdx_hint: Proprietary
+    url: ''
+  data_type:
+  - news
+  - copyrighted
+  download:
+    strategy: none
+  output:
+    pool: quarantine
+    formats:
+    - text
+  routing:
+    subject: safety_incident
+    domain: incident_reports
+    category: incident_reporting_news
+    level: 4
+    granularity: target
+    confidence: 0.5
+    reason: News archive incident reporting.
+- id: confidential_corporate_logs
+  name: Confidential corporate incident logs / PHA / HAZOP / MOC docs
+  enabled: false
+  priority: 1
+  license_profile: restricted
+  license_evidence:
+    spdx_hint: Restricted
+    url: ''
+  data_type:
+  - confidential
+  - pii
+  - facility_security
+  download:
+    strategy: none
+  output:
+    pool: quarantine
+    formats:
+    - docx
+    - pdf
+  routing:
+    subject: safety_incident
+    domain: incident_reports
+    category: internal_confidential
+    level: 7
+    granularity: target
+    confidence: 0.4
+    reason: Confidential internal safety logs.
+- id: openfema_nfirs_annual_public_data
+  name: 'OpenFEMA: USFA NFIRS Annual Public Data (zipped multi-table release)'
+  enabled: false
+  priority: 6
+  license_profile: permissive
+  license_evidence:
+    spdx_hint: US-PUBLIC-DOMAIN
+    url: https://www.fema.gov/about/openfema/data-sets/fema-usfa-nfirs-annual-data
+  data_type:
+  - tabular
+  - incident_events
+  - fire_safety
+  download:
+    strategy: http
+    urls:
+    - https://www.fema.gov/about/openfema/data-sets/fema-usfa-nfirs-annual-data
+    - https://www.usfa.fema.gov/nfirs/access-data/
+  output:
+    pool: permissive
+  routing:
+    subject: safety_incident
+    domain: incident_tables
+    category: fire_incidents
+    level: 4
+    granularity: target
+    confidence: 0.8
+    reason: NFIRS annual public incident tables.
+  notes: Large multi-table annual releases; consider API/partial pulls + strong dedup.
+    Some tables may include detailed location fields—coarsen/suppress as needed.
+- id: atsb_investigation_reports
+  name: ATSB Investigation Reports (Australia) – transport safety investigations
+  enabled: false
+  priority: 7
+  license_profile: permissive
+  license_evidence:
+    spdx_hint: CC-BY-4.0
+    url: https://www.atsb.gov.au/aviation-investigation-reports
+  data_type:
+  - reports
+  - incident_investigation
+  download:
+    strategy: http
+    urls:
+    - https://www.atsb.gov.au/aviation-investigation-reports
+    - https://www.atsb.gov.au/copyright
+  output:
+    pool: quarantine
+  routing:
+    subject: safety_incident
+    domain: incident_reports
+    category: investigations_root_cause
+    level: 6
+    granularity: target
+    confidence: 0.8
+    reason: Australian transport investigation reports.
+  notes: ATSB site states CC BY 4.0 for reports/site content (with exceptions like
+    logos/third-party images). Treat as record-level and strip embedded media.
+- id: atsb_naod_occurrence_database
+  name: ATSB National Aviation Occurrence Database (NAOD) – searchable occurrence
+    records
+  enabled: false
+  priority: 7
+  license_profile: permissive
+  license_evidence:
+    spdx_hint: CC-BY-4.0
+    url: https://www.atsb.gov.au/avdata/naod
+  data_type:
+  - tabular
+  - incident_events
+  - aviation_safety
+  download:
+    strategy: none
+    note: Database UI; implement query-slicing exporter or use any provided bulk endpoint
+      if available.
+  output:
+    pool: quarantine
+  routing:
+    subject: safety_incident
+    domain: incident_tables
+    category: aviation_occurrence
+    level: 4
+    granularity: target
+    confidence: 0.8
+    reason: Aviation occurrence database tables.
+  notes: Consider rate limiting and preserving query provenance. Coarsen locations.
+- id: doe_oe417_event_tables
+  name: DOE OE-417 Electric Emergency Incident & Disturbance Archives (tables by year)
+  enabled: false
+  priority: 6
+  license_profile: permissive
+  license_evidence:
+    spdx_hint: US-PUBLIC-DOMAIN
+    url: https://doe417.pnnl.gov/
+  data_type:
+  - tabular
+  - incident_events
+  - grid_safety
+  download:
+    strategy: http
+    urls:
+    - https://doe417.pnnl.gov/
+  output:
+    pool: permissive
+  routing:
+    subject: safety_incident
+    domain: incident_tables
+    category: energy_outage
+    level: 4
+    granularity: target
+    confidence: 0.7
+    reason: Electric emergency incident tables.
+  notes: Annual tables are often HTML/CSV-like; normalize to event rows and coarsen
+    location.
+- id: eia_major_disturbances_archive
+  name: EIA Major Disturbances & Unusual Occurrences – archive (PDF by year)
+  enabled: false
+  priority: 6
+  license_profile: permissive
+  license_evidence:
+    spdx_hint: US-PUBLIC-DOMAIN
+    url: https://www.eia.gov/electricity/data/disturbance/disturb_events_archive.html
+  data_type:
+  - reports
+  - incident_events
+  - grid_safety
+  download:
+    strategy: http
+    urls:
+    - https://www.eia.gov/electricity/data/disturbance/disturb_events_archive.html
+  output:
+    pool: permissive
+  routing:
+    subject: safety_incident
+    domain: incident_tables
+    category: energy_outage
+    level: 4
+    granularity: target
+    confidence: 0.7
+    reason: Disturbance and outage archive tables.
+  notes: PDF tables; add pdf-table extractor and dedup.
+- id: nist_disaster_failure_studies_repo
+  name: NIST Disaster & Failure Studies Data Repository
+  enabled: false
+  priority: 6
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: MIXED
+    url: https://www.nist.gov/el/disaster-and-failure-studies-repository
+  data_type:
+  - reports
+  - multimodal
+  - incident_investigation
+  download:
+    strategy: http
+    urls:
+    - https://www.nist.gov/el/disaster-and-failure-studies-repository
+  output:
+    pool: quarantine
+  routing:
+    subject: safety_incident
+    domain: incident_reports
+    category: investigations_root_cause
+    level: 6
+    granularity: target
+    confidence: 0.7
+    reason: Disaster and failure investigation reports.
+  notes: Repository can include photos/video and third-party materials; keep record-level
+    license + strip non-text by default.
+- id: usfa_fire_data_sets
+  name: USFA Fire Data Sets landing page (NFIRS + related fire statistics)
+  enabled: false
+  priority: 5
+  license_profile: permissive
+  license_evidence:
+    spdx_hint: US-PUBLIC-DOMAIN
+    url: https://www.usfa.fema.gov/statistics/data-sets/
+  data_type:
+  - catalog
+  - fire_safety
+  download:
+    strategy: http
+    urls:
+    - https://www.usfa.fema.gov/statistics/data-sets/
+  output:
+    pool: permissive
+  routing:
+    subject: safety_incident
+    domain: incident_tables
+    category: fire_incidents
+    level: 4
+    granularity: target
+    confidence: 0.7
+    reason: Fire safety dataset catalog and pointers.
+  notes: Use as discovery target; prefer OpenFEMA NFIRS and other explicitly downloadable
+    datasets.
+- id: event_correlated_outage_dataset
+  name: Event-correlated Outage Dataset in America (EAGLE-I / DOE-417 correlated)
+  enabled: false
+  priority: 6
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: MIXED
+    url: https://catalog.data.gov/dataset/event-correlated-outage-dataset-in-america
+  data_type:
+  - tabular
+  - incident_events
+  - grid_safety
+  download:
+    strategy: http
+    urls:
+    - https://catalog.data.gov/dataset/event-correlated-outage-dataset-in-america
+  output:
+    pool: quarantine
+  routing:
+    subject: safety_incident
+    domain: incident_tables
+    category: energy_outage
+    level: 4
+    granularity: target
+    confidence: 0.6
+    reason: Correlated outage incident tables.
+  notes: Confirm dataset hosting/license; some datasets hosted on OSTI/DOE with their
+    own terms.
+- id: nfirs_data_gov_catalog
+  name: 'Data.gov catalog: National Fire Incident Reporting System (NFIRS)'
+  enabled: false
+  priority: 4
+  license_profile: record_level
+  license_evidence:
+    spdx_hint: MIXED
+    url: https://catalog.data.gov/dataset/national-fire-incident-reporting-system-nfirs
+  data_type:
+  - catalog
+  - fire_safety
+  download:
+    strategy: http
+    urls:
+    - https://catalog.data.gov/dataset/national-fire-incident-reporting-system-nfirs
+  output:
+    pool: quarantine
+  routing:
+    subject: safety_incident
+    domain: incident_tables
+    category: fire_incidents
+    level: 4
+    granularity: target
+    confidence: 0.6
+    reason: NFIRS catalog pointer for fire incidents.
+  notes: Discovery pointer; use OpenFEMA annual NFIRS public data for actual downloads.
+- id: nfpa_codes_standards
+  name: NFPA Codes & Standards (e.g., NFPA 70, NFPA 101)
+  enabled: false
+  priority: 1
+  license_profile: restricted
+  license_evidence:
+    spdx_hint: Proprietary
+    url: ''
+  data_type:
+  - standards
+  - copyrighted
+  download:
+    strategy: none
+  output:
+    pool: quarantine
+  routing:
+    subject: safety_incident
+    domain: standards
+    category: nfpa_process_safety
+    level: 8
+    granularity: target
+    confidence: 0.6
+    reason: NFPA codes and standards.
+  notes: Proprietary standards; do not ingest without explicit licensing for ML training.
+- id: astm_standards_safety
+  name: ASTM safety-related standards
+  enabled: false
+  priority: 1
+  license_profile: restricted
+  license_evidence:
+    spdx_hint: Proprietary
+    url: ''
+  data_type:
+  - standards
+  - copyrighted
+  download:
+    strategy: none
+  output:
+    pool: quarantine
+  routing:
+    subject: safety_incident
+    domain: standards
+    category: astm_safety_standards
+    level: 7
+    granularity: target
+    confidence: 0.6
+    reason: ASTM safety-related standards.
+  notes: Proprietary standards; do not ingest without explicit licensing for ML training.
+- id: sae_aerospace_standards
+  name: SAE aerospace safety standards
+  enabled: false
+  priority: 1
+  license_profile: restricted
+  license_evidence:
+    spdx_hint: Proprietary
+    url: ''
+  data_type:
+  - standards
+  - copyrighted
+  download:
+    strategy: none
+  output:
+    pool: quarantine
+  routing:
+    subject: safety_incident
+    domain: standards
+    category: sae_aerospace_standards
+    level: 7
+    granularity: target
+    confidence: 0.6
+    reason: SAE aerospace safety standards.
+  notes: Proprietary standards; do not ingest without explicit licensing for ML training.
+- id: asme_boiler_pressure_code
+  name: ASME BPVC and related safety codes
+  enabled: false
+  priority: 1
+  license_profile: restricted
+  license_evidence:
+    spdx_hint: Proprietary
+    url: ''
+  data_type:
+  - standards
+  - copyrighted
+  download:
+    strategy: none
+  output:
+    pool: quarantine
+  routing:
+    subject: safety_incident
+    domain: standards
+    category: asme_pressure_code
+    level: 8
+    granularity: target
+    confidence: 0.6
+    reason: ASME boiler and pressure vessel codes.
+  notes: Proprietary standards; do not ingest without explicit licensing for ML training.
