@@ -1,8 +1,0 @@
-# phrase_denylist.yaml
-# Restriction phrases to flag during materials/physics corpus ingestion.
-phrases:
-  - "no commercial use"
-  - "non-commercial"
-  - "no machine learning"
-  - "no text mining"
-  - "no redistribution"
