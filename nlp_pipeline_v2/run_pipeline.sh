@@ -103,6 +103,34 @@ if [[ ! -f "$TARGETS" ]]; then
   fail "targets file not found: $TARGETS"
 fi
 
+get_yaml_value() {
+  local key="$1"
+  local default="$2"
+  python - "$TARGETS" "$key" "$default" <<'PY'
+import sys
+import yaml
+
+targets_path = sys.argv[1]
+key = sys.argv[2]
+default = sys.argv[3]
+
+with open(targets_path, "r", encoding="utf-8") as handle:
+    cfg = yaml.safe_load(handle) or {}
+
+value = cfg
+for part in key.split("."):
+    if not isinstance(value, dict) or part not in value:
+        value = None
+        break
+    value = value[part]
+
+print(value if value is not None else default)
+PY
+}
+
+QUEUES_ROOT="$(get_yaml_value "globals.queues_root" "/data/nlp/_queues")"
+CATALOGS_ROOT="$(get_yaml_value "globals.catalogs_root" "/data/nlp/_catalogs")"
+
 run_classify() {
   log "Stage: classify"
   local limit_args=()
@@ -114,7 +142,7 @@ run_classify() {
 
 run_acquire_green() {
   log "Stage: acquire_green"
-  python acquire_worker.py --queue "/data/nlp/_queues/green_download.jsonl" \
+  python acquire_worker.py --queue "${QUEUES_ROOT}/green_download.jsonl" \
     --targets-yaml "$TARGETS" --bucket green --workers "$WORKERS" ${EXECUTE} \
     ${LIMIT_TARGETS:+--limit-targets "$LIMIT_TARGETS"} \
     ${LIMIT_FILES:+--limit-files "$LIMIT_FILES"}
@@ -122,7 +150,7 @@ run_acquire_green() {
 
 run_acquire_yellow() {
   log "Stage: acquire_yellow"
-  python acquire_worker.py --queue "/data/nlp/_queues/yellow_pipeline.jsonl" \
+  python acquire_worker.py --queue "${QUEUES_ROOT}/yellow_pipeline.jsonl" \
     --targets-yaml "$TARGETS" --bucket yellow --workers "$WORKERS" ${EXECUTE} \
     ${LIMIT_TARGETS:+--limit-targets "$LIMIT_TARGETS"} \
     ${LIMIT_FILES:+--limit-files "$LIMIT_FILES"}
@@ -130,7 +158,7 @@ run_acquire_yellow() {
 
 run_screen_yellow() {
   log "Stage: screen_yellow"
-  python yellow_screen_worker.py --targets "$TARGETS" --queue "/data/nlp/_queues/yellow_pipeline.jsonl" ${EXECUTE}
+  python yellow_screen_worker.py --targets "$TARGETS" --queue "${QUEUES_ROOT}/yellow_pipeline.jsonl" ${EXECUTE}
 }
 
 run_merge() {
@@ -145,12 +173,12 @@ run_difficulty() {
 
 run_catalog() {
   log "Stage: catalog"
-  python catalog_builder.py --targets "$TARGETS" --output "/data/nlp/_catalogs/catalog.json"
+  python catalog_builder.py --targets "$TARGETS" --output "${CATALOGS_ROOT}/catalog.json"
 }
 
 run_review() {
   log "Stage: review"
-  python review_queue.py --queue "/data/nlp/_queues/yellow_pipeline.jsonl" list --limit 50 || true
+  python review_queue.py --queue "${QUEUES_ROOT}/yellow_pipeline.jsonl" list --limit 50 || true
 }
 
 case "$STAGE" in
