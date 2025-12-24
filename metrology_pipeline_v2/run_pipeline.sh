@@ -95,14 +95,20 @@ run_classify() {
 }
 
 run_review() {
-  local queue="${QUEUES_ROOT}/yellow.jsonl"
+  local queue="${QUEUES_ROOT}/yellow_pipeline.jsonl"
   echo -e "${BLUE}[review]${NC} Showing first 50 YELLOW queue rows from ${queue}"
   python "${SCRIPT_DIR}/review_queue.py" --queue "${queue}" list --limit 50 || true
 }
 
 run_acquire() {
   local bucket="$1"
-  local queue="${QUEUES_ROOT}/${bucket}.jsonl"
+  local queue_file=""
+  case "$bucket" in
+    green) queue_file="green_download.jsonl" ;;
+    yellow) queue_file="yellow_pipeline.jsonl" ;;
+    *) queue_file="${bucket}.jsonl" ;;
+  esac
+  local queue="${QUEUES_ROOT}/${queue_file}"
   if [[ ! -f "$queue" ]]; then
     echo -e "${RED}[acquire_${bucket}] queue not found: ${queue}${NC}"
     exit 1
@@ -120,7 +126,7 @@ run_acquire() {
 }
 
 run_screen_yellow() {
-  local queue="${QUEUES_ROOT}/yellow.jsonl"
+  local queue="${QUEUES_ROOT}/yellow_pipeline.jsonl"
   if [[ ! -f "$queue" ]]; then
     echo -e "${RED}[screen_yellow] queue not found: ${queue}${NC}"
     exit 1
