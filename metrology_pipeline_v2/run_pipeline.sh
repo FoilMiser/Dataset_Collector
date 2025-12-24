@@ -12,6 +12,8 @@
 #
 set -euo pipefail
 
+# Interpreter: python
+
 VERSION="2.0"
 
 RED='\033[0;31m'
@@ -43,7 +45,6 @@ Options:
   --workers N             Parallel workers for acquisition (default: 4)
   -h, --help              Show this help
 EOF
-  exit 0
 }
 
 while [[ $# -gt 0 ]]; do
@@ -54,14 +55,15 @@ while [[ $# -gt 0 ]]; do
     --limit-targets) LIMIT_TARGETS="$2"; shift 2 ;;
     --limit-files) LIMIT_FILES="$2"; shift 2 ;;
     --workers) WORKERS="$2"; shift 2 ;;
-    -h|--help) usage ;;
-    *) echo -e "${RED}Unknown option: $1${NC}"; usage ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo -e "${RED}Unknown option: $1${NC}"; usage; exit 1 ;;
   esac
 done
 
 if [[ -z "$TARGETS" ]]; then
   echo -e "${RED}Error: --targets is required${NC}"
   usage
+  exit 1
 fi
 if [[ ! -f "$TARGETS" ]]; then
   echo -e "${RED}Error: targets file not found: $TARGETS${NC}"
@@ -167,7 +169,7 @@ case "$STAGE" in
   difficulty) run_difficulty ;;
   catalog) run_catalog ;;
   review) run_review ;;
-  *) echo -e "${RED}Unknown stage: ${STAGE}${NC}"; usage ;;
+  *) echo -e "${RED}Unknown stage: ${STAGE}${NC}"; usage; exit 1 ;;
 esac
 
 echo -e "${BLUE}Pipeline complete.${NC}"

@@ -12,6 +12,8 @@
 #
 set -euo pipefail
 
+# Interpreter: python
+
 VERSION="2.0"
 
 RED='\033[0;31m'
@@ -37,13 +39,12 @@ Required:
 Options:
   --execute               Perform actions (default is dry-run/plan only)
   --stage STAGE           Stage to run: all, classify, acquire_green, acquire_yellow, \
-                          screen_yellow, merge, difficulty, catalog
+                          screen_yellow, merge, difficulty, catalog, review
   --limit-targets N       Limit number of queue rows processed
   --limit-files N         Limit files per target during acquisition
   --workers N             Parallel workers for acquisition (default: 4)
   -h, --help              Show this help
 EOF
-  exit 0
 }
 
 # Read a value from the targets YAML using python
@@ -73,21 +74,26 @@ while [[ $# -gt 0 ]]; do
     --stage)
       STAGE="$2"; shift 2;;
     --limit-targets)
-      LIMIT_TARGETS="--limit-targets $2"; shift 2;;
+      LIMIT_TARGETS="$2"; shift 2;;
     --limit-files)
-      LIMIT_FILES="--limit-files $2"; shift 2;;
+      LIMIT_FILES="$2"; shift 2;;
     --workers)
       WORKERS="$2"; shift 2;;
     -h|--help)
-      usage;;
+      usage; exit 0;;
     *)
-      echo -e "${RED}Unknown argument: $1${NC}"; usage;;
+      echo -e "${RED}Unknown argument: $1${NC}"; usage; exit 1;;
   esac
 done
 
 if [[ -z "${TARGETS}" ]]; then
   echo -e "${RED}--targets is required${NC}"
   usage
+  exit 1
+fi
+if [[ ! -f "${TARGETS}" ]]; then
+  echo -e "${RED}targets file not found: ${TARGETS}${NC}"
+  exit 1
 fi
 
 QUEUES_ROOT="$(queues_root)"
@@ -95,6 +101,8 @@ CATALOGS_ROOT="$(catalogs_root)"
 GREEN_QUEUE="${QUEUES_ROOT:-/data/bio/_queues}/green_download.jsonl"
 YELLOW_QUEUE="${QUEUES_ROOT:-/data/bio/_queues}/yellow_pipeline.jsonl"
 CATALOG_OUT="${CATALOGS_ROOT:-/data/bio/_catalogs}/catalog.json"
+LIMIT_TARGETS_ARG=""; [[ -n "$LIMIT_TARGETS" ]] && LIMIT_TARGETS_ARG="--limit-targets $LIMIT_TARGETS"
+LIMIT_FILES_ARG=""; [[ -n "$LIMIT_FILES" ]] && LIMIT_FILES_ARG="--limit-files $LIMIT_FILES"
 
 run_classify() {
   echo -e "${BLUE}[*] Classify targets${NC}"
@@ -104,12 +112,12 @@ run_classify() {
 
 run_acquire_green() {
   echo -e "${BLUE}[*] Acquire GREEN targets${NC}"
-  python acquire_worker.py --queue "${GREEN_QUEUE}" --targets-yaml "${TARGETS}" --bucket green ${LIMIT_TARGETS} ${LIMIT_FILES} --workers "${WORKERS}" ${EXECUTE}
+  python acquire_worker.py --queue "${GREEN_QUEUE}" --targets-yaml "${TARGETS}" --bucket green ${LIMIT_TARGETS_ARG} ${LIMIT_FILES_ARG} --workers "${WORKERS}" ${EXECUTE}
 }
 
 run_acquire_yellow() {
   echo -e "${BLUE}[*] Acquire YELLOW targets${NC}"
-  python acquire_worker.py --queue "${YELLOW_QUEUE}" --targets-yaml "${TARGETS}" --bucket yellow ${LIMIT_TARGETS} ${LIMIT_FILES} --workers "${WORKERS}" ${EXECUTE}
+  python acquire_worker.py --queue "${YELLOW_QUEUE}" --targets-yaml "${TARGETS}" --bucket yellow ${LIMIT_TARGETS_ARG} ${LIMIT_FILES_ARG} --workers "${WORKERS}" ${EXECUTE}
 }
 
 run_screen_yellow() {
@@ -134,6 +142,11 @@ run_catalog() {
   echo -e "${GREEN}[✓] Catalog written to ${CATALOG_OUT}${NC}"
 }
 
+run_review() {
+  echo -e "${BLUE}[*] Review YELLOW queue${NC}"
+  python review_queue.py --queue "${YELLOW_QUEUE}" list --limit 50 || true
+}
+
 case "${STAGE}" in
   all)
     run_classify
@@ -151,8 +164,10 @@ case "${STAGE}" in
   merge) run_merge ;;
   difficulty) run_difficulty ;;
   catalog) run_catalog ;;
+  review) run_review ;;
   *)
     echo -e "${RED}Unknown stage: ${STAGE}${NC}"
     usage
+    exit 1
     ;;
  esac
