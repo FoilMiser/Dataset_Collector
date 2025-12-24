@@ -15,7 +15,7 @@ A safety-first pipeline for building an ethical NLP training corpus. Version 2 r
 
 ## Directory layout
 
-The recommended roots live in `targets_nlp.yaml -> globals`:
+The recommended roots live in `targets_nlp.yaml -> globals`. Queue and catalog paths can be overridden with `globals.queues_root` and `globals.catalogs_root`:
 
 ```
 /data/nlp/
