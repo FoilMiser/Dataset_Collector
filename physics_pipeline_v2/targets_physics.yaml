@@ -1,0 +1,648 @@
+schema_version: "0.8"
+updated_utc: "2026-02-15"
+companion_files:
+  license_map: "./license_map.yaml"
+  field_schemas: "./field_schemas.yaml"
+  denylist: "./denylist.yaml"
+  difficulties_map: "./difficulties_physics.yaml"
+
+globals:
+  raw_root: /data/physics/raw
+  screened_yellow_root: /data/physics/screened_yellow
+  combined_root: /data/physics/combined
+  final_root: /data/physics/final
+  ledger_root: /data/physics/_ledger
+  pitches_root: /data/physics/_pitches
+  manifests_root: /data/physics/_manifests
+  queues_root: /data/physics/_queues
+  catalogs_root: /data/physics/_catalogs
+  logs_root: /data/physics/_logs
+  require_yellow_signoff: false
+
+  sharding:
+    max_records_per_shard: 50000
+    compression: gzip
+
+  screening:
+    min_chars: 200
+    max_chars: 12000
+    text_field_candidates: [text, content, body]
+    record_license_field_candidates: [license, license_spdx]
+    require_record_license: false
+    allow_spdx: [CC-BY-4.0, CC0-1.0, MIT, Apache-2.0, CC-BY-SA-4.0]
+    deny_phrases: [noai, "no tdm", "no machine learning"]
+
+  default_gates:
+    - snapshot_terms
+    - resolve_license_spdx
+    - restriction_phrase_scan
+    - emit_training_manifest
+    - emit_attribution_bundle
+
+queues:
+  emit:
+    - id: green_download
+      path: /data/physics/_queues/green_download.jsonl
+      criteria:
+        effective_bucket: GREEN
+        enabled: true
+    - id: yellow_pipeline
+      path: /data/physics/_queues/yellow_pipeline.jsonl
+      criteria:
+        effective_bucket: YELLOW
+        enabled: true
+    - id: red_rejected
+      path: /data/physics/_queues/red_rejected.jsonl
+      criteria:
+        effective_bucket: RED
+        enabled: true
+
+gates_catalog:
+  snapshot_terms: Save Terms/ToS + license page HTML/PDF/TXT + retrieval timestamp.
+  resolve_license_spdx: Normalize license to SPDX via license_map.yaml rules; store evidence.
+  restriction_phrase_scan: Scan terms/content for restriction phrases (no-LLM/no-TDM/etc.).
+  record_level_filter: Require per-record license metadata; keep only allowlist.
+  extract_text_chunks: Extract text into JSONL chunks using globals.text_processing_defaults unless overridden.
+  emit_training_manifest: Manifest of included files/records + checksums + license evidence.
+  emit_attribution_bundle: Generate ATTRIBUTION.md + CITATIONS.bib for included sources.
+
+resolvers:
+  http:
+    mode: direct_url
+    note: Direct file download with resume.
+  github:
+    mode: release
+    api_base: https://api.github.com
+    rate_limit:
+      requests_per_hour: 60
+      retry_on_403: true
+      exponential_backoff: true
+    endpoints:
+      releases: /repos/{owner}/{repo}/releases
+      latest: /repos/{owner}/{repo}/releases/latest
+      assets: /repos/{owner}/{repo}/releases/{release_id}/assets
+    note: Use GITHUB_TOKEN env var for higher rate limits.
+  huggingface_datasets:
+    mode: dataset_id
+    note: Use datasets.load_dataset; capture dataset card + license field.
+  git:
+    mode: repo
+    note: Capture commit hash; store LICENSE + README as evidence.
+  ftp:
+    mode: base_url + globs
+    note: List + filter by glob; store directory listing snapshot.
+  zenodo:
+    mode: record_id_or_doi
+    api: https://zenodo.org/api/records/{record_id}
+    outputs:
+      - files[*].links.self
+      - files[*].checksum
+    verify_checksum: true
+    checksum_algorithm: md5
+  dataverse:
+    mode: persistent_id
+    default_instance: https://dataverse.harvard.edu
+
+
+targets:
+  - id: cern_open_data_portal
+    name: CERN Open Data Portal (HEP datasets, software, docs)
+    enabled: true
+    priority: 85
+    license_profile: permissive
+    license_evidence:
+      spdx_hint: CC0-1.0
+      url: https://opendata.cern.ch/docs/terms-of-use
+    data_type: [experimental_data, documentation, metadata]
+    download:
+      strategy: http
+      urls:
+        - https://opendata.cern.ch/
+        - https://opendata.cern.ch/docs/about
+    output:
+      pool: permissive
+      formats: [html]
+    statistics: {}
+    routing:
+      subject: physics
+      domain: computational_experimental
+      category: particle_data
+      level: 7
+      granularity: target
+      confidence: 0.6
+      reason: CERN open data portal sources
+
+  - id: hepdata_cc0
+    name: HEPData (structured HEP tables; CC0 default)
+    enabled: true
+    priority: 80
+    license_profile: permissive
+    license_evidence:
+      spdx_hint: CC0-1.0
+      url: https://www.hepdata.net/terms
+    data_type: [experimental_data, tables, metadata]
+    download:
+      strategy: http
+      urls:
+        - https://www.hepdata.net/search?phrase=collaborations%3AATLAS&format=json
+        - https://www.hepdata.net/search?phrase=collaborations%3ACMS&format=json
+        - https://www.hepdata.net/search?phrase=collaborations%3AALICE&format=json
+        - https://www.hepdata.net/search?phrase=collaborations%3ALHCb&format=json
+    output:
+      pool: permissive
+      formats: [json]
+    statistics: {}
+    routing:
+      subject: physics
+      domain: computational_experimental
+      category: hep_tables
+      level: 7
+      granularity: target
+      confidence: 0.6
+      reason: HEP experimental tables
+
+  - id: gwosc_gravitational_waves
+    name: GWOSC (LIGO/Virgo/KAGRA open gravitational-wave data)
+    enabled: true
+    priority: 80
+    license_profile: permissive
+    license_evidence:
+      spdx_hint: CC-BY-4.0
+      url: https://gwosc.org/about/license/
+    data_type: [time_series, event_catalog, experimental_data]
+    download:
+      strategy: http
+      urls:
+        - https://gwosc.org/eventapi/json/
+        - https://gwosc.org/
+    output:
+      pool: permissive
+      formats: [json, html]
+    statistics: {}
+    routing:
+      subject: physics
+      domain: astro
+      category: gravitational_waves
+      level: 7
+      granularity: target
+      confidence: 0.6
+      reason: gravitational-wave event data
+
+  - id: noaa_ncei_api
+    name: NOAA NCEI Data Access API (meteorology/ocean/geo)
+    enabled: true
+    priority: 70
+    license_profile: permissive
+    license_evidence:
+      spdx_hint: PUBLIC-DOMAIN
+      url: https://oceanservice.noaa.gov/about/faq.html
+    data_type: [geoscience_data, time_series, gridded_data, metadata]
+    download:
+      strategy: http
+      urls:
+        - https://www.ncei.noaa.gov/access/services/data/v1
+        - https://www.ncei.noaa.gov/access/services/data/v1?datasets=global-hourly&startDate=2020-01-01&endDate=2020-01-02&format=json
+    output:
+      pool: permissive
+      formats: [json]
+    statistics: {}
+    routing:
+      subject: physics
+      domain: computational_experimental
+      category: geoscience_data
+      level: 5
+      granularity: target
+      confidence: 0.5
+      reason: observational geoscience time-series data
+
+  - id: nws_weather_api
+    name: NOAA/NWS API (weather.gov)
+    enabled: true
+    priority: 60
+    license_profile: permissive
+    license_evidence:
+      spdx_hint: PUBLIC-DOMAIN
+      url: https://www.weather.gov/disclaimer
+    data_type: [time_series, geoscience_data, metadata]
+    download:
+      strategy: http
+      urls:
+        - https://api.weather.gov/
+        - https://api.weather.gov/alerts/active
+    output:
+      pool: permissive
+      formats: [json]
+    statistics: {}
+    routing:
+      subject: physics
+      domain: computational_experimental
+      category: weather_time_series
+      level: 4
+      granularity: target
+      confidence: 0.5
+      reason: weather observation data
+
+  - id: usgs_national_map_public_domain
+    name: USGS The National Map + public-domain datasets
+    enabled: true
+    priority: 65
+    license_profile: permissive
+    license_evidence:
+      spdx_hint: PUBLIC-DOMAIN
+      url: https://www.usgs.gov/faqs/are-usgs-reportspublications-copyrighted
+    data_type: [geoscience_data, maps, metadata]
+    download:
+      strategy: http
+      urls:
+        - https://www.usgs.gov/faqs/what-are-terms-uselicensing-map-services-and-data-national-map
+        - https://www.usgs.gov/information-policies-and-instructions/acknowledging-or-crediting-usgs
+    output:
+      pool: permissive
+      formats: [html]
+    statistics: {}
+    routing:
+      subject: physics
+      domain: computational_experimental
+      category: geoscience_maps
+      level: 4
+      granularity: target
+      confidence: 0.5
+      reason: public-domain geoscience maps
+
+  - id: nasa_public_domain_materials
+    name: NASA public-domain materials + APIs (with third-party caveat)
+    enabled: true
+    priority: 65
+    license_profile: permissive
+    license_evidence:
+      spdx_hint: PUBLIC-DOMAIN
+      url: https://sti.nasa.gov/disclaimers/
+    data_type: [documentation, metadata, datasets]
+    download:
+      strategy: http
+      urls:
+        - https://api.nasa.gov/
+        - https://sti.nasa.gov/disclaimers/
+        - https://www.nasa.gov/nasa-brand-center/
+    output:
+      pool: permissive
+      formats: [html, json]
+    statistics: {}
+    routing:
+      subject: physics
+      domain: astro
+      category: space_agency_materials
+      level: 5
+      granularity: target
+      confidence: 0.5
+      reason: NASA public-domain datasets and documentation
+
+  - id: eso_science_archive_ccby
+    name: ESO Science Archive Facility (astronomy data)
+    enabled: true
+    priority: 70
+    license_profile: permissive
+    license_evidence:
+      spdx_hint: CC-BY-4.0
+      url: https://archive.eso.org/cms/eso-data-access-policy.html
+    data_type: [observational_data, metadata]
+    download:
+      strategy: http
+      urls:
+        - https://archive.eso.org/cms/eso-data-access-policy.html
+        - https://archive.eso.org/
+    output:
+      pool: permissive
+      formats: [html]
+    statistics: {}
+    routing:
+      subject: physics
+      domain: astro
+      category: astronomy_archive
+      level: 6
+      granularity: target
+      confidence: 0.6
+      reason: astronomy observational archive
+
+  - id: sdss_bulk_downloads
+    name: Sloan Digital Sky Survey (SDSS) public releases
+    enabled: true
+    priority: 70
+    license_profile: permissive
+    license_evidence:
+      spdx_hint: PUBLIC-DOMAIN
+      url: https://www.sdss4.org/collaboration/
+    data_type: [observational_data, catalogs, images]
+    download:
+      strategy: http
+      urls:
+        - https://sdss.org/dr18/data_access/bulk/
+        - https://www.sdss.org/collaboration/image-use-policy/
+    output:
+      pool: permissive
+      formats: [html]
+    statistics: {}
+    routing:
+      subject: physics
+      domain: astro
+      category: sky_surveys
+      level: 6
+      granularity: target
+      confidence: 0.6
+      reason: survey catalogs and images
+
+  - id: materials_project_ccby
+    name: Materials Project / GNoME Database (materials physics)
+    enabled: true
+    priority: 75
+    license_profile: permissive
+    license_evidence:
+      spdx_hint: CC-BY-4.0
+      url: https://next-gen.materialsproject.org/about/terms
+    data_type: [materials_data, computed_properties, metadata]
+    download:
+      strategy: http
+      urls:
+        - https://next-gen.materialsproject.org/about/terms
+        - https://next-gen.materialsproject.org/api
+    output:
+      pool: permissive
+      formats: [html, json]
+    statistics: {}
+    routing:
+      subject: physics
+      domain: condensed_matter
+      category: materials_databases
+      level: 6
+      granularity: target
+      confidence: 0.6
+      reason: materials physics data
+
+  - id: nomad_ccby
+    name: NOMAD (materials science data; CC BY, metadata CC0)
+    enabled: true
+    priority: 75
+    license_profile: permissive
+    license_evidence:
+      spdx_hint: CC-BY-4.0
+      url: https://nomad-lab.eu/nomad-lab/terms.html
+    data_type: [materials_data, computed_properties, metadata]
+    download:
+      strategy: http
+      urls:
+        - https://nomad-lab.eu/nomad-lab/terms.html
+        - https://nomad-lab.eu/
+    output:
+      pool: permissive
+      formats: [html]
+    statistics: {}
+    routing:
+      subject: physics
+      domain: condensed_matter
+      category: materials_databases
+      level: 6
+      granularity: target
+      confidence: 0.6
+      reason: materials science data
+
+  - id: oqmd_ccby
+    name: OQMD (Open Quantum Materials Database; CC BY)
+    enabled: true
+    priority: 70
+    license_profile: permissive
+    license_evidence:
+      spdx_hint: CC-BY-4.0
+      url: https://oqmd.org/
+    data_type: [materials_data, computed_properties, metadata]
+    download:
+      strategy: http
+      urls:
+        - https://oqmd.org/
+        - https://oqmd.org/documentation/publications
+    output:
+      pool: permissive
+      formats: [html]
+    statistics: {}
+    routing:
+      subject: physics
+      domain: condensed_matter
+      category: materials_databases
+      level: 6
+      granularity: target
+      confidence: 0.6
+      reason: quantum materials database
+
+  - id: open_catalyst_oc20_oc22
+    name: Open Catalyst Project (OC20/OC22; CC BY)
+    enabled: true
+    priority: 75
+    license_profile: permissive
+    license_evidence:
+      spdx_hint: CC-BY-4.0
+      url: https://opencatalystproject.org/
+    data_type: [materials_data, ml_dataset, computed_properties]
+    download:
+      strategy: http
+      urls:
+        - https://opencatalystproject.org/
+        - https://github.com/Open-Catalyst-Project/ocp/blob/main/LICENSE.md
+    output:
+      pool: permissive
+      formats: [html]
+    statistics: {}
+    routing:
+      subject: physics
+      domain: condensed_matter
+      category: catalysis_ml
+      level: 7
+      granularity: target
+      confidence: 0.6
+      reason: materials/catalysis dataset
+
+  - id: icecube_public_data_releases
+    name: IceCube public data releases (some releases LGPL)
+    enabled: true
+    priority: 60
+    license_profile: copyleft
+    license_evidence:
+      spdx_hint: LGPL-3.0-or-later
+      url: https://icecube.wisc.edu/data-releases/2021/12/hese-7-5-year-data/
+    data_type: [event_catalog, experimental_data, time_series]
+    download:
+      strategy: http
+      urls:
+        - https://icecube.wisc.edu/science/data-releases/
+        - https://icecube.wisc.edu/data-releases/2021/12/hese-7-5-year-data/
+    output:
+      pool: copyleft
+      formats: [html]
+    statistics: {}
+    routing:
+      subject: physics
+      domain: astro
+      category: neutrino_observations
+      level: 7
+      granularity: target
+      confidence: 0.6
+      reason: high-energy neutrino observations
+
+  - id: arxiv_oai_physics_metadata
+    name: arXiv OAI-PMH (physics metadata; full text is per-paper license)
+    enabled: true
+    priority: 65
+    license_profile: record_level
+    license_evidence:
+      spdx_hint: RECORD-LEVEL
+      url: https://info.arxiv.org/help/bulk_data.html
+    data_type: [literature_metadata]
+    download:
+      strategy: http
+      urls:
+        - https://export.arxiv.org/oai2
+        - https://info.arxiv.org/help/oa/index.html
+    output:
+      pool: quarantine
+      formats: [xml, html]
+    statistics: {}
+    routing:
+      subject: physics
+      domain: computational_experimental
+      category: literature_metadata
+      level: 7
+      granularity: target
+      confidence: 0.6
+      reason: arXiv physics metadata
+
+  - id: mast_archive_record_level
+    name: MAST (STScI) archive – some copyrighted collections
+    enabled: false
+    priority: 40
+    license_profile: record_level
+    license_evidence:
+      spdx_hint: RECORD-LEVEL
+      url: https://archive.stsci.edu/publishing/data-use
+    data_type: [observational_data, metadata]
+    download:
+      strategy: http
+      urls:
+        - https://archive.stsci.edu/publishing/data-use
+        - https://www.stsci.edu/copyright
+    output:
+      pool: quarantine
+      formats: [html]
+    statistics: {}
+    routing:
+      subject: physics
+      domain: astro
+      category: space_telescope_archive
+      level: 7
+      granularity: target
+      confidence: 0.6
+      reason: space telescope archive metadata
+
+  - id: openkim_record_level
+    name: OpenKIM (interatomic models; license varies by model)
+    enabled: true
+    priority: 55
+    license_profile: record_level
+    license_evidence:
+      spdx_hint: RECORD-LEVEL
+      url: https://openkim.org/kim-licensing-v2/
+    data_type: [materials_models, metadata]
+    download:
+      strategy: http
+      urls:
+        - https://openkim.org/kim-licensing-v2/
+        - https://openkim.org/
+    output:
+      pool: quarantine
+      formats: [html]
+    statistics: {}
+    routing:
+      subject: physics
+      domain: condensed_matter
+      category: interatomic_models
+      level: 7
+      granularity: target
+      confidence: 0.6
+      reason: interatomic model metadata
+
+  - id: inspirehep_api_restricted
+    name: INSPIRE-HEP API (review terms before ingestion)
+    enabled: false
+    priority: 30
+    license_profile: record_level
+    license_evidence:
+      spdx_hint: RESTRICTED-TERMS
+      url: https://help.inspirehep.net/knowledge-base/terms-of-use/
+    data_type: [literature_metadata]
+    download:
+      strategy: http
+      urls:
+        - https://inspirehep.net/api/literature
+        - https://help.inspirehep.net/knowledge-base/terms-of-use/
+    output:
+      pool: quarantine
+      formats: [json, html]
+    statistics: {}
+    routing:
+      subject: physics
+      domain: quantum
+      category: hep_literature
+      level: 8
+      granularity: target
+      confidence: 0.6
+      reason: high-energy physics literature metadata
+
+  - id: gaia_esa_noncommercial
+    name: ESA Gaia (CC BY-NC IGO; non-commercial)
+    enabled: false
+    priority: 20
+    license_profile: record_level
+    license_evidence:
+      spdx_hint: CC-BY-NC-3.0-IGO
+      url: https://www.cosmos.esa.int/web/gaia-users/license
+    data_type: [catalogs, observational_data, metadata]
+    download:
+      strategy: http
+      urls:
+        - https://www.cosmos.esa.int/web/gaia-users/license
+        - https://www.cosmos.esa.int/web/gaia/archive
+    output:
+      pool: quarantine
+      formats: [html]
+    statistics: {}
+    routing:
+      subject: physics
+      domain: astro
+      category: stellar_catalogs
+      level: 7
+      granularity: target
+      confidence: 0.6
+      reason: ESA Gaia stellar catalogs
+
+  - id: jhtdb_requires_agreement
+    name: Johns Hopkins Turbulence Database (token + agreement)
+    enabled: false
+    priority: 20
+    license_profile: record_level
+    license_evidence:
+      spdx_hint: REQUIRES-AGREEMENT
+      url: https://www.re3data.org/repository/r3d100011061
+    data_type: [simulation_data, fluid_dynamics]
+    download:
+      strategy: http
+      urls:
+        - https://www.re3data.org/repository/r3d100011061
+    output:
+      pool: quarantine
+      formats: [html]
+    statistics: {}
+    routing:
+      subject: physics
+      domain: mechanics
+      category: turbulence_simulation
+      level: 7
+      granularity: target
+      confidence: 0.6
+      reason: turbulence simulation data

@@ -1,0 +1,94 @@
+# denylist.yaml
+# v0.2 — explicit denylist patterns (v0.9 enhancements)
+#
+# The pipeline scans target id/name, license evidence URL, and download config.
+# v0.9 NEW: Structured patterns, per-pattern severity, and mandatory provenance.
+#
+# Severity levels:
+#   - hard_red: Forces RED immediately (default, backwards compatible)
+#   - force_yellow: Forces YELLOW for deeper manual review
+#
+# All patterns now require 'link' and 'rationale' fields for auditability.
+
+schema_version: "0.2"
+updated_utc: "2026-06-01"
+
+# v0.9: Domain extraction patterns (match against extracted domain from URLs)
+domain_patterns:
+  - domain: "elsevier.com"
+    severity: "hard_red"
+    link: "https://www.elsevier.com/legal/elsevier-website-terms-and-conditions"
+    rationale: "Paywalled publisher; ToS restrict text and data mining."
+  - domain: "springer.com"
+    severity: "hard_red"
+    link: "https://www.springer.com/gp/legal/terms-conditions"
+    rationale: "Paywalled publisher; bulk download and AI training restricted."
+  - domain: "wiley.com"
+    severity: "hard_red"
+    link: "https://www.wiley.com/en-us/terms-of-use"
+    rationale: "Paywalled publisher; no text and data mining."
+  - domain: "coursera.org"
+    severity: "hard_red"
+    link: "https://www.coursera.org/about/terms"
+    rationale: "MOOC ToS restrict model training."
+  - domain: "edx.org"
+    severity: "hard_red"
+    link: "https://www.edx.org/terms-of-service"
+    rationale: "MOOC ToS restrict commercial reuse and AI training."
+  - domain: "khanacademy.org"
+    severity: "force_yellow"
+    link: "https://www.khanacademy.org/about/tos"
+    rationale: "Terms restrict scraping; requires explicit review."
+
+# v0.9: Publisher/provider tags (match against publisher metadata if available)
+publisher_patterns:
+  - publisher: "Elsevier"
+    severity: "hard_red"
+    link: "https://www.elsevier.com/legal/elsevier-website-terms-and-conditions"
+    rationale: "Paywalled publisher; prohibits text/data mining."
+  - publisher: "Springer Nature"
+    severity: "hard_red"
+    link: "https://www.springernature.com/gp/policies/terms"
+    rationale: "Paywalled publisher; restricts AI training."
+  - publisher: "Wiley"
+    severity: "hard_red"
+    link: "https://www.wiley.com/en-us/terms-of-use"
+    rationale: "Restrictive ToS for bulk use and training."
+
+patterns:
+  - type: "regex"
+    value: "(?i)all rights reserved"
+    fields: ["license_evidence_url", "download_blob"]
+    severity: "hard_red"
+    link: "https://en.wikipedia.org/wiki/All_rights_reserved"
+    rationale: "All rights reserved language conflicts with dataset training."
+  - type: "regex"
+    value: "(?i)no\\s*ai|no\\s*artificial\\s*intelligence"
+    fields: ["license_evidence_url", "download_blob"]
+    severity: "hard_red"
+    link: "https://www.noai.org/"
+    rationale: "Explicit NoAI restrictions."
+  - type: "regex"
+    value: "(?i)no\\s*text\\s*and\\s*data\\s*mining"
+    fields: ["license_evidence_url", "download_blob"]
+    severity: "hard_red"
+    link: "https://en.wikipedia.org/wiki/Text_and_data_mining"
+    rationale: "Terms prohibit TDM."
+  - type: "regex"
+    value: "(?i)noncommercial|non\\-commercial|nc\\s+license"
+    fields: ["license_evidence_url", "download_blob", "name", "id"]
+    severity: "hard_red"
+    link: "https://creativecommons.org/licenses/by-nc/4.0/"
+    rationale: "Non-commercial restriction incompatible with training use."
+  - type: "regex"
+    value: "(?i)no\\s*derivatives|nd\\s+license"
+    fields: ["license_evidence_url", "download_blob", "name", "id"]
+    severity: "hard_red"
+    link: "https://creativecommons.org/licenses/by-nd/4.0/"
+    rationale: "No-derivatives restriction conflicts with model training."
+  - type: "regex"
+    value: "(?i)no\\s*training"
+    fields: ["license_evidence_url", "download_blob"]
+    severity: "hard_red"
+    link: "https://www.noai.org/"
+    rationale: "Text explicitly bars ML training."
