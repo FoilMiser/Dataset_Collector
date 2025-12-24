@@ -1,0 +1,81 @@
+schema_version: "2.0"
+updated_utc: "2025-12-24 04:06:05Z"
+
+globals:
+  default_subject: regcomp
+  default_domain: misc
+  default_category: misc
+  default_level: 5
+
+subjects:
+  regcomp:
+    name: Regulation & Compliance
+    domains:
+      compliance_basics:
+        name: Compliance basics
+        categories:
+          glossary_faq:
+            level: { default: 1, min: 1, max: 2 }
+          checklists_templates:
+            level: { default: 2, min: 1, max: 3 }
+          training_materials:
+            level: { default: 3, min: 2, max: 4 }
+      primary_law_and_regs:
+        name: Statutes and regulations (primary sources)
+        categories:
+          statutes_section:
+            level: { default: 5, min: 4, max: 6 }
+          regulations_section:
+            level: { default: 5, min: 4, max: 7 }
+          rulemaking_notices:
+            level: { default: 6, min: 5, max: 7 }
+      privacy_data_protection:
+        name: Privacy & data protection
+        categories:
+          general_guidance:
+            level: { default: 4, min: 3, max: 5 }
+          gdpr:
+            level: { default: 8, min: 7, max: 9 }
+          us_state_privacy:
+            level: { default: 7, min: 6, max: 8 }
+      cybersecurity_controls:
+        name: Security controls & standards
+        categories:
+          nist_iso_controls:
+            level: { default: 6, min: 5, max: 7 }
+          audits_assessments:
+            level: { default: 7, min: 6, max: 8 }
+      financial_services:
+        name: Financial services regulation
+        categories:
+          aml_kyc:
+            level: { default: 7, min: 6, max: 8 }
+          securities_market_rules:
+            level: { default: 8, min: 7, max: 9 }
+          derivatives_clearing:
+            level: { default: 9, min: 8, max: 10 }
+          corporate_filings:
+            level: { default: 6, min: 5, max: 7 }
+      enforcement_case_law:
+        name: Enforcement and case law
+        categories:
+          admin_orders:
+            level: { default: 7, min: 6, max: 8 }
+          appellate_opinions:
+            level: { default: 9, min: 8, max: 10 }
+      government_oversight:
+        name: Oversight, audits, and investigations
+        categories:
+          audit_reports:
+            level: { default: 6, min: 5, max: 7 }
+          investigations:
+            level: { default: 7, min: 6, max: 8 }
+      compliance_datasets:
+        name: Compliance data sets
+        categories:
+          enforcement_datasets:
+            level: { default: 6, min: 5, max: 7 }
+          procurement_spending:
+            level: { default: 6, min: 5, max: 7 }
+          exclusions_debarment:
+            level: { default: 6, min: 5, max: 7 }
