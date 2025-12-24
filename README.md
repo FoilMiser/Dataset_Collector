@@ -69,6 +69,23 @@ Use `--dry-run` for a no-op preview:
 ./run_pipeline.sh --stage classify --dry-run
 ```
 
+## Windows Quickstart (Natural corpus)
+
+Use the Windows-first orchestrator to run all pipelines sequentially and emit the
+Natural corpus layout under a single destination root.
+
+```powershell
+py -3.11 -m venv .venv
+.venv\Scripts\activate
+pip install -r math_pipeline_v2\requirements.txt
+# repeat for other pipeline requirements as needed
+
+python tools\build_natural_corpus.py --dest-root "E:\AI-Research\datasets\Natural" --pipelines all --execute
+```
+
+To preview the actions without writing data, omit `--execute` (dry-run). See
+`docs/output_contract.md` for the expected on-disk layout.
+
 ## Expected directory structure & configurable paths
 
 Within each `*_pipeline_v2` directory, you should expect:
@@ -93,4 +110,3 @@ Update these in the pipeline’s configuration (commonly under `configs/`) to co
 - **Python**: Each pipeline depends on Python; version and additional tools may vary by pipeline.
 - **Requirements**: Install per-pipeline dependencies via that pipeline’s `requirements.txt`.
 - **Dry-run vs execute**: `--dry-run` prints planned actions; `--execute` performs writes. Use `--execute` only when you intend to modify data or produce outputs.
-
