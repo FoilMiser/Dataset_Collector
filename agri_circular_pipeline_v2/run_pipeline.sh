@@ -12,6 +12,8 @@
 #
 set -euo pipefail
 
+# Interpreter: python
+
 VERSION="2.0"
 
 RED='\033[0;31m'
@@ -43,7 +45,6 @@ Options:
   --workers N             Parallel workers for acquisition (default: 4)
   -h, --help              Show this help
 EOF
-  exit 0
 }
 
 while [[ $# -gt 0 ]]; do
@@ -74,10 +75,12 @@ while [[ $# -gt 0 ]]; do
       ;;
     -h|--help)
       usage
+      exit 0
       ;;
     *)
       echo -e "${RED}Unknown option: $1${NC}"
       usage
+      exit 1
       ;;
   esac
 done
@@ -85,6 +88,7 @@ done
 if [[ -z "$TARGETS" ]]; then
   echo -e "${RED}Error: --targets is required${NC}"
   usage
+  exit 1
 fi
 
 if [[ ! -f "$TARGETS" ]]; then
@@ -230,5 +234,6 @@ case "$STAGE" in
   *)
     echo -e "${RED}Unknown stage: ${STAGE}${NC}"
     usage
+    exit 1
     ;;
 esac

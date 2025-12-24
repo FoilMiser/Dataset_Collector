@@ -11,6 +11,8 @@
 #
 set -euo pipefail
 
+# Interpreter: python
+
 VERSION="2.0"
 
 RED='\033[0;31m'
@@ -36,7 +38,7 @@ Required:
 Options:
   --execute               Perform actions (default is dry-run/plan only)
   --stage STAGE           Stage to run: all, classify, acquire_green, acquire_yellow, \
-                          screen_yellow, merge, difficulty, catalog
+                          screen_yellow, merge, difficulty, catalog, review
   --limit-targets N       Limit number of queue rows processed
   --limit-files N         Limit files per target during acquisition
   --workers N             Parallel workers for acquisition (default: 4)
@@ -88,8 +90,7 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     *)
-      warn "Unknown arg: $1"
-      shift
+      fail "Unknown arg: $1"
       ;;
   esac
 done
@@ -104,13 +105,16 @@ fi
 
 run_classify() {
   log "Stage: classify"
-  python3 pipeline_driver.py --targets "$TARGETS" ${EXECUTE} \
-    ${LIMIT_TARGETS:+--limit-targets "$LIMIT_TARGETS"}
+  local limit_args=()
+  if [[ -n "$LIMIT_TARGETS" ]]; then
+    limit_args=(--limit-targets "$LIMIT_TARGETS")
+  fi
+  python pipeline_driver.py --targets "$TARGETS" ${EXECUTE} "${limit_args[@]}"
 }
 
 run_acquire_green() {
   log "Stage: acquire_green"
-  python3 acquire_worker.py --queue "/data/nlp/_queues/green_download.jsonl" \
+  python acquire_worker.py --queue "/data/nlp/_queues/green_download.jsonl" \
     --targets-yaml "$TARGETS" --bucket green --workers "$WORKERS" ${EXECUTE} \
     ${LIMIT_TARGETS:+--limit-targets "$LIMIT_TARGETS"} \
     ${LIMIT_FILES:+--limit-files "$LIMIT_FILES"}
@@ -118,7 +122,7 @@ run_acquire_green() {
 
 run_acquire_yellow() {
   log "Stage: acquire_yellow"
-  python3 acquire_worker.py --queue "/data/nlp/_queues/yellow_pipeline.jsonl" \
+  python acquire_worker.py --queue "/data/nlp/_queues/yellow_pipeline.jsonl" \
     --targets-yaml "$TARGETS" --bucket yellow --workers "$WORKERS" ${EXECUTE} \
     ${LIMIT_TARGETS:+--limit-targets "$LIMIT_TARGETS"} \
     ${LIMIT_FILES:+--limit-files "$LIMIT_FILES"}
@@ -126,22 +130,27 @@ run_acquire_yellow() {
 
 run_screen_yellow() {
   log "Stage: screen_yellow"
-  python3 yellow_screen_worker.py --targets "$TARGETS" --queue "/data/nlp/_queues/yellow_pipeline.jsonl" ${EXECUTE}
+  python yellow_screen_worker.py --targets "$TARGETS" --queue "/data/nlp/_queues/yellow_pipeline.jsonl" ${EXECUTE}
 }
 
 run_merge() {
   log "Stage: merge"
-  python3 merge_worker.py --targets "$TARGETS" ${EXECUTE}
+  python merge_worker.py --targets "$TARGETS" ${EXECUTE}
 }
 
 run_difficulty() {
   log "Stage: difficulty"
-  python3 difficulty_worker.py --targets "$TARGETS" ${EXECUTE}
+  python difficulty_worker.py --targets "$TARGETS" ${EXECUTE}
 }
 
 run_catalog() {
   log "Stage: catalog"
-  python3 catalog_builder.py --targets "$TARGETS" --output "/data/nlp/_catalogs/catalog.json"
+  python catalog_builder.py --targets "$TARGETS" --output "/data/nlp/_catalogs/catalog.json"
+}
+
+run_review() {
+  log "Stage: review"
+  python review_queue.py --queue "/data/nlp/_queues/yellow_pipeline.jsonl" list --limit 50 || true
 }
 
 case "$STAGE" in
@@ -174,6 +183,9 @@ case "$STAGE" in
     ;;
   catalog)
     run_catalog
+    ;;
+  review)
+    run_review
     ;;
   *)
     fail "Unknown stage: $STAGE"

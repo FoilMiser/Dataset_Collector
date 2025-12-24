@@ -6,6 +6,8 @@
 #
 set -euo pipefail
 
+# Interpreter: python
+
 VERSION="2.0"
 
 RED='\033[0;31m'
@@ -30,7 +32,7 @@ Required:
 
 Options:
   --execute               Perform actions (default is dry-run/plan only)
-  --stage STAGE           Stage to run: all, classify, acquire_green, acquire_yellow, screen_yellow, merge, difficulty, catalog
+  --stage STAGE           Stage to run: all, classify, acquire_green, acquire_yellow, screen_yellow, merge, difficulty, catalog, review
   --limit-targets N       Limit number of queue rows processed
   --limit-files N         Limit files per target during acquisition
   --workers N             Parallel workers for acquisition (default: 4)
@@ -43,8 +45,8 @@ while [[ $# -gt 0 ]]; do
     --targets) TARGETS="$2"; shift 2 ;;
     --stage) STAGE="$2"; shift 2 ;;
     --execute) EXECUTE="--execute"; shift ;;
-    --limit-targets) LIMIT_TARGETS="--limit-targets $2"; shift 2 ;;
-    --limit-files) LIMIT_FILES="--limit-files $2"; shift 2 ;;
+    --limit-targets) LIMIT_TARGETS="$2"; shift 2 ;;
+    --limit-files) LIMIT_FILES="$2"; shift 2 ;;
     --workers) WORKERS="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo -e "${RED}Unknown option: $1${NC}"; usage; exit 1 ;;
@@ -69,6 +71,8 @@ cfg = yaml.safe_load(open("${TARGETS}")) or {}
 print(cfg.get("globals", {}).get("queues_root", "/data/earth/_queues"))
 PY
 )
+LIMIT_TARGETS_ARG=""; [[ -n "$LIMIT_TARGETS" ]] && LIMIT_TARGETS_ARG="--limit-targets $LIMIT_TARGETS"
+LIMIT_FILES_ARG=""; [[ -n "$LIMIT_FILES" ]] && LIMIT_FILES_ARG="--limit-files $LIMIT_FILES"
 
 run_classify() {
   echo -e "${BLUE}== Stage: classify ==${NC}"
@@ -96,8 +100,8 @@ run_acquire() {
     --bucket "$bucket" \
     --workers "$WORKERS" \
     $EXECUTE \
-    $LIMIT_TARGETS \
-    $LIMIT_FILES
+    $LIMIT_TARGETS_ARG \
+    $LIMIT_FILES_ARG
 }
 
 run_screen_yellow() {
@@ -128,6 +132,12 @@ run_catalog() {
   python "$SCRIPT_DIR/catalog_builder.py" --targets "$TARGETS"
 }
 
+run_review() {
+  local queue_file="$QUEUES_ROOT/yellow_pipeline.jsonl"
+  echo -e "${BLUE}== Stage: review ==${NC}"
+  python "$SCRIPT_DIR/review_queue.py" --queue "$queue_file" list --limit 50 || true
+}
+
 case "$STAGE" in
   all)
     run_classify
@@ -145,5 +155,6 @@ case "$STAGE" in
   merge) run_merge ;;
   difficulty) run_difficulty ;;
   catalog) run_catalog ;;
+  review) run_review ;;
   *) echo -e "${RED}Unknown stage: $STAGE${NC}"; usage; exit 1 ;;
 esac

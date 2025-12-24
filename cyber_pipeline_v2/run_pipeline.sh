@@ -12,6 +12,8 @@
 #
 set -euo pipefail
 
+# Interpreter: python
+
 VERSION="2.0"
 
 RED='\033[0;31m'
@@ -36,8 +38,8 @@ Required:
 
 Options:
   --execute               Perform actions (default is dry-run/plan only)
-  --stage STAGE           Stage to run: all, classify, review, acquire_green, acquire_yellow, \
-                          screen_yellow, merge, difficulty, catalog
+  --stage STAGE           Stage to run: all, classify, acquire_green, acquire_yellow, \
+                          screen_yellow, merge, difficulty, catalog, review
   --limit-targets N       Limit number of queue rows processed
   --limit-files N         Limit files per target during acquisition
   --workers N             Parallel workers for acquisition (default: 4)
@@ -61,11 +63,11 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --limit-targets)
-      LIMIT_TARGETS="--limit-targets $2"
+      LIMIT_TARGETS="$2"
       shift 2
       ;;
     --limit-files)
-      LIMIT_FILES="--limit-files $2"
+      LIMIT_FILES="$2"
       shift 2
       ;;
     --workers)
@@ -112,6 +114,8 @@ PY
 
 queues_root=$(cfg_value "queues_root" "/data/cyber/_queues")
 catalogs_root=$(cfg_value "catalogs_root" "/data/cyber/_catalogs")
+LIMIT_TARGETS_ARG=""; [[ -n "$LIMIT_TARGETS" ]] && LIMIT_TARGETS_ARG="--limit-targets $LIMIT_TARGETS"
+LIMIT_FILES_ARG=""; [[ -n "$LIMIT_FILES" ]] && LIMIT_FILES_ARG="--limit-files $LIMIT_FILES"
 
 echo -e "${BLUE}Cyber Corpus Pipeline v${VERSION}${NC}"
 echo -e "Targets: ${GREEN}${TARGETS}${NC}"
@@ -125,8 +129,9 @@ run_classify() {
 }
 
 run_review() {
+  local queue_file="${queues_root}/yellow_pipeline.jsonl"
   echo -e "${YELLOW}[Stage: review]${NC}"
-  python "${SCRIPT_DIR}/yellow_scrubber.py" --targets "${TARGETS}" --limit 50 || true
+  python "${SCRIPT_DIR}/review_queue.py" --queue "${queue_file}" list --limit 50 || true
 }
 
 run_acquire() {
@@ -143,7 +148,7 @@ run_acquire() {
     --targets-yaml "${TARGETS}" \
     --bucket "${bucket}" \
     --workers "${WORKERS}" \
-    ${EXECUTE} ${LIMIT_TARGETS} ${LIMIT_FILES}
+    ${EXECUTE} ${LIMIT_TARGETS_ARG} ${LIMIT_FILES_ARG}
 }
 
 run_screen_yellow() {
@@ -181,7 +186,6 @@ run_catalog() {
 case "${STAGE}" in
   all)
     run_classify
-    run_review
     run_acquire "green"
     run_acquire "yellow"
     run_screen_yellow
