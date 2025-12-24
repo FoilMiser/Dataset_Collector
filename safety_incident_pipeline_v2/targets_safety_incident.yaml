@@ -138,7 +138,9 @@ targets:
   output:
     pool: permissive
     formats:
-    - zip
+      - zip
+      - csv
+      - dbf
   routing:
     subject: safety_incident
     domain: incident_tables
@@ -171,6 +173,8 @@ targets:
     pool: permissive
     formats:
     - zip
+    - csv
+    - dbf
   routing:
     subject: safety_incident
     domain: incident_tables
@@ -416,7 +420,9 @@ targets:
   output:
     pool: permissive
     formats:
-    - zip
+      - zip
+      - csv
+      - dbf
   routing:
     subject: safety_incident
     domain: incident_tables
@@ -425,11 +431,9 @@ targets:
     granularity: target
     confidence: 0.8
     reason: Road safety fatality event tables.
-    - csv
-    - dbf
   gates_override:
     add:
-    - pii_scan_and_redact
+      - pii_scan_and_redact
 - id: osha_enforcement_data_portal
   name: DOL/OSHA Enforcement Data portal (inspections + accident narratives)
   enabled: false
