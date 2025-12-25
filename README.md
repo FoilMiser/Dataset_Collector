@@ -1,7 +1,7 @@
 # Dataset Collector
 
 ## Overview
-The Dataset Collector repository organizes a family of domain-specific data collection pipelines under `*_pipeline_v2/` directories. Each pipeline shares a common execution model (a staged pipeline orchestrated by `run_pipeline.sh`) while tailoring the actual stages, tools, and data sources to its domain.
+The Dataset Collector repository organizes a family of domain-specific data collection pipelines under `*_pipeline_v2/` directories. The primary way to run the full suite is the JupyterLab notebook `dataset_collector_run_all_pipelines.ipynb`, which executes every domain pipeline sequentially in one session while prompting for required API keys and optionally installing per-pipeline requirements.
 
 Each `*_pipeline_v2` directory represents a self-contained pipeline for a domain:
 
@@ -23,6 +23,14 @@ Each `*_pipeline_v2` directory represents a self-contained pipeline for a domain
 - `physics_pipeline_v2`: physics datasets and task sources.
 - `regcomp_pipeline_v2`: regulatory/compliance datasets and task sources.
 - `safety_incident_pipeline_v2`: safety incident datasets and task sources.
+
+## Run all pipelines via JupyterLab
+
+1. Launch JupyterLab from the repository root.
+2. Open `dataset_collector_run_all_pipelines.ipynb`.
+3. Run the notebook cells in order to execute each `*_pipeline_v2` pipeline sequentially.
+
+The notebook prompts for missing environment variables (for example `GITHUB_TOKEN` or `CHEMSPIDER_API_KEY`) and can install each pipeline's requirements before starting its stages.
 
 ## Standard CLI contract (`run_pipeline.sh`)
 
@@ -69,10 +77,10 @@ Use `--dry-run` for a no-op preview:
 ./run_pipeline.sh --stage classify --dry-run
 ```
 
-## Windows Quickstart (Natural corpus)
+## Windows Quickstart (Natural corpus, optional)
 
 Use the Windows-first orchestrator to run all pipelines sequentially and emit the
-Natural corpus layout under a single destination root.
+Natural corpus layout under a single destination root. This is an optional alternative to the JupyterLab notebook flow.
 
 ```powershell
 py -3.11 -m venv .venv
