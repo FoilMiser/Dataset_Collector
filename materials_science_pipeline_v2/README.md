@@ -13,6 +13,12 @@ A safety-first pipeline for building a materials science training corpus. Versio
 
 ---
 
+## Run all pipelines via JupyterLab
+
+This pipeline is typically executed as part of the repository-wide run in JupyterLab using `dataset_collector_run_all_pipelines.ipynb`. The notebook runs every `*_pipeline_v2` directory sequentially, prompts for required API keys, and can install each pipeline's requirements before invoking the stages.
+
+---
+
 ## Directory layout
 
 The recommended roots live in `targets_materials.yaml -> globals`:
@@ -50,7 +56,7 @@ Sharding is controlled by `globals.sharding` (max records per shard, compression
 
 ---
 
-## Quick start
+## Standalone quick start (optional)
 
 ```bash
 pip install -r requirements.txt
