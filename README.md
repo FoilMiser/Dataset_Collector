@@ -26,7 +26,7 @@ Each `*_pipeline_v2` directory represents a self-contained pipeline for a domain
 
 ## Run all pipelines via JupyterLab
 
-1. Launch JupyterLab from the repository root.
+1. Launch JupyterLab from the repository root (WSL or a shell with `bash` available).
 2. Open `dataset_collector_run_all_pipelines.ipynb`.
 3. Run the notebook cells in order to execute each `*_pipeline_v2` pipeline sequentially.
 
@@ -37,11 +37,11 @@ The notebook prompts for missing environment variables (for example `GITHUB_TOKE
 All `*_pipeline_v2` directories expose a `run_pipeline.sh` entrypoint with a shared CLI contract. Individual pipelines may add additional flags, but the following is standardized.
 
 ```bash
-./run_pipeline.sh [flags] --stage <stage>
+./run_pipeline.sh --targets <targets.yaml> --stage <stage> [--execute] [other flags]
 
 Flags:
+  --targets <path>     Required path to the pipeline targets YAML.
   --stage <stage>      Stage name to execute (see Stage names).
-  --dry-run            Print actions without executing.
   --execute            Perform the actual work (required for writes).
   --help               Show usage.
 ```
@@ -62,22 +62,30 @@ Stages are pipeline-specific, but common stage names include:
 A typical end-to-end execution sequence:
 
 ```bash
-./run_pipeline.sh --stage classify --execute
-./run_pipeline.sh --stage acquire_green --execute
-./run_pipeline.sh --stage acquire_yellow --execute
-./run_pipeline.sh --stage screen_yellow --execute
-./run_pipeline.sh --stage merge --execute
-./run_pipeline.sh --stage difficulty --execute
-./run_pipeline.sh --stage catalog --execute
+./run_pipeline.sh --targets targets_math.yaml --stage classify --execute
+./run_pipeline.sh --targets targets_math.yaml --stage acquire_green --execute
+./run_pipeline.sh --targets targets_math.yaml --stage acquire_yellow --execute
+./run_pipeline.sh --targets targets_math.yaml --stage screen_yellow --execute
+./run_pipeline.sh --targets targets_math.yaml --stage merge --execute
+./run_pipeline.sh --targets targets_math.yaml --stage difficulty --execute
+./run_pipeline.sh --targets targets_math.yaml --stage catalog --execute
 ```
 
-Use `--dry-run` for a no-op preview:
+To preview the actions without writing data, omit `--execute` (dry-run):
 
 ```bash
-./run_pipeline.sh --stage classify --dry-run
+./run_pipeline.sh --targets targets_math.yaml --stage classify
 ```
 
-## Windows Quickstart (Natural corpus, optional)
+## Quickstart options
+
+### Jupyter (WSL / bash required)
+
+The notebook uses `bash run_pipeline.sh ...`, so it needs WSL or another environment
+with `bash` available. On native Windows without WSL, use the Windows orchestrator
+below instead.
+
+### Windows Quickstart (Natural corpus, optional)
 
 Use the Windows-first orchestrator to run all pipelines sequentially and emit the
 Natural corpus layout under a single destination root. This is an optional alternative to the JupyterLab notebook flow.
@@ -117,4 +125,5 @@ Update these in the pipeline’s configuration (commonly under `configs/`) to co
 
 - **Python**: Each pipeline depends on Python; version and additional tools may vary by pipeline.
 - **Requirements**: Install per-pipeline dependencies via that pipeline’s `requirements.txt`.
-- **Dry-run vs execute**: `--dry-run` prints planned actions; `--execute` performs writes. Use `--execute` only when you intend to modify data or produce outputs.
+- **Notebook dependencies**: `jupyterlab` and `ipykernel` are not in `requirements.txt`. Install them separately (or via `requirements-dev.txt` if provided).
+- **Dry-run vs execute**: dry-run is the default when `--execute` is absent. Use `--execute` only when you intend to modify data or produce outputs.

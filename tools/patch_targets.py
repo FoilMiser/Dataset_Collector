@@ -73,7 +73,7 @@ def patch_targets_yaml(
 
 
 def _parse_dataset_root(value: str) -> PurePath:
-    if \":\" in value or \"\\\\\" in value:
+    if ":" in value or "\\" in value:
         return PureWindowsPath(value)
     return PurePath(value)
 
