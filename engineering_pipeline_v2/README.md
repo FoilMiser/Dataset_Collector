@@ -1,12 +1,12 @@
 # Engineering Corpus Pipeline (v2.0)
 
-A safety-first **two-pool engineering pipeline** aligned with the `math_pipeline_v2` contract. It emphasizes **license compliance, provenance tracking, late difficulty assignment, and safe-by-default execution** across GREEN and YELLOW pools.
+A safety-first **two-pool engineering pipeline** aligned with the `math_pipeline_v2` contract. It emphasizes **license compliance, provenance tracking, and safe-by-default execution** across GREEN and YELLOW pools.
 
 What's new in v2:
-- `targets_engineering.yaml` (schema v0.8) with explicit roots + routing metadata for difficulty mapping
-- v2 workers: `acquire_worker.py`, `yellow_screen_worker.py`, `merge_worker.py`, `difficulty_worker.py`, `catalog_builder.py`
-- Two-pool raw layout: `raw/green` + `raw/yellow` → screened_yellow → combined → final/difficulty shards
-- Wrapper `run_pipeline.sh` with stages: classify → acquire_green → acquire_yellow → screen_yellow → merge → difficulty → catalog
+- `targets_engineering.yaml` (schema v0.8) with explicit roots + routing metadata for downstream sorting
+- v2 workers: `acquire_worker.py`, `yellow_screen_worker.py`, `merge_worker.py`, `catalog_builder.py`
+- Two-pool raw layout: `raw/green` + `raw/yellow` → screened_yellow → combined → screened shards
+- Wrapper `run_pipeline.sh` with stages: classify → acquire_green → acquire_yellow → screen_yellow → merge → catalog
 
 > Not legal advice. This tool helps you *track* licenses and restrictions; you are responsible for compliance.
 
@@ -34,9 +34,6 @@ yellow_screen_worker.py -> screened_yellow/{pool}/shards/*.jsonl.gz
         |
         v
 merge_worker.py -> combined/{pool}/shards/*.jsonl.gz
-        |
-        v
-difficulty_worker.py -> final/{pool}/d01..d10/shards/*.jsonl.gz
         |
         v
 catalog_builder.py -> _catalogs/global_catalog.json
@@ -70,7 +67,6 @@ python3 review_queue.py --queue /data/engineering/_queues/yellow_pipeline.jsonl 
 ./run_pipeline.sh --targets targets_engineering.yaml --stage acquire_yellow --execute
 ./run_pipeline.sh --targets targets_engineering.yaml --stage screen_yellow --execute
 ./run_pipeline.sh --targets targets_engineering.yaml --stage merge --execute
-./run_pipeline.sh --targets targets_engineering.yaml --stage difficulty --execute
 ./run_pipeline.sh --targets targets_engineering.yaml --stage catalog
 ```
 
@@ -83,8 +79,7 @@ python3 review_queue.py --queue /data/engineering/_queues/yellow_pipeline.jsonl 
 - `acquire_worker.py` - download GREEN/YELLOW payloads into `raw/green|yellow/{pool}/{target}`
 - `yellow_screen_worker.py` - canonicalize YELLOW payloads into screened JSONL shards + ledgers
 - `merge_worker.py` - merge GREEN + screened YELLOW into combined shards
-- `difficulty_worker.py` - assign difficulty and write final shards bucketed by d01–d10
-- `catalog_builder.py` - summarize raw/screened/combined/final outputs
+- `catalog_builder.py` - summarize raw/screened/combined outputs
 - `run_pipeline.sh` - convenience wrapper for the v2 stage order
 - `yellow_scrubber.py` - legacy helper for bespoke YELLOW transforms (optional)
 - `pmc_worker.py` - optional PMC addon (run before merge if used)
@@ -94,7 +89,6 @@ python3 review_queue.py --queue /data/engineering/_queues/yellow_pipeline.jsonl 
 - `license_map.yaml` - SPDX normalization rules + gating policy
 - `field_schemas.yaml` - versioned schemas for extracted/normalized records
 - `denylist.yaml` - explicit denylist patterns (v0.2 with severity and provenance)
-- `difficulties_engineering.yaml` - routing → difficulty defaults for `difficulty_worker.py`
 
 ---
 
@@ -107,7 +101,7 @@ python3 review_queue.py --queue /data/engineering/_queues/yellow_pipeline.jsonl 
     yellow/{license_pool}/{target_id}/...
   screened_yellow/{license_pool}/shards/*.jsonl.gz
   combined/{license_pool}/shards/*.jsonl.gz
-  final/{license_pool}/d01..d10/shards/*.jsonl.gz
+  screened/{license_pool}/shards/*.jsonl.gz
   _ledger/*.jsonl
   _pitches/*.jsonl
   _queues/*.jsonl

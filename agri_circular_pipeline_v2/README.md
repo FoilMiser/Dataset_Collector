@@ -2,14 +2,13 @@
 
 A staged, audit-friendly pipeline for building an agriculture + circular bioeconomy corpus. It adapts the v2 math pipeline layout so every step has explicit queues, manifests, and ledgers.
 
-The pipeline now separates acquisition, strict screening, merging, and difficulty assignment:
+The pipeline now separates acquisition, strict screening, merging, and cataloging:
 
 1. **Classify** targets + snapshot license evidence → GREEN / YELLOW / RED queues
 2. **Acquire** GREEN + YELLOW payloads into `raw/{green|yellow}/...` with per-target manifests
 3. **Screen YELLOW** strictly (anything unclear is pitched) → `screened_yellow/...` + pass/pitch ledgers
 4. **Merge** canonical GREEN + screened YELLOW → `combined/...` + combined index ledger
-5. **Difficulty** final screening + difficulty assignment → `final/.../d01..d10/...` + final index ledger
-6. **Catalog** summaries across stages → `_catalogs/catalog_v2.json`
+5. **Catalog** summaries across stages → `_catalogs/catalog_v2.json`
 
 > Not legal advice. This tool helps you *track* licenses and restrictions; you are responsible for compliance.
 
@@ -30,12 +29,12 @@ This pipeline is typically executed as part of the repository-wide run in Jupyte
 
   screened_yellow/{license_pool}/shards/yellow_shard_00000.jsonl.gz
   combined/{license_pool}/shards/combined_00000.jsonl.gz
-  final/{license_pool}/d01..d10/shards/final_00000.jsonl.gz
+  screened/{license_pool}/shards/screened_00000.jsonl.gz
 
   _queues/{green_download,yellow_pipeline,red_rejected}.jsonl
   _manifests/{target_id}/...
-  _ledger/{yellow_passed,yellow_pitched,combined_index,merge_summary,final_index,difficulty_summary}.jsonl
-  _pitches/final_pitched.jsonl
+  _ledger/{yellow_passed,yellow_pitched,combined_index,merge_summary,screened_index}.jsonl
+  _pitches/screened_pitched.jsonl
   _catalogs/catalog_v2.json
   _logs/
 ```
@@ -55,10 +54,9 @@ Use `run_pipeline.sh` to orchestrate stages (dry-run by default):
 ./run_pipeline.sh --targets targets_agri_circular.yaml --stage acquire_green --execute --workers 4
 ./run_pipeline.sh --targets targets_agri_circular.yaml --stage acquire_yellow --execute --workers 4
 
-# Screen/merge/difficulty
+# Screen/merge
 ./run_pipeline.sh --targets targets_agri_circular.yaml --stage screen_yellow --execute
 ./run_pipeline.sh --targets targets_agri_circular.yaml --stage merge --execute
-./run_pipeline.sh --targets targets_agri_circular.yaml --stage difficulty --execute
 
 # Catalog
 ./run_pipeline.sh --targets targets_agri_circular.yaml --stage catalog
@@ -66,7 +64,7 @@ Use `run_pipeline.sh` to orchestrate stages (dry-run by default):
 
 Additional helper stages:
 - `--stage review` → list pending YELLOW items for manual signoff.
-- `--stage all` → run classify → acquire → screen_yellow → merge → difficulty → catalog.
+- `--stage all` → run classify → acquire → screen_yellow → merge → catalog.
 
 ---
 
@@ -75,9 +73,7 @@ Additional helper stages:
 - `acquire_worker.py` — downloads GREEN/YELLOW targets into the v2 raw layout and writes manifest markers.
 - `yellow_screen_worker.py` — strict YELLOW screening with pass/pitch ledgers; handles JSONL plus common CSV/TSV/TXT/HTML inputs.
 - `merge_worker.py` — merges canonical GREEN + screened YELLOW into `combined/` with deduplication and combined index ledger.
-- `difficulty_worker.py` — assigns difficulty (d01–d10) using routing + heuristics; writes final shards and ledgers.
 - `catalog_builder.py` — summarizes counts/bytes across stages into `_catalogs/catalog_v2.json`.
-- `difficulties_agri_circular.yaml` — starter difficulty map keyed by routing (`subject: agri_circular`).
 
 Legacy/compatibility helpers:
 - `download_worker_legacy.py`, `yellow_scrubber_legacy.py` — kept for reference; not used in the v2 flow.
@@ -86,4 +82,4 @@ Legacy/compatibility helpers:
 ---
 
 ## Targets + routing
-`targets_agri_circular.yaml` now points to the v2 roots and companions, including `difficulties_agri_circular.yaml`. Routing can be provided via `routing` or `agri_routing` blocks; default subject is `agri_circular`.
+`targets_agri_circular.yaml` now points to the v2 roots and companions. Routing can be provided via `routing` or `agri_routing` blocks; default subject is `agri_circular`.

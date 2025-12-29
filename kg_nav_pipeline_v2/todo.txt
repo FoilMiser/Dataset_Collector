@@ -13,8 +13,8 @@ VERSION HISTORY (kg_nav adaptation)
 
 v1 -> v2 skeleton:
   [x] Ported math_pipeline_v2 shell into kg_nav_pipeline_v2
-  [x] Added routing defaults + difficulty map for KG navigation
-  [x] Implemented adapter-based yellow screening + structural difficulty heuristics
+  [x] Added routing defaults for KG navigation (sorter pipeline ownership)
+  [x] Implemented adapter-based yellow screening + structural metadata hooks
 
 ================================================================================
 NEXT STEPS
@@ -27,7 +27,7 @@ HIGH PRIORITY
    [ ] Sample fixtures that exercise PII scrubbing + deny phrase hits
 
 2) Episode synthesis
-   [ ] Implement navigation episode generator to transform combined graph shards into episodes before difficulty bucketting
+   [ ] Implement navigation episode generator to transform combined graph shards into episodes before sorter bucketting
    [ ] Add metrics for episode coverage per task_type/domain/category
 
 3) Download strategy coverage
@@ -35,7 +35,7 @@ HIGH PRIORITY
    [ ] Add resumable snapshot logic for large dumps (OpenAlex, Crossref) with checksum validation
 
 4) Catalog/reporting
-   [ ] Extend catalog_builder to summarize difficulty methods (existing vs routing vs structural)
+   [ ] Extend catalog_builder to summarize routing + structural metadata coverage
    [ ] Add per-routing shard counts for audit
 
 MEDIUM PRIORITY

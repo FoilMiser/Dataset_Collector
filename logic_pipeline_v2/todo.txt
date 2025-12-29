@@ -13,9 +13,9 @@ VERSION HISTORY (logic v2 adaptation)
 
 v1 -> v2 Completed:
   [x] Adopted v2 stage contract and routing-aware pipeline_driver (targets_logic.yaml)
-  [x] Logic-focused license_map, field_schemas, denylist skeletons, and difficulty map
+  [x] Logic-focused license_map, field_schemas, and denylist skeletons (sorting owned by the sorter pipeline)
   [x] Added logic-specific queues/gates (copyleft segregation, record-level filters)
-  [x] Mirrored math v2 layout for raw/screened/combined/final shards
+  [x] Mirrored math v2 layout for raw/screened/combined/screened shards
 
 ================================================================================
 v2 -> v2.x — WHAT NEEDS TO CHANGE / BE UPDATED
@@ -37,7 +37,7 @@ HIGH PRIORITY (Production readiness)
 3) Testing + CI
    [ ] Unit tests for restriction scans and SPDX normalization
    [ ] Sample queue fixtures for logic targets
-   [ ] Smoke test classify -> acquire -> screen -> merge -> difficulty -> catalog on tiny logic fixtures
+   [ ] Smoke test classify -> acquire -> screen -> merge -> catalog on tiny logic fixtures (sorting handled in sorter pipeline)
 
 MEDIUM PRIORITY (Quality + coverage)
 ------------------------------------

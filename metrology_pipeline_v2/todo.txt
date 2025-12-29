@@ -13,9 +13,9 @@ VERSION HISTORY (metrology adaptation)
 
 v1.0 -> v2.0 Completed:
   [x] Adapted pipeline_driver + targets to metrology inventory (targets_metrology.yaml)
-  [x] Added v2 acquisition/screen/merge/difficulty stages
+  [x] Added v2 acquisition/screen/merge stages (sorting owned by the sorter pipeline)
   [x] Added PDF/HTML extraction in acquire_worker for chunked JSONL output
-  [x] Added deterministic difficulty routing via difficulties_metrology.yaml
+  [x] Added routing metadata for downstream sorting (sorter pipeline ownership)
 
 ================================================================================
 v2.0 — WHAT NEEDS TO CHANGE / BE UPDATED
@@ -36,7 +36,7 @@ HIGH PRIORITY (Production readiness)
 3) Testing + CI
    [ ] Unit tests for restriction scans and SPDX normalization
    [ ] Sample queue fixtures for metrology targets
-   [ ] Smoke test classify -> acquire -> difficulty on small PDFs
+   [ ] Smoke test classify -> acquire -> merge -> catalog on small PDFs (sorting handled in sorter pipeline)
 
 MEDIUM PRIORITY (Quality + coverage)
 ------------------------------------
@@ -66,4 +66,4 @@ Notes for next iteration
 ================================================================================
 - Preserve tables and captions; standards often encode definitions there.
 - Keep paywalled standards (ISO/IEEE) disabled.
-- Maintain routing metadata on every chunk for deterministic difficulty mapping.
+- Maintain routing metadata on every chunk for deterministic sorting in the sorter pipeline.

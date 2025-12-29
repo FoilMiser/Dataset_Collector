@@ -12,16 +12,16 @@ Landing checklist
 ================================================================================
 
 v1 -> v2 migration:
-  [x] Adopted math v2 stage order (classify → acquire_green → acquire_yellow → screen_yellow → merge → difficulty → catalog).
-  [x] Migrated targets to v2 roots and added difficulties_cyber.yaml pointer.
+  [x] Adopted math v2 stage order (classify → acquire_green → acquire_yellow → screen_yellow → merge → catalog).
+  [x] Migrated targets to v2 roots and added routing metadata for sorter ownership.
   [x] Swapped download_worker for acquire_worker with dry-run default + done markers.
-  [x] Added merge_worker, difficulty_worker, yellow_screen_worker, and review prep (yellow_scrubber).
+  [x] Added merge_worker, yellow_screen_worker, and review prep (yellow_scrubber).
   [x] Copied cyber domain helpers (nvd_worker, stix_worker, advisory_worker, pmc_worker).
   [x] Updated docs/run_pipeline.sh to reference targets_cyber.yaml and /data/cyber layout.
 
 Next up (full cyber coverage):
   [ ] Integrate normalization hooks (Option A) in acquire_worker for NVD/STIX/GHSA feeds.
   [ ] Define routing defaults per target (incident_response, vulnerability_data, threat_modeling, etc.).
-  [ ] Expand difficulty routing_map for more domains/categories.
-  [ ] Add smoke-test fixtures covering classify → merge → difficulty with sample JSONL shards.
+  [ ] Expand routing coverage for more domains/categories (sorter pipeline ownership).
+  [ ] Add smoke-test fixtures covering classify → merge → catalog with sample JSONL shards (sorting handled in sorter pipeline).
   [ ] Refresh denylist + gates once normalization emits cyber-specific fields.

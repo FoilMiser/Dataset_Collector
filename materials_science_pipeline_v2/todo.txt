@@ -37,7 +37,7 @@ HIGH PRIORITY (Production readiness)
 3) Testing + CI
    [ ] Unit tests for materials restriction scans and SPDX normalization
    [ ] Sample queue fixtures for materials targets
-   [ ] Smoke test classify -> acquire -> merge -> difficulty on tiny materials fixtures
+   [ ] Smoke test classify -> acquire -> merge -> catalog on tiny materials fixtures (sorting handled in sorter pipeline)
 
 MEDIUM PRIORITY (Quality + coverage)
 ------------------------------------

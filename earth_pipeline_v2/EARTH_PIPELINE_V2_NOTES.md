@@ -6,6 +6,6 @@ Key deltas from math → earth:
 - Default roots under `/data/earth` and Earth-specific queue names.
 - Routing defaults to `subject=earth` with optional `earth_routing` alias in targets.
 - User agent set to `earth-corpus-pipeline/{VERSION}` during evidence fetching.
-- New companion files: `targets_earth.yaml`, `difficulties_earth.yaml`, and Earth schemas/license map.
+- New companion files: `targets_earth.yaml` and Earth schemas/license map.
 
 Future improvements live in `todo.txt`.

@@ -8,8 +8,7 @@ Stages:
 2. Acquire GREEN and YELLOW targets into raw pools (`acquire_worker.py`).
 3. Screen YELLOW data into canonical records with chemistry-aware plugins (`yellow_screen_worker.py`).
 4. Merge GREEN + screened YELLOW into combined candidate shards (`merge_worker.py`).
-5. Apply a final screen and difficulty assignment, writing difficulty shards (`difficulty_worker.py`).
-6. Build catalogs and attribution bundles over the new layout (`catalog_builder.py`).
+5. Build collector catalogs, ledgers, and manifests over screened shards (`catalog_builder.py`).
 
 > Not legal advice. This tooling helps track licenses and restrictions; you remain responsible for compliance.
 
@@ -30,7 +29,7 @@ Roots are defined in `targets_chem.yaml -> globals`:
     yellow/{license_pool}/{target_id}/...
   screened_yellow/{license_pool}/shards/*.jsonl.gz
   combined/{license_pool}/shards/*.jsonl.gz
-  final/{license_pool}/d01..d10/shards/*.jsonl.gz
+  screened/{license_pool}/shards/*.jsonl.gz
   _ledger/*.jsonl
   _pitches/*.jsonl
   _queues/*.jsonl
@@ -49,10 +48,9 @@ Sharding is controlled by `globals.sharding` (max records per shard, compression
 | Acquire | `acquire_worker.py` | Downloads payloads into `raw/{green|yellow}/{license_pool}/{target_id}`. Dry-run by default; `--execute` performs downloads. Supports HTTP/FTP/git/Zenodo/Dataverse, HuggingFace datasets, Figshare, and GitHub releases. |
 | Screen YELLOW | `yellow_screen_worker.py` | Converts raw YELLOW payloads into canonical records. Includes `jsonl` default plus chemistry plugins such as `pubchem_computed_only` and `pmc_oa`. Writes pass/pitch ledgers + done markers. |
 | Merge | `merge_worker.py` | Combines canonical GREEN + screened YELLOW shards with deduplication and a combined ledger. |
-| Difficulty | `difficulty_worker.py` | Final light screen + rule-based difficulty assignment using `difficulties_chem.yaml`; writes difficulty shards and ledger. |
-| Catalog | `catalog_builder.py` | Summarizes counts, bytes, and ledgers across stages. |
+| Catalog | `catalog_builder.py` | Summarizes counts, bytes, manifests, and ledgers across stages. |
 
-`run_pipeline.sh` orchestrates these stages with `--stage classify|acquire_green|acquire_yellow|screen_yellow|merge|difficulty|catalog`.
+`run_pipeline.sh` orchestrates these stages with `--stage classify|acquire_green|acquire_yellow|screen_yellow|merge|catalog`.
 
 ---
 
@@ -68,10 +66,9 @@ pip install -r requirements.txt
 ./run_pipeline.sh --targets targets_chem.yaml --stage acquire_green --execute
 ./run_pipeline.sh --targets targets_chem.yaml --stage acquire_yellow --execute
 
-# Screen, merge, difficulty, catalog
+# Screen, merge, catalog
 ./run_pipeline.sh --targets targets_chem.yaml --stage screen_yellow --execute
 ./run_pipeline.sh --targets targets_chem.yaml --stage merge --execute
-./run_pipeline.sh --targets targets_chem.yaml --stage difficulty --execute
 ./run_pipeline.sh --targets targets_chem.yaml --stage catalog
 ```
 
