@@ -126,7 +126,7 @@ resolvers:
 targets:
   - id: "synthetic_logic_problems"
     name: "Your generated deterministic logic problems (auto-graded)"
-    enabled: true
+    enabled: false
     priority: 10
     license_profile: "permissive"
     license_evidence:
@@ -502,7 +502,7 @@ targets:
 
   - id: "sep_stanford_encyclopedia_of_philosophy"
     name: "Stanford Encyclopedia of Philosophy (copyrighted; not a training corpus)"
-    enabled: true
+    enabled: false
     priority: 1
     publisher: "stanford"
     license_profile: "deny"

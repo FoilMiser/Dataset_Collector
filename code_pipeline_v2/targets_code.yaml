@@ -122,7 +122,7 @@ targets:
 
   - id: "synthetic_code_problems_v1"
     name: "Synthetic Code Problems (internal generator output)"
-    enabled: true
+    enabled: false
     bucket_hint: "GREEN"
     license_profile: "permissive"
     license_evidence:
