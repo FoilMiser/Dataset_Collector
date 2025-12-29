@@ -3,7 +3,7 @@
 catalog_builder.py (v2.0)
 
 Builds a lightweight catalog for the v2 code pipeline layout. Summaries are
-organized by stage (raw, screened_yellow, combined, final) and by license pool
+organized by stage (raw, screened_yellow, combined) and by license pool
 when applicable. Adds lightweight language/source coverage stats from combined
 shards.
 """
@@ -96,30 +96,6 @@ def collect_shard_stage(root: Path) -> Dict[str, Any]:
     return stage
 
 
-def collect_final_stage(root: Path) -> Dict[str, Any]:
-    stage = {"path": str(root), "pools": {}}
-    if not root.exists():
-        return stage
-    for pool_dir in root.iterdir():
-        if not pool_dir.is_dir():
-            continue
-        pool_stats: Dict[str, Any] = {"difficulties": {}}
-        for level_dir in pool_dir.iterdir():
-            if not level_dir.is_dir():
-                continue
-            shards_dir = level_dir / "shards"
-            level_stats = {"files": 0, "bytes": 0, "examples": []}
-            if shards_dir.exists():
-                for fp in shards_dir.glob("*.jsonl*"):
-                    level_stats["files"] += 1
-                    level_stats["bytes"] += fp.stat().st_size
-                    if len(level_stats["examples"]) < 3:
-                        level_stats["examples"].append(file_stats(fp))
-            pool_stats["difficulties"][level_dir.name] = level_stats
-        stage["pools"][pool_dir.name] = pool_stats
-    return stage
-
-
 def collect_code_stats(combined_root: Path, sample_limit: int = 2000) -> Dict[str, Any]:
     stats: Dict[str, Any] = {"languages": {}, "avg_loc": 0.0, "samples": 0, "top_sources": {}}
     loc_total = 0
@@ -149,7 +125,6 @@ def build_catalog(cfg: Dict[str, Any]) -> Dict[str, Any]:
     raw_root = Path(g.get("raw_root", "/data/code/raw"))
     screened_root = Path(g.get("screened_yellow_root", "/data/code/screened_yellow"))
     combined_root = Path(g.get("combined_root", "/data/code/combined"))
-    final_root = Path(g.get("final_root", "/data/code/final"))
     ledger_root = Path(g.get("ledger_root", "/data/code/_ledger"))
 
     catalog = {
@@ -158,12 +133,11 @@ def build_catalog(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "raw": collect_raw_stats(raw_root),
         "screened_yellow": collect_shard_stage(screened_root),
         "combined": collect_shard_stage(combined_root),
-        "final": collect_final_stage(final_root),
         "ledgers": {},
         "code": collect_code_stats(combined_root),
     }
 
-    for ledger_name in ["yellow_passed.jsonl", "yellow_pitched.jsonl", "combined_index.jsonl", "final_index.jsonl"]:
+    for ledger_name in ["yellow_passed.jsonl", "yellow_pitched.jsonl", "combined_index.jsonl"]:
         lp = ledger_root / ledger_name
         catalog["ledgers"][ledger_name] = {"exists": lp.exists(), "path": str(lp)}
 

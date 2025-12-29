@@ -37,7 +37,6 @@ def patch_targets_yaml(
         "raw_root": dataset_root / "raw",
         "screened_yellow_root": dataset_root / "screened_yellow",
         "combined_root": dataset_root / "combined",
-        "final_root": dataset_root / "final",
         "ledger_root": dataset_root / "_ledger",
         "pitches_root": dataset_root / "_pitches",
         "manifests_root": dataset_root / "_manifests",

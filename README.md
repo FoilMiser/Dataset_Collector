@@ -1,7 +1,7 @@
 # Dataset Collector
 
 ## Overview
-The Dataset Collector repository organizes a family of domain-specific data collection pipelines under `*_pipeline_v2/` directories. The primary way to run the full suite is the JupyterLab notebook `dataset_collector_run_all_pipelines.ipynb`, which executes every domain pipeline sequentially in one session while prompting for required API keys and optionally installing per-pipeline requirements.
+The Dataset Collector repository organizes a family of domain-specific data collection pipelines under `*_pipeline_v2/` directories. The primary way to run the full suite is the JupyterLab notebook `dataset_collector_run_all_pipelines.ipynb`, which executes every domain pipeline sequentially in one session while prompting for required API keys and optionally installing per-pipeline requirements. The collector's canonical output is the `combined/` stage; no "final" post-processing stage is produced here.
 
 Each `*_pipeline_v2` directory represents a self-contained pipeline for a domain:
 
@@ -139,7 +139,7 @@ Within each `*_pipeline_v2` directory, you should expect:
 Two global configuration entries determine where queues and catalogs are stored:
 
 - `globals.queues_root`: root path for pipeline queues (intermediate work items).
-- `globals.catalogs_root`: root path for final catalogs.
+- `globals.catalogs_root`: root path for pipeline catalogs.
 
 Update these in the pipeline’s configuration (commonly under `configs/`) to control where outputs are written.
 

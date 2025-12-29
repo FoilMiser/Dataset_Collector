@@ -790,7 +790,7 @@ def main() -> None:
         # v0.9: Dataset-aware splitting support
         split_group_id = str(t.get("split_group_id", "") or tid)
 
-        # Output pool selection + 3D routing (difficulty-aware download paths)
+        # Output pool selection (difficulty recorded as metadata only)
         out_pool = (t.get("output", {}) or {}).get("pool")
         if not out_pool:
             if profile in {"permissive", "copyleft", "quarantine"}:
