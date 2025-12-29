@@ -29,7 +29,7 @@ NEAR-TERM IMPROVEMENTS
 2) Safety and routing
    [ ] Enforce record-level license checks when require_record_license is true
    [ ] Add deny phrase coverage for common chemistry publisher terms
-   [ ] Wire chem_routing into merge/difficulty fallbacks everywhere
+   [ ] Wire chem_routing into merge and sorter fallbacks everywhere
 
 3) Testing + fixtures
    [ ] Tiny end-to-end dry-run fixture (classify->acquire->screen) for CI

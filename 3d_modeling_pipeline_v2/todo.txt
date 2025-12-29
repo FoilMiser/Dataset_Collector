@@ -12,8 +12,8 @@ VERSION HISTORY (3D adaptation)
 ================================================================================
 
 v1 -> v2 Completed:
-  [x] Restructured pipeline stages to match v2 flow (classify → acquire → screen → merge → difficulty → catalog)
-  [x] Added 3D routing fields and difficulty mapping via difficulties_3d.yaml
+  [x] Restructured pipeline stages to match v2 flow (classify → acquire → screen → merge → catalog)
+  [x] Added 3D routing fields for downstream sorting (sorter pipeline ownership)
   [x] Preserved strict license evidence + denylist screening
 
 ================================================================================
@@ -32,8 +32,8 @@ HIGH PRIORITY (Production readiness)
    [ ] Add per-record SPDX normalization in screening stage
 
 3) Testing + CI
-   [ ] Unit tests for mesh hashing + routing-based difficulty assignment
-   [ ] Smoke test classify → acquire → screen → merge → difficulty on small fixture
+   [ ] Unit tests for mesh hashing + routing metadata coverage
+   [ ] Smoke test classify → acquire → screen → merge → catalog on small fixture (sorting handled in sorter pipeline)
 
 MEDIUM PRIORITY (Quality + coverage)
 ------------------------------------

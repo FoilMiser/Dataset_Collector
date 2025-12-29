@@ -18,13 +18,13 @@ HIGH PRIORITY (Parity + routing)
    [ ] Move PubChem computed-only transform into yellow_screen_worker plugins.
    [ ] Add record-level license validation hooks for GBIF/iNaturalist when enabled.
 
-2) Difficulty + routing coverage
-   [ ] Expand difficulties_biology.yaml with more domains/categories.
+2) Routing coverage (sorter-owned)
+   [ ] Expand routing coverage for more domains/categories (sorter pipeline ownership).
    [ ] Add regression fixtures ensuring routing fields are present in queues.
 
 3) Testing + CI
    [ ] Unit tests for restriction phrase scans and SPDX normalization.
-   [ ] Smoke test classify → acquire → screen_yellow → merge → difficulty on small fixtures.
+   [ ] Smoke test classify → acquire → screen_yellow → merge → catalog on small fixtures (sorting handled in sorter pipeline).
 
 MEDIUM PRIORITY (Quality + safety)
 ----------------------------------
@@ -47,5 +47,5 @@ LOW PRIORITY (Ergonomics)
 Notes for next iteration
 ================================================================================
 - Keep synthetic/owned problem sets clearly marked and licensed (CC0 preferred).
-- Use routing fields consistently for difficulty + downstream sampling.
+- Use routing fields consistently for downstream sorting and sampling.
 - Preserve attribution bundles and evidence snapshots for reproducibility.
