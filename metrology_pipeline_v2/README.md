@@ -34,7 +34,7 @@ The recommended roots live in `targets_metrology.yaml -> globals`:
   _manifests/{target_id}/...
 ```
 
-Queue files in `_queues/` follow the canonical naming scheme: `green_download.jsonl`, `yellow_pipeline.jsonl`, and `red.jsonl`.
+Queue files in `_queues/` follow the canonical naming scheme: `green_download.jsonl`, `yellow_pipeline.jsonl`, and `red_rejected.jsonl`.
 
 Sharding is controlled by `globals.sharding` (max records per shard, compression, naming `*_00000.jsonl.gz`).
 

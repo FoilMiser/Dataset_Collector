@@ -72,18 +72,18 @@ globals:
 
 queues:
   emit:
-    - id: green
+    - id: green_download
       path: /data/metrology/_queues/green_download.jsonl
       criteria:
         effective_bucket: GREEN
         enabled: true
-    - id: yellow
+    - id: yellow_pipeline
       path: /data/metrology/_queues/yellow_pipeline.jsonl
       criteria:
         effective_bucket: YELLOW
         enabled: true
-    - id: red
-      path: /data/metrology/_queues/red.jsonl
+    - id: red_rejected
+      path: /data/metrology/_queues/red_rejected.jsonl
       criteria:
         effective_bucket: RED
         enabled: true

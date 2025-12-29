@@ -99,6 +99,14 @@ python tools\build_natural_corpus.py --dest-root "E:\AI-Research\datasets\Natura
 
 To preview the actions without writing data, omit `--execute` (dry-run).
 
+#### Prereqs (Windows)
+
+Install the following tools if you plan to use targets that rely on them:
+
+- **Git for Windows** (required for `download.strategy: git`): https://git-scm.com/download/win
+- **AWS CLI v2** (required for `s3_sync` or `aws_requester_pays`): https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
+- **aria2** (required for `download.strategy: torrent`): https://aria2.github.io/
+
 ### Windows Quickstart (Natural corpus, optional)
 
 Use the Windows-first orchestrator to run all pipelines sequentially and emit the
@@ -140,7 +148,7 @@ Update these in the pipeline’s configuration (commonly under `configs/`) to co
 - **Python**: Each pipeline depends on Python; version and additional tools may vary by pipeline.
 - **Requirements**: Install per-pipeline dependencies via that pipeline’s `requirements.txt`.
 - **Notebook dependencies**: `jupyterlab` and `ipykernel` are not in `requirements.txt`. Install them separately (or via `requirements-dev.txt` if provided).
-- **External tools**: `git` is required when a target uses `download.strategy: git`. The AWS CLI is required for `s3_sync` or `aws_requester_pays` download modes.
+- **External tools**: `git` is required when a target uses `download.strategy: git`. The AWS CLI is required for `s3_sync` or `aws_requester_pays` download modes. `aria2c` is required for `download.strategy: torrent`.
 - **Dry-run vs execute**: dry-run is the default when `--execute` is absent. Use `--execute` only when you intend to modify data or produce outputs.
 
 ## Preflight validation

@@ -1,203 +1,111 @@
-#!/usr/bin/env python3
 from __future__ import annotations
 
 import argparse
-import ast
-import importlib
+import importlib.util
 import shutil
 import sys
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, List, Set
 
 import yaml
 
-STRATEGY_DEPENDENCIES: Dict[str, List[str]] = {
-    "huggingface_datasets": ["datasets", "pyarrow"],
-    "s3_public": ["boto3"],
-}
-
-STRATEGY_EXTERNAL_TOOLS: Dict[str, List[str]] = {
-    "git": ["git"],
-    "s3_sync": ["aws"],
-    "aws_requester_pays": ["aws"],
+EXTERNAL_TOOL_STRATEGIES = {
+    "git": "git",
+    "torrent": "aria2c",
+    "s3_sync": "aws",
+    "aws_requester_pays": "aws",
 }
 
 
-def resolve_repo_root() -> Path:
-    return Path(__file__).resolve().parents[1]
+def _load_yaml(path: Path) -> Dict[str, Any]:
+    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
 
-def load_yaml(path: Path) -> Dict[str, object]:
-    try:
-        content = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except Exception as exc:  # pragma: no cover - failure path
-        raise ValueError(f"Failed to parse YAML {path}: {exc}") from exc
-    if not isinstance(content, dict):
-        raise ValueError(f"Expected mapping at top-level in {path}")
-    return content
+def _load_strategy_handlers(acquire_worker_path: Path) -> Set[str]:
+    module_name = f"acquire_worker_{acquire_worker_path.parent.name}"
+    spec = importlib.util.spec_from_file_location(module_name, acquire_worker_path)
+    if not spec or not spec.loader:
+        raise RuntimeError(f"Unable to load module from {acquire_worker_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    handlers = getattr(module, "STRATEGY_HANDLERS", None)
+    if not isinstance(handlers, dict):
+        raise RuntimeError(f"STRATEGY_HANDLERS not found in {acquire_worker_path}")
+    return set(handlers.keys())
 
 
-def extract_strategy_handlers(worker_path: Path) -> Set[str]:
-    if not worker_path.exists():
-        return set()
-    try:
-        tree = ast.parse(worker_path.read_text(encoding="utf-8"))
-    except Exception:
-        return set()
-
-    for node in tree.body:
-        if isinstance(node, ast.Assign):
-            for target in node.targets:
-                if isinstance(target, ast.Name) and target.id == "STRATEGY_HANDLERS":
-                    if isinstance(node.value, ast.Dict):
-                        keys = []
-                        for key in node.value.keys:
-                            if isinstance(key, ast.Constant) and isinstance(key.value, str):
-                                keys.append(key.value)
-                        return set(keys)
-    return set()
-
-
-def normalize_strategy(value: object) -> str:
-    if value is None:
-        return ""
-    return str(value).strip()
-
-
-def record_dependency_warnings(strategies: Iterable[str], warnings: List[str]) -> None:
-    needed_deps: Set[str] = set()
-    for strat in strategies:
-        needed_deps.update(STRATEGY_DEPENDENCIES.get(strat, []))
-    for dep in sorted(needed_deps):
-        try:
-            importlib.import_module(dep)
-        except Exception as exc:  # pragma: no cover - optional deps
-            warnings.append(f"Optional dependency '{dep}' is not importable: {exc}")
-
-
-def record_tool_warnings(strategies: Iterable[str], warnings: List[str]) -> None:
-    needed_tools: Set[str] = set()
-    for strat in strategies:
-        needed_tools.update(STRATEGY_EXTERNAL_TOOLS.get(strat, []))
-    for tool in sorted(needed_tools):
-        if shutil.which(tool) is None:
-            warnings.append(f"External tool '{tool}' is required by enabled targets but was not found on PATH")
-
-
-def validate_targets(
-    pipeline_name: str,
-    pipeline_dir: Path,
-    targets_path: Path,
-    strategies_needed: Set[str],
-    errors: List[str],
-    warnings: List[str],
-) -> None:
-    try:
-        cfg = load_yaml(targets_path)
-    except ValueError as exc:
-        errors.append(str(exc))
-        return
-
-    targets = cfg.get("targets")
-    if targets is None:
-        errors.append(f"{pipeline_name}: missing 'targets' list in {targets_path}")
-        return
-    if not isinstance(targets, list):
-        errors.append(f"{pipeline_name}: 'targets' must be a list in {targets_path}")
-        return
-
-    strategy_handlers = extract_strategy_handlers(pipeline_dir / "acquire_worker.py")
-    if not strategy_handlers:
-        warnings.append(f"{pipeline_name}: unable to determine supported strategies (missing or unparsable acquire_worker.py)")
-
+def _iter_enabled_targets(targets: Iterable[Dict[str, Any]]) -> Iterable[Dict[str, Any]]:
     for target in targets:
-        if not isinstance(target, dict):
-            errors.append(f"{pipeline_name}: target entry must be a mapping in {targets_path}")
-            continue
-        if not target.get("enabled", True):
-            continue
-        target_id = target.get("id", "<missing id>")
-        download = target.get("download") or {}
-        if not isinstance(download, dict):
-            errors.append(f"{pipeline_name}:{target_id}: download section must be a mapping")
-            continue
-        strategy = normalize_strategy(download.get("strategy"))
-        if not strategy or strategy == "none":
-            errors.append(f"{pipeline_name}:{target_id}: enabled target missing supported download.strategy")
-            continue
-        strategies_needed.add(strategy)
-        if strategy_handlers and strategy not in strategy_handlers:
-            errors.append(
-                f"{pipeline_name}:{target_id}: download.strategy '{strategy}' not supported by {pipeline_dir / 'acquire_worker.py'}"
-            )
+        enabled = target.get("enabled", True)
+        if enabled:
+            yield target
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Validate pipeline map + targets configuration.")
-    parser.add_argument(
-        "--pipeline-map",
-        default="tools/pipeline_map.yaml",
-        help="Path to pipeline_map.yaml (default: tools/pipeline_map.yaml)",
-    )
-    args = parser.parse_args()
-
-    repo_root = resolve_repo_root()
-    map_path = Path(args.pipeline_map)
-    if not map_path.is_absolute():
-        map_path = repo_root / map_path
-
+def run_preflight(repo_root: Path, pipeline_map_path: Path) -> int:
+    pipeline_map = _load_yaml(pipeline_map_path)
+    pipelines_cfg = pipeline_map.get("pipelines", {}) or {}
     errors: List[str] = []
     warnings: List[str] = []
-    strategies_needed: Set[str] = set()
+    strategies_in_use: Set[str] = set()
 
-    if not map_path.exists():
-        errors.append(f"Pipeline map not found: {map_path}")
-    else:
+    for pipeline_name, pipeline_entry in pipelines_cfg.items():
+        pipeline_dir = repo_root / pipeline_name
+        if not pipeline_dir.exists():
+            errors.append(f"Pipeline directory missing: {pipeline_dir}")
+            continue
+
+        targets_yaml = pipeline_entry.get("targets_yaml")
+        if not targets_yaml:
+            errors.append(f"Pipeline map entry missing targets_yaml for: {pipeline_name}")
+            continue
+
+        targets_path = pipeline_dir / targets_yaml
+        if not targets_path.exists():
+            errors.append(f"Targets YAML missing: {targets_path}")
+            continue
+
+        acquire_worker_path = pipeline_dir / "acquire_worker.py"
+        if not acquire_worker_path.exists():
+            errors.append(f"Acquire worker missing: {acquire_worker_path}")
+            continue
+
         try:
-            map_cfg = load_yaml(map_path)
-        except ValueError as exc:
+            handler_keys = _load_strategy_handlers(acquire_worker_path)
+        except RuntimeError as exc:
             errors.append(str(exc))
-            map_cfg = {}
+            continue
 
-        pipelines = map_cfg.get("pipelines") if isinstance(map_cfg, dict) else None
-        if not isinstance(pipelines, dict):
-            errors.append(f"Missing or invalid 'pipelines' mapping in {map_path}")
-            pipelines = {}
+        targets_cfg = _load_yaml(targets_path)
+        targets = targets_cfg.get("targets", []) or []
+        for target in _iter_enabled_targets(targets):
+            target_id = target.get("id", "<unknown>")
+            download = target.get("download", {}) or {}
+            strategy = (download.get("strategy") or "").strip()
+            if not strategy or strategy == "none":
+                errors.append(
+                    f"{pipeline_name}:{target_id} enabled with missing/none download.strategy"
+                )
+                continue
+            if strategy not in handler_keys:
+                errors.append(
+                    f"{pipeline_name}:{target_id} uses unsupported strategy '{strategy}'"
+                )
+                continue
+            strategies_in_use.add(strategy)
 
-        for pipeline_name, entry in pipelines.items():
-            if not isinstance(entry, dict):
-                errors.append(f"Pipeline entry for '{pipeline_name}' must be a mapping")
-                continue
-            dest_folder = entry.get("dest_folder")
-            targets_yaml = entry.get("targets_yaml")
-            if not dest_folder:
-                errors.append(f"{pipeline_name}: missing dest_folder in {map_path}")
-            if not targets_yaml:
-                errors.append(f"{pipeline_name}: missing targets_yaml in {map_path}")
-                continue
-            pipeline_dir = repo_root / pipeline_name
-            if not pipeline_dir.exists():
-                errors.append(f"{pipeline_name}: pipeline directory not found at {pipeline_dir}")
-                continue
-            targets_path = Path(targets_yaml)
-            if not targets_path.is_absolute():
-                targets_path = pipeline_dir / targets_path
-            if not targets_path.exists():
-                errors.append(f"{pipeline_name}: targets YAML not found at {targets_path}")
-                continue
-            validate_targets(pipeline_name, pipeline_dir, targets_path, strategies_needed, errors, warnings)
-
-    if strategies_needed:
-        record_dependency_warnings(strategies_needed, warnings)
-        record_tool_warnings(strategies_needed, warnings)
+    for strategy, tool in EXTERNAL_TOOL_STRATEGIES.items():
+        if strategy in strategies_in_use and shutil.which(tool) is None:
+            warnings.append(
+                f"Missing external tool '{tool}' required by strategy '{strategy}'."
+            )
 
     if warnings:
-        print("Warnings:")
+        print("Preflight warnings:")
         for warning in warnings:
             print(f"  - {warning}")
 
     if errors:
-        print("Errors:")
+        print("Preflight errors:")
         for error in errors:
             print(f"  - {error}")
         return 1
@@ -206,5 +114,20 @@ def main() -> int:
     return 0
 
 
+def main(argv: Iterable[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description="Preflight validation for dataset collector pipelines.")
+    ap.add_argument("--repo-root", default=".", help="Repository root containing pipelines")
+    ap.add_argument("--pipeline-map", default="tools/pipeline_map.yaml", help="Pipeline map YAML")
+    args = ap.parse_args(argv)
+
+    repo_root = Path(args.repo_root).expanduser().resolve()
+    pipeline_map_path = Path(args.pipeline_map).expanduser()
+    if not pipeline_map_path.is_absolute():
+        pipeline_map_path = repo_root / pipeline_map_path
+    pipeline_map_path = pipeline_map_path.resolve()
+
+    return run_preflight(repo_root=repo_root, pipeline_map_path=pipeline_map_path)
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

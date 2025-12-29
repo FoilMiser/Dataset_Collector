@@ -10,6 +10,7 @@ import yaml
 
 from init_layout import init_layout
 from patch_targets import patch_targets_yaml
+from preflight import run_preflight
 
 DEFAULT_STAGES = [
     "classify",
@@ -48,6 +49,17 @@ def _dataset_root_paths(dest_root: str, dest_folder: str) -> tuple[Path, PurePat
     return fs_root, yaml_root
 
 
+def pick_existing(queues_root: Path, candidates: List[str]) -> Path:
+    for name in candidates:
+        path = queues_root / name
+        if path.exists():
+            return path
+    raise FileNotFoundError(
+        f"None of {candidates} exist under {queues_root}. "
+        "Did you run the classify stage first?"
+    )
+
+
 def _run_stage(
     pipeline_dir: Path,
     stage: str,
@@ -65,11 +77,12 @@ def _run_stage(
         if not execute:
             cmd.append("--no-fetch")
     elif stage == "acquire_green":
+        queue_path = pick_existing(queues_root, ["green_download.jsonl", "green_queue.jsonl"])
         cmd = [
             python_exe,
             "acquire_worker.py",
             "--queue",
-            str(queues_root / "green_download.jsonl"),
+            str(queue_path),
             "--targets-yaml",
             str(targets_path),
             "--bucket",
@@ -80,11 +93,12 @@ def _run_stage(
         if execute:
             cmd.append("--execute")
     elif stage == "acquire_yellow":
+        queue_path = pick_existing(queues_root, ["yellow_pipeline.jsonl", "yellow_queue.jsonl"])
         cmd = [
             python_exe,
             "acquire_worker.py",
             "--queue",
-            str(queues_root / "yellow_pipeline.jsonl"),
+            str(queue_path),
             "--targets-yaml",
             str(targets_path),
             "--bucket",
@@ -95,13 +109,14 @@ def _run_stage(
         if execute:
             cmd.append("--execute")
     elif stage == "screen_yellow":
+        queue_path = pick_existing(queues_root, ["yellow_pipeline.jsonl", "yellow_queue.jsonl"])
         cmd = [
             python_exe,
             "yellow_screen_worker.py",
             "--targets",
             str(targets_path),
             "--queue",
-            str(queues_root / "yellow_pipeline.jsonl"),
+            str(queue_path),
         ]
         if execute:
             cmd.append("--execute")
@@ -148,6 +163,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     if not pipeline_map_path.is_absolute():
         pipeline_map_path = repo_root / pipeline_map_path
     pipeline_map_path = pipeline_map_path.resolve()
+    run_preflight(repo_root=repo_root, pipeline_map_path=pipeline_map_path)
     pipeline_map = _load_pipeline_map(pipeline_map_path)
     dest_root = args.dest_root or pipeline_map.get("destination_root")
     if not dest_root:
