@@ -4,13 +4,11 @@ companion_files:
   license_map: "./license_map.yaml"
   field_schemas: "./field_schemas.yaml"
   denylist: "./denylist.yaml"
-  difficulties_map: "./difficulties_physics.yaml"
 
 globals:
   raw_root: /data/physics/raw
   screened_yellow_root: /data/physics/screened_yellow
   combined_root: /data/physics/combined
-  final_root: /data/physics/final
   ledger_root: /data/physics/_ledger
   pitches_root: /data/physics/_pitches
   manifests_root: /data/physics/_manifests

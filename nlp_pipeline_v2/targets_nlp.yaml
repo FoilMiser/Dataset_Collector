@@ -16,13 +16,11 @@ companion_files:
   license_map: "./license_map.yaml"
   field_schemas: "./field_schemas.yaml"
   denylist: "./denylist.yaml"
-  difficulties_map: "./difficulties_nlp.yaml"
 
 globals:
   raw_root: "/data/nlp/raw"
   screened_yellow_root: "/data/nlp/screened_yellow"
   combined_root: "/data/nlp/combined"
-  final_root: "/data/nlp/final"
 
   queues_root: "/data/nlp/_queues"
   manifests_root: "/data/nlp/_manifests"

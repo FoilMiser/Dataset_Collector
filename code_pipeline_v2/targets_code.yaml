@@ -11,13 +11,11 @@ companion_files:
   license_map: "./license_map.yaml"
   denylist: "./denylist.yaml"
   field_schemas: "./field_schemas.yaml"
-  difficulties_map: "./difficulties_code.yaml"
 
 globals:
   raw_root: "/data/code/raw"
   screened_yellow_root: "/data/code/screened_yellow"
   combined_root: "/data/code/combined"
-  final_root: "/data/code/final"
   ledger_root: "/data/code/_ledger"
   pitches_root: "/data/code/_pitches"
   manifests_root: "/data/code/_manifests"

@@ -13,13 +13,11 @@ companion_files:
   license_map: "./license_map.yaml"
   field_schemas: "./field_schemas.yaml"
   denylist: "./denylist.yaml"
-  difficulties_map: "./difficulties_agri_circular.yaml"
 
 globals:
   raw_root: "/data/agri_circular/raw"
   screened_yellow_root: "/data/agri_circular/screened_yellow"
   combined_root: "/data/agri_circular/combined"
-  final_root: "/data/agri_circular/final"
 
   ledger_root: "/data/agri_circular/_ledger"
   pitches_root: "/data/agri_circular/_pitches"

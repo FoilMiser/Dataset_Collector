@@ -333,7 +333,7 @@ schemas:
         required: true
         nullable: false
       metadata:
-        description: "Task metadata (type, difficulty, hop_count, dataset provenance)"
+        description: "Task metadata (type, hop_count, dataset provenance)"
         type: "object"
         required: true
         nullable: false
@@ -346,13 +346,13 @@ schemas:
         metadata: "metadata"
 
   kg_navigation_episode_v2.0.0:
-    description: "Navigation episodes synthesized from combined KG records with structural metadata for difficulty scoring"
+    description: "Navigation episodes synthesized from combined KG records with structural metadata for sorter routing"
     version: "2.0.0"
     created_utc: "2026-06-15"
-    source: "difficulty_worker episode synthesis"
+    source: "sorter_pipeline episode synthesis"
     notes: |
-      Captures prompt/answer pairs plus machine-readable metadata used for difficulty
-      estimation. Avoids PII by focusing on identifiers, citations, and graph edges.
+      Captures prompt/answer pairs plus machine-readable metadata used for sorter
+      routing. Avoids PII by focusing on identifiers, citations, and graph edges.
     fields:
       record_id:
         description: "Stable episode identifier"
@@ -370,7 +370,7 @@ schemas:
         required: false
         nullable: true
       metadata:
-        description: "Navigation metadata used for difficulty heuristics"
+        description: "Navigation metadata used for sorter routing"
         type: "object"
         required: false
         nullable: true
@@ -390,4 +390,3 @@ schemas:
         episode_id: "record_id"
         task_type: "metadata.task_type"
         hop_count: "metadata.hop_count"
-        difficulty: "difficulty.level"

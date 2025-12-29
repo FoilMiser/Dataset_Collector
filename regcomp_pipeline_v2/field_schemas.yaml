@@ -34,7 +34,7 @@ schemas:
         nullable: false
 
       routing:
-        description: "Routing metadata used for difficulty assignment"
+        description: "Routing metadata used for sorter topic routing"
         type: "object"
         required: true
         nullable: false

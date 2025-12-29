@@ -4,12 +4,10 @@ companion_files:
   license_map: ./license_map.yaml
   field_schemas: ./field_schemas.yaml
   denylist: ./denylist.yaml
-  difficulties_map: ./difficulties_kg_nav.yaml
 globals:
   raw_root: /data/kg_nav/raw
   screened_yellow_root: /data/kg_nav/screened_yellow
   combined_root: /data/kg_nav/combined
-  final_root: /data/kg_nav/final
   ledger_root: /data/kg_nav/_ledger
   pitches_root: /data/kg_nav/_pitches
   manifests_root: /data/kg_nav/_manifests
@@ -98,7 +96,7 @@ resolvers:
     mode: torrent_or_magnet
     notes: Requires aria2c; prefer verified torrents only.
 
-# Targets carry routing to align with difficulty + folder layout
+# Targets carry routing for sorter folder layout
 # routing fields: subject, domain, category, level, granularity
 
 targets:

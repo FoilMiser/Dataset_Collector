@@ -4,12 +4,10 @@ companion_files:
   license_map: ./license_map.yaml
   field_schemas: ./field_schemas.yaml
   denylist: ./denylist.yaml
-  difficulties_map: ./difficulties_math.yaml
 globals:
   raw_root: /data/math/raw
   screened_yellow_root: /data/math/screened_yellow
   combined_root: /data/math/combined
-  final_root: /data/math/final
   ledger_root: /data/math/_ledger
   pitches_root: /data/math/_pitches
   manifests_root: /data/math/_manifests

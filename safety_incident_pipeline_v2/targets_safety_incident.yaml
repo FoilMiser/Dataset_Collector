@@ -4,12 +4,10 @@ companion_files:
   license_map: ./license_map.yaml
   field_schemas: ./field_schemas_safety_incident.yaml
   denylist: ./denylist.yaml
-  difficulties_map: ./difficulties_safety_incident.yaml
 globals:
   raw_root: /data/safety/raw
   screened_yellow_root: /data/safety/screened_yellow
   combined_root: /data/safety/combined
-  final_root: /data/safety/final
   ledger_root: /data/safety/_ledger
   pitches_root: /data/safety/_pitches
   manifests_root: /data/safety/_manifests

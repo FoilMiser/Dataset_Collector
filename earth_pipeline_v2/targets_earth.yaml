@@ -5,13 +5,11 @@ companion_files:
   license_map: ./license_map.yaml
   field_schemas: ./field_schemas.yaml
   denylist: ./denylist.yaml
-  difficulties_map: ./difficulties_earth.yaml
 
 globals:
   raw_root: /data/earth/raw
   screened_yellow_root: /data/earth/screened_yellow
   combined_root: /data/earth/combined
-  final_root: /data/earth/final
   ledger_root: /data/earth/_ledger
   pitches_root: /data/earth/_pitches
   manifests_root: /data/earth/_manifests

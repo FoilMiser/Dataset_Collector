@@ -262,7 +262,7 @@ schemas:
     version: "2.0.0"
     created_utc: "2026-06-15"
     source: "pipeline_driver.py"
-    notes: "Enables subject-aware routing and difficulty assignment across biology domains."
+    notes: "Enables subject-aware routing across biology domains."
     fields:
       routing_subject:
         description: "Subject for routing (biology, genetics, ecology, etc.)"

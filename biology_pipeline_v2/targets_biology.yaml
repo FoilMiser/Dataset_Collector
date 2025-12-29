@@ -5,13 +5,11 @@ companion_files:
   license_map: "./license_map.yaml"
   field_schemas: "./field_schemas.yaml"
   denylist: "./denylist.yaml"
-  difficulties_map: "./difficulties_biology.yaml"
 
 globals:
   raw_root: "/data/bio/raw"
   screened_yellow_root: "/data/bio/screened_yellow"
   combined_root: "/data/bio/combined"
-  final_root: "/data/bio/final"
   ledger_root: "/data/bio/_ledger"
   pitches_root: "/data/bio/_pitches"
   manifests_root: "/data/bio/_manifests"
