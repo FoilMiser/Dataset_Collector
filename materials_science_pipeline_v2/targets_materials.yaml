@@ -248,7 +248,7 @@ targets:
     granularity: target
 - id: materials_project_api
   name: "Materials Project API"
-  enabled: true
+  enabled: false
   priority: 1
   license_profile: attribution
   license_evidence:
@@ -269,7 +269,7 @@ targets:
     granularity: target
 - id: nomad_api
   name: "NOMAD Repository API"
-  enabled: true
+  enabled: false
   priority: 1
   license_profile: mixed_record_level
   license_evidence:
@@ -290,7 +290,7 @@ targets:
     granularity: target
 - id: oqmd_api_or_dump
   name: "OQMD — API or database dumps"
-  enabled: true
+  enabled: false
   priority: 1
   license_profile: mixed_record_level
   license_evidence:
@@ -311,7 +311,7 @@ targets:
     granularity: target
 - id: pmc_oa_materials_text
   name: "PMC OA — materials/physics filtered full text"
-  enabled: true
+  enabled: false
   priority: 1
   license_profile: mixed_record_level
   license_evidence:
