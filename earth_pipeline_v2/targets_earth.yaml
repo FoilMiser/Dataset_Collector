@@ -198,7 +198,7 @@ targets:
 
   - id: copernicus_cmems_metadata
     name: "Copernicus Marine (CMEMS) catalog metadata snapshots"
-    enabled: true
+    enabled: false
     priority: 4
     license_profile: record_level
     license_evidence:
