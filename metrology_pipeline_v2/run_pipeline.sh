@@ -8,7 +8,6 @@
 # Usage examples:
 #   ./run_pipeline.sh --targets targets_metrology.yaml --stage classify
 #   ./run_pipeline.sh --targets targets_metrology.yaml --stage acquire_green --execute
-#   ./run_pipeline.sh --targets targets_metrology.yaml --stage difficulty --execute
 #
 set -euo pipefail
 
@@ -39,7 +38,7 @@ Required:
 Options:
   --execute               Perform actions (default is dry-run/plan only)
   --stage STAGE           Stage to run: all, classify, acquire_green, acquire_yellow, \
-                          screen_yellow, merge, difficulty, catalog, review
+                          screen_yellow, merge, catalog, review
   --limit-targets N       Limit number of queue rows processed
   --limit-files N         Limit files per target during acquisition
   --workers N             Parallel workers for acquisition (default: 4)
@@ -145,11 +144,6 @@ run_merge() {
   echo -e "${GREEN}[merge] done${NC}"
 }
 
-run_difficulty() {
-  echo -e "${YELLOW}[difficulty]${NC} Assigning difficulty and writing final shards"
-  python "${SCRIPT_DIR}/difficulty_worker.py" --targets "$TARGETS" $EXECUTE
-  echo -e "${GREEN}[difficulty] done${NC}"
-}
 
 run_catalog() {
   echo -e "${YELLOW}[catalog]${NC} Building global catalog"
@@ -164,7 +158,6 @@ case "$STAGE" in
     run_acquire yellow
     run_screen_yellow
     run_merge
-    run_difficulty
     run_catalog
     ;;
   classify) run_classify ;;
@@ -172,7 +165,6 @@ case "$STAGE" in
   acquire_yellow) run_acquire yellow ;;
   screen_yellow) run_screen_yellow ;;
   merge) run_merge ;;
-  difficulty) run_difficulty ;;
   catalog) run_catalog ;;
   review) run_review ;;
   *) echo -e "${RED}Unknown stage: ${STAGE}${NC}"; usage; exit 1 ;;

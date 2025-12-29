@@ -8,7 +8,6 @@
 # Usage examples:
 #   ./run_pipeline.sh --targets targets_3d.yaml --stage classify
 #   ./run_pipeline.sh --targets targets_3d.yaml --stage acquire_green --execute
-#   ./run_pipeline.sh --targets targets_3d.yaml --stage difficulty --execute
 #
 set -euo pipefail
 
@@ -39,7 +38,7 @@ Required:
 Options:
   --execute               Perform actions (default is dry-run/plan only)
   --stage STAGE           Stage to run: all, classify, acquire_green, acquire_yellow, \
-                          screen_yellow, merge, difficulty, catalog, review
+                          screen_yellow, merge, catalog, review
   --limit-targets N       Limit number of queue rows processed
   --limit-files N         Limit files per target during acquisition
   --workers N             Parallel workers for acquisition (default: 4)
@@ -170,14 +169,6 @@ run_merge() {
   echo ""
 }
 
-run_difficulty() {
-  echo -e "${YELLOW}[Stage: Difficulty]${NC} Assigning difficulty and sharding..."
-  python "$SCRIPT_DIR/difficulty_worker.py" \
-    --targets "$TARGETS" \
-    $EXECUTE
-  echo -e "${GREEN}[Stage: Difficulty] Complete${NC}"
-  echo ""
-}
 
 run_catalog() {
   echo -e "${YELLOW}[Stage: Catalog]${NC} Building global catalog..."
@@ -211,9 +202,6 @@ case "$STAGE" in
   merge)
     run_merge
     ;;
-  difficulty)
-    run_difficulty
-    ;;
   catalog)
     run_catalog
     ;;
@@ -226,7 +214,6 @@ case "$STAGE" in
     run_acquire "yellow"
     run_screen_yellow
     run_merge
-    run_difficulty
     run_catalog
     ;;
   *)

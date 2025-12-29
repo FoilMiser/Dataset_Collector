@@ -17,7 +17,6 @@ DEFAULT_STAGES = [
     "acquire_yellow",
     "screen_yellow",
     "merge",
-    "difficulty",
     "catalog",
 ]
 
@@ -108,10 +107,6 @@ def _run_stage(
             cmd.append("--execute")
     elif stage == "merge":
         cmd = [python_exe, "merge_worker.py", "--targets", str(targets_path)]
-        if execute:
-            cmd.append("--execute")
-    elif stage == "difficulty":
-        cmd = [python_exe, "difficulty_worker.py", "--targets", str(targets_path)]
         if execute:
             cmd.append("--execute")
     elif stage == "catalog":
