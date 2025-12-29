@@ -39,7 +39,7 @@ Required:
 Options:
   --execute               Perform actions (default is dry-run/plan only)
   --stage STAGE           Stage to run: all, classify, acquire_green, acquire_yellow, \
-                          screen_yellow, merge, difficulty, catalog, review
+                          screen_yellow, merge, catalog, review
   --limit-targets N       Limit number of queue rows processed (acquire stages)
   --limit-files N         Limit files per target during acquisition
   --workers N             Parallel workers for acquisition (default: 4)
@@ -181,11 +181,6 @@ run_merge() {
   echo -e "${GREEN}[Stage: merge] Complete${NC}\n"
 }
 
-run_difficulty() {
-  echo -e "${YELLOW}[Stage: difficulty]${NC} Assigning difficulty and final shards..."
-  python "$SCRIPT_DIR/difficulty_worker.py" --targets "$TARGETS" ${EXECUTE}
-  echo -e "${GREEN}[Stage: difficulty] Complete${NC}\n"
-}
 
 run_catalog() {
   echo -e "${YELLOW}[Stage: catalog]${NC} Building catalog..."
@@ -204,7 +199,6 @@ case "$STAGE" in
     run_acquire yellow
     run_screen_yellow
     run_merge
-    run_difficulty
     run_catalog
     ;;
   classify)
@@ -221,9 +215,6 @@ case "$STAGE" in
     ;;
   merge)
     run_merge
-    ;;
-  difficulty)
-    run_difficulty
     ;;
   catalog)
     run_catalog

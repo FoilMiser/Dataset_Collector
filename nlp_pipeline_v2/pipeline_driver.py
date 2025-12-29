@@ -574,7 +574,7 @@ def generate_dry_run_report(
         "-" * 40,
         "  1. Review this summary for any unexpected classifications",
         "  2. Run acquire_worker.py with --execute to download GREEN and YELLOW targets",
-        "  3. Run yellow_screen_worker.py, merge_worker.py, and difficulty_worker.py per PIPELINE_V2_REWORK_PLAN.md",
+        "  3. Run yellow_screen_worker.py and merge_worker.py per PIPELINE_V2_REWORK_PLAN.md",
         "",
         "=" * 70,
     ])
