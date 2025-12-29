@@ -130,7 +130,7 @@ resolvers:
 targets:
 - id: synthetic_math_problems
   name: "Deterministic generated math problems (arithmetic\u2192analysis; auto-graded)"
-  enabled: true
+  enabled: false
   priority: 1
   license_profile: permissive
   license_evidence:

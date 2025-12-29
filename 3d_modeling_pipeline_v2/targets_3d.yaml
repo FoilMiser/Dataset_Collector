@@ -136,7 +136,8 @@ targets:
   # 0) Your own synthetic corpus (best source for "how to" paired with known-correct outputs)
   - id: "synthetic_cad_printing_problems"
     name: "Synthetic CAD/3D-printing tasks: prompts + step plans + constrained outputs"
-    enabled: true
+    enabled: false
+    notes: "Synthetic placeholder target."
     priority: 10
     license_profile: "permissive"
     license_evidence: { spdx_hint: "Proprietary", url: "" }
@@ -273,7 +274,8 @@ targets:
 
   - id: "thingi10k_safe_cc0_ccby"
     name: "Derived: Thingi10K (CC0/CC-BY only) normalized meshes + metadata"
-    enabled: true
+    enabled: false
+    notes: "Derived placeholder target."
     priority: 9
     license_profile: "permissive"
     license_evidence: { spdx_hint: "Derived", url: "" }

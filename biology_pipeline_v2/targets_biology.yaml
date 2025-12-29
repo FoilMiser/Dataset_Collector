@@ -166,7 +166,7 @@ targets:
   # -------------------------------------------------------------------
   - id: "synthetic_biology_problems"
     name: "Your generated deterministic biology problems (auto-graded)"
-    enabled: true
+    enabled: false
     license_profile: "permissive"
     license_evidence: { spdx_hint: "Proprietary", url: "" }
     data_type: ["synthetic", "problems", "biology"]

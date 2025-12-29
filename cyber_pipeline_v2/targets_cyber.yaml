@@ -99,7 +99,7 @@ targets:
   # 0) Synthetic (safe) - your generator / curated defensive tasks
   - id: "synthetic_cyber_threatmodeling_problems"
     name: "Synthetic defensive cybersecurity problems (threat modeling, triage, remediation) — auto-graded"
-    enabled: true
+    enabled: false
     license_profile: "permissive"
     license_evidence: { spdx_hint: "Proprietary", url: "" }
     data_type: ["synthetic", "defensive", "threat_modeling", "incident_response", "triage"]

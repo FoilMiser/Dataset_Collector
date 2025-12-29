@@ -128,7 +128,7 @@ targets:
 
   - id: synthetic_earth_cards
     name: "Synthetic Earth dataset cards (deterministic; schema-validated)"
-    enabled: true
+    enabled: false
     priority: 1
     license_profile: permissive
     license_evidence: { spdx_hint: CC0-1.0, url: "" }
