@@ -12,11 +12,6 @@ single domain folder must include the following structure:
     {permissive,copyleft,quarantine}/shards/*.jsonl(.gz)
   combined/
     {permissive,copyleft,quarantine}/shards/*.jsonl(.gz)
-  final/
-    {permissive,copyleft,quarantine}/
-      d01/shards/*.jsonl(.gz)
-      ...
-      d10/shards/*.jsonl(.gz)
   _queues/*.jsonl
   _ledger/*.jsonl
   _pitches/*.jsonl
@@ -32,8 +27,10 @@ single domain folder must include the following structure:
   `raw/yellow/...` respectively.
 - **screen_yellow**: canonicalizes yellow data into `screened_yellow/<pool>/shards/`.
 - **merge**: combines green and screened yellow data into `combined/<pool>/shards/`.
-- **difficulty**: routes records into `final/<pool>/d01..d10/shards/`.
 - **catalog**: writes summary metadata to `_catalogs/catalog.json`.
+- **downstream normalization (optional, out-of-scope)**: any post-collector bucketing or
+  difficulty-style routing happens outside this contract and should consume
+  `combined/<pool>/shards/` plus manifests/ledgers as needed.
 
 ## Ledger and manifests
 
@@ -42,7 +39,7 @@ single domain folder must include the following structure:
 - `_manifests/` contains per-stage manifests and patched targets YAMLs.
 - `_logs/` stores per-stage log output, including orchestrator logs.
 
-## Pools and difficulty shards
+## Pools
 
 All pools are standardized:
 
@@ -50,5 +47,5 @@ All pools are standardized:
 - `copyleft`
 - `quarantine`
 
-Difficulty folders are always two-digit (`d01`–`d10`). Ensure these folders exist
-before writing outputs; the orchestrator initializes them automatically.
+Downstream consumers may bucket or normalize these pools further, but that work is
+outside the collector contract.
