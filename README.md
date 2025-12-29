@@ -54,7 +54,6 @@ Stages are pipeline-specific, but common stage names include:
 - `acquire_yellow`
 - `screen_yellow`
 - `merge`
-- `difficulty`
 - `catalog`
 
 ## Example sequential execution flow
@@ -67,7 +66,6 @@ A typical end-to-end execution sequence:
 ./run_pipeline.sh --targets targets_math.yaml --stage acquire_yellow --execute
 ./run_pipeline.sh --targets targets_math.yaml --stage screen_yellow --execute
 ./run_pipeline.sh --targets targets_math.yaml --stage merge --execute
-./run_pipeline.sh --targets targets_math.yaml --stage difficulty --execute
 ./run_pipeline.sh --targets targets_math.yaml --stage catalog --execute
 ```
 
@@ -84,6 +82,22 @@ To preview the actions without writing data, omit `--execute` (dry-run):
 The notebook uses `bash run_pipeline.sh ...`, so it needs WSL or another environment
 with `bash` available. On native Windows without WSL, use the Windows orchestrator
 below instead.
+
+### Windows-first Jupyter (Natural corpus)
+
+If you prefer to run a smaller subset of stages from Jupyter on Windows, you can
+call the Windows-native orchestrator directly from a notebook cell:
+
+```powershell
+py -3.11 -m venv .venv
+.venv\Scripts\activate
+pip install -r math_pipeline_v2\requirements.txt
+# repeat for other pipeline requirements as needed
+
+python tools\build_natural_corpus.py --dest-root "E:\AI-Research\datasets\Natural" --pipelines all --stages classify,acquire_green,acquire_yellow --execute
+```
+
+To preview the actions without writing data, omit `--execute` (dry-run).
 
 ### Windows Quickstart (Natural corpus, optional)
 
@@ -126,4 +140,5 @@ Update these in the pipeline’s configuration (commonly under `configs/`) to co
 - **Python**: Each pipeline depends on Python; version and additional tools may vary by pipeline.
 - **Requirements**: Install per-pipeline dependencies via that pipeline’s `requirements.txt`.
 - **Notebook dependencies**: `jupyterlab` and `ipykernel` are not in `requirements.txt`. Install them separately (or via `requirements-dev.txt` if provided).
+- **External tools**: `git` is required when a target uses `download.strategy: git`. The AWS CLI is required for `s3_sync` or `aws_requester_pays` download modes.
 - **Dry-run vs execute**: dry-run is the default when `--execute` is absent. Use `--execute` only when you intend to modify data or produce outputs.
