@@ -142,3 +142,17 @@ Update these in the pipeline’s configuration (commonly under `configs/`) to co
 - **Notebook dependencies**: `jupyterlab` and `ipykernel` are not in `requirements.txt`. Install them separately (or via `requirements-dev.txt` if provided).
 - **External tools**: `git` is required when a target uses `download.strategy: git`. The AWS CLI is required for `s3_sync` or `aws_requester_pays` download modes.
 - **Dry-run vs execute**: dry-run is the default when `--execute` is absent. Use `--execute` only when you intend to modify data or produce outputs.
+
+## Preflight validation
+
+Run the preflight checker to validate pipeline map entries, verify target YAML paths, and detect enabled targets with missing or unsupported download strategies. It also warns about missing optional dependencies or external tools needed by enabled strategies.
+
+```bash
+python tools/preflight.py
+```
+
+To point at a custom pipeline map location:
+
+```bash
+python tools/preflight.py --pipeline-map tools/pipeline_map.yaml
+```
