@@ -12,7 +12,6 @@ def init_layout(dataset_root: Path) -> None:
         "raw",
         "screened_yellow",
         "combined",
-        "final",
         "_queues",
         "_logs",
         "_catalogs",
@@ -28,11 +27,6 @@ def init_layout(dataset_root: Path) -> None:
         (dataset_root / "raw" / "yellow" / pool).mkdir(parents=True, exist_ok=True)
         (dataset_root / "screened_yellow" / pool / "shards").mkdir(parents=True, exist_ok=True)
         (dataset_root / "combined" / pool / "shards").mkdir(parents=True, exist_ok=True)
-        for idx in range(1, 11):
-            (dataset_root / "final" / pool / f"d{idx:02d}" / "shards").mkdir(
-                parents=True,
-                exist_ok=True,
-            )
 
 
 def main(argv: Iterable[str] | None = None) -> int:

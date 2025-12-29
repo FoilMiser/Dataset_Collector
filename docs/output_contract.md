@@ -28,9 +28,9 @@ single domain folder must include the following structure:
 - **screen_yellow**: canonicalizes yellow data into `screened_yellow/<pool>/shards/`.
 - **merge**: combines green and screened yellow data into `combined/<pool>/shards/`.
 - **catalog**: writes summary metadata to `_catalogs/catalog.json`.
-- **downstream normalization (optional, out-of-scope)**: any post-collector bucketing or
-  difficulty-style routing happens outside this contract and should consume
-  `combined/<pool>/shards/` plus manifests/ledgers as needed.
+- **downstream normalization (optional, out-of-scope)**: no difficulty routing occurs in this
+  repo; optional fields like `difficulty_level` may appear in queue rows for downstream use.
+  Downstream workflows should consume `combined/<pool>/shards/` plus manifests/ledgers as needed.
 
 ## Ledger and manifests
 

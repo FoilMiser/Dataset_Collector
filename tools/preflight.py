@@ -27,6 +27,7 @@ def _load_strategy_handlers(acquire_worker_path: Path) -> Set[str]:
     if not spec or not spec.loader:
         raise RuntimeError(f"Unable to load module from {acquire_worker_path}")
     module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
     spec.loader.exec_module(module)
     handlers = getattr(module, "STRATEGY_HANDLERS", None)
     if not isinstance(handlers, dict):
