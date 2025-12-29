@@ -6,12 +6,10 @@ companion_files:
   denylist: ./denylist.yaml
   domain_allowlist: ./domain_allowlist.yaml
   phrase_denylist: ./phrase_denylist.yaml
-  difficulties_map: ./difficulties_materials.yaml
 globals:
   raw_root: /data/materials/raw
   screened_yellow_root: /data/materials/screened_yellow
   combined_root: /data/materials/combined
-  final_root: /data/materials/final
   ledger_root: /data/materials/_ledger
   pitches_root: /data/materials/_pitches
   manifests_root: /data/materials/_manifests

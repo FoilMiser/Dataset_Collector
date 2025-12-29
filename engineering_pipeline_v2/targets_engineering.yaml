@@ -4,12 +4,10 @@ companion_files:
   license_map: ./license_map.yaml
   field_schemas: ./field_schemas.yaml
   denylist: ./denylist.yaml
-  difficulties_map: ./difficulties_engineering.yaml
 globals:
   raw_root: /data/engineering/raw
   screened_yellow_root: /data/engineering/screened_yellow
   combined_root: /data/engineering/combined
-  final_root: /data/engineering/final
   ledger_root: /data/engineering/_ledger
   pitches_root: /data/engineering/_pitches
   manifests_root: /data/engineering/_manifests

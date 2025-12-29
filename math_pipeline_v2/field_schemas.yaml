@@ -79,7 +79,7 @@ schemas:
         validation:
           min: 0
       tags:
-        description: "Topic tags and difficulty labels"
+        description: "Topic tags"
         type: "array"
         required: false
         nullable: true

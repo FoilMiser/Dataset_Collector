@@ -16,7 +16,7 @@ schemas:
     source: "acquire_worker.py"
     notes: |
       Preserve tables and standards language. Chunks carry routing metadata for
-      deterministic difficulty mapping.
+      sorter topic routing.
     fields:
       chunk_id:
         description: "Chunk-local identifier"
@@ -51,7 +51,7 @@ schemas:
         required: false
         nullable: true
       routing.subject:
-        description: "Subject for deterministic difficulty routing"
+        description: "Subject for sorter routing"
         type: "string"
         required: true
         nullable: false
@@ -141,7 +141,7 @@ schemas:
         validation:
           min: 0
       tags:
-        description: "Topic tags and difficulty labels"
+        description: "Topic tags"
         type: "array"
         required: false
         nullable: true

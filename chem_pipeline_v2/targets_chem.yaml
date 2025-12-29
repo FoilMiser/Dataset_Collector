@@ -5,7 +5,6 @@ globals:
   raw_root: /data/chem/raw
   screened_yellow_root: /data/chem/screened_yellow
   combined_root: /data/chem/combined
-  final_root: /data/chem/final
   ledger_root: /data/chem/_ledger
   pitches_root: /data/chem/_pitches
   manifests_root: /data/chem/_manifests
@@ -53,7 +52,6 @@ companion_files:
   license_map: ./license_map.yaml
   field_schemas: ./field_schemas.yaml
   denylist: ./denylist.yaml
-  difficulties_map: ./difficulties_chem.yaml
 
 queues:
   emit:

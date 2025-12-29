@@ -5,13 +5,11 @@ companion_files:
   license_map: "./license_map.yaml"
   field_schemas: "./field_schemas.yaml"
   denylist: "./denylist.yaml"
-  difficulties_map: "./difficulties_logic.yaml"
 
 globals:
   raw_root: /data/logic/raw
   screened_yellow_root: /data/logic/screened_yellow
   combined_root: /data/logic/combined
-  final_root: /data/logic/final
   ledger_root: /data/logic/_ledger
   pitches_root: /data/logic/_pitches
   manifests_root: /data/logic/_manifests

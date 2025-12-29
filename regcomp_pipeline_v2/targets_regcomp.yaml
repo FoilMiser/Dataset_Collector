@@ -4,13 +4,11 @@ companion_files:
   license_map: "./license_map.yaml"
   field_schemas: "./field_schemas.yaml"
   denylist: "./denylist.yaml"
-  difficulties_map: "./difficulties_regcomp.yaml"
 
 globals:
   raw_root: /data/regcomp/raw
   screened_yellow_root: /data/regcomp/screened_yellow
   combined_root: /data/regcomp/combined
-  final_root: /data/regcomp/final
   ledger_root: /data/regcomp/_ledger
   pitches_root: /data/regcomp/_pitches
   manifests_root: /data/regcomp/_manifests
