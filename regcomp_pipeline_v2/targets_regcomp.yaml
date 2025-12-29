@@ -61,18 +61,18 @@ globals:
 
 queues:
   emit:
-    - id: green_queue
-      path: /data/regcomp/_queues/green_queue.jsonl
+    - id: green_download
+      path: /data/regcomp/_queues/green_download.jsonl
       criteria:
         effective_bucket: GREEN
         enabled: true
-    - id: yellow_queue
-      path: /data/regcomp/_queues/yellow_queue.jsonl
+    - id: yellow_pipeline
+      path: /data/regcomp/_queues/yellow_pipeline.jsonl
       criteria:
         effective_bucket: YELLOW
         enabled: true
-    - id: red_excluded
-      path: /data/regcomp/_queues/red_excluded.jsonl
+    - id: red_rejected
+      path: /data/regcomp/_queues/red_rejected.jsonl
       criteria:
         effective_bucket: RED
         enabled: true
@@ -874,9 +874,10 @@ targets:
 
   - id: iso_iec_standards
     name: ISO/IEC standards (e.g., ISO 27001/27002)
-    enabled: true
+    enabled: false
     priority: 5
     license_profile: deny
+    notes: "Commercial / paid standards or restricted distribution; not eligible for training data collection."
     license_evidence:
       spdx_hint: Custom-Restrictive
       url: https://www.iso.org/standards.html
@@ -902,9 +903,10 @@ targets:
 
   - id: astm_standards
     name: ASTM standards
-    enabled: true
+    enabled: false
     priority: 5
     license_profile: deny
+    notes: "Commercial / paid standards or restricted distribution; not eligible for training data collection."
     license_evidence:
       spdx_hint: Custom-Restrictive
       url: https://www.astm.org/standards.html
@@ -930,9 +932,10 @@ targets:
 
   - id: nfpa_codes
     name: NFPA fire codes
-    enabled: true
+    enabled: false
     priority: 5
     license_profile: deny
+    notes: "Commercial / paid standards or restricted distribution; not eligible for training data collection."
     license_evidence:
       spdx_hint: Custom-Restrictive
       url: https://www.nfpa.org/Codes-and-Standards
@@ -958,9 +961,10 @@ targets:
 
   - id: cis_benchmarks
     name: CIS Benchmarks
-    enabled: true
+    enabled: false
     priority: 5
     license_profile: deny
+    notes: "Commercial / paid standards or restricted distribution; not eligible for training data collection."
     license_evidence:
       spdx_hint: Custom-Restrictive
       url: https://www.cisecurity.org/cis-benchmarks
@@ -986,9 +990,10 @@ targets:
 
   - id: pci_dss
     name: PCI DSS / PCI SSC materials
-    enabled: true
+    enabled: false
     priority: 5
     license_profile: deny
+    notes: "Commercial / paid standards or restricted distribution; not eligible for training data collection."
     license_evidence:
       spdx_hint: Custom-Restrictive
       url: https://www.pcisecuritystandards.org/document_library
@@ -1014,9 +1019,10 @@ targets:
 
   - id: aicpa_soc2
     name: AICPA / SOC 2 criteria text
-    enabled: true
+    enabled: false
     priority: 5
     license_profile: deny
+    notes: "Commercial / paid standards or restricted distribution; not eligible for training data collection."
     license_evidence:
       spdx_hint: Custom-Restrictive
       url: https://www.aicpa-cima.com/landing/soc2
@@ -1042,9 +1048,10 @@ targets:
 
   - id: ucca_ucc
     name: Uniform Commercial Code (UCC) text
-    enabled: true
+    enabled: false
     priority: 5
     license_profile: deny
+    notes: "Commercial / paid standards or restricted distribution; not eligible for training data collection."
     license_evidence:
       spdx_hint: Custom-Restrictive
       url: https://www.uniformlaws.org/committees/community-home?communitykey=15f48a52-1454-4a5c-b11e-801d4bb1bcf9
@@ -1070,9 +1077,10 @@ targets:
 
   - id: commercial_legal_publishers
     name: Westlaw/Lexis treatises, annotations, headnotes
-    enabled: true
+    enabled: false
     priority: 5
     license_profile: deny
+    notes: "Commercial / paid standards or restricted distribution; not eligible for training data collection."
     license_evidence:
       spdx_hint: Custom-Restrictive
       url: https://legal.thomsonreuters.com/en/products/westlaw
@@ -1098,9 +1106,10 @@ targets:
 
   - id: commercial_compliance_courseware
     name: Commercial compliance training courseware/exam prep
-    enabled: true
+    enabled: false
     priority: 5
     license_profile: deny
+    notes: "Commercial / paid standards or restricted distribution; not eligible for training data collection."
     license_evidence:
       spdx_hint: Custom-Restrictive
       url: https://www.acams.org/en/training

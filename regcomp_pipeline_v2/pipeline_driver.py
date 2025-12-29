@@ -8,9 +8,9 @@ Reads:
   - denylist.yaml (v0.2)
 
 Produces:
-  - queues/green_queue.jsonl
-  - queues/yellow_queue.jsonl
-  - queues/red_excluded.jsonl
+  - queues/green_download.jsonl
+  - queues/yellow_pipeline.jsonl
+  - queues/red_rejected.jsonl
   - manifests/{target_id}/license_evidence.* + evaluation.json
   - queues/run_summary.json (human-readable dry-run report)
 
@@ -895,9 +895,9 @@ def main() -> None:
     yellow_rows.sort(key=sort_key)
     red_rows.sort(key=sort_key)
 
-    write_jsonl(queues_root / "green_queue.jsonl", green_rows)
-    write_jsonl(queues_root / "yellow_queue.jsonl", yellow_rows)
-    write_jsonl(queues_root / "red_excluded.jsonl", red_rows)
+    write_jsonl(queues_root / "green_download.jsonl", green_rows)
+    write_jsonl(queues_root / "yellow_pipeline.jsonl", yellow_rows)
+    write_jsonl(queues_root / "red_rejected.jsonl", red_rows)
 
     summary = {
         "run_at_utc": utc_now(),

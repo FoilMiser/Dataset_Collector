@@ -10,7 +10,7 @@ Reads:
 Produces:
   - queues/green_download.jsonl
   - queues/yellow_pipeline.jsonl
-  - queues/red.jsonl
+  - queues/red_rejected.jsonl
   - manifests/{target_id}/license_evidence.* + evaluation.json
   - queues/run_summary.json (human-readable dry-run report)
 
@@ -911,7 +911,7 @@ def main() -> None:
 
     write_jsonl(queues_root / "green_download.jsonl", green_rows)
     write_jsonl(queues_root / "yellow_pipeline.jsonl", yellow_rows)
-    write_jsonl(queues_root / "red.jsonl", red_rows)
+    write_jsonl(queues_root / "red_rejected.jsonl", red_rows)
 
     summary = {
         "run_at_utc": utc_now(),
