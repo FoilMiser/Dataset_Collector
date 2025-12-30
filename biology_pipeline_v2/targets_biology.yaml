@@ -207,6 +207,7 @@ targets:
       category: "protein_structures"
     download:
       strategy: "ftp"
+      url: "ftp://ftp.wwpdb.org/pub/pdb/data/structures/divided/mmCIF/"
       base_url: "ftp://ftp.wwpdb.org/pub/pdb/data/structures/divided/mmCIF/"
       include_globs: ["*.cif.gz"]
       integrity:

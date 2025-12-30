@@ -1,5 +1,5 @@
 # license_map.yaml
-# v0.2 — companion file for earth targets (schema v0.8) and pipeline scripts
+# v0.3 — companion file for earth targets (schema v0.8) and pipeline scripts
 #
 # This is NOT legal advice. It is a conservative policy tuned for Earth Systems data:
 # - "allow" = generally permissive / public-domain friendly
@@ -8,8 +8,8 @@
 #
 # The pipeline stores evidence snapshots so you can audit every decision.
 
-schema_version: "0.2"
-updated_utc: "2026-06-10"
+schema_version: "0.3"
+updated_utc: "2025-03-01"
 
 spdx:
   allow:
@@ -44,70 +44,90 @@ spdx:
     - "CC-BY-NC-ND"
     - "Proprietary"
     - "Custom-Restrictive"
+    - "All-Rights-Reserved"
     - "NOAI"
     - "NOAI-"
     - "NO-TDM"
     - "NON-COMMERCIAL"
     - "NO-DERIVATIVES"
 
-non_spdx:
-  allow:
-    - "Public Domain"
-    - "Open Government Licence"
-    - "Open Data Commons Public Domain Dedication and License"
-  conditional:
-    - "ShareAlike"
-    - "Copernicus data policy"
-  deny:
-    - "All rights reserved"
-    - "For non-commercial use only"
-    - "No derivatives"
-    - "NoAI"
-    - "No AI"
-    - "No training"
-    - "No text and data mining"
-
-license_profiles:
-  permissive:
-    default_bucket: "GREEN"
-    allow_conditional: false
-  copyleft:
-    default_bucket: "YELLOW"
-    segregate_pool: true
-    require_attribution_bundle: true
-  record_level:
-    default_bucket: "YELLOW"
-    require_per_record_license: true
-  quarantine:
-    default_bucket: "YELLOW"
-  deny:
-    default_bucket: "RED"
+normalization:
+  rules:
+    - match_any: ["public domain", "us public domain", "us-pd", "Public Domain"]
+      spdx: "US-PUBLIC-DOMAIN"
+    - match_any: ["copernicus sentinel", "sentinel data", "copernicus marine service", "Copernicus data policy"]
+      spdx: "COPERNICUS-SENTINEL-LEGAL-NOTICE"
+    - match_any: ["open government licence", "ogl uk", "Open Government Licence"]
+      spdx: "OGL-UK-3.0"
+    - match_any: ["ogl canada", "open government license - canada", "Open Government License - Canada"]
+      spdx: "OGL-Canada-2.0"
+    - match_any: ["pddl", "open data commons pddl", "Open Data Commons Public Domain Dedication and License"]
+      spdx: "PDDL-1.0"
+    - match_any: ["CC-BY 4.0", "CC BY 4.0", "Creative Commons Attribution", "Open Access (CC BY)"]
+      spdx: "CC-BY-4.0"
+    - match_any: ["CC-BY-SA 4.0", "CC BY-SA 4.0", "ShareAlike"]
+      spdx: "CC-BY-SA-4.0"
+    - match_any: ["All rights reserved", "all rights reserved"]
+      spdx: "All-Rights-Reserved"
+    - match_any: ["For non-commercial use only", "non-commercial"]
+      spdx: "CC-BY-NC-4.0"
+    - match_any: ["No derivatives", "no derivatives"]
+      spdx: "CC-BY-ND-4.0"
+    - match_any: ["NoAI", "No AI", "No training"]
+      spdx: "NOAI"
+    - match_any: ["No text and data mining", "no text and data mining"]
+      spdx: "NO-TDM"
+    - match_any: ["terms of use", "terms and conditions", "custom license", "proprietary"]
+      spdx: "Custom-Restrictive"
 
 restriction_scan:
   phrases:
     - "no ai"
+    - "no artificial intelligence"
     - "no machine learning"
+    - "no ml"
+    - "no llm"
+    - "no large language model"
+    - "no generative ai"
+    - "no generative artificial intelligence"
+    - "may not be used to train"
+    - "no model training"
+    - "no training of models"
+    - "prohibited from training"
+    - "not for training"
     - "no text and data mining"
-    - "non-commercial"
-    - "no derivatives"
+    - "no tdm"
+    - "no text mining"
+    - "no data mining"
+    - "no commercial use"
+    - "non-commercial use only"
+    - "commercial use prohibited"
+    - "for academic use only"
+    - "for research use only"
+    - "educational use only"
+    - "prohibited use"
+    - "not permitted for"
+    - "restricted use"
+    - "usage restrictions apply"
     - "no redistribution"
-    - "no training"
 
-normalization:
-  rules:
-    - match_any: ["public domain", "us public domain", "us-pd"]
-      spdx: "US-PUBLIC-DOMAIN"
-    - match_any: ["copernicus sentinel", "sentinel data", "copernicus marine service"]
-      spdx: "COPERNICUS-SENTINEL-LEGAL-NOTICE"
-    - match_any: ["open government licence", "ogl uk"]
-      spdx: "OGL-UK-3.0"
-    - match_any: ["ogl canada", "open government license - canada"]
-      spdx: "OGL-Canada-2.0"
-    - match_any: ["pddl", "open data commons pddl"]
-      spdx: "PDDL-1.0"
 
-  gating:
+gating:
   unknown_spdx_bucket: "YELLOW"
   deny_spdx_bucket: "RED"
   conditional_spdx_bucket: "YELLOW"
   restriction_phrase_bucket: "YELLOW"
+
+profiles:
+  permissive:
+    default_bucket: "GREEN"
+  copyleft:
+    default_bucket: "YELLOW"
+  record_level:
+    default_bucket: "YELLOW"
+  quarantine:
+    default_bucket: "YELLOW"
+  unknown:
+    default_bucket: "YELLOW"
+  deny:
+    default_bucket: "RED"

@@ -480,7 +480,8 @@ targets:
 
   - id: "tptp_problem_library"
     name: "TPTP Problem Library (restrictive redistribution terms for modified versions)"
-    enabled: true
+    enabled: false
+    notes: "Disabled until license evidence URL and download URL are confirmed."
     priority: 1
     publisher: "tptp"
     license_profile: "deny"

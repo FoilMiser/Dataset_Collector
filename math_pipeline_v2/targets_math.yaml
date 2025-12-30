@@ -363,6 +363,7 @@ targets:
     - domain_filter_arxiv_math
     - extract_latex_aware_chunks
   review_required: true
+  review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
   routing:
     domain: math_reference
     category: research_papers
@@ -403,6 +404,7 @@ targets:
     - domain_filter_math_textbooks
     - emit_attribution_bundle
   review_required: true
+  review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
   routing:
     domain: math_reference
     category: encyclopedia
@@ -443,6 +445,7 @@ targets:
     - domain_filter_math_textbooks
     - emit_attribution_bundle
   review_required: true
+  review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
   routing:
     domain: math_reference
     category: encyclopedia
@@ -483,6 +486,7 @@ targets:
     - domain_filter_math_textbooks
     - emit_attribution_bundle
   review_required: true
+  review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
   routing:
     domain: math_reference
     category: encyclopedia
@@ -523,6 +527,7 @@ targets:
     - domain_filter_math_textbooks
     - emit_attribution_bundle
   review_required: true
+  review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
   routing:
     domain: math_reference
     category: encyclopedia
@@ -563,6 +568,7 @@ targets:
     - domain_filter_math_textbooks
     - emit_attribution_bundle
   review_required: true
+  review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
   routing:
     domain: math_reference
     category: encyclopedia
@@ -876,6 +882,7 @@ targets:
     - record_level_filter
     - formal_chunk_by_entry
   review_required: true
+  review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
   routing:
     domain: formal_systems
     category: isabelle_afp
@@ -980,6 +987,7 @@ targets:
     add:
     - manual_legal_review
   review_required: true
+  review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
   routing:
     domain: math_reference
     category: encyclopedia
@@ -1013,6 +1021,7 @@ targets:
     add:
     - manual_legal_review
   review_required: true
+  review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
   routing:
     domain: math_reference
     category: encyclopedia
@@ -1046,6 +1055,7 @@ targets:
     level: 6
     granularity: target
   review_required: true
+  review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
   routing:
     domain: algebra
     category: algebra_contest
@@ -1078,6 +1088,7 @@ targets:
     level: 7
     granularity: target
   review_required: true
+  review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
   routing:
     domain: math_reference
     category: encyclopedia

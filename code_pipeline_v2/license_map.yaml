@@ -183,3 +183,24 @@ restriction_scan:
     - "prohibited use"
     - "unauthorized use"
     - "license required"
+
+gating:
+  # SPDX -> bucket mapping behavior
+  conditional_spdx_bucket: "YELLOW"
+  unknown_spdx_bucket: "YELLOW"
+  deny_spdx_bucket: "RED"
+
+  # Restriction phrase hits override to this bucket
+  restriction_phrase_bucket: "YELLOW"
+
+profiles:
+  permissive:
+    default_bucket: "GREEN"
+  copyleft:
+    default_bucket: "YELLOW"
+  record_level:
+    default_bucket: "YELLOW"
+  unknown:
+    default_bucket: "YELLOW"
+  deny:
+    default_bucket: "RED"

@@ -430,6 +430,7 @@ targets:
     license_profile: "record_level"
     license_evidence: { spdx_hint: "Custom-Restrictive", url: "https://www.chemspider.com/TermsOfUse.aspx" }
     review_required: true
+    review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
     data_type: ["structures", "properties", "ids"]
     download:
       strategy: "api"

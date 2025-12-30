@@ -66,7 +66,7 @@ patterns:
     value: "(?i)no\\s*ai|no\\s*artificial\\s*intelligence"
     fields: ["license_evidence_url", "download_blob"]
     severity: "hard_red"
-    link: "https://noai.example/policy"
+    link: "docs/denylist_rationale.md"
     rationale: "Explicit NoAI restrictions."
   - type: "regex"
     value: "(?i)no\\s*text\\s*and\\s*data\\s*mining"
@@ -90,5 +90,5 @@ patterns:
     value: "(?i)no\\s*training"
     fields: ["license_evidence_url", "download_blob"]
     severity: "hard_red"
-    link: "https://noai.example/policy"
+    link: "docs/denylist_rationale.md"
     rationale: "Text explicitly bars ML training."
