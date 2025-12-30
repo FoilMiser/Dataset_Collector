@@ -1,6 +1,6 @@
 # Metrology Corpus Pipeline (v2)
 
-A safety-first pipeline for building an ethical metrology and standards training corpus. Version 2 restructures the metrology pipeline to match the **PIPELINE_V2_REWORK_PLAN.md** flow:
+A safety-first pipeline for building an ethical metrology and standards training corpus. Version 2 restructures the metrology pipeline to match the **docs/PIPELINE_V2_REWORK_PLAN.md** flow:
 
 1. Classify targets and snapshot evidence (`pipeline_driver.py`).
 2. Acquire GREEN and YELLOW targets into raw pools (`acquire_worker.py`).

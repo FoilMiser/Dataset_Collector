@@ -3,7 +3,7 @@
 # run_pipeline.sh (v2.0)
 #
 # Wrapper script for the Math Corpus Pipeline v2. It follows the
-# PIPELINE_V2_REWORK_PLAN.md stage order.
+# docs/PIPELINE_V2_REWORK_PLAN.md stage order.
 #
 # Usage examples:
 #   ./run_pipeline.sh --targets targets_math.yaml --stage classify

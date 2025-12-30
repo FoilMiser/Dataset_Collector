@@ -5,7 +5,7 @@
 # This ensures reproducibility for computed-only extraction and structured-to-text transforms.
 
 schema_version: "1.0"
-updated_utc: "2026-01-15"
+updated_utc: "2025-12-30"
 
 schemas:
 

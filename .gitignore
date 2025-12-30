@@ -1,0 +1,31 @@
+# Pipeline outputs
+**/raw/
+**/screened_yellow/
+**/combined/
+**/_logs/
+**/_ledger/
+**/_queues/
+**/_manifests/
+**/_catalogs/
+**/_pitches/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -44,10 +44,10 @@ Create the following at repo root (they are currently missing):
 
 ### 1.2 Fix missing/ghost documentation references
 
-Your pipeline drivers (and some docs) reference **`PIPELINE_V2_REWORK_PLAN.md`**, but it does not exist in this repo.
+Your pipeline drivers (and some docs) reference **`docs/PIPELINE_V2_REWORK_PLAN.md`**, but it does not exist in this repo.
 
 **Action (pick one):**
-- **Option A (recommended):** create `docs/PIPELINE_V2_REWORK_PLAN.md` and point all references there.
+- **Option A (recommended):** create `docs/docs/PIPELINE_V2_REWORK_PLAN.md` and point all references there.
 - **Option B:** remove/replace references in docstrings and READMEs with the current canonical doc(s), e.g. `docs/output_contract.md`.
 
 Files referencing this today (non-exhaustive list from scan):
@@ -384,7 +384,7 @@ Add GitHub Actions (or equivalent) to run on PRs:
 If you want a clean, high-impact next commit, do these in order:
 
 1. Add `.gitignore`, `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`.
-2. Create `docs/PIPELINE_V2_REWORK_PLAN.md` **or** remove all references to it.
+2. Create `docs/docs/PIPELINE_V2_REWORK_PLAN.md` **or** remove all references to it.
 3. Update root `requirements.txt` to include: boto3>=1.34.0, datasets>=2.20.0, pyarrow>=14.0.0.
 4. Add validator warnings for:
    - future `updated_utc`

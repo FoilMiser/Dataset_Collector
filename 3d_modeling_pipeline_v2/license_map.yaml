@@ -9,7 +9,7 @@
 # The pipeline stores evidence snapshots so you can audit every decision.
 
 schema_version: "0.2"
-updated_utc: "2026-06-03"
+updated_utc: "2025-12-30"
 
 spdx:
   # GREEN: typically OK for training

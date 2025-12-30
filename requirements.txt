@@ -3,6 +3,9 @@
 # Core dependencies required across pipelines
 pyyaml>=6.0
 requests>=2.31.0
+boto3>=1.34.0
+datasets>=2.20.0
+pyarrow>=14.0.0
 
 # Required by the metrology pipeline
 pypdf>=4.0.0
