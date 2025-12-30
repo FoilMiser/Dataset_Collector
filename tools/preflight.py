@@ -4,8 +4,9 @@ import argparse
 import importlib.util
 import shutil
 import sys
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Set
+from typing import Any
 
 import yaml
 
@@ -23,11 +24,11 @@ TOOL_INSTALL_HINTS = {
 }
 
 
-def _load_yaml(path: Path) -> Dict[str, Any]:
+def _load_yaml(path: Path) -> dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
 
-def _load_strategy_handlers(acquire_worker_path: Path) -> Set[str]:
+def _load_strategy_handlers(acquire_worker_path: Path) -> set[str]:
     module_name = f"acquire_worker_{acquire_worker_path.parent.name}"
     spec = importlib.util.spec_from_file_location(module_name, acquire_worker_path)
     if not spec or not spec.loader:
@@ -41,7 +42,7 @@ def _load_strategy_handlers(acquire_worker_path: Path) -> Set[str]:
     return set(handlers.keys())
 
 
-def _iter_enabled_targets(targets: Iterable[Dict[str, Any]]) -> Iterable[Dict[str, Any]]:
+def _iter_enabled_targets(targets: Iterable[dict[str, Any]]) -> Iterable[dict[str, Any]]:
     for target in targets:
         enabled = target.get("enabled", True)
         if enabled:
@@ -51,10 +52,10 @@ def _iter_enabled_targets(targets: Iterable[Dict[str, Any]]) -> Iterable[Dict[st
 def run_preflight(repo_root: Path, pipeline_map_path: Path, strict: bool = False) -> int:
     pipeline_map = _load_yaml(pipeline_map_path)
     pipelines_cfg = pipeline_map.get("pipelines", {}) or {}
-    errors: List[str] = []
-    warnings: List[str] = []
-    strategies_in_use: Set[str] = set()
-    strategy_targets: Dict[str, List[str]] = {}
+    errors: list[str] = []
+    warnings: list[str] = []
+    strategies_in_use: set[str] = set()
+    strategy_targets: dict[str, list[str]] = {}
 
     for pipeline_name, pipeline_entry in pipelines_cfg.items():
         pipeline_dir = repo_root / pipeline_name

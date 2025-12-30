@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Iterable
 from pathlib import Path, PurePath, PureWindowsPath
-from typing import Dict, Iterable
 
 import yaml
+
 
 def _path_to_posix(path: PurePath) -> str:
     return path.as_posix()
 
 
-def _queue_filename(entry: Dict[str, object]) -> str | None:
+def _queue_filename(entry: dict[str, object]) -> str | None:
     path_value = entry.get("path")
     if isinstance(path_value, str) and path_value:
         if ":" in path_value or "\\" in path_value:

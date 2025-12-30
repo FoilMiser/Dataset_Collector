@@ -145,7 +145,7 @@ requests>=2.31.0    # Core
 
 # Optional
 tiktoken>=0.5.0     # Token counting
-pyarrow>=14.0.0     # Parquet output
+pyarrow>=15.0.0     # Parquet output
 datasketch>=1.6.0   # Near-duplicate detection
 rdkit>=2023.9.0     # SMILES/InChIKey normalization (legacy chem helpers)
 ```

@@ -25,7 +25,7 @@ boto3>=1.34.0
 # tiktoken>=0.5.0
 
 # Optional: for Parquet output
-# pyarrow>=14.0.0
+# pyarrow>=15.0.0
 
 # Optional: for geometry/text near-duplicate detection
 # datasketch>=1.6.0
