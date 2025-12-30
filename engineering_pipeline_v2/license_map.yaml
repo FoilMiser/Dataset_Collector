@@ -192,6 +192,8 @@ gating:
 profiles:
   permissive:
     default_bucket: "GREEN"
+  public_domain:
+    default_bucket: "GREEN"
   copyleft:
     # keep separate pool + consider share-alike obligations
     default_bucket: "YELLOW"
