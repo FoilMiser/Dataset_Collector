@@ -48,7 +48,7 @@ def _iter_enabled_targets(targets: Iterable[Dict[str, Any]]) -> Iterable[Dict[st
             yield target
 
 
-def run_preflight(repo_root: Path, pipeline_map_path: Path) -> int:
+def run_preflight(repo_root: Path, pipeline_map_path: Path, strict: bool = False) -> int:
     pipeline_map = _load_yaml(pipeline_map_path)
     pipelines_cfg = pipeline_map.get("pipelines", {}) or {}
     errors: List[str] = []
@@ -116,6 +116,9 @@ def run_preflight(repo_root: Path, pipeline_map_path: Path) -> int:
         print("Preflight warnings:")
         for warning in warnings:
             print(f"  - {warning}")
+        if strict and not errors:
+            print("Preflight warnings treated as errors (--strict enabled).")
+            return 1
 
     if errors:
         print("Preflight errors:")
@@ -131,6 +134,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Preflight validation for dataset collector pipelines.")
     ap.add_argument("--repo-root", default=".", help="Repository root containing pipelines")
     ap.add_argument("--pipeline-map", default="tools/pipeline_map.yaml", help="Pipeline map YAML")
+    ap.add_argument("--strict", action="store_true", help="Treat warnings as failures")
     args = ap.parse_args(argv)
 
     repo_root = Path(args.repo_root).expanduser().resolve()
@@ -139,7 +143,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         pipeline_map_path = repo_root / pipeline_map_path
     pipeline_map_path = pipeline_map_path.resolve()
 
-    return run_preflight(repo_root=repo_root, pipeline_map_path=pipeline_map_path)
+    return run_preflight(repo_root=repo_root, pipeline_map_path=pipeline_map_path, strict=args.strict)
 
 
 if __name__ == "__main__":

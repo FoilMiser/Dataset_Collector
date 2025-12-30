@@ -2,7 +2,7 @@ schema_version: "0.8"
 updated_utc: "2025-12-30"
 companion_files:
   license_map: ./license_map.yaml
-  field_schemas: ./field_schemas_materials.yaml
+  field_schemas: ./field_schemas.yaml
   denylist: ./denylist.yaml
   domain_allowlist: ./domain_allowlist.yaml
   phrase_denylist: ./phrase_denylist.yaml
@@ -70,7 +70,7 @@ gates_catalog:
   record_level_filter: Require per-record license metadata; keep only allowlist.
   domain_allowlist_filter: Keep only domains in allowlist (for web-derived corpora).
   extract_records: Extract raw records (structures, properties, text) into normalized intermediate JSONL.
-  normalize_materials_schema: Map fields to field_schemas_materials.yaml (composition/structure/properties/provenance).
+  normalize_materials_schema: Map fields to field_schemas.yaml (composition/structure/properties/provenance).
   dedupe_minhash: Near-duplicate removal.
   quality_filter: Drop boilerplate, invalid structures, empty records, etc.
   emit_training_manifest: Manifest of included files/records + checksums + license evidence pointers.

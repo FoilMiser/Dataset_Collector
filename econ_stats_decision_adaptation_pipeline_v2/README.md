@@ -16,6 +16,16 @@ A safety-first pipeline for economics, statistics, and decision science corpora.
 
 This pipeline is typically executed as part of the repository-wide run in JupyterLab using `dataset_collector_run_all_pipelines.ipynb`. The notebook runs every `*_pipeline_v2` directory sequentially, prompts for required API keys, and can install each pipeline's requirements before invoking the stages.
 
+## Recommended run method (Windows-first)
+
+For Windows + Conda, prefer the repo-wide orchestrator:
+
+```bash
+python tools/build_natural_corpus.py --repo-root . --dest-root "E:/AI-Research/datasets/Natural" --mode full --execute
+```
+
+You can also run the Jupyter notebook, which invokes the same workflow. Use `run_pipeline.sh` only if you have Git Bash/WSL on Windows or are on macOS/Linux.
+
 ---
 
 ## Directory layout

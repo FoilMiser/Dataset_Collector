@@ -1,4 +1,4 @@
-# field_schemas_materials.yaml
+# field_schemas.yaml
 # v0.7 — Versioned field definitions for materials/physics extraction
 #
 # Each schema version is immutable once released. Create a new version for changes.
