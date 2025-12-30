@@ -200,7 +200,11 @@ def validate_targets_file(path: Path) -> Tuple[List[Dict[str, Any]], List[Dict[s
 def main() -> int:
     ap = argparse.ArgumentParser(description="Validate Dataset Collector v2 repo configuration.")
     ap.add_argument("--root", default=".", help="Repo root (defaults to current directory)")
-    ap.add_argument("--output", default="validation_report.json", help="Output report path")
+    ap.add_argument(
+        "--output",
+        default=None,
+        help="Output report path (optional; omit to skip writing a report file)",
+    )
     args = ap.parse_args()
 
     root = Path(args.root).resolve()
@@ -214,15 +218,17 @@ def main() -> int:
         report["errors"].extend(errors)
         report["warnings"].extend(warnings)
 
-    output_path = Path(args.output)
-    if not output_path.is_absolute():
-        output_path = root / output_path
-    output_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    output_path = None
+    if args.output:
+        output_path = Path(args.output)
+        if not output_path.is_absolute():
+            output_path = root / output_path
+        output_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
 
     summary = {
         "errors": len(report["errors"]),
         "warnings": len(report["warnings"]),
-        "report_path": str(output_path),
+        "report_path": str(output_path) if output_path else None,
     }
     print(json.dumps(summary, indent=2))
 

@@ -8,7 +8,7 @@ reproducibility.
 
 - Keep changes scoped and reproducible.
 - Run `python tools/validate_repo.py --root .` before submitting.
-- Update `updated_utc` for any YAML configs you edit.
+- Update `updated_utc` for any YAML configs you edit (UTC date).
 
 ## Adding a new target (required steps)
 
@@ -31,7 +31,8 @@ When you add a target to a pipeline YAML (for example `targets_math.yaml`):
    - If `review_required: true`, include `review_notes` explaining why.
 
 5. **Update metadata**
-   - Ensure `updated_utc` is a valid `YYYY-MM-DD` date and not future-dated.
+   - Ensure `updated_utc` is a valid `YYYY-MM-DD` date in UTC and not future-dated
+     relative to the current UTC date.
 
 ## Safety reminders
 
