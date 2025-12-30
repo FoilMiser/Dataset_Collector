@@ -26,6 +26,24 @@ def read_yaml(path: Path) -> Dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
+def normalize_download(download: Dict[str, Any]) -> Dict[str, Any]:
+    d = dict(download or {})
+    cfg = d.get("config")
+
+    if isinstance(cfg, dict):
+        merged = dict(cfg)
+        merged.update({k: v for k, v in d.items() if k != "config"})
+        d = merged
+
+    if d.get("strategy") == "zenodo":
+        if not d.get("record_id") and d.get("record"):
+            d["record_id"] = d["record"]
+        if not d.get("record_id") and isinstance(d.get("record_ids"), list) and d["record_ids"]:
+            d["record_id"] = d["record_ids"][0]
+
+    return d
+
+
 def iter_targets_files(root: Path) -> Iterable[Path]:
     for pipeline_dir in sorted(root.glob("*_pipeline_v2")):
         if not pipeline_dir.is_dir():
@@ -97,7 +115,7 @@ def validate_targets_file(path: Path) -> Tuple[List[Dict[str, Any]], List[Dict[s
                 "target_id": tid,
             })
 
-        download = target.get("download", {}) or {}
+        download = normalize_download(target.get("download", {}) or {})
         strategy = str(download.get("strategy", ""))
         for msg in get_download_requirement_errors(download, strategy):
             errors.append({

@@ -305,7 +305,7 @@ targets:
     data_type: ["qm", "conformers", "forces"]
     download:
       strategy: "zenodo"
-      record: "4288677"
+      record_id: "4288677"
       # v0.6: Zenodo checksum verification
       integrity:
         verify_zenodo_md5: true

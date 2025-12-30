@@ -26,7 +26,7 @@ Each `*_pipeline_v2` directory represents a self-contained pipeline for a domain
 
 ## Run all pipelines via JupyterLab
 
-1. Launch JupyterLab from the repository root (WSL or a shell with `bash` available).
+1. Launch JupyterLab from the repository root (Windows, macOS, or Linux; `bash` is optional unless you plan to run shell-based cells).
 2. Open `dataset_collector_run_all_pipelines.ipynb`.
 3. Run the notebook cells in order to execute each `*_pipeline_v2` pipeline sequentially.
 
@@ -77,11 +77,11 @@ To preview the actions without writing data, omit `--execute` (dry-run):
 
 ## Quickstart options
 
-### Jupyter (WSL / bash required)
+### Jupyter (Windows-first, bash optional)
 
-The notebook uses `bash run_pipeline.sh ...`, so it needs WSL or another environment
-with `bash` available. On native Windows without WSL, use the Windows orchestrator
-below instead.
+The notebook runs on Windows-first Python. Use `bash run_pipeline.sh ...` cells if
+you have WSL or another shell with `bash` available; otherwise use the Windows-native
+orchestrator below.
 
 ### Windows-first Jupyter (Natural corpus)
 

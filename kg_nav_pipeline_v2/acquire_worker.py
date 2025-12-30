@@ -69,6 +69,24 @@ def safe_name(s: str) -> str:
     return s[:200] if s else "file"
 
 
+def normalize_download(download: Dict[str, Any]) -> Dict[str, Any]:
+    d = dict(download or {})
+    cfg = d.get("config")
+
+    if isinstance(cfg, dict):
+        merged = dict(cfg)
+        merged.update({k: v for k, v in d.items() if k != "config"})
+        d = merged
+
+    if d.get("strategy") == "zenodo":
+        if not d.get("record_id") and d.get("record"):
+            d["record_id"] = d["record"]
+        if not d.get("record_id") and isinstance(d.get("record_ids"), list) and d["record_ids"]:
+            d["record_id"] = d["record_ids"][0]
+
+    return d
+
+
 def sha256_file(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as f:
@@ -158,7 +176,7 @@ def _http_download_with_resume(ctx: AcquireContext, url: str, out_path: Path, ex
 
 
 def handle_http(ctx: AcquireContext, row: Dict[str, Any], out_dir: Path) -> List[Dict[str, Any]]:
-    download = row.get("download", {}) or {}
+    download = normalize_download(row.get("download", {}) or {})
     url = download.get("url") or download.get("urls", [None])[0]
     if not url:
         return [{"status": "error", "error": "missing url"}]
@@ -174,7 +192,7 @@ def handle_http(ctx: AcquireContext, row: Dict[str, Any], out_dir: Path) -> List
 
 
 def handle_ftp(ctx: AcquireContext, row: Dict[str, Any], out_dir: Path) -> List[Dict[str, Any]]:
-    download = row.get("download", {}) or {}
+    download = normalize_download(row.get("download", {}) or {})
     base = download.get("base_url")
     globs = download.get("globs", ["*"])
     if FTP is None:
@@ -200,8 +218,8 @@ def handle_ftp(ctx: AcquireContext, row: Dict[str, Any], out_dir: Path) -> List[
 
 
 def handle_git(ctx: AcquireContext, row: Dict[str, Any], out_dir: Path) -> List[Dict[str, Any]]:
-    download = row.get("download", {}) or {}
-    repo = download.get("repo")
+    download = normalize_download(row.get("download", {}) or {})
+    repo = download.get("repo") or download.get("repo_url") or download.get("url") or download.get("url")
     branch = download.get("branch")
     if not repo:
         return [{"status": "error", "error": "missing repo"}]
@@ -219,10 +237,20 @@ def handle_git(ctx: AcquireContext, row: Dict[str, Any], out_dir: Path) -> List[
 
 
 def handle_zenodo(ctx: AcquireContext, row: Dict[str, Any], out_dir: Path) -> List[Dict[str, Any]]:
-    download = row.get("download", {}) or {}
+    download = normalize_download(row.get("download", {}) or {})
     api_url = download.get("api") or download.get("record_url")
+    record_id = download.get("record_id")
+    doi = download.get("doi")
+    url = download.get("url")
     if not api_url:
-        return [{"status": "error", "error": "missing api/record_url"}]
+        if record_id:
+            api_url = f"https://zenodo.org/api/records/{record_id}"
+        elif doi:
+            api_url = f"https://zenodo.org/api/records/?q=doi:{doi}"
+        elif url and "/api/records/" in url:
+            api_url = url
+    if not api_url:
+        return [{"status": "error", "error": "missing api/record_url/record_id/doi/url"}]
     if requests is None:
         return [{"status": "error", "error": "requests missing"}]
     if not ctx.mode.execute:
@@ -230,6 +258,9 @@ def handle_zenodo(ctx: AcquireContext, row: Dict[str, Any], out_dir: Path) -> Li
     resp = requests.get(api_url, timeout=60)
     resp.raise_for_status()
     data = resp.json()
+    hits = data.get("hits", {}).get("hits", [])
+    if hits and not data.get("files"):
+        data = hits[0]
     results: List[Dict[str, Any]] = []
     files = data.get("files", []) or data.get("hits", {}).get("hits", [{}])[0].get("files", [])
     for f in files[: ctx.limits.limit_files or len(files)]:
@@ -249,7 +280,7 @@ def handle_zenodo(ctx: AcquireContext, row: Dict[str, Any], out_dir: Path) -> Li
 
 
 def handle_dataverse(ctx: AcquireContext, row: Dict[str, Any], out_dir: Path) -> List[Dict[str, Any]]:
-    download = row.get("download", {}) or {}
+    download = normalize_download(row.get("download", {}) or {})
     pid = download.get("persistent_id") or download.get("pid")
     instance = download.get("instance") or "https://dataverse.harvard.edu"
     if not pid:
@@ -270,7 +301,7 @@ def handle_dataverse(ctx: AcquireContext, row: Dict[str, Any], out_dir: Path) ->
 
 
 def handle_figshare(ctx: AcquireContext, row: Dict[str, Any], out_dir: Path) -> List[Dict[str, Any]]:
-    download = row.get("download", {}) or {}
+    download = normalize_download(row.get("download", {}) or {})
     article_id = download.get("article_id") or download.get("id")
     api = download.get("api") or (f"https://api.figshare.com/v2/articles/{article_id}/files" if article_id else None)
     if not article_id or not api:
@@ -296,7 +327,7 @@ def handle_figshare(ctx: AcquireContext, row: Dict[str, Any], out_dir: Path) -> 
 
 
 def handle_s3_sync(ctx: AcquireContext, row: Dict[str, Any], out_dir: Path) -> List[Dict[str, Any]]:
-    download = row.get("download", {}) or {}
+    download = normalize_download(row.get("download", {}) or {})
     urls = download.get("urls") or []
     if not urls:
         return [{"status": "error", "error": "missing urls"}]
@@ -318,7 +349,7 @@ def handle_s3_sync(ctx: AcquireContext, row: Dict[str, Any], out_dir: Path) -> L
 
 
 def handle_aws_requester_pays(ctx: AcquireContext, row: Dict[str, Any], out_dir: Path) -> List[Dict[str, Any]]:
-    download = row.get("download", {}) or {}
+    download = normalize_download(row.get("download", {}) or {})
     bucket = download.get("bucket")
     key = download.get("key")
     if not bucket or not key:
@@ -340,7 +371,7 @@ def handle_aws_requester_pays(ctx: AcquireContext, row: Dict[str, Any], out_dir:
 
 
 def handle_torrent(ctx: AcquireContext, row: Dict[str, Any], out_dir: Path) -> List[Dict[str, Any]]:
-    download = row.get("download", {}) or {}
+    download = normalize_download(row.get("download", {}) or {})
     magnet = download.get("magnet") or download.get("torrent")
     if not magnet:
         return [{"status": "error", "error": "missing magnet/torrent"}]
@@ -355,12 +386,16 @@ def handle_torrent(ctx: AcquireContext, row: Dict[str, Any], out_dir: Path) -> L
 
 
 def handle_hf_datasets(ctx: AcquireContext, row: Dict[str, Any], out_dir: Path) -> List[Dict[str, Any]]:
-    download = row.get("download", {}) or {}
+    download = normalize_download(row.get("download", {}) or {})
     dataset_id = download.get("dataset_id")
     if not dataset_id:
         return [{"status": "error", "error": "missing dataset_id"}]
     splits = download.get("splits")
     load_kwargs = download.get("load_kwargs", {}) or {}
+    cfg = download.get("config")
+    hf_name = cfg if isinstance(cfg, str) else None
+    if hf_name and "name" not in load_kwargs:
+        load_kwargs["name"] = hf_name
     if not ctx.mode.execute:
         return [{"status": "noop", "path": str(out_dir)}]
     try:
@@ -397,11 +432,20 @@ STRATEGY_HANDLERS = {
 }
 
 
+LICENSE_POOL_MAP = {
+    "permissive": "permissive",
+    "public_domain": "permissive",
+    "record_level": "permissive",
+    "copyleft": "copyleft",
+    "unknown": "quarantine",
+    "quarantine": "quarantine",
+    "deny": "quarantine",
+}
+
+
 def resolve_license_pool(row: Dict[str, Any]) -> str:
     lp = str(row.get("license_profile") or row.get("license_pool") or "quarantine").lower()
-    if lp not in {"permissive", "copyleft", "quarantine"}:
-        lp = "quarantine"
-    return lp
+    return LICENSE_POOL_MAP.get(lp, "quarantine")
 
 
 def resolve_output_dir(ctx: AcquireContext, bucket: str, pool: str, target_id: str) -> Path:

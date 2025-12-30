@@ -171,16 +171,6 @@ def load_license_map(path: Path) -> LicenseMap:
         profiles=profiles,
     )
 
-    return LicenseMap(
-        allow=spdx.get("allow", []),
-        conditional=spdx.get("conditional", []),
-        deny_prefixes=spdx.get("deny_prefixes", []),
-        normalization_rules=normalization.get("rules", []),
-        restriction_phrases=restriction_scan.get("phrases", []),
-        gating=gating,
-        profiles=profiles,
-    )
-
 
 # ------------------------------
 # Denylist (v0.9)

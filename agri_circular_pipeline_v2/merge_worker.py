@@ -228,13 +228,22 @@ def iter_screened_yellow(roots: Roots) -> Iterator[Dict[str, Any]]:
             yield from read_jsonl(fp)
 
 
+LICENSE_POOL_MAP = {
+    "permissive": "permissive",
+    "public_domain": "permissive",
+    "record_level": "permissive",
+    "copyleft": "copyleft",
+    "unknown": "quarantine",
+    "quarantine": "quarantine",
+    "deny": "quarantine",
+}
+
+
 def route_pool(record: Dict[str, Any]) -> str:
     src = record.get("source", {}) or {}
     lp = src.get("license_profile") or record.get("license_profile")
     lp = str(lp or "quarantine").lower()
-    if lp not in {"permissive", "copyleft", "quarantine"}:
-        lp = "quarantine"
-    return lp
+    return LICENSE_POOL_MAP.get(lp, "quarantine")
 
 
 def merge_records(cfg: Dict[str, Any], roots: Roots, execute: bool) -> Dict[str, Any]:

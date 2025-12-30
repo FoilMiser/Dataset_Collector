@@ -209,7 +209,7 @@ targets:
     granularity: target
 - id: usgs_critical_minerals_aux
   name: "USGS Critical Minerals — auxiliary stats"
-  enabled: true
+  enabled: false
   priority: 1
   license_profile: permissive
   license_evidence:
@@ -230,7 +230,7 @@ targets:
     granularity: target
 - id: epa_egrid_aux
   name: "EPA eGRID — emissions factors (auxiliary)"
-  enabled: true
+  enabled: false
   priority: 1
   license_profile: permissive
   license_evidence:
@@ -335,7 +335,7 @@ targets:
     granularity: record
 - id: arxiv_materials_text
   name: "arXiv — materials/cond-mat filtered text"
-  enabled: true
+  enabled: false
   priority: 1
   license_profile: record_level
   license_evidence:
@@ -356,7 +356,7 @@ targets:
     granularity: record
 - id: aflowlib
   name: "AFLOWLIB — high-throughput repository"
-  enabled: true
+  enabled: false
   priority: 1
   license_profile: record_level
   license_evidence:
@@ -377,7 +377,7 @@ targets:
     granularity: target
 - id: zenodo_materials_collections
   name: "Zenodo collections — materials bundles"
-  enabled: true
+  enabled: false
   priority: 1
   license_profile: record_level
   license_evidence:
@@ -420,7 +420,7 @@ targets:
     granularity: record
 - id: osm_geodata
   name: "OpenStreetMap — geodata overlays (aux)"
-  enabled: true
+  enabled: false
   priority: 1
   license_profile: copyleft
   license_evidence:
