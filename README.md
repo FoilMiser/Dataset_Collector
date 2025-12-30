@@ -93,6 +93,15 @@ The notebook runs on Windows-first Python. Use `bash run_pipeline.sh ...` cells 
 you have WSL or another shell with `bash` available; otherwise use the Windows-native
 orchestrator below.
 
+### CLI wrapper (run all pipelines)
+
+If you prefer a minimal CLI entrypoint instead of the notebook, use the thin wrapper
+around the Windows-first orchestrator:
+
+```bash
+python run_all.py --dest-root "E:/AI-Research/datasets/Natural" --execute
+```
+
 ### Windows-first Jupyter (Natural corpus)
 
 If you prefer to run a smaller subset of stages from Jupyter on Windows, you can
@@ -165,10 +174,29 @@ Update these in the pipeline’s configuration (commonly under `configs/`) to co
 ## Prerequisites & execution notes
 
 - **Python**: Each pipeline depends on Python; version and additional tools may vary by pipeline.
+  Tested on Python 3.10 and 3.11.
 - **Requirements**: Install per-pipeline dependencies via that pipeline’s `requirements.txt`.
 - **Notebook dependencies**: `jupyterlab` and `ipykernel` are not in `requirements.txt`. Install them separately (or via `requirements-dev.txt` if provided).
 - **External tools**: `git` is required when a target uses `download.strategy: git`. The AWS CLI is required for `s3_sync` or `aws_requester_pays` download modes. `aria2c` is required for `download.strategy: torrent`.
 - **Dry-run vs execute**: dry-run is the default when `--execute` is absent. Use `--execute` only when you intend to modify data or produce outputs.
+
+## Reproducible installs (recommended)
+
+```bash
+pip install -r requirements.lock
+```
+
+### Minimal install (looser pins)
+
+```bash
+pip install -r requirements.txt
+```
+
+### Regenerate the lock file
+
+```bash
+pip-compile --generate-hashes -o requirements.lock requirements.txt
+```
 
 ## Preflight validation
 
@@ -182,6 +210,14 @@ To point at a custom pipeline map location:
 
 ```bash
 python tools/preflight.py --pipeline-map tools/pipeline_map.yaml
+```
+
+## Cleaning local artifacts
+
+If you ran pipelines inside the repo and need to reset the tree:
+
+```bash
+python tools/clean_repo_tree.py --yes
 ```
 
 ## Adding a new target safely
