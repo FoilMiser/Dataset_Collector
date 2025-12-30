@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import argparse
 import shutil
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, List
 
 OUTPUT_DIR_NAMES = {
     "raw",
@@ -30,9 +30,9 @@ def _iter_candidates(repo_root: Path) -> Iterable[Path]:
             yield path
 
 
-def _dedupe(paths: Iterable[Path]) -> List[Path]:
+def _dedupe(paths: Iterable[Path]) -> list[Path]:
     seen = set()
-    ordered: List[Path] = []
+    ordered: list[Path] = []
     for path in paths:
         resolved = path.resolve()
         if resolved in seen:
@@ -42,7 +42,7 @@ def _dedupe(paths: Iterable[Path]) -> List[Path]:
     return ordered
 
 
-def _print_plan(paths: List[Path], repo_root: Path) -> None:
+def _print_plan(paths: list[Path], repo_root: Path) -> None:
     if not paths:
         print("No cleanup targets found.")
         return
@@ -52,7 +52,7 @@ def _print_plan(paths: List[Path], repo_root: Path) -> None:
         print(f"  - {rel}")
 
 
-def _remove_paths(paths: List[Path]) -> None:
+def _remove_paths(paths: list[Path]) -> None:
     for path in paths:
         if path.is_dir():
             shutil.rmtree(path, ignore_errors=True)

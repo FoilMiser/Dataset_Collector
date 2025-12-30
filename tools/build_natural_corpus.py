@@ -3,11 +3,10 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+from collections.abc import Iterable, Sequence
 from pathlib import Path, PurePath, PureWindowsPath
-from typing import Dict, Iterable, List, Sequence
 
 import yaml
-
 from init_layout import init_layout
 from patch_targets import patch_targets_yaml
 from preflight import run_preflight
@@ -31,8 +30,8 @@ def _is_windows_style(path_str: str) -> bool:
     return ":" in path_str or "\\" in path_str
 
 
-def _normalize_stages(stages: Sequence[str]) -> List[str]:
-    normalized: List[str] = []
+def _normalize_stages(stages: Sequence[str]) -> list[str]:
+    normalized: list[str] = []
     for stage in stages:
         if "," in stage:
             normalized.extend([part for part in stage.split(",") if part])
@@ -41,7 +40,7 @@ def _normalize_stages(stages: Sequence[str]) -> List[str]:
     return normalized
 
 
-def _load_pipeline_map(path: Path) -> Dict[str, object]:
+def _load_pipeline_map(path: Path) -> dict[str, object]:
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
 
@@ -54,7 +53,7 @@ def _dataset_root_paths(dest_root: str, dest_folder: str) -> tuple[Path, PurePat
     return fs_root, yaml_root
 
 
-def pick_existing(queues_root: Path, candidates: List[str]) -> Path:
+def pick_existing(queues_root: Path, candidates: list[str]) -> Path:
     for name in candidates:
         path = queues_root / name
         if path.exists():
@@ -76,7 +75,7 @@ def _run_stage(
     log_path: Path,
 ) -> None:
     python_exe = sys.executable
-    cmd: List[str]
+    cmd: list[str]
     if stage == "classify":
         cmd = [python_exe, "pipeline_driver.py", "--targets", str(targets_path)]
         if not execute:

@@ -13,21 +13,21 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
+from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any
 
 import yaml
 
 EXPECTED_TARGETS_SCHEMA = "0.8"
 
 
-def read_yaml(path: Path) -> Dict[str, Any]:
+def read_yaml(path: Path) -> dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
-def normalize_download(download: Dict[str, Any]) -> Dict[str, Any]:
+def normalize_download(download: dict[str, Any]) -> dict[str, Any]:
     d = dict(download or {})
     cfg = d.get("config")
 
@@ -49,11 +49,10 @@ def iter_targets_files(root: Path) -> Iterable[Path]:
     for pipeline_dir in sorted(root.glob("*_pipeline_v2")):
         if not pipeline_dir.is_dir():
             continue
-        for target in sorted(pipeline_dir.glob("targets_*.yaml")):
-            yield target
+        yield from sorted(pipeline_dir.glob("targets_*.yaml"))
 
 
-def load_profiles(license_map_path: Path) -> Dict[str, Any]:
+def load_profiles(license_map_path: Path) -> dict[str, Any]:
     if not license_map_path.exists():
         return {}
     data = read_yaml(license_map_path)
@@ -66,8 +65,8 @@ def _parse_updated_utc(value: str) -> datetime | None:
         return None
 
 
-def _collect_updated_utc_warnings(path: Path) -> List[Dict[str, Any]]:
-    warnings: List[Dict[str, Any]] = []
+def _collect_updated_utc_warnings(path: Path) -> list[dict[str, Any]]:
+    warnings: list[dict[str, Any]] = []
     cfg = read_yaml(path) or {}
     updated = str(cfg.get("updated_utc", "")).strip()
     if not updated:
@@ -95,7 +94,7 @@ def _collect_updated_utc_warnings(path: Path) -> List[Dict[str, Any]]:
     return warnings
 
 
-def get_download_requirement_errors(download: Dict[str, Any], strategy: str) -> List[str]:
+def get_download_requirement_errors(download: dict[str, Any], strategy: str) -> list[str]:
     errors = []
     strategy = (strategy or "").lower()
 
@@ -118,9 +117,9 @@ def get_download_requirement_errors(download: Dict[str, Any], strategy: str) -> 
     return errors
 
 
-def validate_targets_file(path: Path) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-    errors: List[Dict[str, Any]] = []
-    warnings: List[Dict[str, Any]] = []
+def validate_targets_file(path: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    errors: list[dict[str, Any]] = []
+    warnings: list[dict[str, Any]] = []
 
     cfg = read_yaml(path) or {}
     warnings.extend(_collect_updated_utc_warnings(path))

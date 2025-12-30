@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import argparse
 import re
+from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable, List
 
 UPDATED_UTC_RE = re.compile(r"^(?P<indent>\s*)updated_utc:\s*(?P<value>.+?)\s*$")
 
@@ -20,7 +20,7 @@ def _iter_yaml_files(paths: Iterable[Path]) -> Iterable[Path]:
             yield path
 
 
-def _normalize_lines(lines: List[str], new_value: str) -> List[str]:
+def _normalize_lines(lines: list[str], new_value: str) -> list[str]:
     updated = []
     for line in lines:
         match = UPDATED_UTC_RE.match(line)
@@ -32,8 +32,8 @@ def _normalize_lines(lines: List[str], new_value: str) -> List[str]:
     return updated
 
 
-def touch_files(paths: Iterable[Path], date_value: str) -> List[Path]:
-    changed: List[Path] = []
+def touch_files(paths: Iterable[Path], date_value: str) -> list[Path]:
+    changed: list[Path] = []
     for path in _iter_yaml_files(paths):
         text = path.read_text(encoding="utf-8")
         if "updated_utc" not in text:
