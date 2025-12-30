@@ -10,7 +10,7 @@ datasets>=2.20.0
 # tiktoken>=0.5.0
 
 # Optional: for Parquet output
-pyarrow>=14.0.0
+pyarrow>=15.0.0
 
 # Optional: for PDF extraction
 # pypdf>=4.0.0
