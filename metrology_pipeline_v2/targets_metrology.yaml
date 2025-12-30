@@ -229,6 +229,7 @@ targets:
     publisher: "NIST"
     license_profile: "record_level"
     review_required: true
+    review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
     license_evidence:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://www.nist.gov/open/license"
@@ -254,6 +255,7 @@ targets:
     publisher: "NASA"
     license_profile: "record_level"
     review_required: true
+    review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
     license_evidence:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://sti.nasa.gov/harvesting-data-from-ntrs/"
@@ -281,6 +283,7 @@ targets:
     publisher: "USGS"
     license_profile: "record_level"
     review_required: true
+    review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
     license_evidence:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://pubs.usgs.gov/documentation/web_service_documentation"
@@ -307,6 +310,7 @@ targets:
     publisher: "NOAA"
     license_profile: "record_level"
     review_required: true
+    review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
     license_evidence:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://github.com/NOAA-Central-Library-NCL/NOAA_IR"
@@ -383,6 +387,7 @@ targets:
     publisher: "FAA"
     license_profile: "record_level"
     review_required: true
+    review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
     license_evidence:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://www.faa.gov/regulations_policies/advisory_circulars/"
@@ -407,6 +412,7 @@ targets:
     publisher: "Common Pile"
     license_profile: "record_level"
     review_required: true
+    review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
     license_evidence:
       spdx_hint: "Derived"
       url: "https://huggingface.co/datasets/common-pile/arxiv_abstracts"
@@ -432,6 +438,7 @@ targets:
     publisher: "Common Pile"
     license_profile: "record_level"
     review_required: true
+    review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
     license_evidence:
       spdx_hint: "Derived"
       url: "https://huggingface.co/datasets/common-pile/doab"

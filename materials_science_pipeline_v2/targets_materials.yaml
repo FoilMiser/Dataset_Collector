@@ -116,9 +116,10 @@ resolvers:
 targets:
 - id: jarvis_dft_figshare
   name: "JARVIS-DFT (NIST) — bulk datasets (Figshare)"
-  enabled: true
+  enabled: false
+  notes: "Disabled until Figshare download URLs and checksums are populated."
   priority: 1
-  license_profile: attribution
+  license_profile: record_level
   license_evidence:
     url: https://jarvis.nist.gov/
     spdx_hint: CC-BY-4.0 (confirm per release)
@@ -138,9 +139,10 @@ targets:
     granularity: target
 - id: open_catalyst_oc20_oc22
   name: "Open Catalyst Project (OC20/OC22)"
-  enabled: true
+  enabled: false
+  notes: "Disabled until official download URLs and checksums are populated."
   priority: 1
-  license_profile: attribution
+  license_profile: record_level
   license_evidence:
     url: https://opencatalystproject.org/
     spdx_hint: CC-BY-4.0 (confirm per dataset release)
@@ -162,7 +164,7 @@ targets:
   name: "Matbench — benchmark tasks + featurized datasets"
   enabled: true
   priority: 2
-  license_profile: permissive_code
+  license_profile: permissive
   license_evidence:
     url: https://github.com/materialsproject/matbench
     spdx_hint: MIT (repo); verify each embedded dataset license
@@ -184,9 +186,10 @@ targets:
     granularity: target
 - id: matbench_discovery
   name: "Matbench Discovery — candidate materials screening benchmark"
-  enabled: true
+  enabled: false
+  notes: "Disabled until dataset download URLs and checksums are populated."
   priority: 2
-  license_profile: attribution
+  license_profile: record_level
   license_evidence:
     url: https://matbench-discovery.materialsproject.org/
     spdx_hint: CC-BY-4.0 (confirm)
@@ -250,7 +253,7 @@ targets:
   name: "Materials Project API"
   enabled: false
   priority: 1
-  license_profile: attribution
+  license_profile: record_level
   license_evidence:
     url: https://materialsproject.org/about
     spdx_hint: Custom-Restrictive (treat as YELLOW)
@@ -271,7 +274,7 @@ targets:
   name: "NOMAD Repository API"
   enabled: false
   priority: 1
-  license_profile: mixed_record_level
+  license_profile: record_level
   license_evidence:
     url: https://nomad-lab.eu/
     spdx_hint: mixed; record-level licensing
@@ -292,7 +295,7 @@ targets:
   name: "OQMD — API or database dumps"
   enabled: false
   priority: 1
-  license_profile: mixed_record_level
+  license_profile: record_level
   license_evidence:
     url: https://oqmd.org/
     spdx_hint: mixed; confirm ToS
@@ -313,7 +316,7 @@ targets:
   name: "PMC OA — materials/physics filtered full text"
   enabled: false
   priority: 1
-  license_profile: mixed_record_level
+  license_profile: record_level
   license_evidence:
     url: https://pmc.ncbi.nlm.nih.gov/tools/openftlist/
     spdx_hint: mixed; record-level licenses
@@ -334,7 +337,7 @@ targets:
   name: "arXiv — materials/cond-mat filtered text"
   enabled: true
   priority: 1
-  license_profile: mixed_record_level
+  license_profile: record_level
   license_evidence:
     url: https://info.arxiv.org/help/license/index.html
     spdx_hint: mixed; record-level
@@ -355,7 +358,7 @@ targets:
   name: "AFLOWLIB — high-throughput repository"
   enabled: true
   priority: 1
-  license_profile: mixed_record_level
+  license_profile: record_level
   license_evidence:
     url: http://www.aflowlib.org/
     spdx_hint: Custom-Restrictive (confirm)
@@ -376,7 +379,7 @@ targets:
   name: "Zenodo collections — materials bundles"
   enabled: true
   priority: 1
-  license_profile: mixed_record_level
+  license_profile: record_level
   license_evidence:
     url: https://zenodo.org/
     spdx_hint: mixed; per-record

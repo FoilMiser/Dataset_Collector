@@ -595,6 +595,7 @@ targets:
       doc_type: docket
       language: en
     review_required: true
+    review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
 
   - id: ecfr_current_view
     name: eCFR current view snapshots (derivative of CFR)
@@ -626,6 +627,7 @@ targets:
       doc_type: regulation
       language: en
     review_required: true
+    review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
 
   - id: eu_eurlex
     name: EUR-Lex (EU law) - acts, recitals, consolidated versions
@@ -657,6 +659,7 @@ targets:
       doc_type: regulation
       language: en
     review_required: true
+    review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
 
   - id: uk_legislation
     name: UK legislation.gov.uk
@@ -778,6 +781,7 @@ targets:
       doc_type: regulation
       language: en
     review_required: true
+    review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
 
   - id: courtlistener_bulk
     name: CourtListener bulk (opinions, dockets)
@@ -809,6 +813,7 @@ targets:
       doc_type: case_law
       language: en
     review_required: true
+    review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
 
   - id: sec_rules_releases
     name: SEC rules & releases (agency-authored)
@@ -840,6 +845,7 @@ targets:
       doc_type: rulemaking
       language: en
     review_required: true
+    review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
 
   - id: edgar_filings
     name: SEC EDGAR corporate filings (company-authored)
@@ -871,6 +877,7 @@ targets:
       doc_type: corporate_filing
       language: en
     review_required: true
+    review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
 
   - id: iso_iec_standards
     name: ISO/IEC standards (e.g., ISO 27001/27002)

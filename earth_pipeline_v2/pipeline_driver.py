@@ -140,11 +140,21 @@ class LicenseMap:
 
 def load_license_map(path: Path) -> LicenseMap:
     m = read_yaml(path)
-    spdx = m.get("spdx", {})
-    normalization = m.get("normalization", {})
-    restriction_scan = m.get("restriction_scan", {})
-    gating = m.get("gating", {})
-    profiles = m.get("license_profiles", {}) or m.get("profiles", {})
+    spdx = m.get("spdx", {}) or {}
+    normalization = m.get("normalization", {}) or {}
+    restriction_scan = m.get("restriction_scan", {}) or {}
+    gating = m.get("gating", {}) or {}
+    profiles = m.get("profiles", {}) or m.get("license_profiles", {}) or {}
+
+    return LicenseMap(
+        allow=spdx.get("allow", []),
+        conditional=spdx.get("conditional", []),
+        deny_prefixes=spdx.get("deny_prefixes", []),
+        normalization_rules=normalization.get("rules", []),
+        restriction_phrases=restriction_scan.get("phrases", []),
+        gating=gating,
+        profiles=profiles,
+    )
 
     return LicenseMap(
         allow=spdx.get("allow", []),
@@ -654,12 +664,21 @@ def main() -> None:
     green_rows: List[Dict[str, Any]] = []
     yellow_rows: List[Dict[str, Any]] = []
     red_rows: List[Dict[str, Any]] = []
+    warnings: List[Dict[str, Any]] = []
 
     for t in targets:
         enabled = bool(t.get("enabled", True))
         tid = str(t.get("id", "")).strip() or "unknown_id"
         name = str(t.get("name", tid))
         profile = str(t.get("license_profile", "unknown"))
+        if profile not in license_map.profiles:
+            warnings.append({
+                "type": "unknown_license_profile",
+                "target_id": tid,
+                "license_profile": profile,
+                "known_profiles": sorted(license_map.profiles.keys()),
+                "message": f"Target {tid} uses license_profile '{profile}' not present in license_map profiles.",
+            })
         evidence = t.get("license_evidence", {}) or {}
         spdx_hint = str(evidence.get("spdx_hint", "UNKNOWN"))
         evidence_url = str(evidence.get("url", ""))
@@ -913,6 +932,7 @@ def main() -> None:
         "license_map_path": str(license_map_path),
         "manifests_root": str(manifests_root),
         "queues_root": str(queues_root),
+        "warnings": warnings,
     }
     write_json(queues_root / "run_summary.json", summary)
     
