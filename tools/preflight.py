@@ -16,6 +16,12 @@ EXTERNAL_TOOL_STRATEGIES = {
     "aws_requester_pays": "aws",
 }
 
+TOOL_INSTALL_HINTS = {
+    "git": "Install Git for Windows: https://git-scm.com/download/win",
+    "aria2c": "Install aria2: https://aria2.github.io/",
+    "aws": "Install AWS CLI v2: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html",
+}
+
 
 def _load_yaml(path: Path) -> Dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
@@ -48,6 +54,7 @@ def run_preflight(repo_root: Path, pipeline_map_path: Path) -> int:
     errors: List[str] = []
     warnings: List[str] = []
     strategies_in_use: Set[str] = set()
+    strategy_targets: Dict[str, List[str]] = {}
 
     for pipeline_name, pipeline_entry in pipelines_cfg.items():
         pipeline_dir = repo_root / pipeline_name
@@ -93,11 +100,16 @@ def run_preflight(repo_root: Path, pipeline_map_path: Path) -> int:
                 )
                 continue
             strategies_in_use.add(strategy)
+            strategy_targets.setdefault(strategy, []).append(f"{pipeline_name}:{target_id}")
 
     for strategy, tool in EXTERNAL_TOOL_STRATEGIES.items():
         if strategy in strategies_in_use and shutil.which(tool) is None:
+            targets = ", ".join(sorted(strategy_targets.get(strategy, [])))
+            hint = TOOL_INSTALL_HINTS.get(tool)
             warnings.append(
                 f"Missing external tool '{tool}' required by strategy '{strategy}'."
+                + (f" Targets: {targets}." if targets else "")
+                + (f" {hint}" if hint else "")
             )
 
     if warnings:

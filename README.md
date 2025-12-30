@@ -1,7 +1,7 @@
 # Dataset Collector
 
 ## Overview
-The Dataset Collector repository organizes a family of domain-specific data collection pipelines under `*_pipeline_v2/` directories. The primary way to run the full suite is the JupyterLab notebook `dataset_collector_run_all_pipelines.ipynb`, which executes every domain pipeline sequentially in one session while prompting for required API keys and optionally installing per-pipeline requirements. The collector's canonical output is the `combined/` stage; no "final" post-processing stage is produced here.
+The Dataset Collector repository organizes a family of domain-specific data collection pipelines under `*_pipeline_v2/` directories. The primary way to run the full suite is the JupyterLab notebook `dataset_collector_run_all_pipelines.ipynb`, which executes every domain pipeline sequentially in one session while prompting for required API keys and optionally installing per-pipeline requirements. The collector's canonical output is the `combined/` stage; no "final" post-processing stage is produced here. See `docs/output_contract.md` for the full output layout.
 
 Each `*_pipeline_v2` directory represents a self-contained pipeline for a domain:
 
@@ -23,6 +23,16 @@ Each `*_pipeline_v2` directory represents a self-contained pipeline for a domain
 - `physics_pipeline_v2`: physics datasets and task sources.
 - `regcomp_pipeline_v2`: regulatory/compliance datasets and task sources.
 - `safety_incident_pipeline_v2`: safety incident datasets and task sources.
+
+## Safety model
+
+Dataset Collector v2 uses three safety buckets to control merges:
+
+- **GREEN**: allowed to merge automatically.
+- **YELLOW**: requires manual review before merging.
+- **RED**: do not collect or merge.
+
+YELLOW items must be reviewed and approved before they are eligible for the combined corpus.
 
 ## Run all pipelines via JupyterLab
 
@@ -124,6 +134,15 @@ python tools\build_natural_corpus.py --dest-root "E:\AI-Research\datasets\Natura
 To preview the actions without writing data, omit `--execute` (dry-run). See
 `docs/output_contract.md` for the expected on-disk layout.
 
+## Toolchain (external tools)
+
+Some targets depend on external tools. Install them as needed:
+
+- **Git** (required for `download.strategy: git`): https://git-scm.com/download/win
+- **7zip/unzip** (optional; for large archive extraction): https://www.7-zip.org/
+- **AWS CLI v2** (required for `s3_sync` or `aws_requester_pays`): https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
+- **huggingface-cli** (optional; if you add Hugging Face auth flows later): https://huggingface.co/docs/huggingface_hub/quick-start#login
+
 ## Expected directory structure & configurable paths
 
 Within each `*_pipeline_v2` directory, you should expect:
@@ -164,3 +183,7 @@ To point at a custom pipeline map location:
 ```bash
 python tools/preflight.py --pipeline-map tools/pipeline_map.yaml
 ```
+
+## Adding a new target safely
+
+Please follow the checklist in `CONTRIBUTING.md` before adding or editing target YAMLs.

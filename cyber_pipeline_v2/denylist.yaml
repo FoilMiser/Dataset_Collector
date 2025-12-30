@@ -9,7 +9,7 @@
 # All patterns require 'link' and 'rationale' fields for auditability.
 
 schema_version: "0.3"
-updated_utc: "2026-01-15"
+updated_utc: "2025-12-30"
 
 domain_patterns:
   - domain: "exploit-db.com"

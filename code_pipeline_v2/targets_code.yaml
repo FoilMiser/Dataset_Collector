@@ -1,7 +1,7 @@
 # targets_code.yaml
 # Code-specialized targets for the ethical dataset pipeline (v2 layout)
 schema_version: "0.8"
-updated_utc: "2026-06-01"
+updated_utc: "2025-12-30"
 notes: >
   Code-focused corpus plan. GREEN sources are safe to ingest automatically.
   YELLOW sources require record-level licensing, attribution bundling, and/or extra ToU review.

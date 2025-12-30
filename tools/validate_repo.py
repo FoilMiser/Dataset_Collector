@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
 
@@ -58,6 +59,41 @@ def load_profiles(license_map_path: Path) -> Dict[str, Any]:
     data = read_yaml(license_map_path)
     return data.get("profiles", {}) or data.get("license_profiles", {}) or {}
 
+def _parse_updated_utc(value: str) -> datetime | None:
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def _collect_updated_utc_warnings(path: Path) -> List[Dict[str, Any]]:
+    warnings: List[Dict[str, Any]] = []
+    cfg = read_yaml(path) or {}
+    updated = str(cfg.get("updated_utc", "")).strip()
+    if not updated:
+        return warnings
+
+    parsed = _parse_updated_utc(updated)
+    if parsed is None:
+        warnings.append({
+            "type": "updated_utc_invalid_format",
+            "path": str(path),
+            "updated_utc": updated,
+            "expected_format": "YYYY-MM-DD",
+        })
+        return warnings
+
+    today = datetime.now(timezone.utc).date()
+    if parsed.date() > today:
+        warnings.append({
+            "type": "updated_utc_future_date",
+            "path": str(path),
+            "updated_utc": updated,
+            "today_utc": today.isoformat(),
+        })
+
+    return warnings
+
 
 def get_download_requirement_errors(download: Dict[str, Any], strategy: str) -> List[str]:
     errors = []
@@ -87,6 +123,7 @@ def validate_targets_file(path: Path) -> Tuple[List[Dict[str, Any]], List[Dict[s
     warnings: List[Dict[str, Any]] = []
 
     cfg = read_yaml(path) or {}
+    warnings.extend(_collect_updated_utc_warnings(path))
     schema_version = str(cfg.get("schema_version", ""))
     if schema_version and schema_version != EXPECTED_TARGETS_SCHEMA:
         errors.append({
@@ -100,7 +137,21 @@ def validate_targets_file(path: Path) -> Tuple[List[Dict[str, Any]], List[Dict[s
     license_map_path = Path(companion.get("license_map", "license_map.yaml"))
     if not license_map_path.is_absolute():
         license_map_path = path.parent / license_map_path
+    if license_map_path.exists():
+        warnings.extend(_collect_updated_utc_warnings(license_map_path))
     profiles = load_profiles(license_map_path)
+
+    field_schemas_path = Path(companion.get("field_schemas", "field_schemas.yaml"))
+    if not field_schemas_path.is_absolute():
+        field_schemas_path = path.parent / field_schemas_path
+    if field_schemas_path.exists():
+        warnings.extend(_collect_updated_utc_warnings(field_schemas_path))
+
+    denylist_path = Path(companion.get("denylist", "denylist.yaml"))
+    if not denylist_path.is_absolute():
+        denylist_path = path.parent / denylist_path
+    if denylist_path.exists():
+        warnings.extend(_collect_updated_utc_warnings(denylist_path))
 
     for target in cfg.get("targets", []) or []:
         if not target.get("enabled", True):
