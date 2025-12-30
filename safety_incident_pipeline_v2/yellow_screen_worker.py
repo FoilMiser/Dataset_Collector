@@ -5,8 +5,9 @@ yellow_screen_worker.py (v2.0)
 Converts raw YELLOW acquisitions into canonical JSONL shards with strict pitch
 behavior. Outputs:
   - screened_yellow/{license_pool}/shards/screened_yellow_00000.jsonl.gz
-  - _ledger/yellow_pass.jsonl (accepted rows)
-  - _pitches/yellow_pitch.jsonl (pitched rows)
+  - _ledger/yellow_passed.jsonl (accepted rows)
+  - _ledger/yellow_pitched.jsonl (pitched rows)
+  - _pitches/yellow_pitch.jsonl (pitched samples)
   - _manifests/{target_id}/screen_yellow_done.json
 """
 
@@ -25,6 +26,8 @@ from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple
 import yaml
 
 VERSION = "2.0"
+PITCH_SAMPLE_LIMIT = 25
+PITCH_TEXT_LIMIT = 400
 
 
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
@@ -227,6 +230,45 @@ def contains_deny(text: str, phrases: List[str]) -> bool:
     return any(p in low for p in phrases)
 
 
+def record_pitch(
+    roots: Roots,
+    pitch_counts: Dict[Tuple[str, str], int],
+    target_id: str,
+    reason: str,
+    raw: Optional[Dict[str, Any]] = None,
+    text: Optional[str] = None,
+    extra: Optional[Dict[str, Any]] = None,
+    sample_extra: Optional[Dict[str, Any]] = None,
+) -> None:
+    row = {"target_id": target_id, "reason": reason}
+    sample_id = None
+    if raw:
+        sample_id = raw.get("record_id") or raw.get("id")
+        if sample_id:
+            row["sample_id"] = sample_id
+    if extra:
+        row.update(extra)
+    append_jsonl(roots.ledger_root / "yellow_pitched.jsonl", [row])
+
+    key = (target_id, reason)
+    if pitch_counts.get(key, 0) >= PITCH_SAMPLE_LIMIT:
+        return
+    sample = {"target_id": target_id, "reason": reason}
+    if sample_id:
+        sample["sample_id"] = sample_id
+    if raw:
+        source = raw.get("source", {}) or {}
+        source_url = source.get("source_url") or raw.get("source_url")
+        if source_url:
+            sample["source_url"] = source_url
+    if text:
+        sample["text"] = text[:PITCH_TEXT_LIMIT]
+    if sample_extra:
+        sample.update(sample_extra)
+    append_jsonl(roots.pitches_root / "yellow_pitch.jsonl", [sample])
+    pitch_counts[key] = pitch_counts.get(key, 0) + 1
+
+
 def redact_text(text: str) -> Tuple[str, List[str]]:
     redactions: List[str] = []
     if EMAIL_RE.search(text):
@@ -284,7 +326,10 @@ def load_signoff(manifest_dir: Path) -> Optional[Dict[str, Any]]:
     signoff_path = manifest_dir / "review_signoff.json"
     if not signoff_path.exists():
         return None
-    return read_json(signoff_path)
+    try:
+        return json.loads(signoff_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
 
 
 def canonical_record(
@@ -333,18 +378,65 @@ def process_target(
     target_cfg = next((t for t in cfg.get("targets", []) if t.get("id") == target_id), {})
     screen_cfg = merge_screening_config(cfg, target_cfg)
     shard_cfg = sharding_cfg(cfg, "screened_yellow")
+    g = (cfg.get("globals", {}) or {})
+    require_signoff = bool(g.get("require_yellow_signoff", False))
+    allow_without_signoff = bool((target_cfg.get("yellow_screen", {}) or {}).get("allow_without_signoff", False))
+    manifest_dir = Path(queue_row.get("manifest_dir") or roots.manifests_root / target_id)
+    signoff = load_signoff(manifest_dir) or {}
+    status = str(signoff.get("status", "") or "").lower()
     pool_dir_base = roots.raw_root / "yellow"
     license_pools = [p.name for p in pool_dir_base.iterdir() if p.is_dir()] if pool_dir_base.exists() else []
     pools = license_pools or [queue_row.get("license_profile", "quarantine")]
 
-    require_signoff = bool((cfg.get("globals", {}) or {}).get("require_yellow_signoff", False))
-    allow_without_signoff = bool((target_cfg.get("yellow_screen", {}) or {}).get("allow", False))
-    manifest_dir = Path(queue_row.get("manifest_dir") or roots.manifests_root / target_id)
-    signoff = load_signoff(manifest_dir)
-    signoff_status = (signoff or {}).get("status")
-
     passed, pitched = 0, 0
     shard_paths: List[str] = []
+    pitch_counts: Dict[Tuple[str, str], int] = {}
+
+    if require_signoff and not allow_without_signoff:
+        if status == "rejected":
+            if execute:
+                record_pitch(
+                    roots,
+                    pitch_counts,
+                    target_id,
+                    "yellow_signoff_rejected",
+                    sample_extra={"details": f"manifest_dir={manifest_dir}"},
+                )
+            manifest = {
+                "target_id": target_id,
+                "passed": passed,
+                "pitched": pitched,
+                "shards": shard_paths,
+                "status": "skipped",
+                "reason": "yellow_signoff_rejected",
+                "finished_at_utc": utc_now(),
+            }
+            if execute:
+                ensure_dir((roots.manifests_root / target_id))
+                write_json(roots.manifests_root / target_id / "screen_yellow_done.json", manifest)
+            return manifest
+        if status != "approved":
+            if execute:
+                record_pitch(
+                    roots,
+                    pitch_counts,
+                    target_id,
+                    "yellow_signoff_missing",
+                    sample_extra={"details": f"manifest_dir={manifest_dir}"},
+                )
+            manifest = {
+                "target_id": target_id,
+                "passed": passed,
+                "pitched": pitched,
+                "shards": shard_paths,
+                "status": "skipped",
+                "reason": "yellow_signoff_missing",
+                "finished_at_utc": utc_now(),
+            }
+            if execute:
+                ensure_dir((roots.manifests_root / target_id))
+                write_json(roots.manifests_root / target_id / "screen_yellow_done.json", manifest)
+            return manifest
 
     for pool in pools:
         raw_dir = pool_dir_base / pool / target_id
@@ -355,65 +447,61 @@ def process_target(
         if not raw_files:
             pitched += 1
             if execute:
-                append_jsonl(roots.pitches_root / "yellow_pitch.jsonl", [{
-                    "target_id": target_id,
-                    "reason": "unsupported_format",
-                    "details": f"no jsonl found in {raw_dir}",
-                }])
+                record_pitch(
+                    roots,
+                    pitch_counts,
+                    target_id,
+                    "unsupported_format",
+                    sample_extra={"details": f"no jsonl found in {raw_dir}"},
+                )
             continue
 
         for file_path in raw_files:
             for raw in read_jsonl(file_path):
-                if require_signoff and not allow_without_signoff and signoff_status != "approved":
-                    pitched += 1
-                    if execute:
-                        append_jsonl(roots.pitches_root / "yellow_pitch.jsonl", [{
-                            "target_id": target_id,
-                            "reason": "yellow_requires_signoff",
-                            "sample_id": raw.get("id"),
-                        }])
-                    continue
-
                 text = find_text(raw, screen_cfg.text_fields)
                 if not text:
                     pitched += 1
                     if execute:
-                        append_jsonl(roots.pitches_root / "yellow_pitch.jsonl", [{"target_id": target_id, "reason": "no_text", "sample": raw}])
+                        record_pitch(roots, pitch_counts, target_id, "no_text", raw=raw)
                     continue
 
                 sensitive_reason = has_sensitive_markers(text)
                 if sensitive_reason:
                     pitched += 1
                     if execute:
-                        append_jsonl(roots.pitches_root / "yellow_pitch.jsonl", [{
-                            "target_id": target_id,
-                            "reason": sensitive_reason,
-                            "sample_id": raw.get("id"),
-                        }])
+                        record_pitch(roots, pitch_counts, target_id, sensitive_reason, raw=raw, text=text)
                     continue
 
                 redacted_text, redactions = redact_text(text)
                 if len(redacted_text) < screen_cfg.min_chars or len(redacted_text) > screen_cfg.max_chars:
                     pitched += 1
                     if execute:
-                        append_jsonl(roots.pitches_root / "yellow_pitch.jsonl", [{"target_id": target_id, "reason": "length_bounds", "sample_id": raw.get("id")}])
+                        record_pitch(roots, pitch_counts, target_id, "length_bounds", raw=raw, text=redacted_text)
                     continue
 
                 lic = find_license(raw, screen_cfg.license_fields)
                 if screen_cfg.require_record_license and not lic:
                     pitched += 1
                     if execute:
-                        append_jsonl(roots.pitches_root / "yellow_pitch.jsonl", [{"target_id": target_id, "reason": "missing_record_license", "sample_id": raw.get("id")}])
+                        record_pitch(roots, pitch_counts, target_id, "missing_record_license", raw=raw)
                     continue
                 if lic and screen_cfg.allow_spdx and lic not in screen_cfg.allow_spdx:
                     pitched += 1
                     if execute:
-                        append_jsonl(roots.pitches_root / "yellow_pitch.jsonl", [{"target_id": target_id, "reason": "license_not_allowlisted", "license": lic, "sample_id": raw.get("id")}])
+                        record_pitch(
+                            roots,
+                            pitch_counts,
+                            target_id,
+                            "license_not_allowlisted",
+                            raw=raw,
+                            extra={"license": lic},
+                            sample_extra={"license": lic},
+                        )
                     continue
                 if contains_deny(redacted_text, screen_cfg.deny_phrases):
                     pitched += 1
                     if execute:
-                        append_jsonl(roots.pitches_root / "yellow_pitch.jsonl", [{"target_id": target_id, "reason": "deny_phrase", "sample_id": raw.get("id")}])
+                        record_pitch(roots, pitch_counts, target_id, "deny_phrase", raw=raw, text=redacted_text)
                     continue
 
                 license_profile = str(raw.get("license_profile") or queue_row.get("license_profile") or pool or "quarantine")
@@ -425,12 +513,15 @@ def process_target(
                 if not valid:
                     pitched += 1
                     if execute:
-                        append_jsonl(roots.pitches_root / "yellow_pitch.jsonl", [{
-                            "target_id": target_id,
-                            "reason": "schema_missing",
-                            "missing": missing,
-                            "sample_id": record.get("record_id"),
-                        }])
+                        record_pitch(
+                            roots,
+                            pitch_counts,
+                            target_id,
+                            "schema_missing",
+                            raw=record,
+                            extra={"missing": missing},
+                            sample_extra={"missing": missing},
+                        )
                     continue
 
                 passed += 1
@@ -449,7 +540,7 @@ def process_target(
                         "output_shard": current_shard,
                         "seen_at_utc": utc_now(),
                     }
-                    append_jsonl(roots.ledger_root / "yellow_pass.jsonl", [ledger_row])
+                    append_jsonl(roots.ledger_root / "yellow_passed.jsonl", [ledger_row])
         if execute:
             flushed = sharder.flush()
             if flushed:

@@ -7,6 +7,7 @@ behavior. Outputs:
   - screened_yellow/{license_pool}/shards/yellow_shard_00000.jsonl.gz
   - _ledger/yellow_passed.jsonl (accepted rows)
   - _ledger/yellow_pitched.jsonl (pitched rows)
+  - _pitches/yellow_pitch.jsonl (pitched samples)
   - _manifests/{target_id}/yellow_screen_done.json
 """
 
@@ -28,6 +29,8 @@ from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple
 import yaml
 
 VERSION = "2.0"
+PITCH_SAMPLE_LIMIT = 25
+PITCH_TEXT_LIMIT = 400
 
 
 def utc_now() -> str:
@@ -147,6 +150,16 @@ def load_targets_cfg(path: Path) -> Dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
 
+def load_signoff(manifest_dir: Path) -> Optional[Dict[str, Any]]:
+    signoff_path = manifest_dir / "review_signoff.json"
+    if not signoff_path.exists():
+        return None
+    try:
+        return json.loads(signoff_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
 def resolve_roots(cfg: Dict[str, Any]) -> Roots:
     g = (cfg.get("globals", {}) or {})
     return Roots(
@@ -206,6 +219,45 @@ def find_license(row: Dict[str, Any], candidates: List[str]) -> Optional[str]:
 def contains_deny(text: str, phrases: List[str]) -> bool:
     low = text.lower()
     return any(p in low for p in phrases)
+
+
+def record_pitch(
+    roots: Roots,
+    pitch_counts: Dict[Tuple[str, str], int],
+    target_id: str,
+    reason: str,
+    raw: Optional[Dict[str, Any]] = None,
+    text: Optional[str] = None,
+    extra: Optional[Dict[str, Any]] = None,
+    sample_extra: Optional[Dict[str, Any]] = None,
+) -> None:
+    row = {"target_id": target_id, "reason": reason, "seen_at_utc": utc_now()}
+    sample_id = None
+    if raw:
+        sample_id = raw.get("record_id") or raw.get("id")
+        if sample_id:
+            row["sample_id"] = sample_id
+    if extra:
+        row.update(extra)
+    append_jsonl(roots.ledger_root / "yellow_pitched.jsonl", [row])
+
+    key = (target_id, reason)
+    if pitch_counts.get(key, 0) >= PITCH_SAMPLE_LIMIT:
+        return
+    sample = {"target_id": target_id, "reason": reason}
+    if sample_id:
+        sample["sample_id"] = sample_id
+    if raw:
+        source = raw.get("source", {}) or {}
+        source_url = source.get("source_url") or raw.get("source_url")
+        if source_url:
+            sample["source_url"] = source_url
+    if text:
+        sample["text"] = text[:PITCH_TEXT_LIMIT]
+    if sample_extra:
+        sample.update(sample_extra)
+    append_jsonl(roots.pitches_root / "yellow_pitch.jsonl", [sample])
+    pitch_counts[key] = pitch_counts.get(key, 0) + 1
 
 
 def canonical_record(raw: Dict[str, Any], text: str, target_id: str, license_profile: str, license_spdx: Optional[str]) -> Dict[str, Any]:
@@ -296,6 +348,12 @@ def process_target(cfg: Dict[str, Any], roots: Roots, queue_row: Dict[str, Any],
     target_cfg = next((t for t in cfg.get("targets", []) if t.get("id") == target_id), {})
     screen_cfg = merge_screening_config(cfg, target_cfg)
     shard_cfg = sharding_cfg(cfg, "yellow_shard")
+    g = (cfg.get("globals", {}) or {})
+    require_signoff = bool(g.get("require_yellow_signoff", False))
+    allow_without_signoff = bool((target_cfg.get("yellow_screen", {}) or {}).get("allow_without_signoff", False))
+    manifest_dir = Path(queue_row.get("manifest_dir") or roots.manifests_root / target_id)
+    signoff = load_signoff(manifest_dir) or {}
+    status = str(signoff.get("status", "") or "").lower()
     pool_dir_base = roots.raw_root / "yellow"
     license_pools = [p.name for p in pool_dir_base.iterdir() if p.is_dir()] if pool_dir_base.exists() else []
     pools = license_pools or [queue_row.get("license_profile", "quarantine")]
@@ -305,6 +363,53 @@ def process_target(cfg: Dict[str, Any], roots: Roots, queue_row: Dict[str, Any],
 
     passed, pitched = 0, 0
     shard_paths: List[str] = []
+    pitch_counts: Dict[Tuple[str, str], int] = {}
+
+    if require_signoff and not allow_without_signoff:
+        if status == "rejected":
+            if execute:
+                record_pitch(
+                    roots,
+                    pitch_counts,
+                    target_id,
+                    "yellow_signoff_rejected",
+                    sample_extra={"details": f"manifest_dir={manifest_dir}"},
+                )
+            manifest = {
+                "target_id": target_id,
+                "passed": passed,
+                "pitched": pitched,
+                "shards": shard_paths,
+                "status": "skipped",
+                "reason": "yellow_signoff_rejected",
+                "finished_at_utc": utc_now(),
+            }
+            if execute:
+                ensure_dir((roots.manifests_root / target_id))
+                write_json(roots.manifests_root / target_id / "yellow_screen_done.json", manifest)
+            return manifest
+        if status != "approved":
+            if execute:
+                record_pitch(
+                    roots,
+                    pitch_counts,
+                    target_id,
+                    "yellow_signoff_missing",
+                    sample_extra={"details": f"manifest_dir={manifest_dir}"},
+                )
+            manifest = {
+                "target_id": target_id,
+                "passed": passed,
+                "pitched": pitched,
+                "shards": shard_paths,
+                "status": "skipped",
+                "reason": "yellow_signoff_missing",
+                "finished_at_utc": utc_now(),
+            }
+            if execute:
+                ensure_dir((roots.manifests_root / target_id))
+                write_json(roots.manifests_root / target_id / "yellow_screen_done.json", manifest)
+            return manifest
 
     for pool in pools:
         raw_dir = pool_dir_base / pool / target_id
@@ -329,12 +434,17 @@ def process_target(cfg: Dict[str, Any], roots: Roots, queue_row: Dict[str, Any],
             nonlocal pitched
             pitched += 1
             if execute:
-                row = {"target_id": target_id, "reason": reason, "seen_at_utc": utc_now()}
-                if sample_id:
-                    row["sample_id"] = sample_id
-                if sample is not None:
-                    row["sample"] = sample
-                append_jsonl(roots.ledger_root / "yellow_pitched.jsonl", [row])
+                extra = {"sample_id": sample_id} if sample_id else None
+                sample_extra = {"sample": sample} if sample is not None else None
+                record_pitch(
+                    roots,
+                    pitch_counts,
+                    target_id,
+                    reason,
+                    raw=None,
+                    extra=extra,
+                    sample_extra=sample_extra,
+                )
 
         def validate_and_add(raw_record: Dict[str, Any], text: Optional[str]) -> None:
             nonlocal passed

@@ -7,6 +7,7 @@ screening plugins. Outputs:
   - screened_yellow/{license_pool}/shards/yellow_shard_00000.jsonl.gz
   - _ledger/yellow_passed.jsonl (accepted rows)
   - _ledger/yellow_pitched.jsonl (pitched rows)
+  - _pitches/yellow_pitch.jsonl (pitched samples)
   - _manifests/{target_id}/yellow_screen_done.json
 """
 
@@ -25,6 +26,8 @@ from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple
 import yaml
 
 VERSION = "2.0"
+PITCH_SAMPLE_LIMIT = 25
+PITCH_TEXT_LIMIT = 400
 
 
 def utc_now() -> str:
@@ -333,10 +336,21 @@ class ScreenContext:
     shard_cfg: ShardingConfig
     execute: bool
     field_schemas: Dict[str, Dict[str, FieldSpec]]
+    pitch_counts: Dict[Tuple[str, str], int]
 
 
 def load_targets_cfg(path: Path) -> Dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+
+
+def load_signoff(manifest_dir: Path) -> Optional[Dict[str, Any]]:
+    signoff_path = manifest_dir / "review_signoff.json"
+    if not signoff_path.exists():
+        return None
+    try:
+        return json.loads(signoff_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
 
 
 def resolve_roots(cfg: Dict[str, Any]) -> Roots:
@@ -395,22 +409,40 @@ def contains_deny(text: str, phrases: List[str]) -> bool:
     return any(p in low for p in phrases)
 
 
-def log_pitch(ctx: ScreenContext, reason: str, sample_id: Optional[str] = None, sample: Optional[Dict[str, Any]] = None) -> None:
+def log_pitch(
+    ctx: ScreenContext,
+    reason: str,
+    sample_id: Optional[str] = None,
+    text: Optional[str] = None,
+    extra: Optional[Dict[str, Any]] = None,
+    sample_extra: Optional[Dict[str, Any]] = None,
+) -> None:
     if not ctx.execute:
         return
-    append_jsonl(
-        ctx.roots.ledger_root / "yellow_pitched.jsonl",
-        [
-            {
-                "stage": "yellow_screen",
-                "target_id": ctx.queue_row["id"],
-                "reason": reason,
-                "sample_id": sample_id,
-                "sample": sample,
-                "seen_at_utc": utc_now(),
-            }
-        ],
-    )
+    row = {
+        "stage": "yellow_screen",
+        "target_id": ctx.queue_row["id"],
+        "reason": reason,
+        "seen_at_utc": utc_now(),
+    }
+    if sample_id:
+        row["sample_id"] = sample_id
+    if extra:
+        row.update(extra)
+    append_jsonl(ctx.roots.ledger_root / "yellow_pitched.jsonl", [row])
+
+    key = (ctx.queue_row["id"], reason)
+    if ctx.pitch_counts.get(key, 0) >= PITCH_SAMPLE_LIMIT:
+        return
+    sample = {"target_id": ctx.queue_row["id"], "reason": reason}
+    if sample_id:
+        sample["sample_id"] = sample_id
+    if text:
+        sample["text"] = text[:PITCH_TEXT_LIMIT]
+    if sample_extra:
+        sample.update(sample_extra)
+    append_jsonl(ctx.roots.pitches_root / "yellow_pitch.jsonl", [sample])
+    ctx.pitch_counts[key] = ctx.pitch_counts.get(key, 0) + 1
 
 
 def log_pass(ctx: ScreenContext, rec: Dict[str, Any], shard_path: Path) -> None:
@@ -457,11 +489,11 @@ def screen_jsonl_mode(ctx: ScreenContext) -> Dict[str, Any]:
                 text = find_text(raw, ctx.screen_cfg.text_fields)
                 if not text:
                     pitched += 1
-                    log_pitch(ctx, "no_text", raw.get("id"), raw)
+                    log_pitch(ctx, "no_text", raw.get("id"))
                     continue
                 if len(text) < ctx.screen_cfg.min_chars or len(text) > ctx.screen_cfg.max_chars:
                     pitched += 1
-                    log_pitch(ctx, "length_bounds", raw.get("id"))
+                    log_pitch(ctx, "length_bounds", raw.get("id"), text=text)
                     continue
                 lic = find_license(raw, ctx.screen_cfg.license_fields)
                 if ctx.screen_cfg.require_record_license and not lic:
@@ -470,11 +502,11 @@ def screen_jsonl_mode(ctx: ScreenContext) -> Dict[str, Any]:
                     continue
                 if lic and ctx.screen_cfg.allow_spdx and lic not in ctx.screen_cfg.allow_spdx:
                     pitched += 1
-                    log_pitch(ctx, "license_not_allowlisted", raw.get("id"))
+                    log_pitch(ctx, "license_not_allowlisted", raw.get("id"), sample_extra={"license": lic})
                     continue
                 if contains_deny(text, ctx.screen_cfg.deny_phrases):
                     pitched += 1
-                    log_pitch(ctx, "deny_phrase", raw.get("id"))
+                    log_pitch(ctx, "deny_phrase", raw.get("id"), text=text)
                     continue
                 license_profile = str(raw.get("license_profile") or ctx.queue_row.get("license_profile") or pool or "quarantine")
                 routing = resolve_routing(raw, ctx.queue_row)
@@ -533,12 +565,12 @@ def screen_pubchem_computed_only(ctx: ScreenContext) -> Dict[str, Any]:
                     record[f] = cast_value(val, schema[f].field_type, schema[f].validation)
                 else:
                     record[f] = val
-            if schema:
-                valid, _ = validate_record(record, schema)
-                if not valid:
-                    pitched += 1
-                    log_pitch(ctx, "schema_validation_failed", str(record.get("PUBCHEM_COMPOUND_CID")))
-                    continue
+                if schema:
+                    valid, _ = validate_record(record, schema)
+                    if not valid:
+                        pitched += 1
+                        log_pitch(ctx, "schema_validation_failed", str(record.get("PUBCHEM_COMPOUND_CID")))
+                        continue
             cid = record.get("PUBCHEM_COMPOUND_CID")
             if cid is None:
                 pitched += 1
@@ -590,7 +622,7 @@ def screen_pmc_oa(ctx: ScreenContext) -> Dict[str, Any]:
                 text = find_text(raw, ctx.screen_cfg.text_fields)
                 if not text:
                     pitched += 1
-                    log_pitch(ctx, "no_text", raw.get("id"), raw)
+                    log_pitch(ctx, "no_text", raw.get("id"))
                     continue
                 routing = resolve_routing(raw, ctx.queue_row)
                 lic = find_license(raw, ctx.screen_cfg.license_fields) or ctx.queue_row.get("resolved_spdx")
@@ -608,7 +640,7 @@ def screen_pmc_oa(ctx: ScreenContext) -> Dict[str, Any]:
                 text = f.read()
             if not text or len(text) < ctx.screen_cfg.min_chars:
                 pitched += 1
-                log_pitch(ctx, "empty_text_file", file_path.name)
+                log_pitch(ctx, "empty_text_file", file_path.name, sample_extra={"file": file_path.name})
                 continue
             raw = {"record_id": sha256_text(f"{target_id}:{file_path.name}"), "source": {"origin": "pmc_oa_file", "source_url": str(file_path)}}
             routing = resolve_routing(raw, ctx.queue_row)
@@ -641,6 +673,43 @@ MODE_HANDLERS = {
 
 
 def process_target(ctx: ScreenContext) -> Dict[str, Any]:
+    g = (ctx.cfg.get("globals", {}) or {})
+    require_signoff = bool(g.get("require_yellow_signoff", False))
+    allow_without_signoff = bool((ctx.target_cfg.get("yellow_screen", {}) or {}).get("allow_without_signoff", False))
+    manifest_dir = Path(ctx.queue_row.get("manifest_dir") or ctx.roots.manifests_root / ctx.queue_row["id"])
+    signoff = load_signoff(manifest_dir) or {}
+    status = str(signoff.get("status", "") or "").lower()
+    if require_signoff and not allow_without_signoff:
+        if status == "rejected":
+            log_pitch(
+                ctx,
+                "yellow_signoff_rejected",
+                sample_extra={"details": f"manifest_dir={manifest_dir}"},
+            )
+            return {
+                "target_id": ctx.queue_row["id"],
+                "passed": 0,
+                "pitched": 0,
+                "shards": [],
+                "status": "skipped",
+                "reason": "yellow_signoff_rejected",
+                "finished_at_utc": utc_now(),
+            }
+        if status != "approved":
+            log_pitch(
+                ctx,
+                "yellow_signoff_missing",
+                sample_extra={"details": f"manifest_dir={manifest_dir}"},
+            )
+            return {
+                "target_id": ctx.queue_row["id"],
+                "passed": 0,
+                "pitched": 0,
+                "shards": [],
+                "status": "skipped",
+                "reason": "yellow_signoff_missing",
+                "finished_at_utc": utc_now(),
+            }
     mode = (ctx.target_cfg.get("yellow_screen", {}) or {}).get("mode", "jsonl")
     handler = MODE_HANDLERS.get(mode, screen_jsonl_mode)
     return handler(ctx)
@@ -691,6 +760,7 @@ def main() -> None:
             shard_cfg=sharding_cfg(cfg, "yellow_shard"),
             execute=args.execute,
             field_schemas=schemas,
+            pitch_counts={},
         )
         res = process_target(ctx)
         summary["results"].append(res)

@@ -15,7 +15,7 @@ globals:
   queues_root: /data/physics/_queues
   catalogs_root: /data/physics/_catalogs
   logs_root: /data/physics/_logs
-  require_yellow_signoff: false
+  require_yellow_signoff: true
 
   sharding:
     max_records_per_shard: 50000

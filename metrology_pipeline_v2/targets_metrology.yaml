@@ -17,7 +17,7 @@ globals:
   catalogs_root: "/data/metrology/_catalogs"
   logs_root: "/data/metrology/_logs"
 
-  require_yellow_signoff: false
+  require_yellow_signoff: true
 
   sharding:
     max_records_per_shard: 50000

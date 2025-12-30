@@ -14,7 +14,7 @@ globals:
   queues_root: /data/math/_queues
   catalogs_root: /data/math/_catalogs
   logs_root: /data/math/_logs
-  require_yellow_signoff: false
+  require_yellow_signoff: true
   sharding:
     max_records_per_shard: 50000
     compression: gzip
