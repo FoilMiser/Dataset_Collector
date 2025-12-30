@@ -35,6 +35,10 @@ single domain folder must include the following structure:
 ## Ledger and manifests
 
 - `_ledger/` tracks acquisition events and audit metadata.
+- Canonical YELLOW ledgers:
+  - `_ledger/yellow_passed.jsonl`
+  - `_ledger/yellow_pitched.jsonl`
+- Pitched samples (capped per run) live in `_pitches/yellow_pitch.jsonl`.
 - `_pitches/` stores potential sources and metadata for future runs.
 - `_manifests/` contains per-stage manifests and patched targets YAMLs.
 - `_logs/` stores per-stage log output, including orchestrator logs.

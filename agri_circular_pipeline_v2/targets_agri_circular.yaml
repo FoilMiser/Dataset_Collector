@@ -26,7 +26,7 @@ globals:
   catalogs_root: "/data/agri_circular/_catalogs"
   logs_root: "/data/agri_circular/_logs"
 
-  require_yellow_signoff: false
+  require_yellow_signoff: true
 
   sharding:
     max_records_per_shard: 50000

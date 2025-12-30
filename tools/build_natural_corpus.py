@@ -20,6 +20,11 @@ DEFAULT_STAGES = [
     "merge",
     "catalog",
 ]
+MODE_STAGES = {
+    "collect": ["classify", "acquire_green", "acquire_yellow"],
+    "compile": ["screen_yellow", "merge", "catalog"],
+    "full": DEFAULT_STAGES,
+}
 
 
 def _is_windows_style(path_str: str) -> bool:
@@ -154,6 +159,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     ap.add_argument("--dest-root", default=None, help="Destination root for Natural corpus")
     ap.add_argument("--pipelines", nargs="+", default=["all"], help="Pipelines to run or 'all'")
     ap.add_argument("--stages", nargs="+", default=DEFAULT_STAGES, help="Stages to execute")
+    ap.add_argument("--mode", choices=sorted(MODE_STAGES.keys()), default="full", help="Stage preset to run")
     ap.add_argument("--workers", type=int, default=8, help="Worker count for acquisition")
     ap.add_argument("--execute", action="store_true", help="Execute pipeline stages")
     args = ap.parse_args(argv)
@@ -163,7 +169,8 @@ def main(argv: Iterable[str] | None = None) -> int:
     if not pipeline_map_path.is_absolute():
         pipeline_map_path = repo_root / pipeline_map_path
     pipeline_map_path = pipeline_map_path.resolve()
-    run_preflight(repo_root=repo_root, pipeline_map_path=pipeline_map_path)
+    if run_preflight(repo_root=repo_root, pipeline_map_path=pipeline_map_path) != 0:
+        sys.exit(1)
     pipeline_map = _load_pipeline_map(pipeline_map_path)
     dest_root = args.dest_root or pipeline_map.get("destination_root")
     if not dest_root:
@@ -176,7 +183,10 @@ def main(argv: Iterable[str] | None = None) -> int:
     else:
         pipeline_names = selected_pipelines
 
-    stages = _normalize_stages(args.stages)
+    if args.mode != "full":
+        stages = MODE_STAGES[args.mode]
+    else:
+        stages = _normalize_stages(args.stages)
 
     for pipeline_name in pipeline_names:
         pipeline_entry = pipelines_cfg.get(pipeline_name)

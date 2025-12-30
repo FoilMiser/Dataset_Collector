@@ -100,13 +100,13 @@ def build_catalog(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "ledgers": {},
     }
 
-    for ledger_name in ["yellow_pass.jsonl", "combined_index.jsonl", "difficulty_index.jsonl"]:
+    for ledger_name in ["yellow_passed.jsonl", "yellow_pitched.jsonl", "combined_index.jsonl"]:
         lp = ledger_root / ledger_name
         catalog["ledgers"][ledger_name] = {"exists": lp.exists(), "path": str(lp)}
 
-    for pitch_name in ["yellow_pitch.jsonl", "difficulty_pitched.jsonl"]:
-        pp = pitches_root / pitch_name
-        catalog["ledgers"][pitch_name] = {"exists": pp.exists(), "path": str(pp)}
+    pitch_name = "yellow_pitch.jsonl"
+    pp = pitches_root / pitch_name
+    catalog["ledgers"][pitch_name] = {"exists": pp.exists(), "path": str(pp)}
 
     return catalog
 
