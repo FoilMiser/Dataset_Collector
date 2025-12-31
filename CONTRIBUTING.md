@@ -7,7 +7,7 @@ reproducibility.
 ## Quick contribution checklist
 
 - Keep changes scoped and reproducible.
-- Run `python tools/validate_repo.py --root .` before submitting.
+- Run `python tools/validate_repo.py --repo-root .` before submitting.
 - Update `updated_utc` for any YAML configs you edit (UTC date).
 
 ## Adding a new target (required steps)

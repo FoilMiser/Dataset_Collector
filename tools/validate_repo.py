@@ -198,7 +198,17 @@ def validate_targets_file(path: Path) -> tuple[list[dict[str, Any]], list[dict[s
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Validate Dataset Collector v2 repo configuration.")
-    ap.add_argument("--root", default=".", help="Repo root (defaults to current directory)")
+    ap.add_argument(
+        "--repo-root",
+        dest="root",
+        default=".",
+        help="Repo root (defaults to current directory)",
+    )
+    ap.add_argument(
+        "--root",
+        dest="root",
+        help="Deprecated alias for --repo-root",
+    )
     ap.add_argument(
         "--output",
         default=None,
