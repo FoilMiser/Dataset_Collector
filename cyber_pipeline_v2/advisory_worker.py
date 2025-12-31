@@ -12,12 +12,12 @@ from typing import Dict, Iterable
 import gzip
 
 
-def load_yaml(path: Path) -> Dict:
+def load_yaml(path: Path) -> dict:
     with path.open("r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
-def iter_advisories(root: Path) -> Iterable[Dict]:
+def iter_advisories(root: Path) -> Iterable[dict]:
     for yaml_path in root.rglob("*.yml"):
         advisory = load_yaml(yaml_path)
         affects = advisory.get("affected", {}) or {}
@@ -34,7 +34,7 @@ def iter_advisories(root: Path) -> Iterable[Dict]:
         }
 
 
-def _join_versions(entries: Iterable[Dict]) -> str:
+def _join_versions(entries: Iterable[dict]) -> str:
     vals = []
     for entry in entries or []:
         if isinstance(entry, str):
@@ -46,7 +46,7 @@ def _join_versions(entries: Iterable[Dict]) -> str:
     return "\n".join(vals)
 
 
-def _join_refs(refs: Iterable[Dict]) -> str:
+def _join_refs(refs: Iterable[dict]) -> str:
     urls = []
     for ref in refs or []:
         url = ref.get("url") or ""
@@ -55,7 +55,7 @@ def _join_refs(refs: Iterable[Dict]) -> str:
     return "\n".join(sorted(set(urls)))
 
 
-def write_jsonl_gz(path: Path, rows: Iterable[Dict]) -> None:
+def write_jsonl_gz(path: Path, rows: Iterable[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with gzip.open(path, "wt", encoding="utf-8") as f:
         for row in rows:
