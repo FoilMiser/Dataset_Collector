@@ -116,7 +116,7 @@ def compute_metadata(
     creator: Optional[str],
     thumbnail: Optional[Path],
     point_cloud_path: Optional[Path],
-) -> dict[str, Any]:
+) -> Dict[str, Any]:
     bounds = mesh.bounds if mesh.bounds is not None else None
     bbox_min = ",".join(map(str, bounds[0].tolist())) if bounds is not None else None
     bbox_max = ",".join(map(str, bounds[1].tolist())) if bounds is not None else None
@@ -150,14 +150,14 @@ def compute_metadata(
     }
 
 
-def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
+def write_jsonl(path: Path, rows: List[Dict[str, Any]]) -> None:
     ensure_dir(path.parent)
     with path.open("w", encoding="utf-8") as f:
         for r in rows:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
 
-def write_parquet(path: Path, rows: list[dict[str, Any]]) -> None:
+def write_parquet(path: Path, rows: List[Dict[str, Any]]) -> None:
     if pa is None or pq is None:
         raise RuntimeError("pyarrow not installed; cannot emit parquet")
     ensure_dir(path.parent)
@@ -174,7 +174,7 @@ def process_file(
     creator: Optional[str],
     generate_thumbnails: bool,
     generate_point_clouds: bool,
-) -> tuple[dict[str, Any], dict[str, Any]]:
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     sha_original = sha256_file(path)
     mesh = load_mesh(path)
     if mesh is None:
@@ -214,8 +214,8 @@ def process_file(
     return metadata, {"status": "ok", "path": str(path), "normalized_path": str(norm_path)}
 
 
-def discover_files(root: Path) -> list[Path]:
-    paths: list[Path] = []
+def discover_files(root: Path) -> List[Path]:
+    paths: List[Path] = []
     for p in root.rglob("*"):
         if p.suffix.lower() in ALLOWED_EXTS and p.is_file():
             paths.append(p)
@@ -247,8 +247,8 @@ def main() -> None:
     if not files:
         sys.exit("No mesh files found in input directory.")
 
-    metadata_rows: list[dict[str, Any]] = []
-    results: list[dict[str, Any]] = []
+    metadata_rows: List[Dict[str, Any]] = []
+    results: List[Dict[str, Any]] = []
 
     for path in files:
         md, res = process_file(

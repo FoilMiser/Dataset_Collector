@@ -33,7 +33,7 @@ def ensure_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
 
-def read_jsonl(path: Path) -> Iterator[dict[str, Any]]:
+def read_jsonl(path: Path) -> Iterator[Dict[str, Any]]:
     opener = gzip.open if path.suffix == ".gz" else open
     with opener(path, "rt", encoding="utf-8", errors="ignore") as f:
         for line in f:
@@ -45,7 +45,7 @@ def read_jsonl(path: Path) -> Iterator[dict[str, Any]]:
                     continue
 
 
-def append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
+def append_jsonl(path: Path, rows: Iterable[Dict[str, Any]]) -> None:
     ensure_dir(path.parent)
     opener = gzip.open if path.suffix == ".gz" else open
     mode = "ab" if path.suffix == ".gz" else "at"
@@ -59,7 +59,7 @@ def append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
                 f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
-def write_json(path: Path, obj: dict[str, Any]) -> None:
+def write_json(path: Path, obj: Dict[str, Any]) -> None:
     ensure_dir(path.parent)
     path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
@@ -83,14 +83,14 @@ class Sharder:
     def __init__(self, base_dir: Path, cfg: ShardingConfig):
         self.base_dir = base_dir
         self.cfg = cfg
-        self.current: list[dict[str, Any]] = []
+        self.current: List[Dict[str, Any]] = []
         self.shard_idx = 0
 
     def _path(self) -> Path:
         suffix = "jsonl.gz" if self.cfg.compression == "gzip" else "jsonl"
         return self.base_dir / f"{self.cfg.prefix}_{self.shard_idx:05d}.{suffix}"
 
-    def add(self, row: dict[str, Any]) -> Optional[Path]:
+    def add(self, row: Dict[str, Any]) -> Optional[Path]:
         self.current.append(row)
         if len(self.current) >= self.cfg.max_records_per_shard:
             path = self.flush()
@@ -107,7 +107,7 @@ class Sharder:
         return path
 
 
-def resolve_roots(cfg: dict[str, Any]) -> Roots:
+def resolve_roots(cfg: Dict[str, Any]) -> Roots:
     g = (cfg.get("globals", {}) or {})
     return Roots(
         raw_root=Path(g.get("raw_root", "/data/physics/raw")),
@@ -117,7 +117,7 @@ def resolve_roots(cfg: dict[str, Any]) -> Roots:
     )
 
 
-def sharding_cfg(cfg: dict[str, Any]) -> ShardingConfig:
+def sharding_cfg(cfg: Dict[str, Any]) -> ShardingConfig:
     g = (cfg.get("globals", {}).get("sharding", {}) or {})
     return ShardingConfig(
         max_records_per_shard=int(g.get("max_records_per_shard", 50000)),
@@ -126,7 +126,7 @@ def sharding_cfg(cfg: dict[str, Any]) -> ShardingConfig:
     )
 
 
-def iter_green_records(roots: Roots) -> Iterator[dict[str, Any]]:
+def iter_green_records(roots: Roots) -> Iterator[Dict[str, Any]]:
     base = roots.raw_root / "green"
     for pool_dir in base.iterdir() if base.exists() else []:
         if not pool_dir.is_dir():
@@ -138,7 +138,7 @@ def iter_green_records(roots: Roots) -> Iterator[dict[str, Any]]:
                 yield from read_jsonl(fp)
 
 
-def iter_screened_yellow(roots: Roots) -> Iterator[dict[str, Any]]:
+def iter_screened_yellow(roots: Roots) -> Iterator[Dict[str, Any]]:
     base = roots.screened_root
     for pool_dir in base.iterdir() if base.exists() else []:
         shards_dir = pool_dir / "shards"
@@ -159,19 +159,19 @@ LICENSE_POOL_MAP = {
 }
 
 
-def route_pool(record: dict[str, Any]) -> str:
+def route_pool(record: Dict[str, Any]) -> str:
     src = record.get("source", {}) or {}
     lp = src.get("license_profile") or record.get("license_profile")
     lp = str(lp or "quarantine").lower()
     return LICENSE_POOL_MAP.get(lp, "quarantine")
 
 
-def merge_records(cfg: dict[str, Any], roots: Roots, execute: bool) -> dict[str, Any]:
+def merge_records(cfg: Dict[str, Any], roots: Roots, execute: bool) -> Dict[str, Any]:
     shard_cfg = sharding_cfg(cfg)
-    dedupe: set[str] = set()
+    dedupe: Set[str] = set()
     summary = {"written": 0, "deduped": 0, "shards": []}
 
-    pool_sharders: dict[str, Sharder] = {}
+    pool_sharders: Dict[str, Sharder] = {}
 
     def get_sharder(pool: str) -> Sharder:
         if pool not in pool_sharders:
@@ -180,7 +180,7 @@ def merge_records(cfg: dict[str, Any], roots: Roots, execute: bool) -> dict[str,
             ensure_dir(sharder.base_dir)
         return pool_sharders[pool]
 
-    def handle_record(rec: dict[str, Any]) -> None:
+    def handle_record(rec: Dict[str, Any]) -> None:
         content_hash = ((rec.get("hash") or {}).get("content_sha256") or rec.get("content_sha256"))
         if not content_hash:
             return
