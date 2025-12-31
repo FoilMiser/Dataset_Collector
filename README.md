@@ -176,7 +176,7 @@ Update these in the pipeline’s configuration (commonly under `configs/`) to co
 - **Python**: Each pipeline depends on Python; version and additional tools may vary by pipeline.
   Tested on Python 3.10 and 3.11.
 - **Requirements**: Install per-pipeline dependencies via that pipeline’s `requirements.txt`.
-- **Notebook dependencies**: `jupyterlab` and `ipykernel` are not in `requirements.txt`. Install them separately (or via `requirements-dev.txt` if provided).
+- **Notebook dependencies**: `jupyterlab` and `ipykernel` are tracked in `requirements-dev.in` and installed from `requirements-dev.lock`.
 - **External tools**: `git` is required when a target uses `download.strategy: git`. The AWS CLI is required for `s3_sync` or `aws_requester_pays` download modes. `aria2c` is required for `download.strategy: torrent`.
 - **Dry-run vs execute**: dry-run is the default when `--execute` is absent. Use `--execute` only when you intend to modify data or produce outputs.
 
@@ -184,18 +184,14 @@ Update these in the pipeline’s configuration (commonly under `configs/`) to co
 
 ```bash
 pip install -r requirements.lock
+pip install -r requirements-dev.lock
 ```
 
-### Minimal install (looser pins)
+### Regenerate the lock files
 
 ```bash
-pip install -r requirements.txt
-```
-
-### Regenerate the lock file
-
-```bash
-pip-compile --generate-hashes -o requirements.lock requirements.txt
+uv pip compile requirements.in -o requirements.lock --generate-hashes
+uv pip compile requirements-dev.in -o requirements-dev.lock --generate-hashes
 ```
 
 ## Preflight validation
