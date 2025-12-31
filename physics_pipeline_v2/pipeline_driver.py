@@ -8,11 +8,11 @@ Reads:
   - denylist.yaml (v0.2)
 
 Produces:
-  - queues/green_download.jsonl
-  - queues/yellow_pipeline.jsonl
-  - queues/red_rejected.jsonl
-  - manifests/{target_id}/license_evidence.* + evaluation.json
-  - queues/run_summary.json (human-readable dry-run report)
+  - _queues/green_download.jsonl
+  - _queues/yellow_pipeline.jsonl
+  - _queues/red_rejected.jsonl
+  - _manifests/{target_id}/license_evidence.* + evaluation.json
+  - _queues/run_summary.json (human-readable dry-run report)
 
 What it does (safe by default):
   - Fetches/snapshots license evidence URLs (HTML/PDF if served)
