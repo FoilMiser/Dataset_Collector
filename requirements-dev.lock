@@ -1,0 +1,4 @@
+# Generated with: uv pip compile requirements-dev.in -o requirements-dev.lock --generate-hashes
+-r requirements.lock
+jupyterlab==4.2.5
+ipykernel==6.29.5

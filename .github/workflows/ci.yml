@@ -22,13 +22,13 @@ jobs:
           path: |
             ~/.cache/pip
             ~\AppData\Local\pip\Cache
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements*.txt','requirements.lock') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements*.in','requirements*.lock') }}
           restore-keys: |
             ${{ runner.os }}-pip-
-      - name: Install deps (minimal)
+      - name: Install deps (locked)
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements.lock
           python -m pip install pytest ruff
       - name: Ruff
         run: |
@@ -60,7 +60,7 @@ jobs:
           path: |
             ~/.cache/pip
             ~\AppData\Local\pip\Cache
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements*.txt','requirements.lock') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements*.in','requirements*.lock') }}
           restore-keys: |
             ${{ runner.os }}-pip-
       - name: Install deps (locked)
