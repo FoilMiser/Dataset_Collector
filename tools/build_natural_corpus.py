@@ -7,9 +7,15 @@ from collections.abc import Iterable, Sequence
 from pathlib import Path, PurePath, PureWindowsPath
 
 import yaml
-from init_layout import init_layout
-from patch_targets import patch_targets_yaml
-from preflight import run_preflight
+
+if __package__ in (None, ""):
+    repo_root = Path(__file__).resolve().parents[1]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+
+from tools.init_layout import init_layout
+from tools.patch_targets import patch_targets_yaml
+from tools.preflight import run_preflight
 
 DEFAULT_STAGES = [
     "classify",
