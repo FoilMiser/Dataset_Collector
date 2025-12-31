@@ -46,7 +46,7 @@ def sha256_text(text: str) -> str:
     return hashlib.sha256(norm.encode("utf-8")).hexdigest()
 
 
-def read_jsonl(path: Path) -> Iterator[Dict[str, Any]]:
+def read_jsonl(path: Path) -> Iterator[dict[str, Any]]:
     opener = gzip.open if path.suffix == ".gz" else open
     with opener(path, "rt", encoding="utf-8", errors="ignore") as f:
         for line in f:
@@ -58,12 +58,12 @@ def read_jsonl(path: Path) -> Iterator[Dict[str, Any]]:
                     continue
 
 
-def write_json(path: Path, obj: Dict[str, Any]) -> None:
+def write_json(path: Path, obj: dict[str, Any]) -> None:
     ensure_dir(path.parent)
     path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
-def write_jsonl(path: Path, rows: Iterable[Dict[str, Any]]) -> None:
+def write_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
     ensure_dir(path.parent)
     opener = gzip.open if path.suffix == ".gz" else open
     with opener(path, "wt", encoding="utf-8") as f:
@@ -71,7 +71,7 @@ def write_jsonl(path: Path, rows: Iterable[Dict[str, Any]]) -> None:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
-def append_jsonl(path: Path, rows: Iterable[Dict[str, Any]]) -> None:
+def append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
     ensure_dir(path.parent)
     opener = gzip.open if path.suffix == ".gz" else open
     mode = "at" if path.suffix != ".gz" else "ab"
@@ -96,10 +96,10 @@ class Roots:
 
 @dataclasses.dataclass
 class ScreeningConfig:
-    text_fields: List[str]
-    license_fields: List[str]
-    allow_spdx: List[str]
-    deny_phrases: List[str]
+    text_fields: list[str]
+    license_fields: list[str]
+    allow_spdx: list[str]
+    deny_phrases: list[str]
     require_record_license: bool
     min_chars: int
     max_chars: int
@@ -121,14 +121,14 @@ class Sharder:
         self.cfg = cfg
         self.count = 0
         self.shard_idx = 0
-        self.current_rows: List[Dict[str, Any]] = []
+        self.current_rows: list[dict[str, Any]] = []
 
     def _next_path(self) -> Path:
         suffix = "jsonl.gz" if self.cfg.compression == "gzip" else "jsonl"
         name = f"{self.cfg.prefix}_{self.shard_idx:05d}.{suffix}"
         return self.base_dir / name
 
-    def add(self, row: Dict[str, Any]) -> Optional[Path]:
+    def add(self, row: dict[str, Any]) -> Optional[Path]:
         self.current_rows.append(row)
         self.count += 1
         if len(self.current_rows) >= self.cfg.max_records_per_shard:
@@ -146,11 +146,11 @@ class Sharder:
         return path
 
 
-def load_targets_cfg(path: Path) -> Dict[str, Any]:
+def load_targets_cfg(path: Path) -> dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
 
-def load_signoff(manifest_dir: Path) -> Optional[Dict[str, Any]]:
+def load_signoff(manifest_dir: Path) -> Optional[dict[str, Any]]:
     signoff_path = manifest_dir / "review_signoff.json"
     if not signoff_path.exists():
         return None
@@ -160,7 +160,7 @@ def load_signoff(manifest_dir: Path) -> Optional[Dict[str, Any]]:
         return None
 
 
-def resolve_roots(cfg: Dict[str, Any]) -> Roots:
+def resolve_roots(cfg: dict[str, Any]) -> Roots:
     g = (cfg.get("globals", {}) or {})
     return Roots(
         raw_root=Path(g.get("raw_root", "/data/econ/raw")),
@@ -171,7 +171,7 @@ def resolve_roots(cfg: Dict[str, Any]) -> Roots:
     )
 
 
-def merge_screening_config(cfg: Dict[str, Any], target: Dict[str, Any]) -> ScreeningConfig:
+def merge_screening_config(cfg: dict[str, Any], target: dict[str, Any]) -> ScreeningConfig:
     g_screen = (cfg.get("globals", {}).get("screening", {}) or {})
     t_screen = (target.get("yellow_screen", {}) or {})
     adapter = str(t_screen.get("adapter") or g_screen.get("adapter") or "auto")
@@ -190,7 +190,7 @@ def merge_screening_config(cfg: Dict[str, Any], target: Dict[str, Any]) -> Scree
     )
 
 
-def sharding_cfg(cfg: Dict[str, Any], prefix: str) -> ShardingConfig:
+def sharding_cfg(cfg: dict[str, Any], prefix: str) -> ShardingConfig:
     g = (cfg.get("globals", {}).get("sharding", {}) or {})
     return ShardingConfig(
         max_records_per_shard=int(g.get("max_records_per_shard", 50000)),
@@ -199,7 +199,7 @@ def sharding_cfg(cfg: Dict[str, Any], prefix: str) -> ShardingConfig:
     )
 
 
-def find_text(row: Dict[str, Any], candidates: List[str]) -> Optional[str]:
+def find_text(row: dict[str, Any], candidates: list[str]) -> Optional[str]:
     for k in candidates:
         if k in row and row[k]:
             val = row[k]
@@ -209,27 +209,27 @@ def find_text(row: Dict[str, Any], candidates: List[str]) -> Optional[str]:
     return None
 
 
-def find_license(row: Dict[str, Any], candidates: List[str]) -> Optional[str]:
+def find_license(row: dict[str, Any], candidates: list[str]) -> Optional[str]:
     for k in candidates:
         if k in row and row[k]:
             return str(row[k])
     return None
 
 
-def contains_deny(text: str, phrases: List[str]) -> bool:
+def contains_deny(text: str, phrases: list[str]) -> bool:
     low = text.lower()
     return any(p in low for p in phrases)
 
 
 def record_pitch(
     roots: Roots,
-    pitch_counts: Dict[Tuple[str, str], int],
+    pitch_counts: dict[tuple[str, str], int],
     target_id: str,
     reason: str,
-    raw: Optional[Dict[str, Any]] = None,
+    raw: Optional[dict[str, Any]] = None,
     text: Optional[str] = None,
-    extra: Optional[Dict[str, Any]] = None,
-    sample_extra: Optional[Dict[str, Any]] = None,
+    extra: Optional[dict[str, Any]] = None,
+    sample_extra: Optional[dict[str, Any]] = None,
 ) -> None:
     row = {"target_id": target_id, "reason": reason, "seen_at_utc": utc_now()}
     sample_id = None
@@ -260,7 +260,7 @@ def record_pitch(
     pitch_counts[key] = pitch_counts.get(key, 0) + 1
 
 
-def canonical_record(raw: Dict[str, Any], text: str, target_id: str, license_profile: str, license_spdx: Optional[str]) -> Dict[str, Any]:
+def canonical_record(raw: dict[str, Any], text: str, target_id: str, license_profile: str, license_spdx: Optional[str]) -> dict[str, Any]:
     record_id = str(raw.get("record_id") or raw.get("id") or sha256_text(f"{target_id}:{text}"))
     content_hash = sha256_text(text)
     source = raw.get("source", {}) or {}
@@ -289,7 +289,7 @@ def iter_raw_files(raw_dir: Path) -> Iterator[Path]:
             yield fp
 
 
-def routing_from_queue(queue_row: Dict[str, Any]) -> Dict[str, Any]:
+def routing_from_queue(queue_row: dict[str, Any]) -> dict[str, Any]:
     return {
         "subject": queue_row.get("routing_subject") or queue_row.get("routing", {}).get("subject") or "econ",
         "domain": queue_row.get("routing_domain") or queue_row.get("routing", {}).get("domain"),
@@ -299,7 +299,7 @@ def routing_from_queue(queue_row: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def primary_source_url(queue_row: Dict[str, Any]) -> Optional[str]:
+def primary_source_url(queue_row: dict[str, Any]) -> Optional[str]:
     download = queue_row.get("download", {}) or {}
     urls = download.get("urls") or []
     if isinstance(urls, list) and urls:
@@ -329,7 +329,7 @@ MICRODATA_HINTS = [
 ]
 
 
-def is_potential_microdata(columns: List[str]) -> bool:
+def is_potential_microdata(columns: list[str]) -> bool:
     col_text = " ".join(columns).lower()
     return any(h in col_text for h in MICRODATA_HINTS)
 
@@ -343,7 +343,7 @@ def safe_read_text(path: Path) -> Optional[str]:
     return None
 
 
-def process_target(cfg: Dict[str, Any], roots: Roots, queue_row: Dict[str, Any], execute: bool) -> Dict[str, Any]:
+def process_target(cfg: dict[str, Any], roots: Roots, queue_row: dict[str, Any], execute: bool) -> dict[str, Any]:
     target_id = queue_row["id"]
     target_cfg = next((t for t in cfg.get("targets", []) if t.get("id") == target_id), {})
     screen_cfg = merge_screening_config(cfg, target_cfg)
@@ -362,8 +362,8 @@ def process_target(cfg: Dict[str, Any], roots: Roots, queue_row: Dict[str, Any],
     license_spdx_hint = queue_row.get("resolved_spdx") or queue_row.get("license_spdx")
 
     passed, pitched = 0, 0
-    shard_paths: List[str] = []
-    pitch_counts: Dict[Tuple[str, str], int] = {}
+    shard_paths: list[str] = []
+    pitch_counts: dict[tuple[str, str], int] = {}
 
     if require_signoff and not allow_without_signoff:
         if status == "rejected":
@@ -418,7 +418,7 @@ def process_target(cfg: Dict[str, Any], roots: Roots, queue_row: Dict[str, Any],
         sharder = Sharder(roots.screened_root / pool / "shards", shard_cfg)
         tabular_chunk_idx = 0
 
-        def prepare_record(raw_record: Dict[str, Any], artifact_path: str) -> Dict[str, Any]:
+        def prepare_record(raw_record: dict[str, Any], artifact_path: str) -> dict[str, Any]:
             record = dict(raw_record)
             src = dict(record.get("source") or {})
             src.setdefault("target_id", target_id)
@@ -446,7 +446,7 @@ def process_target(cfg: Dict[str, Any], roots: Roots, queue_row: Dict[str, Any],
                     sample_extra=sample_extra,
                 )
 
-        def validate_and_add(raw_record: Dict[str, Any], text: Optional[str]) -> None:
+        def validate_and_add(raw_record: dict[str, Any], text: Optional[str]) -> None:
             nonlocal passed
             if not text:
                 pitch("no_text", sample_id=raw_record.get("id") or raw_record.get("record_id"))
@@ -485,7 +485,7 @@ def process_target(cfg: Dict[str, Any], roots: Roots, queue_row: Dict[str, Any],
                 }
                 append_jsonl(roots.ledger_root / "yellow_passed.jsonl", [ledger_row])
 
-        def tabular_text(header: List[str], rows: List[Any], file_label: str) -> str:
+        def tabular_text(header: list[str], rows: list[Any], file_label: str) -> str:
             lines = [f"source_file: {file_label}"]
             if header:
                 lines.append("columns: " + ", ".join(header))
@@ -497,12 +497,12 @@ def process_target(cfg: Dict[str, Any], roots: Roots, queue_row: Dict[str, Any],
                     lines.append(", ".join([str(v) for v in row]))
             return "\n".join(lines)
 
-        def emit_tabular(reader: Iterable[Any], header: List[str], file_label: str, artifact_path: str) -> None:
+        def emit_tabular(reader: Iterable[Any], header: list[str], file_label: str, artifact_path: str) -> None:
             nonlocal tabular_chunk_idx
             if header and is_potential_microdata(header):
                 pitch("possible_microdata", sample=header)
                 return
-            rows: List[Any] = []
+            rows: list[Any] = []
             max_rows = max(screen_cfg.chunk_rows * 3, 3000)
             for idx, row in enumerate(reader):
                 rows.append(row)

@@ -39,12 +39,12 @@ def count_lines(path: Path, max_lines: int = 0) -> int:
     return count
 
 
-def file_stats(path: Path) -> Dict[str, Any]:
+def file_stats(path: Path) -> dict[str, Any]:
     return {"name": path.name, "bytes": path.stat().st_size, "lines_estimate": count_lines(path, max_lines=1000)}
 
 
-def collect_raw_stats(root: Path) -> Dict[str, Any]:
-    stats: Dict[str, Any] = {"path": str(root), "buckets": {}}
+def collect_raw_stats(root: Path) -> dict[str, Any]:
+    stats: dict[str, Any] = {"path": str(root), "buckets": {}}
     for bucket in ["green", "yellow"]:
         bucket_dir = root / bucket
         bucket_stats = {"targets": 0, "bytes": 0, "files": 0}
@@ -64,7 +64,7 @@ def collect_raw_stats(root: Path) -> Dict[str, Any]:
     return stats
 
 
-def collect_shard_stage(root: Path) -> Dict[str, Any]:
+def collect_shard_stage(root: Path) -> dict[str, Any]:
     stage = {"path": str(root), "pools": {}}
     if not root.exists():
         return stage
@@ -83,7 +83,7 @@ def collect_shard_stage(root: Path) -> Dict[str, Any]:
     return stage
 
 
-def build_catalog(cfg: Dict[str, Any]) -> Dict[str, Any]:
+def build_catalog(cfg: dict[str, Any]) -> dict[str, Any]:
     g = (cfg.get("globals", {}) or {})
     raw_root = Path(g.get("raw_root", "/data/safety/raw"))
     screened_root = Path(g.get("screened_yellow_root", "/data/safety/screened_yellow"))

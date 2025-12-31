@@ -57,11 +57,11 @@ def utc_now() -> str:
 def ensure_dir(p: Path) -> None:
     p.mkdir(parents=True, exist_ok=True)
 
-def read_yaml(path: Path) -> Dict[str, Any]:
+def read_yaml(path: Path) -> dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
-def read_jsonl(path: Path) -> List[Dict[str, Any]]:
-    rows: List[Dict[str, Any]] = []
+def read_jsonl(path: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
     with path.open("r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -69,11 +69,11 @@ def read_jsonl(path: Path) -> List[Dict[str, Any]]:
                 rows.append(json.loads(line))
     return rows
 
-def write_json(path: Path, obj: Dict[str, Any]) -> None:
+def write_json(path: Path, obj: dict[str, Any]) -> None:
     ensure_dir(path.parent)
     path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
-def write_jsonl_gz(path: Path, rows: Iterable[Dict[str, Any]]) -> Tuple[int, int]:
+def write_jsonl_gz(path: Path, rows: Iterable[dict[str, Any]]) -> tuple[int, int]:
     ensure_dir(path.parent)
     count = 0
     with gzip.open(path, "wt", encoding="utf-8") as f:
@@ -129,9 +129,9 @@ class FieldSpec:
     field_type: str
     required: bool = False
     nullable: bool = True
-    validation: Dict[str, Any] = dataclasses.field(default_factory=dict)
+    validation: dict[str, Any] = dataclasses.field(default_factory=dict)
 
-def load_field_schemas(path: Path) -> Dict[str, Dict[str, FieldSpec]]:
+def load_field_schemas(path: Path) -> dict[str, dict[str, FieldSpec]]:
     """Load field schemas from field_schemas.yaml."""
     if not path.exists():
         return {}
@@ -153,7 +153,7 @@ def load_field_schemas(path: Path) -> Dict[str, Dict[str, FieldSpec]]:
     
     return schemas
 
-def cast_value(value: str, field_type: str, validation: Dict[str, Any]) -> Any:
+def cast_value(value: str, field_type: str, validation: dict[str, Any]) -> Any:
     """Cast a string value to the appropriate type with validation."""
     if not value or value.strip() == "":
         return None
@@ -194,7 +194,7 @@ def cast_value(value: str, field_type: str, validation: Dict[str, Any]) -> Any:
     except (ValueError, TypeError):
         return None
 
-def validate_record(record: Dict[str, Any], schema: Dict[str, FieldSpec]) -> Tuple[bool, List[str]]:
+def validate_record(record: dict[str, Any], schema: dict[str, FieldSpec]) -> tuple[bool, list[str]]:
     """Validate a record against a schema. Returns (is_valid, errors)."""
     errors = []
     
@@ -216,7 +216,7 @@ def validate_record(record: Dict[str, Any], schema: Dict[str, FieldSpec]) -> Tup
 
 def iter_sdf_records_from_gz(gz_path: Path) -> Iterable[str]:
     with gzip.open(gz_path, "rt", encoding="utf-8", errors="ignore") as f:
-        buf: List[str] = []
+        buf: list[str] = []
         for line in f:
             if line.rstrip("\n").strip() == "$$$$":
                 if buf:
@@ -229,16 +229,16 @@ def iter_sdf_records_from_gz(gz_path: Path) -> Iterable[str]:
 
 TAG_RE = re.compile(r"^>\s*<([^>]+)>\s*$")
 
-def parse_sdf_tags(record: str) -> Dict[str, str]:
+def parse_sdf_tags(record: str) -> dict[str, str]:
     lines = record.splitlines()
-    out: Dict[str, str] = {}
+    out: dict[str, str] = {}
     i = 0
     while i < len(lines):
         m = TAG_RE.match(lines[i].strip())
         if m:
             key = m.group(1).strip()
             i += 1
-            vals: List[str] = []
+            vals: list[str] = []
             while i < len(lines):
                 if TAG_RE.match(lines[i].strip()) or lines[i].strip() == "":
                     break
@@ -253,15 +253,15 @@ def parse_sdf_tags(record: str) -> Dict[str, str]:
 def extract_pubchem_computed_only(
     quarantine_dir: Path,
     permissive_out_dir: Path,
-    include_globs: List[str],
-    include_fields: List[str],
-    field_schema: Optional[Dict[str, FieldSpec]],
+    include_globs: list[str],
+    include_fields: list[str],
+    field_schema: Optional[dict[str, FieldSpec]],
     shard_max_rows: int,
     cid_range_size: Optional[int] = None,
     limit_files: Optional[int] = None,
     limit_rows: Optional[int] = None,
     resume_state_path: Optional[Path] = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Extract computed-only fields from PubChem SDF files.
     
     v0.6: Added schema validation and CID-range sharding.
@@ -287,17 +287,17 @@ def extract_pubchem_computed_only(
     shard_idx = state.get("last_shard_idx", 0)
     total_rows = 0
     files_done = 0
-    current_shard: List[Dict[str, Any]] = []
+    current_shard: list[dict[str, Any]] = []
     validation_errors = 0
     
     # For CID-range sharding
-    cid_shards: Dict[int, List[Dict[str, Any]]] = {} if cid_range_size else None
+    cid_shards: dict[int, list[dict[str, Any]]] = {} if cid_range_size else None
 
     for gz_path in files:
         for raw_record in iter_sdf_records_from_gz(gz_path):
             tags = parse_sdf_tags(raw_record)
             
-            record: Dict[str, Any] = {}
+            record: dict[str, Any] = {}
             for f in include_fields:
                 raw_val = tags.get(f, "")
                 
@@ -380,10 +380,10 @@ def extract_pubchem_computed_only(
 # License Map helpers
 # --------------------------
 
-def load_license_map(path: Path) -> Dict[str, Any]:
+def load_license_map(path: Path) -> dict[str, Any]:
     return read_yaml(path)
 
-def normalize_spdx_from_text(license_map: Dict[str, Any], blob: str, spdx_hint: str = "") -> str:
+def normalize_spdx_from_text(license_map: dict[str, Any], blob: str, spdx_hint: str = "") -> str:
     hint = normalize_whitespace(safe_text(spdx_hint))
     if hint and hint.upper() not in {"MIXED", "UNKNOWN"}:
         return hint
@@ -398,7 +398,7 @@ def normalize_spdx_from_text(license_map: Dict[str, Any], blob: str, spdx_hint: 
     
     return "UNKNOWN"
 
-def spdx_is_allowed(license_map: Dict[str, Any], spdx: str) -> bool:
+def spdx_is_allowed(license_map: dict[str, Any], spdx: str) -> bool:
     spdx = safe_text(spdx).strip()
     allow = license_map.get("spdx", {}).get("allow", [])
     deny_prefixes = license_map.get("spdx", {}).get("deny_prefixes", [])
@@ -408,7 +408,7 @@ def spdx_is_allowed(license_map: Dict[str, Any], spdx: str) -> bool:
             return False
     return spdx in allow
 
-def restriction_phrase_hits(license_map: Dict[str, Any], text: str) -> List[str]:
+def restriction_phrase_hits(license_map: dict[str, Any], text: str) -> list[str]:
     phrases = license_map.get("restriction_scan", {}).get("phrases", [])
     t = lower(text)
     return [p for p in phrases if p and lower(p) in t]
@@ -429,7 +429,7 @@ PMC_OA_FILE_LIST_PATTERNS = [
     ".csv", ".txt", ".tsv"
 ]
 
-def fetch_text_with_fallback(urls: List[str], timeout_s: int = 30) -> Tuple[str, str]:
+def fetch_text_with_fallback(urls: list[str], timeout_s: int = 30) -> tuple[str, str]:
     """Try multiple URLs, return first successful response."""
     require_requests()
     
@@ -444,7 +444,7 @@ def fetch_text_with_fallback(urls: List[str], timeout_s: int = 30) -> Tuple[str,
     
     raise RuntimeError(f"Failed to fetch from any URL: {urls}")
 
-def download_file(url: str, out_path: Path, timeout_s: int = 60) -> Dict[str, Any]:
+def download_file(url: str, out_path: Path, timeout_s: int = 60) -> dict[str, Any]:
     require_requests()
     ensure_dir(out_path.parent)
     
@@ -463,7 +463,7 @@ def download_file(url: str, out_path: Path, timeout_s: int = 60) -> Dict[str, An
         "bytes": out_path.stat().st_size, "sha256": sha256_file(out_path)
     }
 
-def detect_delimiter(lines: List[str]) -> str:
+def detect_delimiter(lines: list[str]) -> str:
     """Detect CSV/TSV delimiter from file content."""
     if not lines:
         return ","
@@ -474,7 +474,7 @@ def detect_delimiter(lines: List[str]) -> str:
     
     return "\t" if tab_count > comma_count else ","
 
-def find_column_index(header: List[str], patterns: List[str]) -> Optional[int]:
+def find_column_index(header: list[str], patterns: list[str]) -> Optional[int]:
     """Find column index matching any of the patterns."""
     for i, h in enumerate(header):
         h_lower = h.lower().strip()
@@ -484,10 +484,10 @@ def find_column_index(header: List[str], patterns: List[str]) -> Optional[int]:
     return None
 
 def plan_pmc_allowlist(
-    license_map: Dict[str, Any],
+    license_map: dict[str, Any],
     out_dir: Path,
-    allowed_spdx: Optional[List[str]] = None
-) -> Dict[str, Any]:
+    allowed_spdx: Optional[list[str]] = None
+) -> dict[str, Any]:
     """Plan PMC allowlist with improved resilience (v0.7)."""
     ensure_dir(out_dir)
     ensure_dir(out_dir / "_manifests")
@@ -516,7 +516,7 @@ def plan_pmc_allowlist(
 
     # Find candidate file list URLs
     hrefs = re.findall(r'href="([^"]+)"', html, flags=re.IGNORECASE)
-    candidates: List[str] = []
+    candidates: list[str] = []
     
     for h in hrefs:
         if any(x in h.lower() for x in PMC_OA_FILE_LIST_PATTERNS):
@@ -578,7 +578,7 @@ def plan_pmc_allowlist(
     }
 
     allow_spdx = allowed_spdx or license_map.get("spdx", {}).get("allow", [])
-    allow_rows: List[Dict[str, Any]] = []
+    allow_rows: list[dict[str, Any]] = []
     deny = 0
     unk = 0
 
@@ -649,7 +649,7 @@ def main() -> None:
     pools = pools_from_targets_yaml(targets_path, Path(args.pools_root).expanduser().resolve())
     target_defs = {t["id"]: t for t in targets_cfg.get("targets", []) if isinstance(t, dict) and t.get("id")}
 
-    run_report: Dict[str, Any] = {
+    run_report: dict[str, Any] = {
         "run_at_utc": utc_now(),
         "pipeline_version": VERSION,
         "targets_yaml": str(targets_path),

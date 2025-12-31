@@ -43,7 +43,7 @@ def sha256_text(text: str) -> str:
     return hashlib.sha256(norm.encode("utf-8")).hexdigest()
 
 
-def read_jsonl(path: Path) -> Iterator[Dict[str, Any]]:
+def read_jsonl(path: Path) -> Iterator[dict[str, Any]]:
     opener = gzip.open if path.suffix == ".gz" else open
     with opener(path, "rt", encoding="utf-8", errors="ignore") as f:
         for line in f:
@@ -55,7 +55,7 @@ def read_jsonl(path: Path) -> Iterator[Dict[str, Any]]:
                     continue
 
 
-def read_json(path: Path) -> List[Dict[str, Any]]:
+def read_json(path: Path) -> list[dict[str, Any]]:
     opener = gzip.open if path.suffix == ".gz" else open
     with opener(path, "rt", encoding="utf-8", errors="ignore") as f:
         data = json.load(f)
@@ -68,12 +68,12 @@ def read_json(path: Path) -> List[Dict[str, Any]]:
     return []
 
 
-def write_json(path: Path, obj: Dict[str, Any]) -> None:
+def write_json(path: Path, obj: dict[str, Any]) -> None:
     ensure_dir(path.parent)
     path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
-def write_jsonl(path: Path, rows: Iterable[Dict[str, Any]]) -> None:
+def write_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
     ensure_dir(path.parent)
     opener = gzip.open if path.suffix == ".gz" else open
     with opener(path, "wt", encoding="utf-8") as f:
@@ -81,7 +81,7 @@ def write_jsonl(path: Path, rows: Iterable[Dict[str, Any]]) -> None:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
-def append_jsonl(path: Path, rows: Iterable[Dict[str, Any]]) -> None:
+def append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
     ensure_dir(path.parent)
     opener = gzip.open if path.suffix == ".gz" else open
     mode = "at" if path.suffix != ".gz" else "ab"
@@ -106,10 +106,10 @@ class Roots:
 
 @dataclasses.dataclass
 class ScreeningConfig:
-    text_fields: List[str]
-    license_fields: List[str]
-    allow_spdx: List[str]
-    deny_phrases: List[str]
+    text_fields: list[str]
+    license_fields: list[str]
+    allow_spdx: list[str]
+    deny_phrases: list[str]
     require_record_license: bool
     min_chars: int
     max_chars: int
@@ -136,14 +136,14 @@ class Sharder:
         self.cfg = cfg
         self.count = 0
         self.shard_idx = 0
-        self.current_rows: List[Dict[str, Any]] = []
+        self.current_rows: list[dict[str, Any]] = []
 
     def _next_path(self) -> Path:
         suffix = "jsonl.gz" if self.cfg.compression == "gzip" else "jsonl"
         name = f"{self.cfg.prefix}_{self.shard_idx:05d}.{suffix}"
         return self.base_dir / name
 
-    def add(self, row: Dict[str, Any]) -> Optional[Path]:
+    def add(self, row: dict[str, Any]) -> Optional[Path]:
         self.current_rows.append(row)
         self.count += 1
         if len(self.current_rows) >= self.cfg.max_records_per_shard:
@@ -161,11 +161,11 @@ class Sharder:
         return path
 
 
-def load_targets_cfg(path: Path) -> Dict[str, Any]:
+def load_targets_cfg(path: Path) -> dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
 
-def load_signoff(manifest_dir: Path) -> Optional[Dict[str, Any]]:
+def load_signoff(manifest_dir: Path) -> Optional[dict[str, Any]]:
     signoff_path = manifest_dir / "review_signoff.json"
     if not signoff_path.exists():
         return None
@@ -175,7 +175,7 @@ def load_signoff(manifest_dir: Path) -> Optional[Dict[str, Any]]:
         return None
 
 
-def resolve_roots(cfg: Dict[str, Any]) -> Roots:
+def resolve_roots(cfg: dict[str, Any]) -> Roots:
     g = (cfg.get("globals", {}) or {})
     return Roots(
         raw_root=Path(g.get("raw_root", "/data/nlp/raw")),
@@ -186,7 +186,7 @@ def resolve_roots(cfg: Dict[str, Any]) -> Roots:
     )
 
 
-def merge_screening_config(cfg: Dict[str, Any], target: Dict[str, Any]) -> ScreeningConfig:
+def merge_screening_config(cfg: dict[str, Any], target: dict[str, Any]) -> ScreeningConfig:
     g_screen = (cfg.get("globals", {}).get("screening", {}) or {})
     t_screen = (target.get("yellow_screen", {}) or {})
     return ScreeningConfig(
@@ -200,7 +200,7 @@ def merge_screening_config(cfg: Dict[str, Any], target: Dict[str, Any]) -> Scree
     )
 
 
-def merge_text_processing(cfg: Dict[str, Any], target: Dict[str, Any]) -> TextProcessingConfig:
+def merge_text_processing(cfg: dict[str, Any], target: dict[str, Any]) -> TextProcessingConfig:
     g_text = (cfg.get("globals", {}).get("text_processing_defaults", {}) or {})
     t_text = (target.get("yellow_screen", {}) or {}).get("text_processing", {})
     max_chars = int(t_text.get("max_chunk_chars", g_text.get("max_chunk_chars", 6000)))
@@ -210,7 +210,7 @@ def merge_text_processing(cfg: Dict[str, Any], target: Dict[str, Any]) -> TextPr
     return TextProcessingConfig(max_chars=max_chars, min_chars=min_chars, normalize_whitespace=normalize, force_language=force_language)
 
 
-def sharding_cfg(cfg: Dict[str, Any], prefix: str) -> ShardingConfig:
+def sharding_cfg(cfg: dict[str, Any], prefix: str) -> ShardingConfig:
     g = (cfg.get("globals", {}).get("sharding", {}) or {})
     return ShardingConfig(
         max_records_per_shard=int(g.get("max_records_per_shard", 50000)),
@@ -219,7 +219,7 @@ def sharding_cfg(cfg: Dict[str, Any], prefix: str) -> ShardingConfig:
     )
 
 
-def find_text(row: Dict[str, Any], candidates: List[str]) -> Optional[str]:
+def find_text(row: dict[str, Any], candidates: list[str]) -> Optional[str]:
     for k in candidates:
         if k in row and row[k]:
             val = row[k]
@@ -229,27 +229,27 @@ def find_text(row: Dict[str, Any], candidates: List[str]) -> Optional[str]:
     return None
 
 
-def find_license(row: Dict[str, Any], candidates: List[str]) -> Optional[str]:
+def find_license(row: dict[str, Any], candidates: list[str]) -> Optional[str]:
     for k in candidates:
         if k in row and row[k]:
             return str(row[k])
     return None
 
 
-def contains_deny(text: str, phrases: List[str]) -> bool:
+def contains_deny(text: str, phrases: list[str]) -> bool:
     low = text.lower()
     return any(p in low for p in phrases)
 
 
 def record_pitch(
     roots: Roots,
-    pitch_counts: Dict[Tuple[str, str], int],
+    pitch_counts: dict[Tuple[str, str], int],
     target_id: str,
     reason: str,
-    raw: Optional[Dict[str, Any]] = None,
+    raw: Optional[dict[str, Any]] = None,
     text: Optional[str] = None,
-    extra: Optional[Dict[str, Any]] = None,
-    sample_extra: Optional[Dict[str, Any]] = None,
+    extra: Optional[dict[str, Any]] = None,
+    sample_extra: Optional[dict[str, Any]] = None,
 ) -> None:
     row = {"target_id": target_id, "reason": reason}
     sample_id = None
@@ -284,12 +284,12 @@ def normalize_text(text: str, normalize: bool) -> str:
     return re.sub(r"\s+", " ", text).strip() if normalize else text.strip()
 
 
-def chunk_text(text: str, max_chars: int, min_chars: int) -> List[str]:
+def chunk_text(text: str, max_chars: int, min_chars: int) -> list[str]:
     if not text.strip():
         return []
     paragraphs = [p.strip() for p in re.split(r"\n{2,}", text) if p.strip()]
-    chunks: List[str] = []
-    buf: List[str] = []
+    chunks: list[str] = []
+    buf: list[str] = []
     buf_len = 0
     for p in paragraphs:
         if buf_len + len(p) + 2 <= max_chars:
@@ -311,7 +311,7 @@ def chunk_text(text: str, max_chars: int, min_chars: int) -> List[str]:
     return [c for c in chunks if len(c) >= min_chars]
 
 
-def detect_language_match(raw: Dict[str, Any], force_language: Optional[str]) -> bool:
+def detect_language_match(raw: dict[str, Any], force_language: Optional[str]) -> bool:
     if not force_language:
         return True
     for key in ["lang", "language", "lang_code"]:
@@ -321,14 +321,14 @@ def detect_language_match(raw: Dict[str, Any], force_language: Optional[str]) ->
 
 
 def canonical_record(
-    raw: Dict[str, Any],
+    raw: dict[str, Any],
     text: str,
     target_id: str,
     license_profile: str,
     license_spdx: Optional[str],
-    routing: Dict[str, Any],
+    routing: dict[str, Any],
     source_file: Optional[str],
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     record_id = str(raw.get("record_id") or raw.get("id") or sha256_text(f"{target_id}:{text}"))
     content_hash = sha256_text(text)
     source = raw.get("source", {}) or {}
@@ -358,7 +358,7 @@ def iter_raw_files(raw_dir: Path) -> Iterator[Path]:
                 yield fp
 
 
-def extract_records_from_file(file_path: Path) -> Iterator[Dict[str, Any]]:
+def extract_records_from_file(file_path: Path) -> Iterator[dict[str, Any]]:
     suffix = "".join(file_path.suffixes)
     if suffix.endswith(".jsonl") or suffix.endswith(".jsonl.gz"):
         yield from read_jsonl(file_path)
@@ -375,7 +375,7 @@ def extract_text_from_file(file_path: Path) -> Optional[str]:
         return f.read()
 
 
-def process_target(cfg: Dict[str, Any], roots: Roots, queue_row: Dict[str, Any], execute: bool) -> Dict[str, Any]:
+def process_target(cfg: dict[str, Any], roots: Roots, queue_row: dict[str, Any], execute: bool) -> dict[str, Any]:
     target_id = queue_row["id"]
     target_cfg = next((t for t in cfg.get("targets", []) if t.get("id") == target_id), {})
     screen_cfg = merge_screening_config(cfg, target_cfg)
@@ -392,8 +392,8 @@ def process_target(cfg: Dict[str, Any], roots: Roots, queue_row: Dict[str, Any],
     pools = license_pools or [queue_row.get("license_profile", "quarantine")]
 
     passed, pitched = 0, 0
-    shard_paths: List[str] = []
-    pitch_counts: Dict[Tuple[str, str], int] = {}
+    shard_paths: list[str] = []
+    pitch_counts: dict[Tuple[str, str], int] = {}
 
     if require_signoff and not allow_without_signoff:
         if status == "rejected":

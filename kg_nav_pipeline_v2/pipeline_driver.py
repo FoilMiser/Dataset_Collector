@@ -65,16 +65,16 @@ def sha256_file(path: Path) -> Optional[str]:
     except Exception:
         return None
 
-def read_yaml(path: Path) -> Dict[str, Any]:
+def read_yaml(path: Path) -> dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
-def write_jsonl(path: Path, rows: List[Dict[str, Any]]) -> None:
+def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     ensure_dir(path.parent)
     with path.open("w", encoding="utf-8") as f:
         for row in rows:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
-def write_json(path: Path, obj: Dict[str, Any]) -> None:
+def write_json(path: Path, obj: dict[str, Any]) -> None:
     ensure_dir(path.parent)
     path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
@@ -84,7 +84,7 @@ def normalize_whitespace(text: str) -> str:
 def lower(text: str) -> str:
     return (text or "").lower()
 
-def contains_any(haystack: str, needles: List[str]) -> List[str]:
+def contains_any(haystack: str, needles: list[str]) -> list[str]:
     hits = []
     h = lower(haystack)
     for n in needles:
@@ -100,7 +100,7 @@ def coerce_int(val: Any, default: Optional[int] = None) -> Optional[int]:
         return default
 
 
-def resolve_routing_fields(target: Dict[str, Any]) -> Dict[str, Any]:
+def resolve_routing_fields(target: dict[str, Any]) -> dict[str, Any]:
     routing = (target.get("routing", {}) or {})
     kg_routing = (target.get("kg_routing", {}) or {})
     legacy_math = (target.get("math_routing", {}) or {})
@@ -124,13 +124,13 @@ def resolve_routing_fields(target: Dict[str, Any]) -> Dict[str, Any]:
 
 @dataclasses.dataclass
 class LicenseMap:
-    allow: List[str]
-    conditional: List[str]
-    deny_prefixes: List[str]
-    normalization_rules: List[Dict[str, Any]]
-    restriction_phrases: List[str]
-    gating: Dict[str, str]
-    profiles: Dict[str, Dict[str, Any]]
+    allow: list[str]
+    conditional: list[str]
+    deny_prefixes: list[str]
+    normalization_rules: list[dict[str, Any]]
+    restriction_phrases: list[str]
+    gating: dict[str, str]
+    profiles: dict[str, dict[str, Any]]
 
 def load_license_map(path: Path) -> LicenseMap:
     m = read_yaml(path)
@@ -165,7 +165,7 @@ def extract_domain(url: str) -> str:
         return ""
 
 
-def load_denylist(path: Path) -> Dict[str, Any]:
+def load_denylist(path: Path) -> dict[str, Any]:
     """Load denylist.yaml if present. Returns dict with keys: patterns, domain_patterns, publisher_patterns."""
     if not path or not path.exists():
         return {"patterns": [], "domain_patterns": [], "publisher_patterns": []}
@@ -235,9 +235,9 @@ def load_denylist(path: Path) -> Dict[str, Any]:
     except Exception:
         return {"patterns": [], "domain_patterns": [], "publisher_patterns": []}
 
-def denylist_hits(denylist: Dict[str, Any], hay: Dict[str, str]) -> List[Dict[str, Any]]:
+def denylist_hits(denylist: dict[str, Any], hay: dict[str, str]) -> list[dict[str, Any]]:
     """Return list of matched denylist patterns with field, reason, severity (v0.9)."""
-    hits: List[Dict[str, Any]] = []
+    hits: list[dict[str, Any]] = []
 
     # Process standard patterns
     pats = (denylist or {}).get("patterns", []) or []
@@ -327,7 +327,7 @@ def denylist_hits(denylist: Dict[str, Any], hay: Dict[str, str]) -> List[Dict[st
 # Manual review signoff (v0.7)
 # ------------------------------
 
-def read_review_signoff(manifest_dir: Path) -> Dict[str, Any]:
+def read_review_signoff(manifest_dir: Path) -> dict[str, Any]:
     """Read review_signoff.json if present."""
     p = manifest_dir / "review_signoff.json"
     if not p.exists():
@@ -339,7 +339,7 @@ def read_review_signoff(manifest_dir: Path) -> Dict[str, Any]:
 
 def resolve_spdx_with_confidence(
     license_map: LicenseMap, evidence_text: str, spdx_hint: str
-) -> Tuple[str, float, str]:
+) -> tuple[str, float, str]:
     """Resolve SPDX with a lightweight confidence score and rationale."""
 
     hint = normalize_whitespace(str(spdx_hint or ""))
@@ -382,13 +382,13 @@ def fetch_url_with_retry(
     timeout_s: int = 30,
     max_retries: int = 3,
     backoff_base: float = 2.0,
-    headers: Optional[Dict[str, str]] = None,
-) -> Tuple[Optional[bytes], Optional[str], Dict[str, Any]]:
+    headers: Optional[dict[str, str]] = None,
+) -> tuple[Optional[bytes], Optional[str], dict[str, Any]]:
     """Fetch URL with retry and exponential backoff."""
     if requests is None:
         return None, "requests not installed; pip install requests", {"retries": 0}
     
-    meta: Dict[str, Any] = {"retries": 0, "errors": []}
+    meta: dict[str, Any] = {"retries": 0, "errors": []}
     
     for attempt in range(max_retries):
         try:
@@ -414,9 +414,9 @@ def snapshot_evidence(
     manifest_dir: Path,
     url: str,
     max_retries: int = 3,
-    headers: Optional[Dict[str, str]] = None,
-) -> Dict[str, Any]:
-    result: Dict[str, Any] = {
+    headers: Optional[dict[str, str]] = None,
+) -> dict[str, Any]:
+    result: dict[str, Any] = {
         "url": url,
         "fetched_at_utc": utc_now(),
         "status": "skipped",
@@ -471,7 +471,7 @@ def snapshot_evidence(
     write_json(manifest_dir / "license_evidence_meta.json", result)
     return result
 
-def extract_text_for_scanning(evidence: Dict[str, Any]) -> str:
+def extract_text_for_scanning(evidence: dict[str, Any]) -> str:
     saved = str(evidence.get("saved_path") or "")
     if not saved:
         return ""
@@ -486,7 +486,7 @@ def extract_text_for_scanning(evidence: Dict[str, Any]) -> str:
     return ""
 
 
-def merge_gates(default_gates: List[str], gates_override: Dict[str, Any]) -> List[str]:
+def merge_gates(default_gates: list[str], gates_override: dict[str, Any]) -> list[str]:
     if not gates_override:
         return list(default_gates)
     add = gates_override.get("add", []) or []
@@ -501,7 +501,7 @@ def compute_effective_bucket(
     license_map: LicenseMap,
     license_profile: str,
     resolved_spdx: str,
-    restriction_hits: List[str]
+    restriction_hits: list[str]
 ) -> str:
     profile = license_map.profiles.get(license_profile, {})
     default_bucket = str(profile.get("default_bucket", "YELLOW")).upper() or "YELLOW"
@@ -515,10 +515,10 @@ def compute_effective_bucket(
 
 
 def generate_dry_run_report(
-    targets: List[Dict[str, Any]],
-    green_rows: List[Dict[str, Any]],
-    yellow_rows: List[Dict[str, Any]],
-    red_rows: List[Dict[str, Any]],
+    targets: list[dict[str, Any]],
+    green_rows: list[dict[str, Any]],
+    yellow_rows: list[dict[str, Any]],
+    red_rows: list[dict[str, Any]],
     queues_root: Path
 ) -> str:
     """Generate human-readable dry-run summary report."""
@@ -614,7 +614,7 @@ def main() -> None:
     ap.add_argument("--quiet", action="store_true", help="Suppress dry-run report output")
     args = ap.parse_args()
 
-    headers: Dict[str, str] = {}
+    headers: dict[str, str] = {}
     for raw in args.evidence_header:
         if "=" not in raw:
             continue
@@ -645,10 +645,10 @@ def main() -> None:
     # v0.9: Global setting to require signoff for all YELLOW items
     require_yellow_signoff = bool(globals_cfg.get("require_yellow_signoff", False))
 
-    green_rows: List[Dict[str, Any]] = []
-    yellow_rows: List[Dict[str, Any]] = []
-    red_rows: List[Dict[str, Any]] = []
-    warnings: List[Dict[str, Any]] = []
+    green_rows: list[dict[str, Any]] = []
+    yellow_rows: list[dict[str, Any]] = []
+    red_rows: list[dict[str, Any]] = []
+    warnings: list[dict[str, Any]] = []
 
     for t in targets:
         enabled = bool(t.get("enabled", True))
@@ -735,7 +735,7 @@ def main() -> None:
             license_map, evidence_text=evidence_text, spdx_hint=spdx_hint
         )
 
-        restriction_hits: List[str] = []
+        restriction_hits: list[str] = []
         if "restriction_phrase_scan" in gates:
             scan_blob = normalize_whitespace(f"{evidence_text} {evidence_url} {name}")
             restriction_hits = contains_any(scan_blob, license_map.restriction_phrases)
@@ -888,7 +888,7 @@ def main() -> None:
         else:
             red_rows.append(row)
 
-    def sort_key(r: Dict[str, Any]) -> Tuple[int, str]:
+    def sort_key(r: dict[str, Any]) -> tuple[int, str]:
         p = r.get("priority", None)
         try:
             pi = int(p) if p is not None else -999999
