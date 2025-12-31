@@ -34,7 +34,7 @@ This document is a **repo-wide punch list** for turning the current Dataset Coll
 ### P0 (must-fix: affects “it runs” / “it works as documented”)
 1. **`run_all.py` is currently broken** due to tool import layout (module imports fail).
 2. **Jupyter notebook is broken** (`repo_root` never gets defined because of a placeholder `...`).
-3. **Tool invocation inconsistency** (`validate_repo.py` uses `--root` while others use `--repo-root`) adds friction and creates “works in CI but not locally” confusion.
+3. **Tool invocation inconsistency** around repo-root flags adds friction and creates “works in CI but not locally” confusion.
 
 ### P1 (high leverage: reproducibility + maintenance + correctness hardening)
 4. Make dependency management **actually reproducible** (true lockfile strategy).
@@ -117,13 +117,13 @@ Remove the placeholder `...` line entirely.
 ## 3) Standardize CLI args for repo tools (reduce confusion)
 
 ### Current state
-- `tools/validate_repo.py` uses `--root`
+- `tools/validate_repo.py` uses `--repo-root`
 - `tools/preflight.py` uses `--repo-root`
 
 ### Recommended fix
 Pick **one** convention and apply across tools. Recommended: `--repo-root`.
 
-- Update `tools/validate_repo.py` to accept `--repo-root` (keep `--root` as deprecated alias for one release if you want).
+- Update `tools/validate_repo.py` to accept `--repo-root` (keep a deprecated alias for one release if you want).
 - Update notebook + docs accordingly.
 
 ### Acceptance criteria
