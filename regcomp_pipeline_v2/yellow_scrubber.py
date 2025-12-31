@@ -37,8 +37,9 @@ import hashlib
 import json
 import re
 import time
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable, Optional, Tuple, Union
+from typing import Any
 
 import yaml
 
@@ -73,7 +74,7 @@ def write_json(path: Path, obj: dict[str, Any]) -> None:
     ensure_dir(path.parent)
     path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
-def write_jsonl_gz(path: Path, rows: Iterable[dict[str, Any]]) -> Tuple[int, int]:
+def write_jsonl_gz(path: Path, rows: Iterable[dict[str, Any]]) -> tuple[int, int]:
     ensure_dir(path.parent)
     count = 0
     with gzip.open(path, "wt", encoding="utf-8") as f:
@@ -194,7 +195,7 @@ def cast_value(value: str, field_type: str, validation: dict[str, Any]) -> Any:
     except (ValueError, TypeError):
         return None
 
-def validate_record(record: dict[str, Any], schema: dict[str, FieldSpec]) -> Tuple[bool, list[str]]:
+def validate_record(record: dict[str, Any], schema: dict[str, FieldSpec]) -> tuple[bool, list[str]]:
     """Validate a record against a schema. Returns (is_valid, errors)."""
     errors = []
     
@@ -255,12 +256,12 @@ def extract_pubchem_computed_only(
     permissive_out_dir: Path,
     include_globs: list[str],
     include_fields: list[str],
-    field_schema: Optional[dict[str, FieldSpec]],
+    field_schema: dict[str, FieldSpec] | None,
     shard_max_rows: int,
-    cid_range_size: Optional[int] = None,
-    limit_files: Optional[int] = None,
-    limit_rows: Optional[int] = None,
-    resume_state_path: Optional[Path] = None,
+    cid_range_size: int | None = None,
+    limit_files: int | None = None,
+    limit_rows: int | None = None,
+    resume_state_path: Path | None = None,
 ) -> dict[str, Any]:
     """Extract computed-only fields from PubChem SDF files.
     
@@ -429,7 +430,7 @@ PMC_OA_FILE_LIST_PATTERNS = [
     ".csv", ".txt", ".tsv"
 ]
 
-def fetch_text_with_fallback(urls: list[str], timeout_s: int = 30) -> Tuple[str, str]:
+def fetch_text_with_fallback(urls: list[str], timeout_s: int = 30) -> tuple[str, str]:
     """Try multiple URLs, return first successful response."""
     require_requests()
     
@@ -474,7 +475,7 @@ def detect_delimiter(lines: list[str]) -> str:
     
     return "\t" if tab_count > comma_count else ","
 
-def find_column_index(header: list[str], patterns: list[str]) -> Optional[int]:
+def find_column_index(header: list[str], patterns: list[str]) -> int | None:
     """Find column index matching any of the patterns."""
     for i, h in enumerate(header):
         h_lower = h.lower().strip()
@@ -486,7 +487,7 @@ def find_column_index(header: list[str], patterns: list[str]) -> Optional[int]:
 def plan_pmc_allowlist(
     license_map: dict[str, Any],
     out_dir: Path,
-    allowed_spdx: Optional[list[str]] = None
+    allowed_spdx: list[str] | None = None
 ) -> dict[str, Any]:
     """Plan PMC allowlist with improved resilience (v0.7)."""
     ensure_dir(out_dir)

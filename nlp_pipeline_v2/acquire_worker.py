@@ -23,12 +23,11 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from ftplib import FTP
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import urlparse
 
 import requests
 import yaml
-
 
 VERSION = "2.0"
 
@@ -96,7 +95,7 @@ def md5_file(path: Path) -> str:
     return h.hexdigest()
 
 
-def run_cmd(cmd: list[str], cwd: Optional[Path] = None) -> str:
+def run_cmd(cmd: list[str], cwd: Path | None = None) -> str:
     p = subprocess.run(cmd, cwd=str(cwd) if cwd else None, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     return p.stdout.decode("utf-8", errors="ignore")
 
@@ -110,9 +109,9 @@ class Roots:
 
 @dataclasses.dataclass
 class Limits:
-    limit_targets: Optional[int]
-    limit_files: Optional[int]
-    max_bytes_per_target: Optional[int]
+    limit_targets: int | None
+    limit_files: int | None
+    max_bytes_per_target: int | None
 
 
 @dataclasses.dataclass
@@ -144,7 +143,7 @@ class AcquireContext:
 # Strategy handlers
 # ---------------------------------
 
-def _http_download_with_resume(ctx: AcquireContext, url: str, out_path: Path, expected_size: Optional[int] = None) -> dict[str, Any]:
+def _http_download_with_resume(ctx: AcquireContext, url: str, out_path: Path, expected_size: int | None = None) -> dict[str, Any]:
     ensure_dir(out_path.parent)
     headers = {}
     mode = "wb"
@@ -475,7 +474,7 @@ def run_target(ctx: AcquireContext, bucket: str, row: dict[str, Any]) -> dict[st
     return {"id": tid, "status": status, "bucket": bucket, "license_pool": pool, "strategy": strat}
 
 
-def load_roots(targets_path: Optional[Path], overrides: argparse.Namespace) -> Roots:
+def load_roots(targets_path: Path | None, overrides: argparse.Namespace) -> Roots:
     cfg: dict[str, Any] = {}
     if targets_path and targets_path.exists():
         cfg = yaml.safe_load(targets_path.read_text(encoding="utf-8")) or {}

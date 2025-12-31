@@ -25,7 +25,7 @@ import re
 import tarfile
 import time
 from pathlib import Path
-from typing import Any, Optional, Tuple
+from typing import Any
 
 import yaml
 
@@ -40,7 +40,6 @@ except ImportError:
     FTP = None
 
 import xml.etree.ElementTree as ET
-
 
 VERSION = "0.9"
 
@@ -131,7 +130,7 @@ def chunk_text(text: str, max_chars: int, min_chars: int) -> list[str]:
     return [c for c in chunks if len(c) >= min_chars]
 
 
-def http_get_bytes(url: str, timeout_s: int = 120) -> Tuple[bytes, Dict]:
+def http_get_bytes(url: str, timeout_s: int = 120) -> tuple[bytes, dict]:
     if requests is None:
         raise RuntimeError("requests not installed")
     with requests.get(url, stream=True, timeout=timeout_s, headers={"User-Agent": f"pmc-worker/{VERSION}"}) as r:
@@ -153,7 +152,7 @@ def ftp_get_bytes(host: str, remote_path: str) -> bytes:
     return bio.getvalue()
 
 
-def fetch_pmc_package(file_ref: str, max_bytes: int, cache_dir: Optional[Path]) -> Tuple[Optional[bytes], Dict]:
+def fetch_pmc_package(file_ref: str, max_bytes: int, cache_dir: Path | None) -> tuple[bytes | None, dict]:
     fr = safe_text(file_ref).strip()
     meta: dict[str, Any] = {"file_ref": fr}
     
@@ -189,7 +188,7 @@ def fetch_pmc_package(file_ref: str, max_bytes: int, cache_dir: Optional[Path]) 
         return None, {"status": "error", "error": repr(e)}
 
 
-def extract_nxml(pkg_bytes: bytes) -> Tuple[Optional[bytes], list[str]]:
+def extract_nxml(pkg_bytes: bytes) -> tuple[bytes | None, list[str]]:
     bio = io.BytesIO(pkg_bytes)
     members = []
     try:
@@ -200,12 +199,12 @@ def extract_nxml(pkg_bytes: bytes) -> Tuple[Optional[bytes], list[str]]:
                     f = tf.extractfile(m)
                     if f:
                         return f.read(), members
-    except:
+    except Exception:
         pass
     return None, members
 
 
-def get_text(elem: Optional[ET.Element]) -> str:
+def get_text(elem: ET.Element | None) -> str:
     return normalize_whitespace("".join(elem.itertext())) if elem is not None else ""
 
 def extract_article_text(nxml_bytes: bytes, drop_refs: bool = True, 
@@ -213,7 +212,7 @@ def extract_article_text(nxml_bytes: bytes, drop_refs: bool = True,
                          include_tables: bool = True) -> dict[str, Any]:
     try:
         root = ET.fromstring(nxml_bytes)
-    except:
+    except Exception:
         return {"error": "parse_error"}
 
     result: dict[str, Any] = {"title": "", "abstract": "", "body_text": "", "doi": "", "pmid": "",
@@ -314,11 +313,11 @@ def main() -> None:
     log_path = log_dir / "pmc_worker_log.jsonl"
 
     train_idx, valid_idx = 0, 0
-    train_buf: list[Dict] = []
-    valid_buf: list[Dict] = []
+    train_buf: list[dict] = []
+    valid_buf: list[dict] = []
     total_train, total_valid = 0, 0
     successful = 0
-    shard_files: dict[str, List] = {"train": [], "valid": []}
+    shard_files: dict[str, list] = {"train": [], "valid": []}
 
     def flush(split: str):
         nonlocal train_idx, valid_idx, train_buf, valid_buf, total_train, total_valid

@@ -9,18 +9,18 @@ auditability.
 """
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Dict, Iterable, List
-import json
 import gzip
+import json
+from collections.abc import Iterable
+from pathlib import Path
 
 
-def load_bundle(path: Path) -> Dict:
+def load_bundle(path: Path) -> dict:
     with path.open("r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def summarize_objects(bundle: Dict) -> Iterable[Dict]:
+def summarize_objects(bundle: dict) -> Iterable[dict]:
     """Yield simplified STIX object summaries suitable for text corpora."""
     for obj in bundle.get("objects", []):
         yield {
@@ -33,8 +33,8 @@ def summarize_objects(bundle: Dict) -> Iterable[Dict]:
         }
 
 
-def _stringify_relationships(bundle: Dict, source_id: str | None) -> str:
-    rels: List[str] = []
+def _stringify_relationships(bundle: dict, source_id: str | None) -> str:
+    rels: list[str] = []
     if not source_id:
         return ""
     for rel in bundle.get("objects", []):
@@ -45,7 +45,7 @@ def _stringify_relationships(bundle: Dict, source_id: str | None) -> str:
     return "\n".join(rels)
 
 
-def _stringify_references(refs: List[Dict]) -> str:
+def _stringify_references(refs: list[dict]) -> str:
     lines = []
     for ref in refs or []:
         name = ref.get("source_name") or ""
@@ -55,7 +55,7 @@ def _stringify_references(refs: List[Dict]) -> str:
     return "\n".join(lines)
 
 
-def write_jsonl_gz(path: Path, rows: Iterable[Dict]) -> None:
+def write_jsonl_gz(path: Path, rows: Iterable[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with gzip.open(path, "wt", encoding="utf-8") as f:
         for row in rows:

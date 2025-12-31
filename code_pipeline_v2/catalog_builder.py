@@ -14,8 +14,9 @@ import argparse
 import gzip
 import json
 import time
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Dict, Iterator, List
+from typing import Any
 
 import yaml
 
@@ -40,11 +41,11 @@ def count_lines(path: Path, max_lines: int = 0) -> int:
     return count
 
 
-def file_stats(path: Path) -> Dict[str, Any]:
+def file_stats(path: Path) -> dict[str, Any]:
     return {"name": path.name, "bytes": path.stat().st_size, "lines_estimate": count_lines(path, max_lines=1000)}
 
 
-def read_jsonl(path: Path) -> Iterator[Dict[str, Any]]:
+def read_jsonl(path: Path) -> Iterator[dict[str, Any]]:
     opener = gzip.open if path.suffix == ".gz" else open
     with opener(path, "rt", encoding="utf-8", errors="ignore") as f:
         for line in f:
@@ -56,8 +57,8 @@ def read_jsonl(path: Path) -> Iterator[Dict[str, Any]]:
                     continue
 
 
-def collect_raw_stats(root: Path) -> Dict[str, Any]:
-    stats: Dict[str, Any] = {"path": str(root), "buckets": {}}
+def collect_raw_stats(root: Path) -> dict[str, Any]:
+    stats: dict[str, Any] = {"path": str(root), "buckets": {}}
     for bucket in ["green", "yellow"]:
         bucket_dir = root / bucket
         bucket_stats = {"targets": 0, "bytes": 0, "files": 0}
@@ -77,7 +78,7 @@ def collect_raw_stats(root: Path) -> Dict[str, Any]:
     return stats
 
 
-def collect_shard_stage(root: Path) -> Dict[str, Any]:
+def collect_shard_stage(root: Path) -> dict[str, Any]:
     stage = {"path": str(root), "pools": {}}
     if not root.exists():
         return stage
@@ -96,8 +97,8 @@ def collect_shard_stage(root: Path) -> Dict[str, Any]:
     return stage
 
 
-def collect_code_stats(combined_root: Path, sample_limit: int = 2000) -> Dict[str, Any]:
-    stats: Dict[str, Any] = {"languages": {}, "avg_loc": 0.0, "samples": 0, "top_sources": {}}
+def collect_code_stats(combined_root: Path, sample_limit: int = 2000) -> dict[str, Any]:
+    stats: dict[str, Any] = {"languages": {}, "avg_loc": 0.0, "samples": 0, "top_sources": {}}
     loc_total = 0
     shards = list(combined_root.rglob("*.jsonl*")) if combined_root.exists() else []
     for fp in shards:
@@ -120,7 +121,7 @@ def collect_code_stats(combined_root: Path, sample_limit: int = 2000) -> Dict[st
     return stats
 
 
-def build_catalog(cfg: Dict[str, Any]) -> Dict[str, Any]:
+def build_catalog(cfg: dict[str, Any]) -> dict[str, Any]:
     g = (cfg.get("globals", {}) or {})
     raw_root = Path(g.get("raw_root", "/data/code/raw"))
     screened_root = Path(g.get("screened_yellow_root", "/data/code/screened_yellow"))

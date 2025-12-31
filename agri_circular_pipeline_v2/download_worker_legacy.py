@@ -34,7 +34,7 @@ import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 from urllib.parse import urlparse
 
 import yaml
@@ -59,8 +59,8 @@ def utc_now() -> str:
 def ensure_dir(p: Path) -> None:
     p.mkdir(parents=True, exist_ok=True)
 
-def read_jsonl(path: Path) -> List[Dict[str, Any]]:
-    rows: List[Dict[str, Any]] = []
+def read_jsonl(path: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
     with path.open("r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -68,11 +68,11 @@ def read_jsonl(path: Path) -> List[Dict[str, Any]]:
                 rows.append(json.loads(line))
     return rows
 
-def write_json(path: Path, obj: Dict[str, Any]) -> None:
+def write_json(path: Path, obj: dict[str, Any]) -> None:
     ensure_dir(path.parent)
     path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
-def append_jsonl(path: Path, obj: Dict[str, Any]) -> None:
+def append_jsonl(path: Path, obj: dict[str, Any]) -> None:
     ensure_dir(path.parent)
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(obj, ensure_ascii=False) + "\n")
@@ -96,10 +96,10 @@ def safe_name(s: str) -> str:
     s = re.sub(r"[^a-zA-Z0-9._-]+", "_", (s or "").strip())
     return s[:200] if s else "file"
 
-def load_yaml(path: Path) -> Dict[str, Any]:
+def load_yaml(path: Path) -> dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
-def run_cmd(cmd: List[str], cwd: Optional[Path] = None) -> str:
+def run_cmd(cmd: list[str], cwd: Path | None = None) -> str:
     p = subprocess.run(cmd, cwd=str(cwd) if cwd else None, check=True, 
                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     return p.stdout.decode("utf-8", errors="ignore")
@@ -113,9 +113,9 @@ class Pools:
 
 @dataclasses.dataclass
 class Limits:
-    limit_targets: Optional[int]
-    limit_files: Optional[int]
-    max_bytes_per_target: Optional[int]
+    limit_targets: int | None
+    limit_files: int | None
+    max_bytes_per_target: int | None
 
 @dataclasses.dataclass
 class RetryConfig:
@@ -141,7 +141,7 @@ class DownloaderContext:
     retry: RetryConfig
 
 
-def pools_from_targets_yaml(targets_yaml: Optional[Path], fallback: Path) -> Pools:
+def pools_from_targets_yaml(targets_yaml: Path | None, fallback: Path) -> Pools:
     if targets_yaml and targets_yaml.exists():
         cfg = load_yaml(targets_yaml)
         pools = cfg.get("globals", {}).get("pools", {})
@@ -159,20 +159,20 @@ def resolve_pool_dir(ctx: DownloaderContext, pool_name: str, target_id: str) -> 
     ensure_dir(out)
     return out
 
-def log_event(ctx: DownloaderContext, event: Dict[str, Any]) -> None:
+def log_event(ctx: DownloaderContext, event: dict[str, Any]) -> None:
     event = dict(event)
     event.setdefault("at_utc", utc_now())
     append_jsonl(ctx.logs_dir / "download_log.jsonl", event)
 
 
 def http_download_with_resume(ctx: DownloaderContext, url: str, out_path: Path, 
-                               expected_size: Optional[int] = None) -> Dict[str, Any]:
+                               expected_size: int | None = None) -> dict[str, Any]:
     """Download with retry, exponential backoff, and resume support."""
     if requests is None:
         return {"status": "error", "error": "requests not installed"}
     
     ensure_dir(out_path.parent)
-    meta: Dict[str, Any] = {"url": url, "path": str(out_path), "attempts": 0, "resumed": False}
+    meta: dict[str, Any] = {"url": url, "path": str(out_path), "attempts": 0, "resumed": False}
 
     if out_path.exists() and not ctx.mode.overwrite:
         existing_size = out_path.stat().st_size
@@ -233,7 +233,7 @@ def http_download_with_resume(ctx: DownloaderContext, url: str, out_path: Path,
 
 
 def ftp_download_many(ctx: DownloaderContext, base_url: str, 
-                      include_globs: List[str], out_dir: Path) -> List[Dict[str, Any]]:
+                      include_globs: list[str], out_dir: Path) -> list[dict[str, Any]]:
     if FTP is None:
         return [{"status": "error", "error": "ftplib not available"}]
     
@@ -245,7 +245,7 @@ def ftp_download_many(ctx: DownloaderContext, base_url: str,
         return [{"status": "planned", "base_url": base_url, "include_globs": include_globs}]
 
     ensure_dir(out_dir)
-    results: List[Dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
     
     for attempt in range(ctx.retry.max_attempts):
         try:
@@ -269,7 +269,7 @@ def ftp_download_many(ctx: DownloaderContext, base_url: str,
                 
                 try:
                     size = ftp.size(fname) or 0
-                except:
+                except Exception:
                     size = 0
                     
                 if ctx.limits.max_bytes_per_target and bytes_so_far + size > ctx.limits.max_bytes_per_target:
@@ -298,7 +298,7 @@ def ftp_download_many(ctx: DownloaderContext, base_url: str,
     return results
 
 
-def handle_http(ctx: DownloaderContext, target: Dict[str, Any], out_dir: Path) -> List[Dict[str, Any]]:
+def handle_http(ctx: DownloaderContext, target: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     urls = target.get("download", {}).get("urls") or []
     if not urls:
         return [{"status": "noop", "reason": "no urls"}]
@@ -309,7 +309,7 @@ def handle_http(ctx: DownloaderContext, target: Dict[str, Any], out_dir: Path) -
     return results
 
 
-def handle_git(ctx: DownloaderContext, target: Dict[str, Any], out_dir: Path) -> List[Dict[str, Any]]:
+def handle_git(ctx: DownloaderContext, target: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     dl = target.get("download", {})
     repo = dl.get("repo") or dl.get("url")
     checkout = dl.get("checkout") or dl.get("branch") or "main"
@@ -337,7 +337,7 @@ def handle_git(ctx: DownloaderContext, target: Dict[str, Any], out_dir: Path) ->
     return [{"status": "error"}]
 
 
-def handle_zenodo(ctx: DownloaderContext, target: Dict[str, Any], out_dir: Path) -> List[Dict[str, Any]]:
+def handle_zenodo(ctx: DownloaderContext, target: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     if requests is None:
         return [{"status": "error", "error": "requests not installed"}]
     
@@ -400,7 +400,7 @@ def handle_zenodo(ctx: DownloaderContext, target: Dict[str, Any], out_dir: Path)
     return results
 
 
-def handle_dataverse(ctx: DownloaderContext, target: Dict[str, Any], out_dir: Path) -> List[Dict[str, Any]]:
+def handle_dataverse(ctx: DownloaderContext, target: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     if requests is None:
         return [{"status": "error", "error": "requests not installed"}]
     
@@ -415,7 +415,7 @@ def handle_dataverse(ctx: DownloaderContext, target: Dict[str, Any], out_dir: Pa
     return [http_download_with_resume(ctx, api, out_dir / f"dataverse_{safe_name(pid)}.zip")]
 
 
-def handle_ftp(ctx: DownloaderContext, target: Dict[str, Any], out_dir: Path) -> List[Dict[str, Any]]:
+def handle_ftp(ctx: DownloaderContext, target: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     dl = target.get("download", {})
     base_url = dl.get("base_url")
     globs = dl.get("include_globs") or ["*"]
@@ -424,7 +424,7 @@ def handle_ftp(ctx: DownloaderContext, target: Dict[str, Any], out_dir: Path) ->
     return ftp_download_many(ctx, base_url, globs, out_dir)
 
 
-def handle_hf_datasets(ctx: DownloaderContext, target: Dict[str, Any], out_dir: Path) -> List[Dict[str, Any]]:
+def handle_hf_datasets(ctx: DownloaderContext, target: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     dl = target.get("download", {})
     dataset_id = dl.get("dataset_id")
     if not dataset_id:
@@ -472,7 +472,7 @@ STRATEGY_HANDLERS = {
 }
 
 
-def run_target(ctx: DownloaderContext, row: Dict[str, Any]) -> Dict[str, Any]:
+def run_target(ctx: DownloaderContext, row: dict[str, Any]) -> dict[str, Any]:
     tid = row["id"]
     pool = row.get("output_pool", "quarantine") or "quarantine"
     download = row.get("download", {})

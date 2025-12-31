@@ -42,7 +42,7 @@ import json
 import re
 import time
 from pathlib import Path
-from typing import Any, Optional, Tuple
+from typing import Any
 
 import yaml
 
@@ -65,7 +65,7 @@ def sha256_bytes(b: bytes) -> str:
     return hashlib.sha256(b).hexdigest()
 
 
-def sha256_file(path: Path) -> Optional[str]:
+def sha256_file(path: Path) -> str | None:
     try:
         return sha256_bytes(path.read_bytes())
     except Exception:
@@ -99,7 +99,7 @@ def contains_any(haystack: str, needles: list[str]) -> list[str]:
     return hits
 
 
-def coerce_int(val: Any, default: Optional[int] = None) -> Optional[int]:
+def coerce_int(val: Any, default: int | None = None) -> int | None:
     try:
         return int(val)
     except Exception:
@@ -360,7 +360,7 @@ def read_review_signoff(manifest_dir: Path) -> dict[str, Any]:
 
 def resolve_spdx_with_confidence(
     license_map: LicenseMap, evidence_text: str, spdx_hint: str
-) -> Tuple[str, float, str]:
+) -> tuple[str, float, str]:
     """Resolve SPDX with a lightweight confidence score and rationale."""
 
     hint = normalize_whitespace(str(spdx_hint or ""))
@@ -403,8 +403,8 @@ def fetch_url_with_retry(
     timeout_s: int = 30,
     max_retries: int = 3,
     backoff_base: float = 2.0,
-    headers: Optional[dict[str, str]] = None,
-) -> Tuple[Optional[bytes], Optional[str], dict[str, Any]]:
+    headers: dict[str, str] | None = None,
+) -> tuple[bytes | None, str | None, dict[str, Any]]:
     """Fetch URL with retry and exponential backoff."""
     if requests is None:
         return None, "requests not installed; pip install requests", {"retries": 0}
@@ -435,7 +435,7 @@ def snapshot_evidence(
     manifest_dir: Path,
     url: str,
     max_retries: int = 3,
-    headers: Optional[dict[str, str]] = None,
+    headers: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     result: dict[str, Any] = {
         "url": url,
@@ -930,7 +930,7 @@ def main() -> None:
         else:
             red_rows.append(row)
 
-    def sort_key(r: dict[str, Any]) -> Tuple[int, str]:
+    def sort_key(r: dict[str, Any]) -> tuple[int, str]:
         p = r.get("priority", None)
         try:
             pi = int(p) if p is not None else -999999

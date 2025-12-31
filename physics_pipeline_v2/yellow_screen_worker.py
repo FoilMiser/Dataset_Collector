@@ -20,8 +20,9 @@ import hashlib
 import json
 import re
 import time
+from collections.abc import Iterable, Iterator
 from pathlib import Path
-from typing import Any, Iterable, Iterator, Optional, Tuple
+from typing import Any
 
 import yaml
 
@@ -70,7 +71,6 @@ def write_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
 
 def append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
     ensure_dir(path.parent)
-    opener = gzip.open if path.suffix == ".gz" else open
     mode = "at" if path.suffix != ".gz" else "ab"
     if path.suffix == ".gz":
         with gzip.open(path, mode) as f:  # type: ignore
@@ -122,7 +122,7 @@ class Sharder:
         name = f"{self.cfg.prefix}_{self.shard_idx:05d}.{suffix}"
         return self.base_dir / name
 
-    def add(self, row: dict[str, Any]) -> Optional[Path]:
+    def add(self, row: dict[str, Any]) -> Path | None:
         self.current_rows.append(row)
         self.count += 1
         if len(self.current_rows) >= self.cfg.max_records_per_shard:
@@ -131,7 +131,7 @@ class Sharder:
             return path
         return None
 
-    def flush(self) -> Optional[Path]:
+    def flush(self) -> Path | None:
         if not self.current_rows:
             return None
         path = self._next_path()
@@ -146,7 +146,7 @@ def load_targets_cfg(path: Path) -> dict[str, Any]:
 
 
 
-def load_signoff(manifest_dir: Path) -> Optional[dict[str, Any]]:
+def load_signoff(manifest_dir: Path) -> dict[str, Any] | None:
     signoff_path = manifest_dir / "review_signoff.json"
     if not signoff_path.exists():
         return None
@@ -189,7 +189,7 @@ def sharding_cfg(cfg: dict[str, Any], prefix: str) -> ShardingConfig:
     )
 
 
-def find_text(row: dict[str, Any], candidates: list[str]) -> Optional[str]:
+def find_text(row: dict[str, Any], candidates: list[str]) -> str | None:
     for k in candidates:
         if k in row and row[k]:
             val = row[k]
@@ -199,7 +199,7 @@ def find_text(row: dict[str, Any], candidates: list[str]) -> Optional[str]:
     return None
 
 
-def find_license(row: dict[str, Any], candidates: list[str]) -> Optional[str]:
+def find_license(row: dict[str, Any], candidates: list[str]) -> str | None:
     for k in candidates:
         if k in row and row[k]:
             return str(row[k])
@@ -215,13 +215,13 @@ def contains_deny(text: str, phrases: list[str]) -> bool:
 
 def record_pitch(
     roots: Roots,
-    pitch_counts: dict[Tuple[str, str], int],
+    pitch_counts: dict[tuple[str, str], int],
     target_id: str,
     reason: str,
-    raw: Optional[dict[str, Any]] = None,
-    text: Optional[str] = None,
-    extra: Optional[dict[str, Any]] = None,
-    sample_extra: Optional[dict[str, Any]] = None,
+    raw: dict[str, Any] | None = None,
+    text: str | None = None,
+    extra: dict[str, Any] | None = None,
+    sample_extra: dict[str, Any] | None = None,
 ) -> None:
     row = {"target_id": target_id, "reason": reason}
     sample_id = None
@@ -251,7 +251,7 @@ def record_pitch(
     append_jsonl(roots.pitches_root / "yellow_pitch.jsonl", [sample])
     pitch_counts[key] = pitch_counts.get(key, 0) + 1
 
-def canonical_record(raw: dict[str, Any], text: str, target_id: str, license_profile: str, license_spdx: Optional[str]) -> dict[str, Any]:
+def canonical_record(raw: dict[str, Any], text: str, target_id: str, license_profile: str, license_spdx: str | None) -> dict[str, Any]:
     record_id = str(raw.get("record_id") or raw.get("id") or sha256_text(f"{target_id}:{text}"))
     content_hash = sha256_text(text)
     source = raw.get("source", {}) or {}
@@ -298,7 +298,7 @@ def process_target(cfg: dict[str, Any], roots: Roots, queue_row: dict[str, Any],
     passed, pitched = 0, 0
     shard_paths: list[str] = []
 
-    pitch_counts: dict[Tuple[str, str], int] = {}
+    pitch_counts: dict[tuple[str, str], int] = {}
 
     if require_signoff and not allow_without_signoff:
         if status == "rejected":
@@ -320,7 +320,7 @@ def process_target(cfg: dict[str, Any], roots: Roots, queue_row: dict[str, Any],
                 "finished_at_utc": utc_now(),
             }
             if execute:
-                ensure_dir((roots.manifests_root / target_id))
+                ensure_dir(roots.manifests_root / target_id)
                 write_json(roots.manifests_root / target_id / "yellow_screen_done.json", manifest)
             return manifest
         if status != "approved":
@@ -342,7 +342,7 @@ def process_target(cfg: dict[str, Any], roots: Roots, queue_row: dict[str, Any],
                 "finished_at_utc": utc_now(),
             }
             if execute:
-                ensure_dir((roots.manifests_root / target_id))
+                ensure_dir(roots.manifests_root / target_id)
                 write_json(roots.manifests_root / target_id / "yellow_screen_done.json", manifest)
             return manifest
 
@@ -413,7 +413,7 @@ def process_target(cfg: dict[str, Any], roots: Roots, queue_row: dict[str, Any],
         "finished_at_utc": utc_now(),
     }
     if execute:
-        ensure_dir((roots.manifests_root / target_id))
+        ensure_dir(roots.manifests_root / target_id)
         write_json(roots.manifests_root / target_id / "yellow_screen_done.json", manifest)
     return manifest
 

@@ -29,12 +29,9 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import os
-import sys
 import time
 from pathlib import Path
-from typing import Any, Optional
-
+from typing import Any
 
 VERSION = "0.9"
 
@@ -121,7 +118,7 @@ def write_signoff(
     reason: str,
     promote_to: str = "",
     reviewer_contact: str = "",
-    evidence_links_checked: Optional[list[str]] = None,
+    evidence_links_checked: list[str] | None = None,
     constraints: str = "",
     notes: str = "",
 ) -> None:
@@ -173,7 +170,7 @@ def cmd_set(args: argparse.Namespace, status: str) -> int:
         promote_to = str(args.promote_to).upper()
 
     # v0.9: Extended signoff fields
-    evidence_links: Optional[list[str]] = None
+    evidence_links: list[str] | None = None
     if hasattr(args, "evidence_links") and args.evidence_links:
         evidence_links = [link.strip() for link in args.evidence_links.split(",")]
 

@@ -20,8 +20,9 @@ import hashlib
 import json
 import re
 import time
+from collections.abc import Iterable, Iterator
 from pathlib import Path
-from typing import Any, Iterable, Iterator, Optional
+from typing import Any
 
 import yaml
 
@@ -83,7 +84,6 @@ def write_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
 
 def append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
     ensure_dir(path.parent)
-    opener = gzip.open if path.suffix == ".gz" else open
     mode = "at" if path.suffix != ".gz" else "ab"
     if path.suffix == ".gz":
         with gzip.open(path, mode) as f:  # type: ignore
@@ -120,7 +120,7 @@ class TextProcessingConfig:
     max_chars: int
     min_chars: int
     normalize_whitespace: bool
-    force_language: Optional[str]
+    force_language: str | None
 
 
 @dataclasses.dataclass
@@ -143,7 +143,7 @@ class Sharder:
         name = f"{self.cfg.prefix}_{self.shard_idx:05d}.{suffix}"
         return self.base_dir / name
 
-    def add(self, row: dict[str, Any]) -> Optional[Path]:
+    def add(self, row: dict[str, Any]) -> Path | None:
         self.current_rows.append(row)
         self.count += 1
         if len(self.current_rows) >= self.cfg.max_records_per_shard:
@@ -152,7 +152,7 @@ class Sharder:
             return path
         return None
 
-    def flush(self) -> Optional[Path]:
+    def flush(self) -> Path | None:
         if not self.current_rows:
             return None
         path = self._next_path()
@@ -165,7 +165,7 @@ def load_targets_cfg(path: Path) -> dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
 
-def load_signoff(manifest_dir: Path) -> Optional[dict[str, Any]]:
+def load_signoff(manifest_dir: Path) -> dict[str, Any] | None:
     signoff_path = manifest_dir / "review_signoff.json"
     if not signoff_path.exists():
         return None
@@ -219,7 +219,7 @@ def sharding_cfg(cfg: dict[str, Any], prefix: str) -> ShardingConfig:
     )
 
 
-def find_text(row: dict[str, Any], candidates: list[str]) -> Optional[str]:
+def find_text(row: dict[str, Any], candidates: list[str]) -> str | None:
     for k in candidates:
         if k in row and row[k]:
             val = row[k]
@@ -229,7 +229,7 @@ def find_text(row: dict[str, Any], candidates: list[str]) -> Optional[str]:
     return None
 
 
-def find_license(row: dict[str, Any], candidates: list[str]) -> Optional[str]:
+def find_license(row: dict[str, Any], candidates: list[str]) -> str | None:
     for k in candidates:
         if k in row and row[k]:
             return str(row[k])
@@ -243,13 +243,13 @@ def contains_deny(text: str, phrases: list[str]) -> bool:
 
 def record_pitch(
     roots: Roots,
-    pitch_counts: dict[Tuple[str, str], int],
+    pitch_counts: dict[tuple[str, str], int],
     target_id: str,
     reason: str,
-    raw: Optional[dict[str, Any]] = None,
-    text: Optional[str] = None,
-    extra: Optional[dict[str, Any]] = None,
-    sample_extra: Optional[dict[str, Any]] = None,
+    raw: dict[str, Any] | None = None,
+    text: str | None = None,
+    extra: dict[str, Any] | None = None,
+    sample_extra: dict[str, Any] | None = None,
 ) -> None:
     row = {"target_id": target_id, "reason": reason}
     sample_id = None
@@ -311,7 +311,7 @@ def chunk_text(text: str, max_chars: int, min_chars: int) -> list[str]:
     return [c for c in chunks if len(c) >= min_chars]
 
 
-def detect_language_match(raw: dict[str, Any], force_language: Optional[str]) -> bool:
+def detect_language_match(raw: dict[str, Any], force_language: str | None) -> bool:
     if not force_language:
         return True
     for key in ["lang", "language", "lang_code"]:
@@ -325,9 +325,9 @@ def canonical_record(
     text: str,
     target_id: str,
     license_profile: str,
-    license_spdx: Optional[str],
+    license_spdx: str | None,
     routing: dict[str, Any],
-    source_file: Optional[str],
+    source_file: str | None,
 ) -> dict[str, Any]:
     record_id = str(raw.get("record_id") or raw.get("id") or sha256_text(f"{target_id}:{text}"))
     content_hash = sha256_text(text)
@@ -364,12 +364,11 @@ def extract_records_from_file(file_path: Path) -> Iterator[dict[str, Any]]:
         yield from read_jsonl(file_path)
         return
     if suffix.endswith(".json") or suffix.endswith(".json.gz"):
-        for row in read_json(file_path):
-            yield row
+        yield from read_json(file_path)
         return
 
 
-def extract_text_from_file(file_path: Path) -> Optional[str]:
+def extract_text_from_file(file_path: Path) -> str | None:
     opener = gzip.open if file_path.suffix == ".gz" else open
     with opener(file_path, "rt", encoding="utf-8", errors="ignore") as f:
         return f.read()
@@ -393,7 +392,7 @@ def process_target(cfg: dict[str, Any], roots: Roots, queue_row: dict[str, Any],
 
     passed, pitched = 0, 0
     shard_paths: list[str] = []
-    pitch_counts: dict[Tuple[str, str], int] = {}
+    pitch_counts: dict[tuple[str, str], int] = {}
 
     if require_signoff and not allow_without_signoff:
         if status == "rejected":
@@ -415,7 +414,7 @@ def process_target(cfg: dict[str, Any], roots: Roots, queue_row: dict[str, Any],
                 "finished_at_utc": utc_now(),
             }
             if execute:
-                ensure_dir((roots.manifests_root / target_id))
+                ensure_dir(roots.manifests_root / target_id)
                 write_json(roots.manifests_root / target_id / "yellow_screen_done.json", manifest)
             return manifest
         if status != "approved":
@@ -437,7 +436,7 @@ def process_target(cfg: dict[str, Any], roots: Roots, queue_row: dict[str, Any],
                 "finished_at_utc": utc_now(),
             }
             if execute:
-                ensure_dir((roots.manifests_root / target_id))
+                ensure_dir(roots.manifests_root / target_id)
                 write_json(roots.manifests_root / target_id / "yellow_screen_done.json", manifest)
             return manifest
 
@@ -606,7 +605,7 @@ def process_target(cfg: dict[str, Any], roots: Roots, queue_row: dict[str, Any],
         "finished_at_utc": utc_now(),
     }
     if execute:
-        ensure_dir((roots.manifests_root / target_id))
+        ensure_dir(roots.manifests_root / target_id)
         write_json(roots.manifests_root / target_id / "yellow_screen_done.json", manifest)
     return manifest
 

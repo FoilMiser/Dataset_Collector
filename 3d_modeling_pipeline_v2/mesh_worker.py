@@ -19,11 +19,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import shutil
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 try:
     import numpy as np
@@ -64,7 +63,7 @@ def ensure_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
 
-def load_mesh(path: Path) -> Optional["trimesh.Trimesh"]:
+def load_mesh(path: Path) -> trimesh.Trimesh | None:
     if trimesh is None:
         raise RuntimeError("trimesh is required for mesh_worker.py")
     try:
@@ -73,7 +72,7 @@ def load_mesh(path: Path) -> Optional["trimesh.Trimesh"]:
         return None
 
 
-def render_thumbnail(mesh: "trimesh.Trimesh", out_path: Path) -> Optional[Path]:
+def render_thumbnail(mesh: trimesh.Trimesh, out_path: Path) -> Path | None:
     if Image is None:
         return None
     try:
@@ -87,7 +86,7 @@ def render_thumbnail(mesh: "trimesh.Trimesh", out_path: Path) -> Optional[Path]:
         return None
 
 
-def sample_point_cloud(mesh: "trimesh.Trimesh", n_points: int) -> Optional[np.ndarray]:
+def sample_point_cloud(mesh: trimesh.Trimesh, n_points: int) -> np.ndarray | None:
     try:
         pts, _ = trimesh.sample.sample_surface(mesh, n_points)
         return pts
@@ -95,7 +94,7 @@ def sample_point_cloud(mesh: "trimesh.Trimesh", n_points: int) -> Optional[np.nd
         return None
 
 
-def export_mesh(mesh: "trimesh.Trimesh", dest: Path) -> Optional[Path]:
+def export_mesh(mesh: trimesh.Trimesh, dest: Path) -> Path | None:
     ensure_dir(dest.parent)
     try:
         mesh.export(dest)
@@ -108,15 +107,15 @@ def compute_metadata(
     source_id: str,
     src_path: Path,
     norm_path: Path,
-    mesh: "trimesh.Trimesh",
+    mesh: trimesh.Trimesh,
     sha_original: str,
-    sha_norm: Optional[str],
+    sha_norm: str | None,
     license_spdx: str,
-    attribution: Optional[str],
-    creator: Optional[str],
-    thumbnail: Optional[Path],
-    point_cloud_path: Optional[Path],
-) -> Dict[str, Any]:
+    attribution: str | None,
+    creator: str | None,
+    thumbnail: Path | None,
+    point_cloud_path: Path | None,
+) -> dict[str, Any]:
     bounds = mesh.bounds if mesh.bounds is not None else None
     bbox_min = ",".join(map(str, bounds[0].tolist())) if bounds is not None else None
     bbox_max = ",".join(map(str, bounds[1].tolist())) if bounds is not None else None
@@ -150,14 +149,14 @@ def compute_metadata(
     }
 
 
-def write_jsonl(path: Path, rows: List[Dict[str, Any]]) -> None:
+def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     ensure_dir(path.parent)
     with path.open("w", encoding="utf-8") as f:
         for r in rows:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
 
-def write_parquet(path: Path, rows: List[Dict[str, Any]]) -> None:
+def write_parquet(path: Path, rows: list[dict[str, Any]]) -> None:
     if pa is None or pq is None:
         raise RuntimeError("pyarrow not installed; cannot emit parquet")
     ensure_dir(path.parent)
@@ -170,11 +169,11 @@ def process_file(
     output_root: Path,
     source_id: str,
     license_spdx: str,
-    attribution: Optional[str],
-    creator: Optional[str],
+    attribution: str | None,
+    creator: str | None,
     generate_thumbnails: bool,
     generate_point_clouds: bool,
-) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+) -> tuple[dict[str, Any], dict[str, Any]]:
     sha_original = sha256_file(path)
     mesh = load_mesh(path)
     if mesh is None:
@@ -214,8 +213,8 @@ def process_file(
     return metadata, {"status": "ok", "path": str(path), "normalized_path": str(norm_path)}
 
 
-def discover_files(root: Path) -> List[Path]:
-    paths: List[Path] = []
+def discover_files(root: Path) -> list[Path]:
+    paths: list[Path] = []
     for p in root.rglob("*"):
         if p.suffix.lower() in ALLOWED_EXTS and p.is_file():
             paths.append(p)
@@ -247,8 +246,8 @@ def main() -> None:
     if not files:
         sys.exit("No mesh files found in input directory.")
 
-    metadata_rows: List[Dict[str, Any]] = []
-    results: List[Dict[str, Any]] = []
+    metadata_rows: list[dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
 
     for path in files:
         md, res = process_file(

@@ -24,12 +24,12 @@ import argparse
 import json
 import time
 from collections import Counter
-from dataclasses import dataclass, asdict
+from collections.abc import Iterable
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List
+from typing import Any
 
 import yaml
-
 
 VERSION = "1.0"
 
@@ -41,15 +41,15 @@ class QueueEntry:
     effective_bucket: str
     license_profile: str
     resolved_spdx: str
-    restriction_hits: List[str]
+    restriction_hits: list[str]
     require_yellow_signoff: bool
     review_required: bool
-    denylist_hits: List[Dict[str, Any]]
+    denylist_hits: list[dict[str, Any]]
     priority: Any
     manifest_dir: str
 
     @classmethod
-    def from_raw(cls, raw: Dict[str, Any]) -> "QueueEntry":
+    def from_raw(cls, raw: dict[str, Any]) -> QueueEntry:
         return cls(
             id=str(raw.get("id", "")),
             name=str(raw.get("name", "")),
@@ -69,12 +69,12 @@ def utc_now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
-def read_yaml(path: Path) -> Dict[str, Any]:
+def read_yaml(path: Path) -> dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
-def read_jsonl(path: Path) -> List[Dict[str, Any]]:
-    rows: List[Dict[str, Any]] = []
+def read_jsonl(path: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
     with path.open("r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -87,15 +87,15 @@ def ensure_dir(p: Path) -> None:
     p.mkdir(parents=True, exist_ok=True)
 
 
-def load_queue(queue_path: Path, limit: int | None = None) -> List[QueueEntry]:
+def load_queue(queue_path: Path, limit: int | None = None) -> list[QueueEntry]:
     raw_rows = read_jsonl(queue_path)
-    entries: List[QueueEntry] = []
+    entries: list[QueueEntry] = []
     for raw in raw_rows[:limit]:
         entries.append(QueueEntry.from_raw(raw))
     return entries
 
 
-def summarize(entries: Iterable[QueueEntry]) -> Dict[str, Any]:
+def summarize(entries: Iterable[QueueEntry]) -> dict[str, Any]:
     total = 0
     by_profile = Counter()
     by_spdx = Counter()
@@ -120,7 +120,7 @@ def summarize(entries: Iterable[QueueEntry]) -> Dict[str, Any]:
     }
 
 
-def write_plan(output_path: Path, entries: List[QueueEntry], summary: Dict[str, Any], targets_path: Path) -> None:
+def write_plan(output_path: Path, entries: list[QueueEntry], summary: dict[str, Any], targets_path: Path) -> None:
     ensure_dir(output_path.parent)
     plan = {
         "generated_utc": utc_now(),

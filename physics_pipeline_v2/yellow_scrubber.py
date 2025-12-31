@@ -25,12 +25,12 @@ import argparse
 import json
 import time
 from collections import Counter
-from dataclasses import dataclass, asdict
+from collections.abc import Iterable
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import yaml
-
 
 VERSION = "1.0"
 
@@ -50,7 +50,7 @@ class QueueEntry:
     manifest_dir: str
 
     @classmethod
-    def from_raw(cls, raw: dict[str, Any]) -> "QueueEntry":
+    def from_raw(cls, raw: dict[str, Any]) -> QueueEntry:
         return cls(
             id=str(raw.get("id", "")),
             name=str(raw.get("name", "")),

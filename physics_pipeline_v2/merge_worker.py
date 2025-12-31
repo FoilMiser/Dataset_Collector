@@ -17,8 +17,9 @@ import dataclasses
 import gzip
 import json
 import time
+from collections.abc import Iterable, Iterator
 from pathlib import Path
-from typing import Any, Iterable, Iterator, Optional, Set
+from typing import Any
 
 import yaml
 
@@ -90,7 +91,7 @@ class Sharder:
         suffix = "jsonl.gz" if self.cfg.compression == "gzip" else "jsonl"
         return self.base_dir / f"{self.cfg.prefix}_{self.shard_idx:05d}.{suffix}"
 
-    def add(self, row: dict[str, Any]) -> Optional[Path]:
+    def add(self, row: dict[str, Any]) -> Path | None:
         self.current.append(row)
         if len(self.current) >= self.cfg.max_records_per_shard:
             path = self.flush()
@@ -98,7 +99,7 @@ class Sharder:
             return path
         return None
 
-    def flush(self) -> Optional[Path]:
+    def flush(self) -> Path | None:
         if not self.current:
             return None
         path = self._path()
@@ -168,7 +169,7 @@ def route_pool(record: dict[str, Any]) -> str:
 
 def merge_records(cfg: dict[str, Any], roots: Roots, execute: bool) -> dict[str, Any]:
     shard_cfg = sharding_cfg(cfg)
-    dedupe: Set[str] = set()
+    dedupe: set[str] = set()
     summary = {"written": 0, "deduped": 0, "shards": []}
 
     pool_sharders: dict[str, Sharder] = {}
