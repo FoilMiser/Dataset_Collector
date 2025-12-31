@@ -40,7 +40,7 @@ class QueueEntry:
     name: str
     license_profile: str
     resolved_spdx: str
-    restriction_hits: list[str]
+    restriction_hits: List[str]
     download_strategy: str
     routing_subject: str
     routing_domain: str
@@ -55,8 +55,8 @@ def utc_now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
-def load_queue(queue_path: Path) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
+def load_queue(queue_path: Path) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
     with queue_path.open("r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -71,14 +71,14 @@ def queue_root_from_targets(targets_path: Path) -> Path:
     return Path(queues_root)
 
 
-def summary_stats(entries: Iterable[QueueEntry]) -> dict[str, Any]:
+def summary_stats(entries: Iterable[QueueEntry]) -> Dict[str, Any]:
     lp = Counter(e.license_profile for e in entries)
     spdx = Counter(e.resolved_spdx for e in entries)
     strat = Counter(e.download_strategy for e in entries)
     return {"license_profiles": lp, "resolved_spdx": spdx, "download_strategies": strat}
 
 
-def build_review_plan(entries: Iterable[QueueEntry]) -> dict[str, Any]:
+def build_review_plan(entries: Iterable[QueueEntry]) -> Dict[str, Any]:
     plan = {
         "generated_at_utc": utc_now(),
         "version": VERSION,
@@ -87,7 +87,7 @@ def build_review_plan(entries: Iterable[QueueEntry]) -> dict[str, Any]:
     return plan
 
 
-def print_summary(entries: list[QueueEntry]) -> None:
+def print_summary(entries: List[QueueEntry]) -> None:
     stats = summary_stats(entries)
     print(f"[yellow_scrubber] {len(entries)} targets")
     print(f"License profiles: {stats['license_profiles']}")
@@ -100,7 +100,7 @@ def print_summary(entries: list[QueueEntry]) -> None:
         print(f"- {e.id} ({e.name}) [{e.license_profile}] spdx={e.resolved_spdx}{restriction}{routing} strategy={e.download_strategy}")
 
 
-def queue_entry_from_row(row: dict[str, Any]) -> QueueEntry:
+def queue_entry_from_row(row: Dict[str, Any]) -> QueueEntry:
     routing = row.get("routing") or {}
     return QueueEntry(
         id=row.get("id", ""),

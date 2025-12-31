@@ -43,7 +43,7 @@ def utc_now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
-def read_jsonl(path: Path) -> list[dict[str, Any]]:
+def read_jsonl(path: Path) -> List[Dict[str, Any]]:
     if not path.exists():
         return []
     rows = []
@@ -59,12 +59,12 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def write_json(path: Path, obj: dict[str, Any]) -> None:
+def write_json(path: Path, obj: Dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
-def load_existing_signoff(manifest_dir: Path) -> dict[str, Any]:
+def load_existing_signoff(manifest_dir: Path) -> Dict[str, Any]:
     p = manifest_dir / "review_signoff.json"
     if not p.exists():
         return {}
@@ -121,12 +121,12 @@ def write_signoff(
     reason: str,
     promote_to: str = "",
     reviewer_contact: str = "",
-    evidence_links_checked: Optional[list[str]] = None,
+    evidence_links_checked: Optional[List[str]] = None,
     constraints: str = "",
     notes: str = "",
 ) -> None:
     """Write signoff with extended schema (v0.2)."""
-    signoff: dict[str, Any] = {
+    signoff: Dict[str, Any] = {
         "target_id": target_id,
         "status": status,
         "reviewer": reviewer,
@@ -149,7 +149,7 @@ def write_signoff(
     write_json(manifest_dir / "review_signoff.json", signoff)
 
 
-def find_target_in_queue(queue_path: Path, target_id: str) -> dict[str, Any]:
+def find_target_in_queue(queue_path: Path, target_id: str) -> Dict[str, Any]:
     for r in read_jsonl(queue_path):
         if str(r.get("id", "")).strip() == target_id:
             return r
@@ -173,7 +173,7 @@ def cmd_set(args: argparse.Namespace, status: str) -> int:
         promote_to = str(args.promote_to).upper()
 
     # v0.9: Extended signoff fields
-    evidence_links: Optional[list[str]] = None
+    evidence_links: Optional[List[str]] = None
     if hasattr(args, "evidence_links") and args.evidence_links:
         evidence_links = [link.strip() for link in args.evidence_links.split(",")]
 
@@ -202,7 +202,7 @@ def cmd_export(args: argparse.Namespace) -> int:
         print("No YELLOW items found.")
         return 0
 
-    reviewed: list[dict[str, Any]] = []
+    reviewed: List[Dict[str, Any]] = []
     for r in yellow_rows:
         mdir = Path(r.get("manifest_dir", ""))
         signoff = load_existing_signoff(mdir) if mdir else {}

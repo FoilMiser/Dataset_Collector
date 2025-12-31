@@ -15,12 +15,12 @@ import json
 import gzip
 
 
-def load_bundle(path: Path) -> dict:
+def load_bundle(path: Path) -> Dict:
     with path.open("r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def summarize_objects(bundle: dict) -> Iterable[dict]:
+def summarize_objects(bundle: Dict) -> Iterable[Dict]:
     """Yield simplified STIX object summaries suitable for text corpora."""
     for obj in bundle.get("objects", []):
         yield {
@@ -33,8 +33,8 @@ def summarize_objects(bundle: dict) -> Iterable[dict]:
         }
 
 
-def _stringify_relationships(bundle: dict, source_id: str | None) -> str:
-    rels: list[str] = []
+def _stringify_relationships(bundle: Dict, source_id: str | None) -> str:
+    rels: List[str] = []
     if not source_id:
         return ""
     for rel in bundle.get("objects", []):
@@ -45,7 +45,7 @@ def _stringify_relationships(bundle: dict, source_id: str | None) -> str:
     return "\n".join(rels)
 
 
-def _stringify_references(refs: list[dict]) -> str:
+def _stringify_references(refs: List[Dict]) -> str:
     lines = []
     for ref in refs or []:
         name = ref.get("source_name") or ""
@@ -55,7 +55,7 @@ def _stringify_references(refs: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def write_jsonl_gz(path: Path, rows: Iterable[dict]) -> None:
+def write_jsonl_gz(path: Path, rows: Iterable[Dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with gzip.open(path, "wt", encoding="utf-8") as f:
         for row in rows:

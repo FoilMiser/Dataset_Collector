@@ -46,11 +46,11 @@ def sha256_text(text: str) -> str:
     return hashlib.sha256(norm.encode("utf-8")).hexdigest()
 
 
-def read_yaml(path: Path) -> dict[str, Any]:
+def read_yaml(path: Path) -> Dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
 
-def load_targets_cfg(path: Optional[Path]) -> dict[str, Any]:
+def load_targets_cfg(path: Optional[Path]) -> Dict[str, Any]:
     if not path:
         return {}
     if not path.exists():
@@ -74,8 +74,8 @@ class CodeProcessingConfig:
     include_comments: bool
     strip_trailing_whitespace: bool
     normalize_newlines: bool
-    languages_allowlist: list[str]
-    path_deny_globs: list[str]
+    languages_allowlist: List[str]
+    path_deny_globs: List[str]
 
 
 @dataclasses.dataclass
@@ -84,7 +84,7 @@ class WorkerContext:
     bucket: str
     license_profile: str
     license_spdx: Optional[str]
-    routing: dict[str, Any]
+    routing: Dict[str, Any]
     source_url: Optional[str]
     processing: CodeProcessingConfig
     sharding: ShardingConfig
@@ -97,14 +97,14 @@ class Sharder:
     def __init__(self, cfg: ShardingConfig, base_dir: Path):
         self.cfg = cfg
         self.base_dir = base_dir
-        self.rows: list[dict[str, Any]] = []
+        self.rows: List[Dict[str, Any]] = []
         self.idx = 0
 
     def _path(self) -> Path:
         suffix = "jsonl.gz" if self.cfg.compression == "gzip" else "jsonl"
         return self.base_dir / f"{self.cfg.prefix}_{self.idx:05d}.{suffix}"
 
-    def add(self, row: dict[str, Any]) -> Optional[Path]:
+    def add(self, row: Dict[str, Any]) -> Optional[Path]:
         self.rows.append(row)
         if len(self.rows) >= self.cfg.max_records_per_shard:
             path = self.flush()
@@ -131,7 +131,7 @@ class Sharder:
         return path
 
 
-SECRET_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
+SECRET_PATTERNS: List[Tuple[str, re.Pattern[str]]] = [
     ("aws_access_key", re.compile(r"AKIA[0-9A-Z]{16}")),
     ("aws_secret_key", re.compile(r"(?i)aws(.{0,20})?(secret|access)_?key")),
     ("github_token", re.compile(r"gh[pousr]_[A-Za-z0-9_]{30,}")),
@@ -170,7 +170,7 @@ def normalize_newlines(text: str) -> str:
     return text.replace("\r\n", "\n").replace("\r", "\n")
 
 
-def should_skip(path: Path, deny_globs: list[str]) -> bool:
+def should_skip(path: Path, deny_globs: List[str]) -> bool:
     return any(fnmatch.fnmatch(str(path), pattern) for pattern in deny_globs)
 
 
@@ -185,8 +185,8 @@ def detect_language(path: Path, text: str) -> Optional[str]:
     return None
 
 
-def scan_secrets(text: str) -> tuple[str, list[str]]:
-    hits: list[str] = []
+def scan_secrets(text: str) -> Tuple[str, List[str]]:
+    hits: List[str] = []
     redacted = text
     for name, pat in SECRET_PATTERNS:
         for match in pat.finditer(redacted):
@@ -202,11 +202,11 @@ def iter_code_files(root: Path) -> Iterator[Path]:
             yield fp
 
 
-def chunk_code(text: str, min_chars: int, max_chars: int) -> list[tuple[int, int, str]]:
+def chunk_code(text: str, min_chars: int, max_chars: int) -> List[Tuple[int, int, str]]:
     lines = text.splitlines()
-    chunks: list[tuple[int, int, str]] = []
+    chunks: List[Tuple[int, int, str]] = []
     start_idx = 0
-    buf: list[str] = []
+    buf: List[str] = []
     char_count = 0
 
     for idx, line in enumerate(lines, start=1):
@@ -234,7 +234,7 @@ def canonical_record(
     start_line: int,
     end_line: int,
     secrets_redacted: bool,
-) -> dict[str, Any]:
+) -> Dict[str, Any]:
     record_id = sha256_text(f"{ctx.target_id}:{rel_path}:{start_line}:{end_line}")
     content_hash = sha256_text(chunk)
     source_block = {
@@ -264,10 +264,10 @@ def canonical_record(
     }
 
 
-def extract_codebase(ctx: WorkerContext) -> dict[str, Any]:
+def extract_codebase(ctx: WorkerContext) -> Dict[str, Any]:
     ensure_dir(ctx.output_dir)
     sharder = Sharder(ctx.sharding, ctx.output_dir)
-    pitched: list[dict[str, Any]] = []
+    pitched: List[Dict[str, Any]] = []
     emitted = 0
     files_seen = 0
     for fp in iter_code_files(ctx.input_dir):
@@ -347,7 +347,7 @@ def extract_codebase(ctx: WorkerContext) -> dict[str, Any]:
     return manifest
 
 
-def sharding_from_cfg(cfg: dict[str, Any]) -> ShardingConfig:
+def sharding_from_cfg(cfg: Dict[str, Any]) -> ShardingConfig:
     g = (cfg.get("globals", {}).get("sharding", {}) or {})
     return ShardingConfig(
         max_records_per_shard=int(g.get("max_records_per_shard", 50000)),
@@ -356,7 +356,7 @@ def sharding_from_cfg(cfg: dict[str, Any]) -> ShardingConfig:
     )
 
 
-def processing_from_cfg(cfg: dict[str, Any], target: dict[str, Any]) -> CodeProcessingConfig:
+def processing_from_cfg(cfg: Dict[str, Any], target: Dict[str, Any]) -> CodeProcessingConfig:
     g = (cfg.get("globals", {}).get("code_processing_defaults", {}) or {})
     t = (target.get("code_processing") or {})
     deny_globs = list(t.get("path_deny_globs") or g.get("path_deny_globs") or [])
@@ -373,7 +373,7 @@ def processing_from_cfg(cfg: dict[str, Any], target: dict[str, Any]) -> CodeProc
     )
 
 
-def resolve_target(cfg: dict[str, Any], target_id: str) -> dict[str, Any]:
+def resolve_target(cfg: Dict[str, Any], target_id: str) -> Dict[str, Any]:
     for t in cfg.get("targets", []) or []:
         if t.get("id") == target_id:
             return t
@@ -386,14 +386,14 @@ def run_extraction(
     target_id: str,
     license_profile: str,
     bucket: str,
-    routing: Optional[dict[str, Any]] = None,
-    processing_defaults: Optional[dict[str, Any]] = None,
-    sharding: Optional[dict[str, Any]] = None,
+    routing: Optional[Dict[str, Any]] = None,
+    processing_defaults: Optional[Dict[str, Any]] = None,
+    sharding: Optional[Dict[str, Any]] = None,
     source_url: Optional[str] = None,
     license_spdx: Optional[str] = None,
     output_dir: Optional[Path] = None,
     pitches_root: Optional[Path] = None,
-) -> dict[str, Any]:
+) -> Dict[str, Any]:
     cfg_wrapper = {"globals": {"code_processing_defaults": processing_defaults or {}, "sharding": sharding or {}}}
     processing_cfg = processing_from_cfg(cfg_wrapper, {})
     sharding_cfg = ShardingConfig(
@@ -417,7 +417,7 @@ def run_extraction(
     return extract_codebase(ctx)
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=f"Code Worker v{VERSION}")
     ap.add_argument("--targets", required=False, help="Path to targets_code.yaml")
     ap.add_argument("--target-id", required=True, help="Target id to process")
@@ -430,7 +430,7 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     targets_path = Path(args.targets).expanduser().resolve() if args.targets else None
     cfg = load_targets_cfg(targets_path)
-    target_cfg: dict[str, Any] = {}
+    target_cfg: Dict[str, Any] = {}
     if cfg:
         target_cfg = resolve_target(cfg, args.target_id)
     routing = (target_cfg.get("routing") or target_cfg.get("code_routing") or target_cfg.get("math_routing") or {})

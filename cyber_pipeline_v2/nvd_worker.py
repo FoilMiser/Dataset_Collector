@@ -12,12 +12,12 @@ from typing import Dict, Iterable
 import gzip
 
 
-def load_feed(path: Path) -> dict:
+def load_feed(path: Path) -> Dict:
     with gzip.open(path, "rt", encoding="utf-8") as f:
         return json.load(f)
 
 
-def iter_records(feed: dict) -> Iterable[dict]:
+def iter_records(feed: Dict) -> Iterable[Dict]:
     for item in feed.get("vulnerabilities", []):
         cve = item.get("cve", {})
         metrics = (cve.get("metrics", {}) or {}).get("cvssMetricV31", [])
@@ -36,7 +36,7 @@ def iter_records(feed: dict) -> Iterable[dict]:
         }
 
 
-def _flatten_cpes(configurations: Iterable[dict]) -> str:
+def _flatten_cpes(configurations: Iterable[Dict]) -> str:
     cpes = []
     for cfg in configurations or []:
         for node in cfg.get("nodes", []):
@@ -47,7 +47,7 @@ def _flatten_cpes(configurations: Iterable[dict]) -> str:
     return "\n".join(sorted(set(cpes)))
 
 
-def _primary_description(cve: dict) -> str:
+def _primary_description(cve: Dict) -> str:
     descriptions = cve.get("descriptions", [])
     if not descriptions:
         return ""
@@ -58,7 +58,7 @@ def _primary_description(cve: dict) -> str:
     return descriptions[0].get("value", "")
 
 
-def _flatten_refs(refs: Iterable[dict]) -> str:
+def _flatten_refs(refs: Iterable[Dict]) -> str:
     urls = []
     for ref in refs or []:
         for url in ref.get("url", "").split():
@@ -67,7 +67,7 @@ def _flatten_refs(refs: Iterable[dict]) -> str:
     return "\n".join(sorted(set(urls)))
 
 
-def write_jsonl_gz(path: Path, rows: Iterable[dict]) -> None:
+def write_jsonl_gz(path: Path, rows: Iterable[Dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with gzip.open(path, "wt", encoding="utf-8") as f:
         for row in rows:
