@@ -20,8 +20,9 @@ import hashlib
 import json
 import re
 import time
+from collections.abc import Iterable, Iterator
 from pathlib import Path
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple
+from typing import Any
 
 import yaml
 
@@ -56,11 +57,11 @@ def sha256_text(text: str) -> str:
     return hashlib.sha256(norm.encode("utf-8")).hexdigest()
 
 
-def read_json(path: Path) -> Dict[str, Any]:
+def read_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def read_jsonl(path: Path) -> Iterator[Dict[str, Any]]:
+def read_jsonl(path: Path) -> Iterator[dict[str, Any]]:
     opener = gzip.open if path.suffix == ".gz" else open
     with opener(path, "rt", encoding="utf-8", errors="ignore") as f:
         for line in f:
@@ -72,12 +73,12 @@ def read_jsonl(path: Path) -> Iterator[Dict[str, Any]]:
                     continue
 
 
-def write_json(path: Path, obj: Dict[str, Any]) -> None:
+def write_json(path: Path, obj: dict[str, Any]) -> None:
     ensure_dir(path.parent)
     path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
-def write_jsonl(path: Path, rows: Iterable[Dict[str, Any]]) -> None:
+def write_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
     ensure_dir(path.parent)
     opener = gzip.open if path.suffix == ".gz" else open
     with opener(path, "wt", encoding="utf-8") as f:
@@ -85,9 +86,8 @@ def write_jsonl(path: Path, rows: Iterable[Dict[str, Any]]) -> None:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
-def append_jsonl(path: Path, rows: Iterable[Dict[str, Any]]) -> None:
+def append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
     ensure_dir(path.parent)
-    opener = gzip.open if path.suffix == ".gz" else open
     mode = "at" if path.suffix != ".gz" else "ab"
     if path.suffix == ".gz":
         with gzip.open(path, mode) as f:  # type: ignore
@@ -110,10 +110,10 @@ class Roots:
 
 @dataclasses.dataclass
 class ScreeningConfig:
-    text_fields: List[str]
-    license_fields: List[str]
-    allow_spdx: List[str]
-    deny_phrases: List[str]
+    text_fields: list[str]
+    license_fields: list[str]
+    allow_spdx: list[str]
+    deny_phrases: list[str]
     require_record_license: bool
     min_chars: int
     max_chars: int
@@ -132,14 +132,14 @@ class Sharder:
         self.cfg = cfg
         self.count = 0
         self.shard_idx = 0
-        self.current_rows: List[Dict[str, Any]] = []
+        self.current_rows: list[dict[str, Any]] = []
 
     def _next_path(self) -> Path:
         suffix = "jsonl.gz" if self.cfg.compression == "gzip" else "jsonl"
         name = f"{self.cfg.prefix}_{self.shard_idx:05d}.{suffix}"
         return self.base_dir / name
 
-    def add(self, row: Dict[str, Any]) -> Optional[Path]:
+    def add(self, row: dict[str, Any]) -> Path | None:
         self.current_rows.append(row)
         self.count += 1
         if len(self.current_rows) >= self.cfg.max_records_per_shard:
@@ -148,7 +148,7 @@ class Sharder:
             return path
         return None
 
-    def flush(self) -> Optional[Path]:
+    def flush(self) -> Path | None:
         if not self.current_rows:
             return None
         path = self._next_path()
@@ -157,11 +157,11 @@ class Sharder:
         return path
 
 
-def load_targets_cfg(path: Path) -> Dict[str, Any]:
+def load_targets_cfg(path: Path) -> dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
 
-def resolve_roots(cfg: Dict[str, Any]) -> Roots:
+def resolve_roots(cfg: dict[str, Any]) -> Roots:
     g = (cfg.get("globals", {}) or {})
     return Roots(
         raw_root=Path(g.get("raw_root", "/data/safety/raw")),
@@ -172,7 +172,7 @@ def resolve_roots(cfg: Dict[str, Any]) -> Roots:
     )
 
 
-def merge_screening_config(cfg: Dict[str, Any], target: Dict[str, Any]) -> ScreeningConfig:
+def merge_screening_config(cfg: dict[str, Any], target: dict[str, Any]) -> ScreeningConfig:
     g_screen = (cfg.get("globals", {}).get("screening", {}) or {})
     t_screen = (target.get("yellow_screen", {}) or {})
     return ScreeningConfig(
@@ -186,7 +186,7 @@ def merge_screening_config(cfg: Dict[str, Any], target: Dict[str, Any]) -> Scree
     )
 
 
-def sharding_cfg(cfg: Dict[str, Any], prefix: str) -> ShardingConfig:
+def sharding_cfg(cfg: dict[str, Any], prefix: str) -> ShardingConfig:
     g = (cfg.get("globals", {}).get("sharding", {}) or {})
     return ShardingConfig(
         max_records_per_shard=int(g.get("max_records_per_shard", 50000)),
@@ -195,7 +195,7 @@ def sharding_cfg(cfg: Dict[str, Any], prefix: str) -> ShardingConfig:
     )
 
 
-def load_field_schemas(cfg: Dict[str, Any], targets_path: Path) -> Dict[str, Dict[str, Any]]:
+def load_field_schemas(cfg: dict[str, Any], targets_path: Path) -> dict[str, dict[str, Any]]:
     comp = (cfg.get("companion_files", {}) or {})
     schema_path = comp.get("field_schemas")
     if not schema_path:
@@ -208,7 +208,7 @@ def load_field_schemas(cfg: Dict[str, Any], targets_path: Path) -> Dict[str, Dic
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
 
-def find_text(row: Dict[str, Any], candidates: List[str]) -> Optional[str]:
+def find_text(row: dict[str, Any], candidates: list[str]) -> str | None:
     for k in candidates:
         if k in row and row[k]:
             val = row[k]
@@ -218,27 +218,27 @@ def find_text(row: Dict[str, Any], candidates: List[str]) -> Optional[str]:
     return None
 
 
-def find_license(row: Dict[str, Any], candidates: List[str]) -> Optional[str]:
+def find_license(row: dict[str, Any], candidates: list[str]) -> str | None:
     for k in candidates:
         if k in row and row[k]:
             return str(row[k])
     return None
 
 
-def contains_deny(text: str, phrases: List[str]) -> bool:
+def contains_deny(text: str, phrases: list[str]) -> bool:
     low = text.lower()
     return any(p in low for p in phrases)
 
 
 def record_pitch(
     roots: Roots,
-    pitch_counts: Dict[Tuple[str, str], int],
+    pitch_counts: dict[tuple[str, str], int],
     target_id: str,
     reason: str,
-    raw: Optional[Dict[str, Any]] = None,
-    text: Optional[str] = None,
-    extra: Optional[Dict[str, Any]] = None,
-    sample_extra: Optional[Dict[str, Any]] = None,
+    raw: dict[str, Any] | None = None,
+    text: str | None = None,
+    extra: dict[str, Any] | None = None,
+    sample_extra: dict[str, Any] | None = None,
 ) -> None:
     row = {"target_id": target_id, "reason": reason}
     sample_id = None
@@ -269,8 +269,8 @@ def record_pitch(
     pitch_counts[key] = pitch_counts.get(key, 0) + 1
 
 
-def redact_text(text: str) -> Tuple[str, List[str]]:
-    redactions: List[str] = []
+def redact_text(text: str) -> tuple[str, list[str]]:
+    redactions: list[str] = []
     if EMAIL_RE.search(text):
         text = EMAIL_RE.sub("[REDACTED_EMAIL]", text)
         redactions.append("email")
@@ -286,13 +286,13 @@ def redact_text(text: str) -> Tuple[str, List[str]]:
     return text, redactions
 
 
-def has_sensitive_markers(text: str) -> Optional[str]:
+def has_sensitive_markers(text: str) -> str | None:
     if COORD_RE.search(text):
         return "precise_coordinates"
     return None
 
 
-def coarsen_meta(meta: Dict[str, Any], redactions: List[str]) -> Dict[str, Any]:
+def coarsen_meta(meta: dict[str, Any], redactions: list[str]) -> dict[str, Any]:
     meta = dict(meta or {})
     for key in ["location", "location_detail", "address", "latitude", "longitude", "coordinates"]:
         meta.pop(key, None)
@@ -305,14 +305,14 @@ def coarsen_meta(meta: Dict[str, Any], redactions: List[str]) -> Dict[str, Any]:
     return meta
 
 
-def schema_key(record: Dict[str, Any]) -> Optional[str]:
+def schema_key(record: dict[str, Any]) -> str | None:
     for key in SCHEMA_KEYS:
         if record.get(key):
             return str(record.get(key))
     return None
 
 
-def validate_schema(record: Dict[str, Any], schemas: Dict[str, Any]) -> Tuple[bool, List[str]]:
+def validate_schema(record: dict[str, Any], schemas: dict[str, Any]) -> tuple[bool, list[str]]:
     s_key = schema_key(record)
     if not s_key or s_key not in schemas:
         return True, []
@@ -322,7 +322,7 @@ def validate_schema(record: Dict[str, Any], schemas: Dict[str, Any]) -> Tuple[bo
     return not missing, missing
 
 
-def load_signoff(manifest_dir: Path) -> Optional[Dict[str, Any]]:
+def load_signoff(manifest_dir: Path) -> dict[str, Any] | None:
     signoff_path = manifest_dir / "review_signoff.json"
     if not signoff_path.exists():
         return None
@@ -333,13 +333,13 @@ def load_signoff(manifest_dir: Path) -> Optional[Dict[str, Any]]:
 
 
 def canonical_record(
-    raw: Dict[str, Any],
+    raw: dict[str, Any],
     text: str,
     target_id: str,
     license_profile: str,
-    license_spdx: Optional[str],
-    routing: Dict[str, Any],
-) -> Dict[str, Any]:
+    license_spdx: str | None,
+    routing: dict[str, Any],
+) -> dict[str, Any]:
     record_id = str(raw.get("record_id") or raw.get("id") or sha256_text(f"{target_id}:{text}"))
     content_hash = sha256_text(text)
     source = raw.get("source", {}) or {}
@@ -368,12 +368,12 @@ def iter_raw_files(raw_dir: Path) -> Iterator[Path]:
 
 
 def process_target(
-    cfg: Dict[str, Any],
-    schemas: Dict[str, Any],
+    cfg: dict[str, Any],
+    schemas: dict[str, Any],
     roots: Roots,
-    queue_row: Dict[str, Any],
+    queue_row: dict[str, Any],
     execute: bool,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     target_id = queue_row["id"]
     target_cfg = next((t for t in cfg.get("targets", []) if t.get("id") == target_id), {})
     screen_cfg = merge_screening_config(cfg, target_cfg)
@@ -389,8 +389,8 @@ def process_target(
     pools = license_pools or [queue_row.get("license_profile", "quarantine")]
 
     passed, pitched = 0, 0
-    shard_paths: List[str] = []
-    pitch_counts: Dict[Tuple[str, str], int] = {}
+    shard_paths: list[str] = []
+    pitch_counts: dict[tuple[str, str], int] = {}
 
     if require_signoff and not allow_without_signoff:
         if status == "rejected":
@@ -412,7 +412,7 @@ def process_target(
                 "finished_at_utc": utc_now(),
             }
             if execute:
-                ensure_dir((roots.manifests_root / target_id))
+                ensure_dir(roots.manifests_root / target_id)
                 write_json(roots.manifests_root / target_id / "screen_yellow_done.json", manifest)
             return manifest
         if status != "approved":
@@ -434,7 +434,7 @@ def process_target(
                 "finished_at_utc": utc_now(),
             }
             if execute:
-                ensure_dir((roots.manifests_root / target_id))
+                ensure_dir(roots.manifests_root / target_id)
                 write_json(roots.manifests_root / target_id / "screen_yellow_done.json", manifest)
             return manifest
 
@@ -555,7 +555,7 @@ def process_target(
         "finished_at_utc": utc_now(),
     }
     if execute:
-        ensure_dir((roots.manifests_root / target_id))
+        ensure_dir(roots.manifests_root / target_id)
         write_json(roots.manifests_root / target_id / "screen_yellow_done.json", manifest)
     return manifest
 

@@ -23,7 +23,7 @@ import re
 import tarfile
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import yaml
 
@@ -39,7 +39,6 @@ except ImportError:
 
 import xml.etree.ElementTree as ET
 
-
 VERSION = "2.0"
 
 
@@ -49,17 +48,17 @@ def utc_now() -> str:
 def ensure_dir(p: Path) -> None:
     p.mkdir(parents=True, exist_ok=True)
 
-def read_yaml(path: Path) -> Dict[str, Any]:
+def read_yaml(path: Path) -> dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
-def read_jsonl(path: Path) -> List[Dict[str, Any]]:
+def read_jsonl(path: Path) -> list[dict[str, Any]]:
     return [json.loads(ln) for ln in path.read_text().splitlines() if ln.strip()]
 
-def write_json(path: Path, obj: Dict[str, Any]) -> None:
+def write_json(path: Path, obj: dict[str, Any]) -> None:
     ensure_dir(path.parent)
     path.write_text(json.dumps(obj, indent=2) + "\n", encoding="utf-8")
 
-def append_jsonl(path: Path, obj: Dict[str, Any]) -> None:
+def append_jsonl(path: Path, obj: dict[str, Any]) -> None:
     ensure_dir(path.parent)
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(obj) + "\n")
@@ -90,7 +89,7 @@ def raw_root_from_targets_yaml(targets_yaml: Path, fallback: Path) -> Path:
     raw_root = cfg.get("globals", {}).get("raw_root")
     return Path(raw_root or fallback).expanduser()
 
-def chunk_defaults_from_targets_yaml(targets_yaml: Path) -> Dict[str, Any]:
+def chunk_defaults_from_targets_yaml(targets_yaml: Path) -> dict[str, Any]:
     cfg = read_yaml(targets_yaml)
     d = cfg.get("globals", {}).get("text_processing_defaults", {})
     screening = cfg.get("globals", {}).get("screening", {})
@@ -104,7 +103,7 @@ def chunk_defaults_from_targets_yaml(targets_yaml: Path) -> Dict[str, Any]:
     }
 
 
-def chunk_text(text: str, max_chars: int, min_chars: int) -> List[str]:
+def chunk_text(text: str, max_chars: int, min_chars: int) -> list[str]:
     if not text.strip():
         return []
     paras = [p.strip() for p in re.split(r"\n{2,}", text) if p.strip()]
@@ -126,7 +125,7 @@ def chunk_text(text: str, max_chars: int, min_chars: int) -> List[str]:
     return [c for c in chunks if len(c) >= min_chars]
 
 
-def http_get_bytes(url: str, timeout_s: int = 120) -> Tuple[bytes, Dict]:
+def http_get_bytes(url: str, timeout_s: int = 120) -> tuple[bytes, dict]:
     if requests is None:
         raise RuntimeError("requests not installed")
     with requests.get(url, stream=True, timeout=timeout_s, headers={"User-Agent": f"pmc-worker/{VERSION}"}) as r:
@@ -148,9 +147,9 @@ def ftp_get_bytes(host: str, remote_path: str) -> bytes:
     return bio.getvalue()
 
 
-def fetch_pmc_package(file_ref: str, max_bytes: int, cache_dir: Optional[Path]) -> Tuple[Optional[bytes], Dict]:
+def fetch_pmc_package(file_ref: str, max_bytes: int, cache_dir: Path | None) -> tuple[bytes | None, dict]:
     fr = safe_text(file_ref).strip()
-    meta: Dict[str, Any] = {"file_ref": fr}
+    meta: dict[str, Any] = {"file_ref": fr}
     
     if cache_dir:
         cache_key = sha256_bytes(fr.encode())[:16]
@@ -184,7 +183,7 @@ def fetch_pmc_package(file_ref: str, max_bytes: int, cache_dir: Optional[Path]) 
         return None, {"status": "error", "error": repr(e)}
 
 
-def extract_nxml(pkg_bytes: bytes) -> Tuple[Optional[bytes], List[str]]:
+def extract_nxml(pkg_bytes: bytes) -> tuple[bytes | None, list[str]]:
     bio = io.BytesIO(pkg_bytes)
     members = []
     try:
@@ -195,23 +194,23 @@ def extract_nxml(pkg_bytes: bytes) -> Tuple[Optional[bytes], List[str]]:
                     f = tf.extractfile(m)
                     if f:
                         return f.read(), members
-    except:
+    except Exception:
         pass
     return None, members
 
 
-def get_text(elem: Optional[ET.Element]) -> str:
+def get_text(elem: ET.Element | None) -> str:
     return normalize_whitespace("".join(elem.itertext())) if elem is not None else ""
 
 def extract_article_text(nxml_bytes: bytes, drop_refs: bool = True, 
                          include_headers: bool = True, include_figs: bool = True, 
-                         include_tables: bool = True) -> Dict[str, Any]:
+                         include_tables: bool = True) -> dict[str, Any]:
     try:
         root = ET.fromstring(nxml_bytes)
-    except:
+    except Exception:
         return {"error": "parse_error"}
 
-    result: Dict[str, Any] = {"title": "", "abstract": "", "body_text": "", "doi": "", "pmid": "",
+    result: dict[str, Any] = {"title": "", "abstract": "", "body_text": "", "doi": "", "pmid": "",
                               "sections": [], "figure_captions": [], "table_captions": []}
 
     for aid in root.findall(".//article-id"):
@@ -310,11 +309,11 @@ def main() -> None:
     log_path = log_dir / "pmc_worker_log.jsonl"
 
     train_idx, valid_idx = 0, 0
-    train_buf: List[Dict] = []
-    valid_buf: List[Dict] = []
+    train_buf: list[dict] = []
+    valid_buf: list[dict] = []
     total_train, total_valid = 0, 0
     successful = 0
-    shard_files: Dict[str, List] = {"train": [], "valid": []}
+    shard_files: dict[str, list] = {"train": [], "valid": []}
 
     def flush(split: str):
         nonlocal train_idx, valid_idx, train_buf, valid_buf, total_train, total_valid

@@ -5,19 +5,20 @@ Parses GHSA YAML advisories into flattened JSONL rows that align to
 """
 from __future__ import annotations
 
-import json
-import yaml
-from pathlib import Path
-from typing import Dict, Iterable
 import gzip
+import json
+from collections.abc import Iterable
+from pathlib import Path
+
+import yaml
 
 
-def load_yaml(path: Path) -> Dict:
+def load_yaml(path: Path) -> dict:
     with path.open("r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
-def iter_advisories(root: Path) -> Iterable[Dict]:
+def iter_advisories(root: Path) -> Iterable[dict]:
     for yaml_path in root.rglob("*.yml"):
         advisory = load_yaml(yaml_path)
         affects = advisory.get("affected", {}) or {}
@@ -27,14 +28,14 @@ def iter_advisories(root: Path) -> Iterable[Dict]:
             "ecosystem": affects.get("package", {}).get("ecosystem"),
             "severity": (advisory.get("database_specific", {}) or {}).get("severity"),
             "summary": advisory.get("summary"),
-            "vulnerable_ranges": _join_versions((affects.get("ranges") or [])),
-            "patched_versions": _join_versions((affects.get("versions") or [])),
+            "vulnerable_ranges": _join_versions(affects.get("ranges") or []),
+            "patched_versions": _join_versions(affects.get("versions") or []),
             "references": _join_refs(advisory.get("references", [])),
             "cve_ids": ",".join(advisory.get("aliases", []) or []),
         }
 
 
-def _join_versions(entries: Iterable[Dict]) -> str:
+def _join_versions(entries: Iterable[dict]) -> str:
     vals = []
     for entry in entries or []:
         if isinstance(entry, str):
@@ -46,7 +47,7 @@ def _join_versions(entries: Iterable[Dict]) -> str:
     return "\n".join(vals)
 
 
-def _join_refs(refs: Iterable[Dict]) -> str:
+def _join_refs(refs: Iterable[dict]) -> str:
     urls = []
     for ref in refs or []:
         url = ref.get("url") or ""
@@ -55,7 +56,7 @@ def _join_refs(refs: Iterable[Dict]) -> str:
     return "\n".join(sorted(set(urls)))
 
 
-def write_jsonl_gz(path: Path, rows: Iterable[Dict]) -> None:
+def write_jsonl_gz(path: Path, rows: Iterable[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with gzip.open(path, "wt", encoding="utf-8") as f:
         for row in rows:
