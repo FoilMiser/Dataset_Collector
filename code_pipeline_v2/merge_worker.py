@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from datasets import DatasetDict, load_from_disk
 
 VERSION = "2.0"
 
@@ -87,6 +88,25 @@ class ShardingConfig:
     prefix: str
 
 
+@dataclasses.dataclass
+class GreenInput:
+    raw: dict[str, Any]
+    target_id: str
+    pool: str
+    source_path: Path
+    source_kind: str
+
+
+@dataclasses.dataclass
+class GreenSkip:
+    target_id: str
+    pool: str
+    source_path: Path
+    source_kind: str
+    reason: str
+    detail: dict[str, Any] | None = None
+
+
 class Sharder:
     def __init__(self, base_dir: Path, cfg: ShardingConfig):
         self.base_dir = base_dir
@@ -134,25 +154,166 @@ def sharding_cfg(cfg: dict[str, Any]) -> ShardingConfig:
     )
 
 
-def iter_green_records(roots: Roots) -> Iterator[dict[str, Any]]:
+def text_field_candidates(cfg: dict[str, Any]) -> list[str]:
+    g = (cfg.get("globals", {}) or {})
+    canon = (g.get("canonicalize", {}) or {})
+    screen = (g.get("screening", {}) or {})
+    return list(canon.get("text_field_candidates") or screen.get("text_field_candidates") or ["text"])
+
+
+def coerce_text(value: Any) -> str:
+    if isinstance(value, (list, tuple)):
+        return "\n".join(map(str, value))
+    return str(value)
+
+
+def extract_text(row: dict[str, Any], candidates: list[str]) -> str | None:
+    if "text" in row and row["text"]:
+        return coerce_text(row["text"])
+    for key in candidates:
+        if key == "text":
+            continue
+        if key in row and row[key]:
+            return coerce_text(row[key])
+    string_fields = [v for v in row.values() if isinstance(v, str) and v]
+    if string_fields:
+        return "\n".join(string_fields)
+    try:
+        return json.dumps(row, ensure_ascii=False)
+    except Exception:
+        return str(row)
+
+
+def resolve_routing(raw: dict[str, Any]) -> dict[str, Any]:
+    if raw.get("routing") or raw.get("route"):
+        return raw.get("routing") or raw.get("route") or {}
+    routing_keys = sorted(k for k in raw.keys() if k.endswith("_routing"))
+    for key in routing_keys:
+        if raw.get(key):
+            return raw.get(key) or {}
+    return {}
+
+
+def canonicalize_row(raw: dict[str, Any], target_id: str, pool: str, candidates: list[str]) -> tuple[dict[str, Any] | None, str | None]:
+    if not isinstance(raw, dict):
+        return None, "unsupported_row_type"
+    text = extract_text(raw, candidates)
+    if not text:
+        return None, "missing_text"
+    content_hash = ((raw.get("hash") or {}).get("content_sha256") or raw.get("content_sha256"))
+    if not content_hash:
+        content_hash = sha256_text(text)
+    record_id = str(raw.get("record_id") or raw.get("id") or sha256_text(f"{target_id}:{text}"))
+    source = raw.get("source", {}) or {}
+    license_profile = raw.get("license_profile") or source.get("license_profile") or pool
+    license_spdx = raw.get("license_spdx") or source.get("license_spdx")
+    return {
+        "record_id": record_id,
+        "text": text,
+        "source": {
+            "target_id": source.get("target_id", target_id),
+            "origin": source.get("origin", raw.get("origin", "unknown")),
+            "source_url": source.get("source_url") or raw.get("source_url"),
+            "license_spdx": license_spdx,
+            "license_profile": license_profile,
+            "license_evidence": source.get("license_evidence", raw.get("license_evidence")),
+            "retrieved_at_utc": source.get("retrieved_at_utc", raw.get("retrieved_at_utc")),
+        },
+        "routing": resolve_routing(raw),
+        "hash": {"content_sha256": content_hash},
+    }, None
+
+
+def is_hf_dataset_dir(path: Path) -> bool:
+    if not path.is_dir():
+        return False
+    markers = ("dataset_info.json", "state.json", "dataset_dict.json")
+    return any((path / marker).exists() for marker in markers)
+
+
+def iter_hf_dataset_dirs(target_dir: Path) -> list[Path]:
+    candidates: list[Path] = []
+    if is_hf_dataset_dir(target_dir):
+        candidates.append(target_dir)
+    for marker in ("dataset_info.json", "state.json", "dataset_dict.json"):
+        for fp in target_dir.rglob(marker):
+            candidates.append(fp.parent)
+    for pattern in ("hf_dataset", "split_*"):
+        candidates.extend([p for p in target_dir.rglob(pattern) if p.is_dir()])
+    seen: set[Path] = set()
+    ordered: list[Path] = []
+    for path in sorted(candidates):
+        resolved = path.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        ordered.append(path)
+    return ordered
+
+
+def iter_green_records(roots: Roots) -> Iterator[GreenInput | GreenSkip]:
     base = roots.raw_root / "green"
-    for pool_dir in base.iterdir() if base.exists() else []:
+    for pool_dir in sorted(base.iterdir()) if base.exists() else []:
         if not pool_dir.is_dir():
             continue
-        for target_dir in pool_dir.iterdir():
+        for target_dir in sorted(p for p in pool_dir.iterdir() if p.is_dir()):
             if not target_dir.is_dir():
                 continue
-            for fp in target_dir.glob("**/*.jsonl*"):
-                yield from read_jsonl(fp)
+            target_id = target_dir.name
+            jsonl_files = sorted([fp for fp in target_dir.rglob("*.jsonl") if fp.is_file()])
+            jsonl_files.extend(sorted([fp for fp in target_dir.rglob("*.jsonl.gz") if fp.is_file()]))
+            jsonl_set = {fp.resolve() for fp in jsonl_files}
+            for fp in jsonl_files:
+                for raw in read_jsonl(fp):
+                    yield GreenInput(raw, target_id, pool_dir.name, fp, "jsonl")
+
+            hf_dirs = iter_hf_dataset_dirs(target_dir)
+            hf_dir_set = {p.resolve() for p in hf_dirs}
+            for ds_path in hf_dirs:
+                try:
+                    dataset_obj = load_from_disk(str(ds_path))
+                except Exception as exc:
+                    yield GreenSkip(
+                        target_id,
+                        pool_dir.name,
+                        ds_path,
+                        "hf_dataset",
+                        "hf_load_failed",
+                        detail={"error": str(exc)},
+                    )
+                    continue
+                datasets = (
+                    [dataset_obj[name] for name in sorted(dataset_obj.keys())]
+                    if isinstance(dataset_obj, DatasetDict)
+                    else [dataset_obj]
+                )
+                for dataset in datasets:
+                    for raw in dataset:
+                        yield GreenInput(dict(raw), target_id, pool_dir.name, ds_path, "hf_dataset")
+
+            for fp in sorted([p for p in target_dir.rglob("*") if p.is_file()]):
+                resolved = fp.resolve()
+                if resolved in jsonl_set:
+                    continue
+                if any(parent in hf_dir_set for parent in resolved.parents):
+                    continue
+                yield GreenSkip(
+                    target_id,
+                    pool_dir.name,
+                    fp,
+                    "file",
+                    "unsupported_green_format",
+                    detail={"extension": fp.suffix},
+                )
 
 
 def iter_screened_yellow(roots: Roots) -> Iterator[dict[str, Any]]:
     base = roots.screened_root
-    for pool_dir in base.iterdir() if base.exists() else []:
+    for pool_dir in sorted(base.iterdir()) if base.exists() else []:
         shards_dir = pool_dir / "shards"
         if not shards_dir.exists():
             continue
-        for fp in shards_dir.glob("*.jsonl*"):
+        for fp in sorted(shards_dir.glob("*.jsonl*")):
             yield from read_jsonl(fp)
 
 
@@ -174,10 +335,38 @@ def route_pool(record: dict[str, Any]) -> str:
     return LICENSE_POOL_MAP.get(lp, "quarantine")
 
 
+def record_skip(
+    roots: Roots,
+    target_id: str,
+    pool: str,
+    reason: str,
+    source_path: Path | None,
+    source_kind: str,
+    execute: bool,
+    detail: dict[str, Any] | None = None,
+) -> None:
+    if not execute:
+        return
+    row = {
+        "stage": "merge",
+        "target_id": target_id,
+        "license_pool": pool,
+        "reason": reason,
+        "source_kind": source_kind,
+        "seen_at_utc": utc_now(),
+    }
+    if source_path is not None:
+        row["source_path"] = str(source_path)
+    if detail:
+        row.update(detail)
+    append_jsonl(roots.ledger_root / "combined_skipped.jsonl", [row])
+
+
 def merge_records(cfg: dict[str, Any], roots: Roots, execute: bool) -> dict[str, Any]:
     shard_cfg = sharding_cfg(cfg)
     dedupe: set[str] = set()
-    summary = {"written": 0, "deduped": 0, "shards": []}
+    summary = {"written": 0, "deduped": 0, "skipped": 0, "shards": []}
+    candidates = text_field_candidates(cfg)
 
     pool_sharders: dict[str, Sharder] = {}
 
@@ -188,14 +377,27 @@ def merge_records(cfg: dict[str, Any], roots: Roots, execute: bool) -> dict[str,
             ensure_dir(sharder.base_dir)
         return pool_sharders[pool]
 
-    def handle_record(rec: dict[str, Any]) -> None:
+    def handle_record(
+        rec: dict[str, Any],
+        source_kind: str,
+        source_path: Path | None,
+        target_id: str | None = None,
+        pool_hint: str | None = None,
+    ) -> None:
         content_hash = ((rec.get("hash") or {}).get("content_sha256") or rec.get("content_sha256"))
         if not content_hash:
-            payload = rec.get("text") or rec.get("code") or rec.get("content")
-            if payload:
-                content_hash = sha256_text(str(payload))
-                rec.setdefault("hash", {})["content_sha256"] = content_hash
-        if not content_hash:
+            summary["skipped"] += 1
+            resolved_target = target_id or (rec.get("source", {}) or {}).get("target_id") or "unknown"
+            pool = pool_hint or route_pool(rec)
+            record_skip(
+                roots,
+                resolved_target,
+                pool,
+                "missing_content_hash",
+                source_path,
+                source_kind,
+                execute,
+            )
             return
         if content_hash in dedupe:
             summary["deduped"] += 1
@@ -218,10 +420,37 @@ def merge_records(cfg: dict[str, Any], roots: Roots, execute: bool) -> dict[str,
             }])
         summary["written"] += 1
 
-    for rec in iter_green_records(roots):
-        handle_record(rec)
+    for item in iter_green_records(roots):
+        if isinstance(item, GreenSkip):
+            summary["skipped"] += 1
+            record_skip(
+                roots,
+                item.target_id,
+                item.pool,
+                item.reason,
+                item.source_path,
+                item.source_kind,
+                execute,
+                detail=item.detail,
+            )
+            continue
+        canonical, reason = canonicalize_row(item.raw, item.target_id, item.pool, candidates)
+        if not canonical:
+            summary["skipped"] += 1
+            record_skip(
+                roots,
+                item.target_id,
+                item.pool,
+                reason or "canonicalize_failed",
+                item.source_path,
+                item.source_kind,
+                execute,
+            )
+            continue
+        handle_record(canonical, item.source_kind, item.source_path, item.target_id, item.pool)
     for rec in iter_screened_yellow(roots):
-        handle_record(rec)
+        target_id = (rec.get("source", {}) or {}).get("target_id") or "unknown"
+        handle_record(rec, "screened_yellow", None, target_id)
 
     if execute:
         for sharder in pool_sharders.values():
