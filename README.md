@@ -160,8 +160,10 @@ Within each `*_pipeline_v2` directory, you should expect:
 *_pipeline_v2/
   run_pipeline.sh
   requirements.txt
-  src/
-  configs/
+  pipeline_driver.py
+  acquire_worker.py
+  targets_*.yaml
+  license_map.yaml
 ```
 
 Two global configuration entries determine where queues and catalogs are stored:
@@ -169,7 +171,7 @@ Two global configuration entries determine where queues and catalogs are stored:
 - `globals.queues_root`: root path for pipeline queues (intermediate work items).
 - `globals.catalogs_root`: root path for pipeline catalogs.
 
-Update these in the pipeline’s configuration (commonly under `configs/`) to control where outputs are written.
+Update these in the pipeline’s configuration files (for example `targets_*.yaml` in each pipeline directory) to control where outputs are written.
 
 ## Prerequisites & execution notes
 
@@ -199,16 +201,24 @@ uv pip compile requirements-dev.in -o requirements-dev.lock --generate-hashes
 Run the preflight checker to validate pipeline map entries, verify target YAML paths, and detect enabled targets with missing or unsupported download strategies. It also warns about missing optional dependencies or external tools needed by enabled strategies.
 
 ```bash
-python tools/preflight.py
+python -m tools.preflight
 ```
 
 To point at a custom pipeline map location:
 
 ```bash
-python tools/preflight.py --pipeline-map tools/pipeline_map.yaml
+python -m tools.preflight --pipeline-map tools/pipeline_map.yaml
 ```
 
 For local runs, copy `tools/pipeline_map.sample.yaml` to something like `tools/pipeline_map.local.yaml`, set `destination_root` to your dataset folder, and pass it via `--pipeline-map` (or use `--dest-root` when running `tools/build_natural_corpus.py`). This keeps user-specific paths out of version control.
+
+## Repo validation
+
+Validate all enabled targets across pipeline configs and emit a JSON summary:
+
+```bash
+python -m tools.validate_repo --output tools/validate_report.json
+```
 
 ## Cleaning local artifacts
 

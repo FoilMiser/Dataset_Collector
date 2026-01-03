@@ -15,7 +15,6 @@ with a single canonical description.
 ## Related docs
 
 - Output structure: `docs/output_contract.md`
-- Repo-wide maintenance plan: `dataset_collector_repo_fix_plan_CLEAR.md`
 
 ## Notes
 
