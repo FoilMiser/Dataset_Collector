@@ -10,12 +10,7 @@ from typing import Any
 
 import yaml
 
-EXTERNAL_TOOL_STRATEGIES = {
-    "git": "git",
-    "torrent": "aria2c",
-    "s3_sync": "aws",
-    "aws_requester_pays": "aws",
-}
+from tools.strategy_registry import get_external_tools, get_strategy_spec
 
 TOOL_INSTALL_HINTS = {
     "git": "Install Git for Windows: https://git-scm.com/download/win",
@@ -56,6 +51,7 @@ def run_preflight(repo_root: Path, pipeline_map_path: Path, strict: bool = False
     warnings: list[str] = []
     strategies_in_use: set[str] = set()
     strategy_targets: dict[str, list[str]] = {}
+    registry_misses: dict[str, list[str]] = {}
 
     for pipeline_name, pipeline_entry in pipelines_cfg.items():
         pipeline_dir = repo_root / pipeline_name
@@ -100,18 +96,28 @@ def run_preflight(repo_root: Path, pipeline_map_path: Path, strict: bool = False
                     f"{pipeline_name}:{target_id} uses unsupported strategy '{strategy}'"
                 )
                 continue
+            if get_strategy_spec(strategy) is None:
+                registry_misses.setdefault(strategy, []).append(f"{pipeline_name}:{target_id}")
             strategies_in_use.add(strategy)
             strategy_targets.setdefault(strategy, []).append(f"{pipeline_name}:{target_id}")
 
-    for strategy, tool in EXTERNAL_TOOL_STRATEGIES.items():
-        if strategy in strategies_in_use and shutil.which(tool) is None:
-            targets = ", ".join(sorted(strategy_targets.get(strategy, [])))
-            hint = TOOL_INSTALL_HINTS.get(tool)
-            warnings.append(
-                f"Missing external tool '{tool}' required by strategy '{strategy}'."
-                + (f" Targets: {targets}." if targets else "")
-                + (f" {hint}" if hint else "")
-            )
+    for strategy in sorted(strategies_in_use):
+        for tool in get_external_tools(strategy):
+            if shutil.which(tool) is None:
+                targets = ", ".join(sorted(strategy_targets.get(strategy, [])))
+                hint = TOOL_INSTALL_HINTS.get(tool)
+                warnings.append(
+                    f"Missing external tool '{tool}' required by strategy '{strategy}'."
+                    + (f" Targets: {targets}." if targets else "")
+                    + (f" {hint}" if hint else "")
+                )
+
+    for strategy, targets in sorted(registry_misses.items()):
+        warnings.append(
+            "Strategy registry missing entry for "
+            f"'{strategy}'. Add it to tools/strategy_registry.py. "
+            f"Targets: {', '.join(sorted(targets))}."
+        )
 
     if warnings:
         print("Preflight warnings:")

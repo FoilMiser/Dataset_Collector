@@ -20,6 +20,12 @@ from typing import Any
 
 import yaml
 
+from tools.strategy_registry import (
+    get_strategy_requirement_errors,
+    get_strategy_spec,
+    iter_registry_strategies,
+)
+
 EXPECTED_TARGETS_SCHEMA = "0.8"
 
 
@@ -95,26 +101,7 @@ def _collect_updated_utc_warnings(path: Path) -> list[dict[str, Any]]:
 
 
 def get_download_requirement_errors(download: dict[str, Any], strategy: str) -> list[str]:
-    errors = []
-    strategy = (strategy or "").lower()
-
-    if strategy in {"http", "ftp"}:
-        if not (download.get("url") or download.get("urls") or download.get("base_url")):
-            errors.append("download.url(s) or base_url required for http/ftp strategy")
-    elif strategy == "git":
-        if not (download.get("repo") or download.get("repo_url") or download.get("url")):
-            errors.append("download.repo/repo_url/url required for git strategy")
-    elif strategy == "huggingface_datasets":
-        if not download.get("dataset_id"):
-            errors.append("download.dataset_id required for huggingface_datasets strategy")
-    elif strategy == "zenodo":
-        if not (download.get("record_id") or download.get("doi") or download.get("url")):
-            errors.append("download.record_id/doi/url required for zenodo strategy")
-    elif strategy == "dataverse":
-        if not (download.get("persistent_id") or download.get("url")):
-            errors.append("download.persistent_id/url required for dataverse strategy")
-
-    return errors
+    return get_strategy_requirement_errors(download, strategy)
 
 
 def validate_targets_file(path: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -167,6 +154,23 @@ def validate_targets_file(path: Path) -> tuple[list[dict[str, Any]], list[dict[s
 
         download = normalize_download(target.get("download", {}) or {})
         strategy = str(download.get("strategy", ""))
+        if not strategy:
+            errors.append({
+                "type": "missing_download_strategy",
+                "targets_path": str(path),
+                "target_id": tid,
+                "message": "download.strategy is required for enabled targets",
+            })
+            continue
+        if get_strategy_spec(strategy) is None:
+            errors.append({
+                "type": "unknown_download_strategy",
+                "targets_path": str(path),
+                "target_id": tid,
+                "strategy": strategy,
+                "known_strategies": sorted(iter_registry_strategies()),
+            })
+            continue
         for msg in get_download_requirement_errors(download, strategy):
             errors.append({
                 "type": "missing_download_requirement",
