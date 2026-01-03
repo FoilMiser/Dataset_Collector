@@ -1,4 +1,4 @@
-destination_root: "YOUR_DATASET_ROOT_HERE" # Sample map. Copy to tools/pipeline_map.local.yaml and set destination_root.
+destination_root: "./_dataset_runs" # Default safe destination; override via --dest-root or pipeline_map.local.yaml.
 pipelines:
   math_pipeline_v2:
     dest_folder: "math"
