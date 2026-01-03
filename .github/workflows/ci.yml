@@ -38,10 +38,10 @@ jobs:
           pytest -q
       - name: Validate repo
         run: |
-          python tools/validate_repo.py --root .
+          python -m tools.validate_repo --root .
       - name: Preflight
         run: |
-          python tools/preflight.py --repo-root .
+          python -m tools.preflight --repo-root .
 
   validate-lock:
     runs-on: ${{ matrix.os }}
@@ -76,7 +76,7 @@ jobs:
           pytest -q
       - name: Validate repo
         run: |
-          python tools/validate_repo.py --root .
+          python -m tools.validate_repo --root .
       - name: Preflight
         run: |
-          python tools/preflight.py --repo-root .
+          python -m tools.preflight --repo-root .

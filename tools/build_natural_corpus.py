@@ -25,6 +25,7 @@ DEFAULT_STAGES = [
     "merge",
     "catalog",
 ]
+PIPELINE_MAP_PLACEHOLDER = "YOUR_DATASET_ROOT_HERE"
 MODE_STAGES = {
     "collect": ["classify", "acquire_green", "acquire_yellow"],
     "compile": ["screen_yellow", "merge", "catalog"],
@@ -48,6 +49,15 @@ def _normalize_stages(stages: Sequence[str]) -> list[str]:
 
 def _load_pipeline_map(path: Path) -> dict[str, object]:
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+
+
+def _validate_pipeline_map_destination(dest_root: str | None, pipeline_map_path: Path) -> None:
+    if not dest_root or dest_root == PIPELINE_MAP_PLACEHOLDER:
+        raise SystemExit(
+            "Pipeline map destination_root is not configured. "
+            "Set destination_root in tools/pipeline_map.local.yaml or pass --dest-root."
+            f" (Current map: {pipeline_map_path})"
+        )
 
 
 def _dataset_root_paths(dest_root: str, dest_folder: str) -> tuple[Path, PurePath]:
@@ -178,8 +188,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         sys.exit(1)
     pipeline_map = _load_pipeline_map(pipeline_map_path)
     dest_root = args.dest_root or pipeline_map.get("destination_root")
-    if not dest_root:
-        raise SystemExit("Destination root must be provided via --dest-root or pipeline_map.")
+    _validate_pipeline_map_destination(dest_root, pipeline_map_path)
 
     pipelines_cfg = pipeline_map.get("pipelines", {}) or {}
     selected_pipelines = _normalize_stages(args.pipelines)
