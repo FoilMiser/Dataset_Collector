@@ -122,6 +122,8 @@ targets:
     download:
       strategy: "huggingface_datasets"
       dataset_id: "common-pile/usgpo_filtered"
+    canonicalize:
+      text_field_candidates: ["text", "content", "body", "document", "plain_text"]
     output:
       pool: "permissive"
       formats: ["hf_disk"]
@@ -146,6 +148,8 @@ targets:
     download:
       strategy: "huggingface_datasets"
       dataset_id: "common-pile/regulations_filtered"
+    canonicalize:
+      text_field_candidates: ["text", "content", "body", "document", "comment_text"]
     output:
       pool: "permissive"
       formats: ["hf_disk"]
@@ -172,6 +176,8 @@ targets:
     download:
       strategy: "huggingface_datasets"
       dataset_id: "common-pile/caselaw_access_project_filtered"
+    canonicalize:
+      text_field_candidates: ["text", "content", "body", "opinion", "case_text"]
     output:
       pool: "permissive"
       formats: ["hf_disk"]
