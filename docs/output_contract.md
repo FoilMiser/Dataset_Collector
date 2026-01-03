@@ -32,6 +32,15 @@ single domain folder must include the following structure:
   repo; optional fields like `difficulty_level` may appear in queue rows for downstream use.
   Downstream workflows should consume `combined/<pool>/shards/` plus manifests/ledgers as needed.
 
+## Merge deduplication strategy
+
+The merge worker uses a SQLite-backed index (`_ledger/combined_dedupe.sqlite`) keyed by
+`content_sha256` to enforce deterministic, first-seen wins deduplication without keeping all
+hashes in memory. Tradeoffs: this keeps memory bounded and determinism stable across runs, but
+adds local disk I/O and uses a single-writer index. Alternatives like hash-bucket partitioning
+reduce DB overhead but create many intermediate files, while Bloom filter + verify can be faster
+but introduces probabilistic false positives and requires a second pass to confirm duplicates.
+
 ## Ledger and manifests
 
 - `_ledger/` tracks acquisition events and audit metadata.
