@@ -26,6 +26,8 @@ from typing import Any
 
 import yaml
 
+from datasets import Dataset, DatasetDict, load_from_disk
+
 VERSION = "2.0"
 PITCH_SAMPLE_LIMIT = 25
 PITCH_TEXT_LIMIT = 400
@@ -452,144 +454,115 @@ def process_target(cfg: dict[str, Any], roots: Roots, queue_row: dict[str, Any],
         if not raw_dir.exists():
             continue
         sharder = Sharder(roots.screened_root / pool / "shards", shard_cfg)
-        for file_path in iter_raw_files(raw_dir):
-            source_file = str(file_path)
-            file_suffix = "".join(file_path.suffixes)
-            if file_suffix.endswith(".txt") or file_suffix.endswith(".txt.gz"):
-                raw_text = extract_text_from_file(file_path)
-                if raw_text is None:
-                    pitched += 1
-                    if execute:
-                        record_pitch(
-                            roots,
-                            pitch_counts,
-                            target_id,
-                            "unreadable_text",
-                            sample_extra={"file": source_file},
-                        )
-                    continue
-                normalized = normalize_text(raw_text, text_cfg.normalize_whitespace)
-                chunks = chunk_text(normalized, text_cfg.max_chars, text_cfg.min_chars)
-                if not chunks:
-                    pitched += 1
-                    if execute:
-                        record_pitch(
-                            roots,
-                            pitch_counts,
-                            target_id,
-                            "no_text",
-                            sample_extra={"file": source_file},
-                        )
-                    continue
-                for chunk in chunks:
-                    if contains_deny(chunk, screen_cfg.deny_phrases):
-                        pitched += 1
-                        if execute:
-                            record_pitch(
-                                roots,
-                                pitch_counts,
-                                target_id,
-                                "deny_phrase",
-                                text=chunk,
-                                sample_extra={"file": source_file},
-                            )
-                        continue
-                    if len(chunk) < screen_cfg.min_chars or len(chunk) > screen_cfg.max_chars:
-                        pitched += 1
-                        if execute:
-                            record_pitch(
-                                roots,
-                                pitch_counts,
-                                target_id,
-                                "length_bounds",
-                                text=chunk,
-                                sample_extra={"file": source_file},
-                            )
-                        continue
-                    license_profile = str(queue_row.get("license_profile") or pool or "quarantine")
-                    rec = canonical_record({}, chunk, target_id, license_profile, None, base_routing, source_file)
-                    passed += 1
-                    if execute:
-                        current_shard = str(sharder._next_path())
-                        path = sharder.add(rec)
-                        if path:
-                            current_shard = str(path)
-                            shard_paths.append(current_shard)
-                        ledger_row = {
-                            "stage": "yellow_screen",
-                            "target_id": target_id,
-                            "record_id": rec["record_id"],
-                            "content_sha256": rec["hash"]["content_sha256"],
-                            "decision": "pass",
-                            "output_shard": current_shard,
-                            "seen_at_utc": utc_now(),
-                        }
-                        append_jsonl(roots.ledger_root / "yellow_passed.jsonl", [ledger_row])
-                continue
 
-            for raw in extract_records_from_file(file_path):
-                text = find_text(raw, screen_cfg.text_fields)
-                if text:
-                    text = normalize_text(text, text_cfg.normalize_whitespace)
-                if not text:
-                    pitched += 1
-                    if execute:
-                        record_pitch(roots, pitch_counts, target_id, "no_text", raw=raw)
-                    continue
+        def handle_raw(raw: dict[str, Any]) -> None:
+            nonlocal passed, pitched
+            routing = coalesce_routing(raw, queue_routing, target_routing)
+            text = extract_text(raw, screen_cfg.text_fields)
+            lic = find_license(raw, screen_cfg.license_fields)
+            license_spdx = lic or queue_row.get("resolved_spdx")
+
+            if text:
                 if len(text) < screen_cfg.min_chars or len(text) > screen_cfg.max_chars:
                     pitched += 1
                     if execute:
                         record_pitch(roots, pitch_counts, target_id, "length_bounds", raw=raw, text=text)
-                    continue
-                if not detect_language_match(raw, text_cfg.force_language):
-                    pitched += 1
-                    if execute:
-                        record_pitch(roots, pitch_counts, target_id, "language_mismatch", raw=raw)
-                    continue
-                lic = find_license(raw, screen_cfg.license_fields)
-                if screen_cfg.require_record_license and not lic:
-                    pitched += 1
-                    if execute:
-                        record_pitch(roots, pitch_counts, target_id, "missing_record_license", raw=raw)
-                    continue
-                if lic and screen_cfg.allow_spdx and lic not in screen_cfg.allow_spdx:
-                    pitched += 1
-                    if execute:
-                        record_pitch(
-                            roots,
-                            pitch_counts,
-                            target_id,
-                            "license_not_allowlisted",
-                            raw=raw,
-                            extra={"license": lic},
-                            sample_extra={"license": lic},
-                        )
-                    continue
+                    return
                 if contains_deny(text, screen_cfg.deny_phrases):
                     pitched += 1
                     if execute:
                         record_pitch(roots, pitch_counts, target_id, "deny_phrase", raw=raw, text=text)
-                    continue
-                license_profile = str(raw.get("license_profile") or queue_row.get("license_profile") or pool or "quarantine")
-                routing = raw.get("routing") or raw.get("nlp_routing") or raw.get("route") or base_routing
-                rec = canonical_record(raw, text, target_id, license_profile, lic, routing, source_file)
-                passed += 1
+                    return
+
+            if screen_cfg.require_record_license and not license_spdx:
+                pitched += 1
                 if execute:
-                    current_shard = str(sharder._next_path())
-                    path = sharder.add(rec)
-                    if path:
-                        current_shard = str(path)
-                        shard_paths.append(current_shard)
-                    ledger_row = {
-                        "stage": "yellow_screen",
-                        "target_id": target_id,
-                        "record_id": rec["record_id"],
-                        "content_sha256": rec["hash"]["content_sha256"],
-                        "decision": "pass",
-                        "output_shard": current_shard,
-                        "seen_at_utc": utc_now(),
-                    }
-                    append_jsonl(roots.ledger_root / "yellow_passed.jsonl", [ledger_row])
+                    record_pitch(roots, pitch_counts, target_id, "missing_record_license", raw=raw)
+                return
+            if license_spdx and screen_cfg.allow_spdx and license_spdx not in screen_cfg.allow_spdx:
+                pitched += 1
+                if execute:
+                    record_pitch(
+                        roots,
+                        pitch_counts,
+                        target_id,
+                        "license_not_allowlisted",
+                        raw=raw,
+                        extra={"license": license_spdx},
+                        sample_extra={"license": license_spdx},
+                    )
+                return
+
+            payload: dict[str, Any] | None = None
+            if adapter_name and adapter_name in ADAPTERS:
+                payload = ADAPTERS[adapter_name](raw, routing)
+            elif text:
+                payload = {"text": text, "routing": routing}
+                record_id = raw.get("record_id") or raw.get("id")
+                if record_id:
+                    payload["record_id"] = record_id
+
+            if not payload:
+                pitched += 1
+                if execute:
+                    record_pitch(
+                        roots,
+                        pitch_counts,
+                        target_id,
+                        "adapter_failed",
+                        raw=raw,
+                        extra={"adapter": adapter_name},
+                        sample_extra={"adapter": adapter_name},
+                    )
+                return
+
+            license_profile = str(raw.get("license_profile") or queue_row.get("license_profile") or pool or "quarantine")
+            rec = canonical_record(raw, payload, routing, target_id, license_profile, license_spdx, text=text)
+            if "hash" not in rec or not rec["hash"].get("content_sha256"):
+                rec["hash"] = {"content_sha256": sha256_obj(rec)}
+            passed += 1
+            if execute:
+                current_shard = str(sharder._next_path())
+                path = sharder.add(rec)
+                if path:
+                    current_shard = str(path)
+                    shard_paths.append(current_shard)
+                ledger_row = {
+                    "stage": "yellow_screen",
+                    "target_id": target_id,
+                    "record_id": rec["record_id"],
+                    "content_sha256": rec["hash"]["content_sha256"],
+                    "decision": "pass",
+                    "adapter": adapter_name,
+                    "routing": rec.get("routing"),
+                    "output_shard": current_shard,
+                    "seen_at_utc": utc_now(),
+                }
+                append_jsonl(roots.ledger_root / "yellow_passed.jsonl", [ledger_row])
+
+        for file_path in iter_raw_files(raw_dir):
+            for raw in read_jsonl(file_path):
+                handle_raw(raw)
+
+        for ds_path in iter_hf_dataset_dirs(raw_dir):
+            try:
+                dataset_obj = load_from_disk(str(ds_path))
+            except Exception as exc:
+                pitched += 1
+                if execute:
+                    record_pitch(
+                        roots,
+                        pitch_counts,
+                        target_id,
+                        "hf_load_failed",
+                        extra={"path": str(ds_path), "error": str(exc)},
+                        sample_extra={"path": str(ds_path)},
+                    )
+                continue
+            datasets = list(dataset_obj.values()) if isinstance(dataset_obj, DatasetDict) else [dataset_obj]
+            for dataset in datasets:
+                for raw in dataset:
+                    handle_raw(dict(raw))
 
         if execute:
             flushed = sharder.flush()

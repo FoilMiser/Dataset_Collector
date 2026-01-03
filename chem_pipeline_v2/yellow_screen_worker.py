@@ -26,6 +26,8 @@ from typing import Any
 
 import yaml
 
+from datasets import Dataset, DatasetDict, load_from_disk
+
 VERSION = "2.0"
 PITCH_SAMPLE_LIMIT = 25
 PITCH_TEXT_LIMIT = 400
@@ -216,6 +218,19 @@ def iter_raw_files(raw_dir: Path) -> Iterator[Path]:
         yield from raw_dir.glob(ext)
 
 
+def iter_hf_dataset_dirs(raw_dir: Path) -> Iterator[Path]:
+    candidates = []
+    for pattern in ("hf_dataset", "split_*"):
+        candidates.extend([p for p in raw_dir.rglob(pattern) if p.is_dir()])
+    seen = set()
+    for path in sorted(candidates):
+        resolved = path.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        yield path
+
+
 def iter_text_files(raw_dir: Path) -> Iterator[Path]:
     for ext in ("*.txt", "*.txt.gz"):
         yield from raw_dir.glob(ext)
@@ -397,6 +412,25 @@ def find_text(row: dict[str, Any], candidates: list[str]) -> str | None:
     return None
 
 
+def extract_text(row: dict[str, Any], candidates: list[str]) -> str | None:
+    if row.get("text"):
+        val = row["text"]
+        if isinstance(val, (list, tuple)):
+            val = "\n".join(map(str, val))
+        return str(val)
+    remaining = [c for c in candidates if c != "text"]
+    text = find_text(row, remaining)
+    if text:
+        return text
+    string_fields = [str(v) for v in row.values() if isinstance(v, str) and v]
+    if string_fields:
+        return "\n".join(string_fields)
+    try:
+        return json.dumps(row, ensure_ascii=False)
+    except Exception:
+        return str(row)
+
+
 def find_license(row: dict[str, Any], candidates: list[str]) -> str | None:
     for k in candidates:
         if k in row and row[k]:
@@ -484,40 +518,58 @@ def screen_jsonl_mode(ctx: ScreenContext) -> dict[str, Any]:
         if not raw_dir.exists():
             continue
         sharder = Sharder(ctx.roots.screened_root / pool / "shards", ctx.shard_cfg)
+
+        def handle_raw(raw: dict[str, Any]) -> None:
+            nonlocal passed, pitched
+            text = extract_text(raw, ctx.screen_cfg.text_fields)
+            if not text:
+                pitched += 1
+                log_pitch(ctx, "no_text", raw.get("id"))
+                return
+            if len(text) < ctx.screen_cfg.min_chars or len(text) > ctx.screen_cfg.max_chars:
+                pitched += 1
+                log_pitch(ctx, "length_bounds", raw.get("id"), text=text)
+                return
+            lic = find_license(raw, ctx.screen_cfg.license_fields)
+            if ctx.screen_cfg.require_record_license and not lic:
+                pitched += 1
+                log_pitch(ctx, "missing_record_license", raw.get("id"))
+                return
+            if lic and ctx.screen_cfg.allow_spdx and lic not in ctx.screen_cfg.allow_spdx:
+                pitched += 1
+                log_pitch(ctx, "license_not_allowlisted", raw.get("id"), sample_extra={"license": lic})
+                return
+            if contains_deny(text, ctx.screen_cfg.deny_phrases):
+                pitched += 1
+                log_pitch(ctx, "deny_phrase", raw.get("id"), text=text)
+                return
+            license_profile = str(raw.get("license_profile") or ctx.queue_row.get("license_profile") or pool or "quarantine")
+            routing = resolve_routing(raw, ctx.queue_row)
+            rec = canonical_record(raw, text, target_id, license_profile, lic, routing)
+            passed += 1
+            if ctx.execute:
+                current_shard = sharder._next_path()
+                path = sharder.add(rec)
+                log_pass(ctx, rec, path or current_shard)
+                if path:
+                    shard_paths.append(str(path))
+
         for file_path in iter_raw_files(raw_dir):
             for raw in read_jsonl(file_path):
-                text = find_text(raw, ctx.screen_cfg.text_fields)
-                if not text:
-                    pitched += 1
-                    log_pitch(ctx, "no_text", raw.get("id"))
-                    continue
-                if len(text) < ctx.screen_cfg.min_chars or len(text) > ctx.screen_cfg.max_chars:
-                    pitched += 1
-                    log_pitch(ctx, "length_bounds", raw.get("id"), text=text)
-                    continue
-                lic = find_license(raw, ctx.screen_cfg.license_fields)
-                if ctx.screen_cfg.require_record_license and not lic:
-                    pitched += 1
-                    log_pitch(ctx, "missing_record_license", raw.get("id"))
-                    continue
-                if lic and ctx.screen_cfg.allow_spdx and lic not in ctx.screen_cfg.allow_spdx:
-                    pitched += 1
-                    log_pitch(ctx, "license_not_allowlisted", raw.get("id"), sample_extra={"license": lic})
-                    continue
-                if contains_deny(text, ctx.screen_cfg.deny_phrases):
-                    pitched += 1
-                    log_pitch(ctx, "deny_phrase", raw.get("id"), text=text)
-                    continue
-                license_profile = str(raw.get("license_profile") or ctx.queue_row.get("license_profile") or pool or "quarantine")
-                routing = resolve_routing(raw, ctx.queue_row)
-                rec = canonical_record(raw, text, target_id, license_profile, lic, routing)
-                passed += 1
-                if ctx.execute:
-                    current_shard = sharder._next_path()
-                    path = sharder.add(rec)
-                    log_pass(ctx, rec, path or current_shard)
-                    if path:
-                        shard_paths.append(str(path))
+                handle_raw(raw)
+
+        for ds_path in iter_hf_dataset_dirs(raw_dir):
+            try:
+                dataset_obj = load_from_disk(str(ds_path))
+            except Exception as exc:
+                pitched += 1
+                log_pitch(ctx, "hf_load_failed", sample_extra={"path": str(ds_path), "error": str(exc)})
+                continue
+            datasets = list(dataset_obj.values()) if isinstance(dataset_obj, DatasetDict) else [dataset_obj]
+            for dataset in datasets:
+                for raw in dataset:
+                    handle_raw(dict(raw))
+
         if ctx.execute:
             flush_sharder(sharder, shard_paths)
 
@@ -619,7 +671,7 @@ def screen_pmc_oa(ctx: ScreenContext) -> dict[str, Any]:
         if file_path.suffix in {".jsonl", ".gz"}:
             iterator = read_jsonl(file_path)
             for raw in iterator:
-                text = find_text(raw, ctx.screen_cfg.text_fields)
+                text = extract_text(raw, ctx.screen_cfg.text_fields)
                 if not text:
                     pitched += 1
                     log_pitch(ctx, "no_text", raw.get("id"))
