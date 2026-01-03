@@ -10,13 +10,13 @@ from typing import Any
 
 import yaml
 
-EXTERNAL_TOOL_STRATEGIES = {
-    "git": "git",
-    "torrent": "aria2c",
-    "s3_sync": "aws",
-    "aws_requester_pays": "aws",
-}
+from tools.strategy_registry import get_external_tools_for_strategy
 
+PLACEHOLDER_VALUES = {
+    "YOUR_DATASET_ROOT_HERE",
+    "REPLACE_ME",
+    "TODO",
+}
 TOOL_INSTALL_HINTS = {
     "git": "Install Git for Windows: https://git-scm.com/download/win",
     "aria2c": "Install aria2: https://aria2.github.io/",
@@ -26,6 +26,14 @@ TOOL_INSTALL_HINTS = {
 
 def _load_yaml(path: Path) -> dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+
+
+def resolve_pipeline_map_path(repo_root: Path, pipeline_map_path: Path) -> Path:
+    default_map = repo_root / "tools" / "pipeline_map.yaml"
+    local_map = repo_root / "tools" / "pipeline_map.local.yaml"
+    if pipeline_map_path == default_map and local_map.exists():
+        return local_map
+    return pipeline_map_path
 
 
 def _load_strategy_handlers(acquire_worker_path: Path) -> set[str]:
@@ -56,6 +64,13 @@ def run_preflight(repo_root: Path, pipeline_map_path: Path, strict: bool = False
     warnings: list[str] = []
     strategies_in_use: set[str] = set()
     strategy_targets: dict[str, list[str]] = {}
+
+    dest_root = str(pipeline_map.get("destination_root", "")).strip()
+    if not dest_root or dest_root in PLACEHOLDER_VALUES:
+        errors.append(
+            "Pipeline map destination_root is missing or still set to a placeholder. "
+            "Copy tools/pipeline_map.sample.yaml to tools/pipeline_map.local.yaml and update destination_root."
+        )
 
     for pipeline_name, pipeline_entry in pipelines_cfg.items():
         pipeline_dir = repo_root / pipeline_name
@@ -103,15 +118,23 @@ def run_preflight(repo_root: Path, pipeline_map_path: Path, strict: bool = False
             strategies_in_use.add(strategy)
             strategy_targets.setdefault(strategy, []).append(f"{pipeline_name}:{target_id}")
 
-    for strategy, tool in EXTERNAL_TOOL_STRATEGIES.items():
-        if strategy in strategies_in_use and shutil.which(tool) is None:
-            targets = ", ".join(sorted(strategy_targets.get(strategy, [])))
-            hint = TOOL_INSTALL_HINTS.get(tool)
-            warnings.append(
-                f"Missing external tool '{tool}' required by strategy '{strategy}'."
-                + (f" Targets: {targets}." if targets else "")
-                + (f" {hint}" if hint else "")
-            )
+    missing_tools: dict[str, list[str]] = {}
+    for strategy in strategies_in_use:
+        for tool in get_external_tools_for_strategy(strategy):
+            if shutil.which(tool) is None:
+                missing_tools.setdefault(tool, []).append(strategy)
+
+    for tool, strategies in sorted(missing_tools.items()):
+        targets = []
+        for strategy in strategies:
+            targets.extend(strategy_targets.get(strategy, []))
+        targets_str = ", ".join(sorted(targets))
+        hint = TOOL_INSTALL_HINTS.get(tool)
+        warnings.append(
+            f"Missing external tool '{tool}' required by strategy '{', '.join(strategies)}'."
+            + (f" Targets: {targets_str}." if targets_str else "")
+            + (f" {hint}" if hint else "")
+        )
 
     if warnings:
         print("Preflight warnings:")
@@ -142,7 +165,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     pipeline_map_path = Path(args.pipeline_map).expanduser()
     if not pipeline_map_path.is_absolute():
         pipeline_map_path = repo_root / pipeline_map_path
-    pipeline_map_path = pipeline_map_path.resolve()
+    pipeline_map_path = resolve_pipeline_map_path(repo_root, pipeline_map_path.resolve())
 
     return run_preflight(repo_root=repo_root, pipeline_map_path=pipeline_map_path, strict=args.strict)
 

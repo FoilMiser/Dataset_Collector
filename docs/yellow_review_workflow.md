@@ -47,7 +47,7 @@ Each YELLOW target MUST have a manifest directory and review signoff artifacts. 
 
 ## Where review queues live
 
-Each pipeline writes queue files to a per-pipeline queues root, configured via `globals.queues_root` in the targets YAML. The default layout is:
+Each pipeline writes queue files to a per-pipeline queues root, configured via `globals.queues_root` in the targets YAML. When you run `tools/build_natural_corpus.py`, it patches targets so queues live under `<dataset_root>/_queues`. The default layout is:
 
 ```
 <queues_root>/_queues/

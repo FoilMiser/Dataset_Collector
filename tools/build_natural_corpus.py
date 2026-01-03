@@ -15,7 +15,7 @@ if __package__ in (None, ""):
 
 from tools.init_layout import init_layout
 from tools.patch_targets import patch_targets_yaml
-from tools.preflight import run_preflight
+from tools.preflight import resolve_pipeline_map_path, run_preflight
 
 DEFAULT_STAGES = [
     "classify",
@@ -173,7 +173,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     pipeline_map_path = Path(args.pipeline_map).expanduser()
     if not pipeline_map_path.is_absolute():
         pipeline_map_path = repo_root / pipeline_map_path
-    pipeline_map_path = pipeline_map_path.resolve()
+    pipeline_map_path = resolve_pipeline_map_path(repo_root, pipeline_map_path.resolve())
     if run_preflight(repo_root=repo_root, pipeline_map_path=pipeline_map_path) != 0:
         sys.exit(1)
     pipeline_map = _load_pipeline_map(pipeline_map_path)
