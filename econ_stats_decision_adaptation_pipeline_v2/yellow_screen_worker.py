@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from datasets import DatasetDict, load_from_disk
 
 VERSION = "2.0"
 PITCH_SAMPLE_LIMIT = 25
@@ -208,6 +209,26 @@ def find_text(row: dict[str, Any], candidates: list[str]) -> str | None:
             return str(val)
     return None
 
+def extract_text(row: dict[str, Any], candidates: list[str]) -> str | None:
+    if row.get("text"):
+        val = row["text"]
+        if isinstance(val, (list, tuple)):
+            val = "\n".join(map(str, val))
+        return str(val)
+    remaining = [c for c in candidates if c != "text"]
+    text = find_text(row, remaining)
+    if text:
+        return text
+    string_fields = [str(v) for v in row.values() if isinstance(v, str) and v]
+    if string_fields:
+        return "\n".join(string_fields)
+    try:
+        return json.dumps(row, ensure_ascii=False)
+    except Exception:
+        return str(row)
+
+
+
 
 def find_license(row: dict[str, Any], candidates: list[str]) -> str | None:
     for k in candidates:
@@ -287,6 +308,20 @@ def iter_raw_files(raw_dir: Path) -> Iterator[Path]:
     for fp in raw_dir.rglob("*"):
         if fp.is_file() and fp.name not in skip_names:
             yield fp
+
+
+def iter_hf_dataset_dirs(raw_dir: Path) -> Iterator[Path]:
+    candidates = []
+    for pattern in ("hf_dataset", "split_*"):
+        candidates.extend([p for p in raw_dir.rglob(pattern) if p.is_dir()])
+    seen = set()
+    for path in sorted(candidates):
+        resolved = path.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        yield path
+
 
 
 def routing_from_queue(queue_row: dict[str, Any]) -> dict[str, Any]:
@@ -537,11 +572,11 @@ def process_target(cfg: dict[str, Any], roots: Roots, queue_row: dict[str, Any],
                         break
                     raw = item if isinstance(item, dict) else {"text": str(item)}
                     prepared = prepare_record(raw, artifact_path)
-                    text = find_text(prepared, screen_cfg.text_fields) or json.dumps(item, ensure_ascii=False)
+                    text = extract_text(prepared, screen_cfg.text_fields) or json.dumps(item, ensure_ascii=False)
                     validate_and_add(prepared, text)
             elif isinstance(data, dict):
                 prepared = prepare_record(data, artifact_path)
-                text = find_text(prepared, screen_cfg.text_fields) or json.dumps(data, ensure_ascii=False)
+                text = extract_text(prepared, screen_cfg.text_fields) or json.dumps(data, ensure_ascii=False)
                 validate_and_add(prepared, text)
             else:
                 prepared = prepare_record({"text": str(data)}, artifact_path)
@@ -558,7 +593,7 @@ def process_target(cfg: dict[str, Any], roots: Roots, queue_row: dict[str, Any],
                 for raw in read_jsonl(file_path):
                     record = raw if isinstance(raw, dict) else {"text": str(raw)}
                     prepared = prepare_record(record, str(file_path))
-                    validate_and_add(prepared, find_text(prepared, screen_cfg.text_fields))
+                    validate_and_add(prepared, extract_text(prepared, screen_cfg.text_fields))
             elif handler_suffix == ".json":
                 try:
                     opener = gzip.open if suffix == ".gz" else open
@@ -629,7 +664,7 @@ def process_target(cfg: dict[str, Any], roots: Roots, queue_row: dict[str, Any],
                                         except json.JSONDecodeError:
                                             continue
                                         prepared = prepare_record(raw if isinstance(raw, dict) else {"text": str(raw)}, artifact_label)
-                                        validate_and_add(prepared, find_text(prepared, screen_cfg.text_fields))
+                                        validate_and_add(prepared, extract_text(prepared, screen_cfg.text_fields))
                                 elif inner_suffix == ".json":
                                     text_stream = io.TextIOWrapper(f, encoding="utf-8", errors="ignore")
                                     try:
@@ -649,6 +684,29 @@ def process_target(cfg: dict[str, Any], roots: Roots, queue_row: dict[str, Any],
                     pitch("zip_error", sample=str(e))
             else:
                 pitch("unsupported_filetype", sample_id=file_path.name)
+        for ds_path in iter_hf_dataset_dirs(raw_dir):
+            try:
+                dataset_obj = load_from_disk(str(ds_path))
+            except Exception as exc:
+                pitched += 1
+                if execute:
+                    record_pitch(
+                        roots,
+                        pitch_counts,
+                        target_id,
+                        "hf_load_failed",
+                        extra={"path": str(ds_path), "error": str(exc)},
+                        sample_extra={"path": str(ds_path)},
+                    )
+                continue
+            datasets = list(dataset_obj.values()) if isinstance(dataset_obj, DatasetDict) else [dataset_obj]
+            for dataset in datasets:
+                for raw in dataset:
+                    record = raw if isinstance(raw, dict) else {"text": str(raw)}
+                    prepared = prepare_record(record, str(ds_path))
+                    validate_and_add(prepared, extract_text(prepared, screen_cfg.text_fields))
+
+
         if execute:
             flushed = sharder.flush()
             if flushed:

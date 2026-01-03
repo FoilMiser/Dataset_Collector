@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from datasets import DatasetDict, load_from_disk
 
 VERSION = "2.0"
 PITCH_SAMPLE_LIMIT = 25
@@ -217,6 +218,26 @@ def find_text(row: dict[str, Any], candidates: list[str]) -> str | None:
             return str(val)
     return None
 
+def extract_text(row: dict[str, Any], candidates: list[str]) -> str | None:
+    if row.get("text"):
+        val = row["text"]
+        if isinstance(val, (list, tuple)):
+            val = "\n".join(map(str, val))
+        return str(val)
+    remaining = [c for c in candidates if c != "text"]
+    text = extract_text(row, remaining)
+    if text:
+        return text
+    string_fields = [str(v) for v in row.values() if isinstance(v, str) and v]
+    if string_fields:
+        return "\n".join(string_fields)
+    try:
+        return json.dumps(row, ensure_ascii=False)
+    except Exception:
+        return str(row)
+
+
+
 
 def find_license(row: dict[str, Any], candidates: list[str]) -> str | None:
     for k in candidates:
@@ -367,6 +388,20 @@ def iter_raw_files(raw_dir: Path) -> Iterator[Path]:
                 yield fp
 
 
+def iter_hf_dataset_dirs(raw_dir: Path) -> Iterator[Path]:
+    candidates = []
+    for pattern in ("hf_dataset", "split_*"):
+        candidates.extend([p for p in raw_dir.rglob(pattern) if p.is_dir()])
+    seen = set()
+    for path in sorted(candidates):
+        resolved = path.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        yield path
+
+
+
 def process_target(
     cfg: dict[str, Any],
     schemas: dict[str, Any],
@@ -444,7 +479,8 @@ def process_target(
             continue
         sharder = Sharder(roots.screened_root / pool / "shards", shard_cfg)
         raw_files = list(iter_raw_files(raw_dir))
-        if not raw_files:
+        hf_datasets = list(iter_hf_dataset_dirs(raw_dir))
+        if not raw_files and not hf_datasets:
             pitched += 1
             if execute:
                 record_pitch(
@@ -456,91 +492,121 @@ def process_target(
                 )
             continue
 
+        def handle_raw(
+            raw: dict[str, Any],
+            *,
+            pool: str = pool,
+            sharder: Sharder = sharder,
+        ) -> None:
+            nonlocal passed, pitched
+            text = extract_text(raw, screen_cfg.text_fields)
+            if not text:
+                pitched += 1
+                if execute:
+                    record_pitch(roots, pitch_counts, target_id, "no_text", raw=raw)
+                return
+            
+            sensitive_reason = has_sensitive_markers(text)
+            if sensitive_reason:
+                pitched += 1
+                if execute:
+                    record_pitch(roots, pitch_counts, target_id, sensitive_reason, raw=raw, text=text)
+                return
+            
+            redacted_text, redactions = redact_text(text)
+            if len(redacted_text) < screen_cfg.min_chars or len(redacted_text) > screen_cfg.max_chars:
+                pitched += 1
+                if execute:
+                    record_pitch(roots, pitch_counts, target_id, "length_bounds", raw=raw, text=redacted_text)
+                return
+            
+            lic = find_license(raw, screen_cfg.license_fields)
+            if screen_cfg.require_record_license and not lic:
+                pitched += 1
+                if execute:
+                    record_pitch(roots, pitch_counts, target_id, "missing_record_license", raw=raw)
+                return
+            if lic and screen_cfg.allow_spdx and lic not in screen_cfg.allow_spdx:
+                pitched += 1
+                if execute:
+                    record_pitch(
+                        roots,
+                        pitch_counts,
+                        target_id,
+                        "license_not_allowlisted",
+                        raw=raw,
+                        extra={"license": lic},
+                        sample_extra={"license": lic},
+                    )
+                return
+            if contains_deny(redacted_text, screen_cfg.deny_phrases):
+                pitched += 1
+                if execute:
+                    record_pitch(roots, pitch_counts, target_id, "deny_phrase", raw=raw, text=redacted_text)
+                return
+            
+            license_profile = str(raw.get("license_profile") or queue_row.get("license_profile") or pool or "quarantine")
+            routing = raw.get("routing") or queue_row.get("routing") or target_cfg.get("routing") or {}
+            record = canonical_record(raw, redacted_text, target_id, license_profile, lic, routing)
+            record["meta"] = coarsen_meta(record.get("meta", {}), redactions)
+            
+            valid, missing = validate_schema(record, schemas)
+            if not valid:
+                pitched += 1
+                if execute:
+                    record_pitch(
+                        roots,
+                        pitch_counts,
+                        target_id,
+                        "schema_missing",
+                        raw=record,
+                        extra={"missing": missing},
+                        sample_extra={"missing": missing},
+                    )
+                return
+            
+            passed += 1
+            if execute:
+                current_shard = str(sharder._next_path())
+                path = sharder.add(record)
+                if path:
+                    current_shard = str(path)
+                    shard_paths.append(current_shard)
+                ledger_row = {
+                    "stage": "yellow_screen",
+                    "target_id": target_id,
+                    "record_id": record["record_id"],
+                    "content_sha256": record["hash"]["content_sha256"],
+                    "decision": "pass",
+                    "output_shard": current_shard,
+                    "seen_at_utc": utc_now(),
+                }
+                append_jsonl(roots.ledger_root / "yellow_passed.jsonl", [ledger_row])
+
         for file_path in raw_files:
             for raw in read_jsonl(file_path):
-                text = find_text(raw, screen_cfg.text_fields)
-                if not text:
-                    pitched += 1
-                    if execute:
-                        record_pitch(roots, pitch_counts, target_id, "no_text", raw=raw)
-                    continue
+                handle_raw(raw)
 
-                sensitive_reason = has_sensitive_markers(text)
-                if sensitive_reason:
-                    pitched += 1
-                    if execute:
-                        record_pitch(roots, pitch_counts, target_id, sensitive_reason, raw=raw, text=text)
-                    continue
-
-                redacted_text, redactions = redact_text(text)
-                if len(redacted_text) < screen_cfg.min_chars or len(redacted_text) > screen_cfg.max_chars:
-                    pitched += 1
-                    if execute:
-                        record_pitch(roots, pitch_counts, target_id, "length_bounds", raw=raw, text=redacted_text)
-                    continue
-
-                lic = find_license(raw, screen_cfg.license_fields)
-                if screen_cfg.require_record_license and not lic:
-                    pitched += 1
-                    if execute:
-                        record_pitch(roots, pitch_counts, target_id, "missing_record_license", raw=raw)
-                    continue
-                if lic and screen_cfg.allow_spdx and lic not in screen_cfg.allow_spdx:
-                    pitched += 1
-                    if execute:
-                        record_pitch(
-                            roots,
-                            pitch_counts,
-                            target_id,
-                            "license_not_allowlisted",
-                            raw=raw,
-                            extra={"license": lic},
-                            sample_extra={"license": lic},
-                        )
-                    continue
-                if contains_deny(redacted_text, screen_cfg.deny_phrases):
-                    pitched += 1
-                    if execute:
-                        record_pitch(roots, pitch_counts, target_id, "deny_phrase", raw=raw, text=redacted_text)
-                    continue
-
-                license_profile = str(raw.get("license_profile") or queue_row.get("license_profile") or pool or "quarantine")
-                routing = raw.get("routing") or queue_row.get("routing") or target_cfg.get("routing") or {}
-                record = canonical_record(raw, redacted_text, target_id, license_profile, lic, routing)
-                record["meta"] = coarsen_meta(record.get("meta", {}), redactions)
-
-                valid, missing = validate_schema(record, schemas)
-                if not valid:
-                    pitched += 1
-                    if execute:
-                        record_pitch(
-                            roots,
-                            pitch_counts,
-                            target_id,
-                            "schema_missing",
-                            raw=record,
-                            extra={"missing": missing},
-                            sample_extra={"missing": missing},
-                        )
-                    continue
-
-                passed += 1
+        for ds_path in hf_datasets:
+            try:
+                dataset_obj = load_from_disk(str(ds_path))
+            except Exception as exc:
+                pitched += 1
                 if execute:
-                    current_shard = str(sharder._next_path())
-                    path = sharder.add(record)
-                    if path:
-                        current_shard = str(path)
-                        shard_paths.append(current_shard)
-                    ledger_row = {
-                        "stage": "yellow_screen",
-                        "target_id": target_id,
-                        "record_id": record["record_id"],
-                        "content_sha256": record["hash"]["content_sha256"],
-                        "decision": "pass",
-                        "output_shard": current_shard,
-                        "seen_at_utc": utc_now(),
-                    }
-                    append_jsonl(roots.ledger_root / "yellow_passed.jsonl", [ledger_row])
+                    record_pitch(
+                        roots,
+                        pitch_counts,
+                        target_id,
+                        "hf_load_failed",
+                        extra={{"path": str(ds_path), "error": str(exc)}},
+                        sample_extra={{"path": str(ds_path)}},
+                    )
+                continue
+            datasets = list(dataset_obj.values()) if isinstance(dataset_obj, DatasetDict) else [dataset_obj]
+            for dataset in datasets:
+                for raw in dataset:
+                    handle_raw(dict(raw))
+
         if execute:
             flushed = sharder.flush()
             if flushed:
