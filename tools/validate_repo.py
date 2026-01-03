@@ -20,29 +20,13 @@ from typing import Any
 
 import yaml
 
+from tools.strategy_registry import normalize_download, validate_download_config
+
 EXPECTED_TARGETS_SCHEMA = "0.8"
 
 
 def read_yaml(path: Path) -> dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
-
-
-def normalize_download(download: dict[str, Any]) -> dict[str, Any]:
-    d = dict(download or {})
-    cfg = d.get("config")
-
-    if isinstance(cfg, dict):
-        merged = dict(cfg)
-        merged.update({k: v for k, v in d.items() if k != "config"})
-        d = merged
-
-    if d.get("strategy") == "zenodo":
-        if not d.get("record_id") and d.get("record"):
-            d["record_id"] = d["record"]
-        if not d.get("record_id") and isinstance(d.get("record_ids"), list) and d["record_ids"]:
-            d["record_id"] = d["record_ids"][0]
-
-    return d
 
 
 def iter_targets_files(root: Path) -> Iterable[Path]:
@@ -92,29 +76,6 @@ def _collect_updated_utc_warnings(path: Path) -> list[dict[str, Any]]:
         })
 
     return warnings
-
-
-def get_download_requirement_errors(download: dict[str, Any], strategy: str) -> list[str]:
-    errors = []
-    strategy = (strategy or "").lower()
-
-    if strategy in {"http", "ftp"}:
-        if not (download.get("url") or download.get("urls") or download.get("base_url")):
-            errors.append("download.url(s) or base_url required for http/ftp strategy")
-    elif strategy == "git":
-        if not (download.get("repo") or download.get("repo_url") or download.get("url")):
-            errors.append("download.repo/repo_url/url required for git strategy")
-    elif strategy == "huggingface_datasets":
-        if not download.get("dataset_id"):
-            errors.append("download.dataset_id required for huggingface_datasets strategy")
-    elif strategy == "zenodo":
-        if not (download.get("record_id") or download.get("doi") or download.get("url")):
-            errors.append("download.record_id/doi/url required for zenodo strategy")
-    elif strategy == "dataverse":
-        if not (download.get("persistent_id") or download.get("url")):
-            errors.append("download.persistent_id/url required for dataverse strategy")
-
-    return errors
 
 
 def validate_targets_file(path: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -167,9 +128,11 @@ def validate_targets_file(path: Path) -> tuple[list[dict[str, Any]], list[dict[s
 
         download = normalize_download(target.get("download", {}) or {})
         strategy = str(download.get("strategy", ""))
-        for msg in get_download_requirement_errors(download, strategy):
+        requirement_errors = validate_download_config(download, strategy)
+        for msg in requirement_errors:
+            error_type = "unknown_download_strategy" if msg.startswith("unknown strategy") else "missing_download_requirement"
             errors.append({
-                "type": "missing_download_requirement",
+                "type": error_type,
                 "targets_path": str(path),
                 "target_id": tid,
                 "strategy": strategy,
