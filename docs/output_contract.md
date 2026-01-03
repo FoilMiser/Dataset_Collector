@@ -26,7 +26,7 @@ single domain folder must include the following structure:
 - **acquire_green / acquire_yellow**: downloads raw files into `raw/green/...` and
   `raw/yellow/...` respectively.
 - **screen_yellow**: canonicalizes yellow data into `screened_yellow/<pool>/shards/`.
-- **merge**: combines green and screened yellow data into `combined/<pool>/shards/`.
+- **merge**: combines green and screened yellow data into `combined/<pool>/shards/`. The merge stage consumes JSONL (`.jsonl/.jsonl.gz`) and HF saved datasets (`datasets.load_from_disk`) from `raw/green/...`.
 - **catalog**: writes summary metadata to `_catalogs/catalog.json`.
 - **downstream normalization (optional, out-of-scope)**: no difficulty routing occurs in this
   repo; optional fields like `difficulty_level` may appear in queue rows for downstream use.
