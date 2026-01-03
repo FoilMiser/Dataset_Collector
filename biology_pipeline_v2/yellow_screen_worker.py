@@ -168,16 +168,25 @@ def resolve_roots(cfg: dict[str, Any]) -> Roots:
 
 
 def merge_screening_config(cfg: dict[str, Any], target: dict[str, Any]) -> ScreeningConfig:
-    g_screen = (cfg.get("globals", {}).get("screening", {}) or {})
+    g = (cfg.get("globals", {}) or {})
+    g_screen = (g.get("screening", {}) or {})
+    g_canon = (g.get("canonicalize", {}) or {})
     t_screen = (target.get("yellow_screen", {}) or {})
+    t_canon = (target.get("canonicalize", {}) or {})
     return ScreeningConfig(
-        text_fields=list(t_screen.get("text_field_candidates") or g_screen.get("text_field_candidates") or ["text"]),
+        text_fields=list(
+            t_canon.get("text_field_candidates")
+            or t_screen.get("text_field_candidates")
+            or g_canon.get("text_field_candidates")
+            or g_screen.get("text_field_candidates")
+            or ["text"]
+        ),
         license_fields=list(t_screen.get("record_license_field_candidates") or g_screen.get("record_license_field_candidates") or ["license", "license_spdx"]),
         allow_spdx=list(t_screen.get("allow_spdx") or g_screen.get("allow_spdx") or []),
         deny_phrases=[p.lower() for p in (t_screen.get("deny_phrases") or g_screen.get("deny_phrases") or [])],
         require_record_license=bool(t_screen.get("require_record_license", g_screen.get("require_record_license", False))),
         min_chars=int(t_screen.get("min_chars", g_screen.get("min_chars", 200))),
-        max_chars=int(t_screen.get("max_chars", g_screen.get("max_chars", 12000))),
+        max_chars=int(t_canon.get("max_chars", t_screen.get("max_chars", g_canon.get("max_chars", g_screen.get("max_chars", 12000))))),
     )
 
 

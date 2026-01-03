@@ -203,6 +203,18 @@ def validate_targets_file(path: Path) -> tuple[list[dict[str, Any]], list[dict[s
                 "target_id": tid,
             })
 
+        if strategy == "huggingface_datasets":
+            canonicalize = target.get("canonicalize", {}) or {}
+            candidates = canonicalize.get("text_field_candidates") or []
+            if not candidates:
+                warnings.append({
+                    "type": "missing_canonicalize_text_field_candidates",
+                    "targets_path": str(path),
+                    "target_id": tid,
+                    "strategy": strategy,
+                    "message": "Add canonicalize.text_field_candidates for HF targets to improve text extraction.",
+                })
+
     return errors, warnings
 
 

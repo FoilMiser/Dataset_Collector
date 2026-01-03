@@ -149,6 +149,8 @@ targets:
       strategy: "huggingface_datasets"
       config:
         dataset_id: "openai/openai_humaneval"
+    canonicalize:
+      text_field_candidates: ["prompt", "canonical_solution", "solution", "text"]
 
   - id: "python_peps"
     name: "Python Enhancement Proposals (PEPs)"
@@ -179,6 +181,8 @@ targets:
       strategy: "huggingface_datasets"
       config:
         dataset_id: "evalplus/mbppplus"
+    canonicalize:
+      text_field_candidates: ["prompt", "solution", "code", "text"]
 
   # -----------------------------
   # YELLOW (quarantine then scrub/allowlist)

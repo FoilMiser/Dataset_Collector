@@ -154,11 +154,22 @@ def sharding_cfg(cfg: dict[str, Any]) -> ShardingConfig:
     )
 
 
-def text_field_candidates(cfg: dict[str, Any]) -> list[str]:
+def resolve_canonicalize_config(cfg: dict[str, Any], target_cfg: dict[str, Any] | None) -> tuple[list[str], int | None]:
     g = (cfg.get("globals", {}) or {})
-    canon = (g.get("canonicalize", {}) or {})
-    screen = (g.get("screening", {}) or {})
-    return list(canon.get("text_field_candidates") or screen.get("text_field_candidates") or ["text"])
+    g_canon = (g.get("canonicalize", {}) or {})
+    g_screen = (g.get("screening", {}) or {})
+    t_screen = (target_cfg.get("yellow_screen", {}) or {}) if target_cfg else {}
+    t_canon = (target_cfg.get("canonicalize", {}) or {}) if target_cfg else {}
+    candidates = list(
+        t_canon.get("text_field_candidates")
+        or t_screen.get("text_field_candidates")
+        or g_canon.get("text_field_candidates")
+        or g_screen.get("text_field_candidates")
+        or ["text"]
+    )
+    max_chars_value = t_canon.get("max_chars", t_screen.get("max_chars", g_canon.get("max_chars", g_screen.get("max_chars"))))
+    max_chars = int(max_chars_value) if max_chars_value is not None else None
+    return candidates, max_chars
 
 
 def coerce_text(value: Any) -> str:
@@ -194,12 +205,14 @@ def resolve_routing(raw: dict[str, Any]) -> dict[str, Any]:
     return {}
 
 
-def canonicalize_row(raw: dict[str, Any], target_id: str, pool: str, candidates: list[str]) -> tuple[dict[str, Any] | None, str | None]:
+def canonicalize_row(raw: dict[str, Any], target_id: str, pool: str, candidates: list[str], max_chars: int | None) -> tuple[dict[str, Any] | None, str | None]:
     if not isinstance(raw, dict):
         return None, "unsupported_row_type"
     text = extract_text(raw, candidates)
     if not text:
         return None, "missing_text"
+    if max_chars is not None and max_chars > 0 and len(text) > max_chars:
+        text = text[:max_chars]
     content_hash = ((raw.get("hash") or {}).get("content_sha256") or raw.get("content_sha256"))
     if not content_hash:
         content_hash = sha256_text(text)
@@ -366,7 +379,12 @@ def merge_records(cfg: dict[str, Any], roots: Roots, execute: bool) -> dict[str,
     shard_cfg = sharding_cfg(cfg)
     dedupe: set[str] = set()
     summary = {"written": 0, "deduped": 0, "skipped": 0, "shards": []}
-    candidates = text_field_candidates(cfg)
+    target_canon = {
+        str(target.get("id")): resolve_canonicalize_config(cfg, target)
+        for target in (cfg.get("targets", []) or [])
+        if target.get("id") is not None
+    }
+    default_canon = resolve_canonicalize_config(cfg, None)
 
     pool_sharders: dict[str, Sharder] = {}
 
@@ -421,6 +439,7 @@ def merge_records(cfg: dict[str, Any], roots: Roots, execute: bool) -> dict[str,
         summary["written"] += 1
 
     for item in iter_green_records(roots):
+        candidates, max_chars = target_canon.get(item.target_id, default_canon)
         if isinstance(item, GreenSkip):
             summary["skipped"] += 1
             record_skip(
@@ -434,7 +453,7 @@ def merge_records(cfg: dict[str, Any], roots: Roots, execute: bool) -> dict[str,
                 detail=item.detail,
             )
             continue
-        canonical, reason = canonicalize_row(item.raw, item.target_id, item.pool, candidates)
+        canonical, reason = canonicalize_row(item.raw, item.target_id, item.pool, candidates, max_chars)
         if not canonical:
             summary["skipped"] += 1
             record_skip(
