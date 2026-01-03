@@ -19,6 +19,9 @@ OUTPUT_DIR_NAMES = {
 
 
 def _iter_candidates(repo_root: Path) -> Iterable[Path]:
+    for path in repo_root.rglob(".pytest_cache"):
+        if path.is_dir():
+            yield path
     for path in repo_root.rglob("__pycache__"):
         if path.is_dir():
             yield path
