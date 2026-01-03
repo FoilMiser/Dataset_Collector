@@ -25,8 +25,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-
-from datasets import Dataset, DatasetDict, load_from_disk
+from datasets import DatasetDict, load_from_disk
 
 VERSION = "2.0"
 PITCH_SAMPLE_LIMIT = 25
@@ -497,7 +496,12 @@ def process_target(cfg: dict[str, Any], roots: Roots, queue_row: dict[str, Any],
             continue
         sharder = Sharder(roots.screened_root / pool / "shards", shard_cfg)
 
-        def handle_raw(raw: dict[str, Any]) -> None:
+        def handle_raw(
+            raw: dict[str, Any],
+            *,
+            pool: str = pool,
+            sharder: Sharder = sharder,
+        ) -> None:
             nonlocal passed, pitched
             routing = coalesce_routing(raw, queue_routing, target_routing)
             text = extract_text(raw, screen_cfg.text_fields)

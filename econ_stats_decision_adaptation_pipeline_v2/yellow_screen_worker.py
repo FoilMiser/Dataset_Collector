@@ -28,8 +28,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-
-from datasets import Dataset, DatasetDict, load_from_disk
+from datasets import DatasetDict, load_from_disk
 
 VERSION = "2.0"
 PITCH_SAMPLE_LIMIT = 25
@@ -311,6 +310,20 @@ def iter_raw_files(raw_dir: Path) -> Iterator[Path]:
             yield fp
 
 
+def iter_hf_dataset_dirs(raw_dir: Path) -> Iterator[Path]:
+    candidates = []
+    for pattern in ("hf_dataset", "split_*"):
+        candidates.extend([p for p in raw_dir.rglob(pattern) if p.is_dir()])
+    seen = set()
+    for path in sorted(candidates):
+        resolved = path.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        yield path
+
+
+
 def routing_from_queue(queue_row: dict[str, Any]) -> dict[str, Any]:
     return {
         "subject": queue_row.get("routing_subject") or queue_row.get("routing", {}).get("subject") or "econ",
@@ -438,96 +451,239 @@ def process_target(cfg: dict[str, Any], roots: Roots, queue_row: dict[str, Any],
         if not raw_dir.exists():
             continue
         sharder = Sharder(roots.screened_root / pool / "shards", shard_cfg)
+        tabular_chunk_idx = 0
 
-        def handle_raw(raw: dict[str, Any]) -> None:
-            nonlocal passed, pitched
-            routing = coalesce_routing(raw, queue_routing, target_routing)
-            text = extract_text(raw, screen_cfg.text_fields)
-            lic = find_license(raw, screen_cfg.license_fields)
-            license_spdx = lic or queue_row.get("resolved_spdx")
+        def prepare_record(
+            raw_record: dict[str, Any],
+            artifact_path: str,
+            pool: str = pool,
+        ) -> dict[str, Any]:
+            record = dict(raw_record)
+            src = dict(record.get("source") or {})
+            src.setdefault("target_id", target_id)
+            src.setdefault("source_url", primary_url)
+            src.setdefault("artifact_path", artifact_path)
+            record["source"] = src
+            record.setdefault("routing", base_routing)
+            record.setdefault("license_profile", queue_row.get("license_profile") or pool or "quarantine")
+            record.setdefault("artifact_path", artifact_path)
+            return record
 
-            if text:
-                if len(text) < screen_cfg.min_chars or len(text) > screen_cfg.max_chars:
-                    pitched += 1
-                    if execute:
-                        record_pitch(roots, pitch_counts, target_id, "length_bounds", raw=raw, text=text)
-                    return
-                if contains_deny(text, screen_cfg.deny_phrases):
-                    pitched += 1
-                    if execute:
-                        record_pitch(roots, pitch_counts, target_id, "deny_phrase", raw=raw, text=text)
-                    return
+        def pitch(reason: str, sample_id: str | None = None, sample: Any = None) -> None:
+            nonlocal pitched
+            pitched += 1
+            if execute:
+                extra = {"sample_id": sample_id} if sample_id else None
+                sample_extra = {"sample": sample} if sample is not None else None
+                record_pitch(
+                    roots,
+                    pitch_counts,
+                    target_id,
+                    reason,
+                    raw=None,
+                    extra=extra,
+                    sample_extra=sample_extra,
+                )
 
-            if screen_cfg.require_record_license and not license_spdx:
-                pitched += 1
-                if execute:
-                    record_pitch(roots, pitch_counts, target_id, "missing_record_license", raw=raw)
+        def validate_and_add(
+            raw_record: dict[str, Any],
+            text: str | None,
+            pool: str = pool,
+            sharder: Sharder = sharder,
+        ) -> None:
+            nonlocal passed
+            if not text:
+                pitch("no_text", sample_id=raw_record.get("id") or raw_record.get("record_id"))
                 return
-            if license_spdx and screen_cfg.allow_spdx and license_spdx not in screen_cfg.allow_spdx:
-                pitched += 1
-                if execute:
-                    record_pitch(
-                        roots,
-                        pitch_counts,
-                        target_id,
-                        "license_not_allowlisted",
-                        raw=raw,
-                        extra={"license": license_spdx},
-                        sample_extra={"license": license_spdx},
-                    )
+            if len(text) < screen_cfg.min_chars or len(text) > screen_cfg.max_chars:
+                pitch("length_bounds", sample_id=raw_record.get("id") or raw_record.get("record_id"))
                 return
-
-            payload: dict[str, Any] | None = None
-            if adapter_name and adapter_name in ADAPTERS:
-                payload = ADAPTERS[adapter_name](raw, routing)
-            elif text:
-                payload = {"text": text, "routing": routing}
-                record_id = raw.get("record_id") or raw.get("id")
-                if record_id:
-                    payload["record_id"] = record_id
-
-            if not payload:
-                pitched += 1
-                if execute:
-                    record_pitch(
-                        roots,
-                        pitch_counts,
-                        target_id,
-                        "adapter_failed",
-                        raw=raw,
-                        extra={"adapter": adapter_name},
-                        sample_extra={"adapter": adapter_name},
-                    )
+            lic = find_license(raw_record, screen_cfg.license_fields)
+            if screen_cfg.require_record_license and not lic:
+                pitch("missing_record_license", sample_id=raw_record.get("id") or raw_record.get("record_id"))
                 return
-
-            license_profile = str(raw.get("license_profile") or queue_row.get("license_profile") or pool or "quarantine")
-            rec = canonical_record(raw, payload, routing, target_id, license_profile, license_spdx, text=text)
-            if "hash" not in rec or not rec["hash"].get("content_sha256"):
-                rec["hash"] = {"content_sha256": sha256_obj(rec)}
+            if lic and screen_cfg.allow_spdx and lic not in screen_cfg.allow_spdx:
+                pitch("license_not_allowlisted", sample_id=raw_record.get("id") or raw_record.get("record_id"))
+                return
+            if contains_deny(text, screen_cfg.deny_phrases):
+                pitch("deny_phrase", sample_id=raw_record.get("id") or raw_record.get("record_id"))
+                return
+            license_profile = str(raw_record.get("license_profile") or queue_row.get("license_profile") or pool or "quarantine")
+            record = canonical_record(raw_record, text, target_id, license_profile, lic or license_spdx_hint)
             passed += 1
             if execute:
                 current_shard = str(sharder._next_path())
-                path = sharder.add(rec)
+                path = sharder.add(record)
                 if path:
                     current_shard = str(path)
                     shard_paths.append(current_shard)
                 ledger_row = {
                     "stage": "yellow_screen",
                     "target_id": target_id,
-                    "record_id": rec["record_id"],
-                    "content_sha256": rec["hash"]["content_sha256"],
+                    "record_id": record["record_id"],
+                    "content_sha256": record["hash"]["content_sha256"],
                     "decision": "pass",
-                    "adapter": adapter_name,
-                    "routing": rec.get("routing"),
                     "output_shard": current_shard,
+                    "license_pool": pool,
                     "seen_at_utc": utc_now(),
                 }
                 append_jsonl(roots.ledger_root / "yellow_passed.jsonl", [ledger_row])
 
-        for file_path in iter_raw_files(raw_dir):
-            for raw in read_jsonl(file_path):
-                handle_raw(raw)
+        def tabular_text(header: list[str], rows: list[Any], file_label: str) -> str:
+            lines = [f"source_file: {file_label}"]
+            if header:
+                lines.append("columns: " + ", ".join(header))
+            lines.append("rows:")
+            for row in rows:
+                if isinstance(row, dict):
+                    lines.append(json.dumps(row, ensure_ascii=False))
+                else:
+                    lines.append(", ".join([str(v) for v in row]))
+            return "\n".join(lines)
 
+        def emit_tabular(reader: Iterable[Any], header: list[str], file_label: str, artifact_path: str) -> None:
+            nonlocal tabular_chunk_idx
+            if header and is_potential_microdata(header):
+                pitch("possible_microdata", sample=header)
+                return
+            rows: list[Any] = []
+            max_rows = max(screen_cfg.chunk_rows * 3, 3000)
+            for idx, row in enumerate(reader):
+                rows.append(row)
+                if len(rows) >= screen_cfg.chunk_rows:
+                    text = tabular_text(header, rows, file_label)
+                    raw = prepare_record({"record_id": f"{target_id}:{file_label}:chunk{tabular_chunk_idx:04d}"}, artifact_path)
+                    tabular_chunk_idx += 1
+                    validate_and_add(raw, text)
+                    rows = []
+                if idx + 1 >= max_rows:
+                    break
+            if rows:
+                text = tabular_text(header, rows, file_label)
+                raw = prepare_record({"record_id": f"{target_id}:{file_label}:chunk{tabular_chunk_idx:04d}"}, artifact_path)
+                tabular_chunk_idx += 1
+                validate_and_add(raw, text)
+
+        def handle_json_payload(data: Any, artifact_path: str) -> None:
+            if isinstance(data, list):
+                max_items = max(20, min(200, screen_cfg.chunk_rows))
+                for idx, item in enumerate(data):
+                    if idx >= max_items:
+                        break
+                    raw = item if isinstance(item, dict) else {"text": str(item)}
+                    prepared = prepare_record(raw, artifact_path)
+                    text = extract_text(prepared, screen_cfg.text_fields) or json.dumps(item, ensure_ascii=False)
+                    validate_and_add(prepared, text)
+            elif isinstance(data, dict):
+                prepared = prepare_record(data, artifact_path)
+                text = extract_text(prepared, screen_cfg.text_fields) or json.dumps(data, ensure_ascii=False)
+                validate_and_add(prepared, text)
+            else:
+                prepared = prepare_record({"text": str(data)}, artifact_path)
+                validate_and_add(prepared, str(data))
+
+        for file_path in iter_raw_files(raw_dir):
+            suffixes = [s.lower() for s in file_path.suffixes]
+            suffix = suffixes[-1] if suffixes else file_path.suffix.lower()
+            handler_suffix = suffix
+            if suffix == ".gz" and len(suffixes) > 1:
+                handler_suffix = suffixes[-2]
+
+            if handler_suffix == ".jsonl":
+                for raw in read_jsonl(file_path):
+                    record = raw if isinstance(raw, dict) else {"text": str(raw)}
+                    prepared = prepare_record(record, str(file_path))
+                    validate_and_add(prepared, extract_text(prepared, screen_cfg.text_fields))
+            elif handler_suffix == ".json":
+                try:
+                    opener = gzip.open if suffix == ".gz" else open
+                    with opener(file_path, "rt", encoding="utf-8", errors="ignore") as f:
+                        data = json.load(f)
+                    handle_json_payload(data, str(file_path))
+                except Exception:
+                    pitch("json_error", sample_id=file_path.name)
+            elif handler_suffix == ".txt":
+                text = safe_read_text(file_path)
+                if text:
+                    prepared = prepare_record({"record_id": f"{target_id}:{file_path.name}"}, str(file_path))
+                    validate_and_add(prepared, text)
+                else:
+                    pitch("no_text", sample_id=file_path.name)
+            elif handler_suffix in {".csv", ".tsv"}:
+                delimiter = "," if handler_suffix == ".csv" else "\t"
+                try:
+                    opener = gzip.open if suffix == ".gz" else open
+                    with opener(file_path, "rt", encoding="utf-8", errors="ignore", newline="") as f:
+                        f.seek(0)
+                        reader = csv.DictReader(f, delimiter=delimiter)
+                        header = reader.fieldnames or []
+                        if header:
+                            emit_tabular(reader, header, file_path.name, str(file_path))
+                        else:
+                            f.seek(0)
+                            raw_reader = csv.reader(f, delimiter=delimiter)
+                            header_row = next(raw_reader, [])
+                            header_list = header_row if isinstance(header_row, list) else [header_row]
+                            emit_tabular(raw_reader, header_list, file_path.name, str(file_path))
+                except Exception:
+                    pitch("tabular_parse_error", sample_id=file_path.name)
+            elif handler_suffix == ".zip":
+                try:
+                    with zipfile.ZipFile(file_path) as zf:
+                        for info in zf.infolist():
+                            if info.is_dir():
+                                continue
+                            if info.file_size > 50 * 1024 * 1024:
+                                pitch("file_too_large", sample_id=info.filename)
+                                continue
+                            artifact_label = f"{file_path.name}:{info.filename}"
+                            inner_suffixes = Path(info.filename).suffixes
+                            inner_suffix = inner_suffixes[-1].lower() if inner_suffixes else ""
+                            with zf.open(info) as f:
+                                if inner_suffix in {".csv", ".tsv"} or screen_cfg.inner_adapter == "csv_chunked":
+                                    delimiter = "," if inner_suffix != ".tsv" else "\t"
+                                    text_stream = io.TextIOWrapper(f, encoding="utf-8", errors="ignore", newline="")
+                                    reader = csv.DictReader(text_stream, delimiter=delimiter)
+                                    header = reader.fieldnames or []
+                                    if header:
+                                        emit_tabular(reader, header, artifact_label, artifact_label)
+                                    else:
+                                        text_stream.seek(0)
+                                        raw_reader = csv.reader(text_stream, delimiter=delimiter)
+                                        header_row = next(raw_reader, [])
+                                        header_list = header_row if isinstance(header_row, list) else [header_row]
+                                        emit_tabular(raw_reader, header_list, artifact_label, artifact_label)
+                                elif inner_suffix == ".jsonl":
+                                    text_stream = io.TextIOWrapper(f, encoding="utf-8", errors="ignore")
+                                    for line in text_stream:
+                                        line = line.strip()
+                                        if not line:
+                                            continue
+                                        try:
+                                            raw = json.loads(line)
+                                        except json.JSONDecodeError:
+                                            continue
+                                        prepared = prepare_record(raw if isinstance(raw, dict) else {"text": str(raw)}, artifact_label)
+                                        validate_and_add(prepared, extract_text(prepared, screen_cfg.text_fields))
+                                elif inner_suffix == ".json":
+                                    text_stream = io.TextIOWrapper(f, encoding="utf-8", errors="ignore")
+                                    try:
+                                        data = json.load(text_stream)
+                                    except Exception:
+                                        pitch("json_error", sample_id=artifact_label)
+                                        continue
+                                    handle_json_payload(data, artifact_label)
+                                elif inner_suffix == ".txt":
+                                    text_stream = io.TextIOWrapper(f, encoding="utf-8", errors="ignore")
+                                    text = text_stream.read()
+                                    prepared = prepare_record({"record_id": f"{target_id}:{artifact_label}"}, artifact_label)
+                                    validate_and_add(prepared, text)
+                                else:
+                                    pitch("unsupported_inner_file", sample_id=artifact_label)
+                except Exception as e:
+                    pitch("zip_error", sample=str(e))
+            else:
+                pitch("unsupported_filetype", sample_id=file_path.name)
         for ds_path in iter_hf_dataset_dirs(raw_dir):
             try:
                 dataset_obj = load_from_disk(str(ds_path))
@@ -546,7 +702,10 @@ def process_target(cfg: dict[str, Any], roots: Roots, queue_row: dict[str, Any],
             datasets = list(dataset_obj.values()) if isinstance(dataset_obj, DatasetDict) else [dataset_obj]
             for dataset in datasets:
                 for raw in dataset:
-                    handle_raw(dict(raw))
+                    record = raw if isinstance(raw, dict) else {"text": str(raw)}
+                    prepared = prepare_record(record, str(ds_path))
+                    validate_and_add(prepared, extract_text(prepared, screen_cfg.text_fields))
+
 
         if execute:
             flushed = sharder.flush()

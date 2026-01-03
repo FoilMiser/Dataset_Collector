@@ -25,8 +25,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-
-from datasets import Dataset, DatasetDict, load_from_disk
+from datasets import DatasetDict, load_from_disk
 
 VERSION = "2.0"
 PITCH_SAMPLE_LIMIT = 25
@@ -207,7 +206,7 @@ def extract_text(row: dict[str, Any], candidates: list[str]) -> str | None:
             val = "\n".join(map(str, val))
         return str(val)
     remaining = [c for c in candidates if c != "text"]
-    text = find_text(row, remaining)
+    text = extract_text(row, remaining)
     if text:
         return text
     string_fields = [str(v) for v in row.values() if isinstance(v, str) and v]
@@ -314,6 +313,7 @@ def iter_hf_dataset_dirs(raw_dir: Path) -> Iterator[Path]:
         yield path
 
 
+
 def process_target(cfg: dict[str, Any], roots: Roots, queue_row: dict[str, Any], execute: bool) -> dict[str, Any]:
     target_id = queue_row["id"]
     target_cfg = next((t for t in cfg.get("targets", []) if t.get("id") == target_id), {})
@@ -386,72 +386,37 @@ def process_target(cfg: dict[str, Any], roots: Roots, queue_row: dict[str, Any],
         if not raw_dir.exists():
             continue
         sharder = Sharder(roots.screened_root / pool / "shards", shard_cfg)
-
-        def handle_raw(raw: dict[str, Any]) -> None:
+        def handle_raw(raw: dict[str, Any], *, pool: str = pool, sharder: Sharder = sharder) -> None:
             nonlocal passed, pitched
-            routing = coalesce_routing(raw, queue_routing, target_routing)
             text = extract_text(raw, screen_cfg.text_fields)
+            if not text:
+                pitched += 1
+                if execute:
+                    record_pitch(roots, pitch_counts, target_id, "no_text", raw=raw)
+                return
+            if len(text) < screen_cfg.min_chars or len(text) > screen_cfg.max_chars:
+                pitched += 1
+                if execute:
+                    record_pitch(roots, pitch_counts, target_id, "length_bounds", raw=raw, text=text)
+                return
             lic = find_license(raw, screen_cfg.license_fields)
-            license_spdx = lic or queue_row.get("resolved_spdx")
-
-            if text:
-                if len(text) < screen_cfg.min_chars or len(text) > screen_cfg.max_chars:
-                    pitched += 1
-                    if execute:
-                        record_pitch(roots, pitch_counts, target_id, "length_bounds", raw=raw, text=text)
-                    return
-                if contains_deny(text, screen_cfg.deny_phrases):
-                    pitched += 1
-                    if execute:
-                        record_pitch(roots, pitch_counts, target_id, "deny_phrase", raw=raw, text=text)
-                    return
-
-            if screen_cfg.require_record_license and not license_spdx:
+            if screen_cfg.require_record_license and not lic:
                 pitched += 1
                 if execute:
                     record_pitch(roots, pitch_counts, target_id, "missing_record_license", raw=raw)
                 return
-            if license_spdx and screen_cfg.allow_spdx and license_spdx not in screen_cfg.allow_spdx:
+            if lic and screen_cfg.allow_spdx and lic not in screen_cfg.allow_spdx:
                 pitched += 1
                 if execute:
-                    record_pitch(
-                        roots,
-                        pitch_counts,
-                        target_id,
-                        "license_not_allowlisted",
-                        raw=raw,
-                        extra={"license": license_spdx},
-                        sample_extra={"license": license_spdx},
-                    )
+                    record_pitch(roots, pitch_counts, target_id, "license_not_allowlisted", raw=raw, extra={"license": lic}, sample_extra={"license": lic})
                 return
-
-            payload: dict[str, Any] | None = None
-            if adapter_name and adapter_name in ADAPTERS:
-                payload = ADAPTERS[adapter_name](raw, routing)
-            elif text:
-                payload = {"text": text, "routing": routing}
-                record_id = raw.get("record_id") or raw.get("id")
-                if record_id:
-                    payload["record_id"] = record_id
-
-            if not payload:
+            if contains_deny(text, screen_cfg.deny_phrases):
                 pitched += 1
                 if execute:
-                    record_pitch(
-                        roots,
-                        pitch_counts,
-                        target_id,
-                        "adapter_failed",
-                        raw=raw,
-                        extra={"adapter": adapter_name},
-                        sample_extra={"adapter": adapter_name},
-                    )
+                    record_pitch(roots, pitch_counts, target_id, "deny_phrase", raw=raw, text=text)
                 return
-
             license_profile = str(raw.get("license_profile") or queue_row.get("license_profile") or pool or "quarantine")
-            rec = canonical_record(raw, payload, routing, target_id, license_profile, license_spdx, text=text)
-            if "hash" not in rec or not rec["hash"].get("content_sha256"):
-                rec["hash"] = {"content_sha256": sha256_obj(rec)}
+            rec = canonical_record(raw, text, target_id, license_profile, lic)
             passed += 1
             if execute:
                 current_shard = str(sharder._next_path())
@@ -465,8 +430,6 @@ def process_target(cfg: dict[str, Any], roots: Roots, queue_row: dict[str, Any],
                     "record_id": rec["record_id"],
                     "content_sha256": rec["hash"]["content_sha256"],
                     "decision": "pass",
-                    "adapter": adapter_name,
-                    "routing": rec.get("routing"),
                     "output_shard": current_shard,
                     "seen_at_utc": utc_now(),
                 }

@@ -25,8 +25,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-
-from datasets import Dataset, DatasetDict, load_from_disk
+from datasets import DatasetDict, load_from_disk
 
 VERSION = "2.0"
 PITCH_SAMPLE_LIMIT = 25
@@ -519,7 +518,12 @@ def screen_jsonl_mode(ctx: ScreenContext) -> dict[str, Any]:
             continue
         sharder = Sharder(ctx.roots.screened_root / pool / "shards", ctx.shard_cfg)
 
-        def handle_raw(raw: dict[str, Any]) -> None:
+        def handle_raw(
+            raw: dict[str, Any],
+            *,
+            pool: str = pool,
+            sharder: Sharder = sharder,
+        ) -> None:
             nonlocal passed, pitched
             text = extract_text(raw, ctx.screen_cfg.text_fields)
             if not text:

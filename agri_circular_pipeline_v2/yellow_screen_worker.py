@@ -26,8 +26,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-
-from datasets import Dataset, DatasetDict, load_from_disk
+from datasets import DatasetDict, load_from_disk
 
 VERSION = "2.0"
 PITCH_SAMPLE_LIMIT = 25
@@ -211,7 +210,7 @@ def extract_text(row: dict[str, Any], candidates: list[str]) -> str | None:
             val = "\n".join(map(str, val))
         return str(val)
     remaining = [c for c in candidates if c != "text"]
-    text = find_text(row, remaining)
+    text = extract_text(row, remaining)
     if text:
         return text
     string_fields = [str(v) for v in row.values() if isinstance(v, str) and v]
@@ -318,6 +317,20 @@ def iter_raw_files(raw_dir: Path) -> Iterator[Path]:
                 yield fp
 
 
+def iter_hf_dataset_dirs(raw_dir: Path) -> Iterator[Path]:
+    candidates = []
+    for pattern in ("hf_dataset", "split_*"):
+        candidates.extend([p for p in raw_dir.rglob(pattern) if p.is_dir()])
+    seen = set()
+    for path in sorted(candidates):
+        resolved = path.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        yield path
+
+
+
 def iter_records_from_path(path: Path) -> Iterator[dict[str, Any]]:
     name = path.name.lower()
     if name.endswith(".jsonl") or name.endswith(".jsonl.gz"):
@@ -422,32 +435,54 @@ def process_target(cfg: dict[str, Any], roots: Roots, queue_row: dict[str, Any],
         if not raw_dir.exists():
             continue
         sharder = Sharder(roots.screened_root / pool / "shards", shard_cfg)
-
-        def handle_raw(raw: dict[str, Any]) -> None:
+        def handle_raw(
+            raw: dict[str, Any],
+            *,
+            source_path: str | None = None,
+            pool: str = pool,
+            sharder: Sharder = sharder,
+        ) -> None:
             nonlocal passed, pitched
-            routing = coalesce_routing(raw, queue_routing, target_routing)
             text = extract_text(raw, screen_cfg.text_fields)
-            lic = find_license(raw, screen_cfg.license_fields)
-            license_spdx = lic or queue_row.get("resolved_spdx")
-
-            if text:
-                if len(text) < screen_cfg.min_chars or len(text) > screen_cfg.max_chars:
-                    pitched += 1
-                    if execute:
-                        record_pitch(roots, pitch_counts, target_id, "length_bounds", raw=raw, text=text)
-                    return
-                if contains_deny(text, screen_cfg.deny_phrases):
-                    pitched += 1
-                    if execute:
-                        record_pitch(roots, pitch_counts, target_id, "deny_phrase", raw=raw, text=text)
-                    return
-
-            if screen_cfg.require_record_license and not license_spdx:
+            if not text:
                 pitched += 1
                 if execute:
-                    record_pitch(roots, pitch_counts, target_id, "missing_record_license", raw=raw)
+                    record_pitch(
+                        roots,
+                        pitch_counts,
+                        target_id,
+                        "no_text",
+                        raw=raw,
+                        sample_extra={"source_path": source_path},
+                    )
                 return
-            if license_spdx and screen_cfg.allow_spdx and license_spdx not in screen_cfg.allow_spdx:
+            if len(text) < screen_cfg.min_chars or len(text) > screen_cfg.max_chars:
+                pitched += 1
+                if execute:
+                    record_pitch(
+                        roots,
+                        pitch_counts,
+                        target_id,
+                        "length_bounds",
+                        raw=raw,
+                        text=text,
+                        sample_extra={"source_path": source_path},
+                    )
+                return
+            lic = find_license(raw, screen_cfg.license_fields)
+            if screen_cfg.require_record_license and not lic:
+                pitched += 1
+                if execute:
+                    record_pitch(
+                        roots,
+                        pitch_counts,
+                        target_id,
+                        "missing_record_license",
+                        raw=raw,
+                        sample_extra={"source_path": source_path},
+                    )
+                return
+            if lic and screen_cfg.allow_spdx and lic not in screen_cfg.allow_spdx:
                 pitched += 1
                 if execute:
                     record_pitch(
@@ -456,38 +491,25 @@ def process_target(cfg: dict[str, Any], roots: Roots, queue_row: dict[str, Any],
                         target_id,
                         "license_not_allowlisted",
                         raw=raw,
-                        extra={"license": license_spdx},
-                        sample_extra={"license": license_spdx},
+                        extra={"license": lic},
+                        sample_extra={"license": lic, "source_path": source_path},
                     )
                 return
-
-            payload: dict[str, Any] | None = None
-            if adapter_name and adapter_name in ADAPTERS:
-                payload = ADAPTERS[adapter_name](raw, routing)
-            elif text:
-                payload = {"text": text, "routing": routing}
-                record_id = raw.get("record_id") or raw.get("id")
-                if record_id:
-                    payload["record_id"] = record_id
-
-            if not payload:
+            if contains_deny(text, screen_cfg.deny_phrases):
                 pitched += 1
                 if execute:
                     record_pitch(
                         roots,
                         pitch_counts,
                         target_id,
-                        "adapter_failed",
+                        "deny_phrase",
                         raw=raw,
-                        extra={"adapter": adapter_name},
-                        sample_extra={"adapter": adapter_name},
+                        text=text,
+                        sample_extra={"source_path": source_path},
                     )
                 return
-
             license_profile = str(raw.get("license_profile") or queue_row.get("license_profile") or pool or "quarantine")
-            rec = canonical_record(raw, payload, routing, target_id, license_profile, license_spdx, text=text)
-            if "hash" not in rec or not rec["hash"].get("content_sha256"):
-                rec["hash"] = {"content_sha256": sha256_obj(rec)}
+            rec = canonical_record(raw, text, target_id, license_profile, lic)
             passed += 1
             if execute:
                 current_shard = str(sharder._next_path())
@@ -501,16 +523,14 @@ def process_target(cfg: dict[str, Any], roots: Roots, queue_row: dict[str, Any],
                     "record_id": rec["record_id"],
                     "content_sha256": rec["hash"]["content_sha256"],
                     "decision": "pass",
-                    "adapter": adapter_name,
-                    "routing": rec.get("routing"),
                     "output_shard": current_shard,
                     "seen_at_utc": utc_now(),
                 }
                 append_jsonl(roots.ledger_root / "yellow_passed.jsonl", [ledger_row])
 
         for file_path in iter_raw_files(raw_dir):
-            for raw in read_jsonl(file_path):
-                handle_raw(raw)
+            for raw in iter_records_from_path(file_path):
+                handle_raw(raw, source_path=str(file_path))
 
         for ds_path in iter_hf_dataset_dirs(raw_dir):
             try:
@@ -530,7 +550,7 @@ def process_target(cfg: dict[str, Any], roots: Roots, queue_row: dict[str, Any],
             datasets = list(dataset_obj.values()) if isinstance(dataset_obj, DatasetDict) else [dataset_obj]
             for dataset in datasets:
                 for raw in dataset:
-                    handle_raw(dict(raw))
+                    handle_raw(dict(raw), source_path=str(ds_path))
 
         if execute:
             flushed = sharder.flush()
