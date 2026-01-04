@@ -56,9 +56,7 @@ try:  # pragma: no cover - optional dependency
     import trafilatura
 except ImportError:
     trafilatura = None
-
-
-VERSION = "2.0"
+from collector_core.__version__ import __version__ as VERSION
 
 
 def utc_now() -> str:

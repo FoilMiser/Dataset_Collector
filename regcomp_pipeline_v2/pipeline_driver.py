@@ -41,13 +41,19 @@ import hashlib
 import json
 import os
 import re
+import sys
 import time
 from pathlib import Path
 from typing import Any
 
 import yaml
 
-from collector_core.pipeline_version import VERSION
+if __package__ in (None, ""):
+    repo_root = Path(__file__).resolve().parents[1]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+
+from collector_core.__version__ import __version__ as VERSION
 
 try:
     import requests

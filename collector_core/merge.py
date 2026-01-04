@@ -16,9 +16,8 @@ from typing import Any
 import yaml
 from datasets import DatasetDict, load_from_disk
 
+from collector_core.__version__ import __version__ as VERSION
 from tools.output_contract import normalize_output_record, validate_output_contract
-
-VERSION = "2.0"
 
 
 @dataclasses.dataclass(frozen=True)

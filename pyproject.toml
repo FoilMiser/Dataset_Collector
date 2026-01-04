@@ -18,3 +18,9 @@ exclude = [
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
 ignore = ["E501"]
+
+[project]
+dynamic = ["version"]
+
+[tool.setuptools.dynamic]
+version = { attr = "collector_core.__version__.__version__" }
