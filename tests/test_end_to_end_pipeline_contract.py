@@ -7,6 +7,12 @@ from pathlib import Path
 import yaml
 from datasets import Dataset
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from tools.output_contract import validate_output_contract  # noqa: E402
+
 
 def test_end_to_end_pipeline_contract(tmp_path: Path) -> None:
     raw_root = tmp_path / "raw"
@@ -95,3 +101,4 @@ def test_end_to_end_pipeline_contract(tmp_path: Path) -> None:
     assert record["record_id"]
     assert record["source"]["license_profile"] == pool
     assert record["hash"]["content_sha256"]
+    validate_output_contract(record, "combined shard")
