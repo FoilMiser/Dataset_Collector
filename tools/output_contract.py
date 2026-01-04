@@ -59,13 +59,15 @@ def normalize_output_record(
     if normalized_hash:
         out["normalized_sha256"] = normalized_hash
 
-    if dataset_id and "dataset_id" not in out:
-        out["dataset_id"] = dataset_id
+    if "dataset_id" not in out:
+        out["dataset_id"] = dataset_id or target_id
 
     if "split" not in out:
         source = out.get("source") or {}
         if source.get("split"):
             out["split"] = source.get("split")
+        else:
+            out["split"] = "train"
 
     if "config" not in out:
         out["config"] = config or "default"
@@ -81,15 +83,13 @@ def normalize_output_record(
         license_obj = out.get("license") or {}
         source = out.get("source") or {}
         spdx = license_obj.get("spdx") or source.get("license_spdx")
-        if spdx:
-            out["license_spdx"] = spdx
+        out["license_spdx"] = spdx or "NOASSERTION"
 
     if "license_profile" not in out:
         license_obj = out.get("license") or {}
         source = out.get("source") or {}
         profile = license_obj.get("profile") or source.get("license_profile") or pool
-        if profile is not None:
-            out["license_profile"] = profile
+        out["license_profile"] = profile or "quarantine"
 
     if "source_urls" not in out:
         source_url = out.get("source_url") or out.get("url")
@@ -98,11 +98,16 @@ def normalize_output_record(
             source_url = source.get("source_url") or source.get("url")
         if source_url:
             out["source_urls"] = [source_url]
+        else:
+            out["source_urls"] = []
     elif isinstance(out.get("source_urls"), str):
         out["source_urls"] = [out["source_urls"]]
 
-    if "reviewer_notes" not in out and isinstance(out.get("notes"), str):
-        out["reviewer_notes"] = out["notes"]
+    if "reviewer_notes" not in out:
+        if isinstance(out.get("notes"), str):
+            out["reviewer_notes"] = out["notes"]
+        else:
+            out["reviewer_notes"] = ""
 
     if pool is not None:
         out.setdefault("pool", pool)
