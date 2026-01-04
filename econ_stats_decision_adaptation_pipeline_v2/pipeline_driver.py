@@ -47,13 +47,13 @@ from typing import Any
 
 import yaml
 
+from collector_core.pipeline_version import VERSION
+
 try:
     import requests
 except ImportError:
     requests = None
 
-
-VERSION = "2.0"
 
 
 def utc_now() -> str:

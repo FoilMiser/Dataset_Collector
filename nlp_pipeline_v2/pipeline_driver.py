@@ -42,7 +42,7 @@ from typing import Any
 import requests
 import yaml
 
-VERSION = "1.0"
+from collector_core.pipeline_version import VERSION
 
 
 def utc_now() -> str:
