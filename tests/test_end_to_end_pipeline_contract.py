@@ -9,6 +9,7 @@ from datasets import Dataset
 
 from tools.output_contract import REQUIRED_FIELDS, validate_output_contract
 
+
 def test_end_to_end_pipeline_contract(tmp_path: Path) -> None:
     raw_root = tmp_path / "raw"
     screened_root = tmp_path / "screened_yellow"
