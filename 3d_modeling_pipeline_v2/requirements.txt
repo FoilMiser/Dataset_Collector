@@ -1,4 +1,4 @@
-# 3D Modeling Corpus Pipeline v1.0 - Requirements
+# 3D Modeling Corpus Pipeline v2.0 - Requirements
 # Core dependencies shared with the chemistry prototype
 pyyaml>=6.0
 requests>=2.31.0

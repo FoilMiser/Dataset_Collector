@@ -1,4 +1,4 @@
-# Physics Corpus Pipeline v1.0 - Requirements
+# Physics Corpus Pipeline v2.0 - Requirements
 # Core dependencies
 pyyaml>=6.0
 requests>=2.31.0
