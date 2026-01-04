@@ -6,7 +6,6 @@ from typing import Any
 from collector_core.pipeline_driver_base import (
     BasePipelineDriver,
     RoutingBlockSpec,
-    coerce_int,
 )
 
 
