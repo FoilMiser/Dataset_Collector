@@ -34,7 +34,7 @@ def test_pipeline_driver_license_mapping_and_denylist(tmp_path: Path) -> None:
     denylist_path.write_text(yaml.safe_dump(denylist), encoding="utf-8")
 
     targets_cfg = {
-        "companion_files": {"denylist": str(denylist_path)},
+        "companion_files": {"denylist": denylist_path.as_posix()},
         "globals": {"default_gates": []},
         "targets": [
             {
