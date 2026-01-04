@@ -1,3 +1,2 @@
 """Shared version identifier for dataset collector pipelines."""
-
-VERSION = "2.0"
+from collector_core.__version__ import __version__ as VERSION

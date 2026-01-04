@@ -28,9 +28,7 @@ from urllib.parse import urlparse
 
 import requests
 import yaml
-
-VERSION = "2.0"
-
+from collector_core.__version__ import __version__ as VERSION
 
 def utc_now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())

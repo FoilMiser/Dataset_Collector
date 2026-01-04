@@ -30,9 +30,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-
-VERSION = "1.0"
-
+from collector_core.__version__ import __schema_version__ as VERSION
 
 @dataclass
 class QueueEntry:

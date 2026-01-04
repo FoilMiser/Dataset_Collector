@@ -47,10 +47,7 @@ try:
     import requests
 except ImportError:
     requests = None
-
-
-VERSION = "0.9"
-
+from collector_core.__version__ import __schema_version__ as VERSION
 
 def utc_now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())

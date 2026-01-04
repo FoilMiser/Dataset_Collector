@@ -12,8 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-
-VERSION = "2.0"
+from collector_core.__version__ import __version__ as VERSION
 PITCH_SAMPLE_LIMIT = 25
 PITCH_TEXT_LIMIT = 400
 

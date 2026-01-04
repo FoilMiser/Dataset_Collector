@@ -78,6 +78,35 @@ def iter_pipeline_drivers(root: Path) -> Iterable[Path]:
             yield driver
 
 
+def iter_acquire_workers(root: Path) -> Iterable[Path]:
+    for pipeline_dir in sorted(root.glob("*_pipeline_v2")):
+        if not pipeline_dir.is_dir():
+            continue
+        worker = pipeline_dir / "acquire_worker.py"
+        if worker.exists():
+            yield worker
+
+
+def iter_yellow_scrubbers(root: Path) -> Iterable[Path]:
+    for pipeline_dir in sorted(root.glob("*_pipeline_v2")):
+        if not pipeline_dir.is_dir():
+            continue
+        yield from sorted(pipeline_dir.glob("yellow_scrubber*.py"))
+
+
+def iter_collector_core_versioned_modules(root: Path) -> Iterable[Path]:
+    core_dir = root / "collector_core"
+    if not core_dir.is_dir():
+        return
+    yield from sorted(core_dir.glob("yellow_screen_*.py"))
+    merge = core_dir / "merge.py"
+    if merge.exists():
+        yield merge
+    pipeline_version = core_dir / "pipeline_version.py"
+    if pipeline_version.exists():
+        yield pipeline_version
+
+
 def validate_pipeline_driver_versions(root: Path) -> list[dict[str, Any]]:
     errors: list[dict[str, Any]] = []
     drivers = list(iter_pipeline_drivers(root))
@@ -97,11 +126,40 @@ def validate_pipeline_driver_versions(root: Path) -> list[dict[str, Any]]:
                 "path": str(driver),
                 "message": "Remove VERSION assignment from pipeline drivers.",
             })
-        if "from collector_core.pipeline_version import VERSION" not in text:
+        if "collector_core.__version__" not in text:
             errors.append({
                 "type": "missing_pipeline_version_import",
                 "path": str(driver),
-                "message": "Import VERSION from collector_core.pipeline_version.",
+                "message": "Import VERSION from collector_core.__version__.",
+            })
+
+    return errors
+
+
+def validate_versioned_modules(root: Path) -> list[dict[str, Any]]:
+    errors: list[dict[str, Any]] = []
+    versioned_files = [
+        *iter_acquire_workers(root),
+        *iter_yellow_scrubbers(root),
+        *iter_collector_core_versioned_modules(root),
+    ]
+    if not versioned_files:
+        return errors
+
+    hardcoded_version = re.compile(r"^\\s*VERSION\\s*=\\s*[\"']\\d", re.M)
+    for path in versioned_files:
+        text = path.read_text(encoding="utf-8")
+        if hardcoded_version.search(text):
+            errors.append({
+                "type": "hardcoded_version_string",
+                "path": str(path),
+                "message": "Remove hardcoded VERSION strings and import from collector_core.__version__.",
+            })
+        if "collector_core.__version__" not in text:
+            errors.append({
+                "type": "missing_version_import",
+                "path": str(path),
+                "message": "Import VERSION from collector_core.__version__.",
             })
 
     return errors
@@ -300,6 +358,7 @@ def main() -> int:
         report["warnings"].extend(warnings)
 
     report["errors"].extend(validate_pipeline_driver_versions(root))
+    report["errors"].extend(validate_versioned_modules(root))
 
     output_path = None
     if args.output:

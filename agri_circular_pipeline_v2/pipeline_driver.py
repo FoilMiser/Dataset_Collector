@@ -47,7 +47,7 @@ from typing import Any
 
 import yaml
 
-from collector_core.pipeline_version import VERSION
+from collector_core.__version__ import __version__ as VERSION
 
 try:
     import requests

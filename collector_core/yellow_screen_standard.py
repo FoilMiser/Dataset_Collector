@@ -29,9 +29,7 @@ from collector_core.yellow_screen_common import (
     utc_now,
     write_json,
 )
-
-VERSION = "2.0"
-
+from collector_core.__version__ import __version__ as VERSION
 
 def load_signoff(manifest_dir: Path) -> dict[str, Any] | None:
     signoff_path = manifest_dir / "review_signoff.json"
