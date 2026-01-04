@@ -495,15 +495,15 @@ targets:
       url: "https://huggingface.co/collections/common-pile/common-pile-v01-6724f18a787781ca9ae25749"
       notes: "CommonPile is large and heterogeneous; implement streaming + per-component license filters before enabling."
     data_type: ["text", "web", "scientific", "policy"]
-  download:
-    strategy: "huggingface_datasets"
-    out_subdir: "commonpile"
-    dataset_id: "common-pile/common-pile"
-    configs: []
-  canonicalize:
-    text_field_candidates: ["text", "content", "body", "document", "plain_text", "summary", "description"]
-  output:
-    pool: "quarantine"
+    download:
+      strategy: "huggingface_datasets"
+      out_subdir: "commonpile"
+      dataset_id: "common-pile/common-pile"
+      configs: []
+    canonicalize:
+      text_field_candidates: ["text", "content", "body", "document", "plain_text", "summary", "description"]
+    output:
+      pool: "quarantine"
       formats: ["hf_dataset_cache"]
 
   - id: "gbif_occurrences_candidate"
