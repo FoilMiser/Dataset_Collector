@@ -240,6 +240,13 @@ def main() -> int:
         default=None,
         help="Output report path (optional; omit to skip writing a report file)",
     )
+    ap.add_argument(
+        "--strict",
+        "--fail-on-warnings",
+        dest="strict",
+        action="store_true",
+        help="Exit with non-zero status if warnings are present.",
+    )
     args = ap.parse_args()
 
     root = Path(args.root).resolve()
@@ -260,14 +267,17 @@ def main() -> int:
             output_path = root / output_path
         output_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
 
+    exit_code = 1 if report["errors"] or (args.strict and report["warnings"]) else 0
     summary = {
         "errors": len(report["errors"]),
         "warnings": len(report["warnings"]),
         "report_path": str(output_path) if output_path else None,
+        "strict_mode": args.strict,
+        "exit_code": exit_code,
     }
     print(json.dumps(summary, indent=2))
 
-    return 1 if report["errors"] else 0
+    return exit_code
 
 
 if __name__ == "__main__":
