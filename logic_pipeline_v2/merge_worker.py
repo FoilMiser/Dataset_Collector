@@ -19,10 +19,10 @@ import hashlib
 import json
 import re
 import sqlite3
+import sys
 import time
 from collections.abc import Iterable, Iterator
 from pathlib import Path
-import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
