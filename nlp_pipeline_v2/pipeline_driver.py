@@ -41,6 +41,7 @@ from typing import Any
 
 import requests
 import yaml
+
 from collector_core.pipeline_version import VERSION
 
 

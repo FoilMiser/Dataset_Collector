@@ -40,6 +40,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+
 from collector_core.pipeline_version import VERSION
 
 try:
