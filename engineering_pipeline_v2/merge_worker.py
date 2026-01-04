@@ -18,6 +18,7 @@ import gzip
 import hashlib
 import json
 import re
+import sqlite3
 import time
 from collections.abc import Iterable, Iterator
 from pathlib import Path
@@ -133,6 +134,29 @@ class Sharder:
         append_jsonl(path, self.current)
         self.current = []
         return path
+
+
+class DedupeIndex:
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        ensure_dir(path.parent)
+        if path.exists():
+            path.unlink()
+        self.conn = sqlite3.connect(str(path))
+        self.conn.execute("PRAGMA journal_mode=WAL;")
+        self.conn.execute("PRAGMA synchronous=OFF;")
+        self.conn.execute("CREATE TABLE IF NOT EXISTS seen (content_sha256 TEXT PRIMARY KEY)")
+
+    def add_if_new(self, content_hash: str) -> bool:
+        cursor = self.conn.execute(
+            "INSERT OR IGNORE INTO seen (content_sha256) VALUES (?)",
+            (content_hash,),
+        )
+        return cursor.rowcount == 1
+
+    def close(self) -> None:
+        self.conn.commit()
+        self.conn.close()
 
 
 def resolve_roots(cfg: dict[str, Any]) -> Roots:
@@ -377,7 +401,7 @@ def record_skip(
 
 def merge_records(cfg: dict[str, Any], roots: Roots, execute: bool) -> dict[str, Any]:
     shard_cfg = sharding_cfg(cfg)
-    dedupe: set[str] = set()
+    dedupe = DedupeIndex(roots.ledger_root / "combined_dedupe.sqlite")
     summary = {"written": 0, "deduped": 0, "skipped": 0, "shards": []}
     target_canon = {
         str(target.get("id")): resolve_canonicalize_config(cfg, target)
@@ -417,10 +441,9 @@ def merge_records(cfg: dict[str, Any], roots: Roots, execute: bool) -> dict[str,
                 execute,
             )
             return
-        if content_hash in dedupe:
+        if not dedupe.add_if_new(content_hash):
             summary["deduped"] += 1
             return
-        dedupe.add(content_hash)
         pool = route_pool(rec)
         sharder = get_sharder(pool)
         shard_path = str(sharder._path())
@@ -477,6 +500,7 @@ def merge_records(cfg: dict[str, Any], roots: Roots, execute: bool) -> dict[str,
             if flushed:
                 summary["shards"].append(str(flushed))
 
+    dedupe.close()
     summary["finished_at_utc"] = utc_now()
     return summary
 
