@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from collections.abc import Iterable
 from datetime import datetime, timezone
@@ -66,6 +67,44 @@ def iter_targets_files(root: Path) -> Iterable[Path]:
         if not pipeline_dir.is_dir():
             continue
         yield from sorted(pipeline_dir.glob("targets_*.yaml"))
+
+
+def iter_pipeline_drivers(root: Path) -> Iterable[Path]:
+    for pipeline_dir in sorted(root.glob("*_pipeline_v2")):
+        if not pipeline_dir.is_dir():
+            continue
+        driver = pipeline_dir / "pipeline_driver.py"
+        if driver.exists():
+            yield driver
+
+
+def validate_pipeline_driver_versions(root: Path) -> list[dict[str, Any]]:
+    errors: list[dict[str, Any]] = []
+    drivers = list(iter_pipeline_drivers(root))
+    if len(drivers) != 18:
+        errors.append({
+            "type": "unexpected_pipeline_driver_count",
+            "expected": 18,
+            "found": len(drivers),
+        })
+
+    version_assignment = re.compile(r"^\\s*VERSION\\s*=", re.M)
+    for driver in drivers:
+        text = driver.read_text(encoding="utf-8")
+        if version_assignment.search(text):
+            errors.append({
+                "type": "hardcoded_pipeline_version",
+                "path": str(driver),
+                "message": "Remove VERSION assignment from pipeline drivers.",
+            })
+        if "from collector_core.pipeline_version import VERSION" not in text:
+            errors.append({
+                "type": "missing_pipeline_version_import",
+                "path": str(driver),
+                "message": "Import VERSION from collector_core.pipeline_version.",
+            })
+
+    return errors
 
 
 def load_profiles(license_map_path: Path) -> dict[str, Any]:
@@ -259,6 +298,8 @@ def main() -> int:
         errors, warnings = validate_targets_file(targets_path)
         report["errors"].extend(errors)
         report["warnings"].extend(warnings)
+
+    report["errors"].extend(validate_pipeline_driver_versions(root))
 
     output_path = None
     if args.output:
