@@ -7,6 +7,7 @@ from pathlib import Path
 import yaml
 from datasets import Dataset
 
+from tools.output_contract import REQUIRED_FIELDS, validate_output_contract
 
 def test_end_to_end_pipeline_contract(tmp_path: Path) -> None:
     raw_root = tmp_path / "raw"
@@ -95,3 +96,12 @@ def test_end_to_end_pipeline_contract(tmp_path: Path) -> None:
     assert record["record_id"]
     assert record["source"]["license_profile"] == pool
     assert record["hash"]["content_sha256"]
+    validate_output_contract(record, "combined/shard")
+
+    for field, expected_type in REQUIRED_FIELDS.items():
+        assert field in record
+        if field == "source_urls":
+            assert isinstance(record[field], list)
+            assert all(isinstance(item, str) for item in record[field])
+        else:
+            assert isinstance(record[field], expected_type)
