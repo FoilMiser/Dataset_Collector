@@ -39,6 +39,7 @@ import argparse
 import dataclasses
 import hashlib
 import json
+import os
 import re
 import time
 from pathlib import Path
@@ -70,6 +71,13 @@ def sha256_file(path: Path) -> str | None:
         return sha256_bytes(path.read_bytes())
     except Exception:
         return None
+
+
+def resolve_dataset_root(explicit: str | None) -> Path | None:
+    value = explicit or os.getenv("DATASET_ROOT") or os.getenv("DATASET_COLLECTOR_ROOT")
+    if not value:
+        return None
+    return Path(value).expanduser().resolve()
 
 def read_yaml(path: Path) -> dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -423,6 +431,7 @@ def snapshot_evidence(
     manifest_dir: Path,
     url: str,
     max_retries: int = 3,
+    backoff_base: float = 2.0,
     headers: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     result: dict[str, Any] = {
@@ -444,7 +453,12 @@ def snapshot_evidence(
             previous_digest = sha256_file(candidate)
             break
 
-    content, info, meta = fetch_url_with_retry(url, max_retries=max_retries, headers=headers)
+    content, info, meta = fetch_url_with_retry(
+        url,
+        max_retries=max_retries,
+        backoff_base=backoff_base,
+        headers=headers,
+    )
     result["fetch_meta"] = meta
 
     if content is None:
@@ -609,10 +623,15 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=f"Pipeline Driver v{VERSION}")
     ap.add_argument("--targets", required=True, help="Path to targets_code.yaml (v0.8)")
     ap.add_argument("--license-map", default=None, help="Path to license_map.yaml (defaults to companion_files.license_map)")
-    ap.add_argument("--out-manifests", default=None, help="Override manifests_root")
-    ap.add_argument("--out-queues", default=None, help="Override queues_root")
+    ap.add_argument("--dataset-root", default=None, help="Override dataset root (sets manifests/queues defaults)")
+    ap.add_argument("--manifests-root", default=None, help="Override manifests_root (alias: --out-manifests)")
+    ap.add_argument("--queues-root", default=None, help="Override queues_root (alias: --out-queues)")
+    ap.add_argument("--out-manifests", default=None, help=argparse.SUPPRESS)
+    ap.add_argument("--out-queues", default=None, help=argparse.SUPPRESS)
     ap.add_argument("--no-fetch", action="store_true", help="Do not fetch evidence URLs (offline mode - v0.9: forces YELLOW if no snapshot)")
-    ap.add_argument("--max-retries", type=int, default=3, help="Max retries for evidence fetching")
+    ap.add_argument("--retry-max", type=int, default=None, help="Max retries for evidence fetching")
+    ap.add_argument("--retry-backoff", type=float, default=None, help="Backoff base for evidence fetching")
+    ap.add_argument("--max-retries", type=int, default=None, help=argparse.SUPPRESS)
     ap.add_argument("--min-license-confidence", type=float, default=0.6, help="Minimum SPDX confidence required before GREEN classification")
     ap.add_argument(
         "--evidence-header",
@@ -622,6 +641,13 @@ def main() -> None:
     )
     ap.add_argument("--quiet", action="store_true", help="Suppress dry-run report output")
     args = ap.parse_args()
+
+    retry_max_env = os.getenv("PIPELINE_RETRY_MAX")
+    retry_backoff_env = os.getenv("PIPELINE_RETRY_BACKOFF")
+    retry_max = args.retry_max if args.retry_max is not None else args.max_retries
+    if retry_max is None:
+        retry_max = int(retry_max_env) if retry_max_env else 3
+    retry_backoff = args.retry_backoff if args.retry_backoff is not None else (float(retry_backoff_env) if retry_backoff_env else 2.0)
 
     headers: dict[str, str] = {}
     for raw in args.evidence_header:
@@ -643,8 +669,21 @@ def main() -> None:
 
 
     globals_cfg = targets_cfg.get("globals", {}) or {}
-    manifests_root = Path(args.out_manifests or globals_cfg.get("manifests_root", "./manifests")).resolve()
-    queues_root = Path(args.out_queues or globals_cfg.get("queues_root", "./queues")).resolve()
+    dataset_root = resolve_dataset_root(args.dataset_root)
+    manifests_override = args.manifests_root or args.out_manifests
+    queues_override = args.queues_root or args.out_queues
+    if manifests_override:
+        manifests_root = Path(manifests_override).expanduser().resolve()
+    elif dataset_root:
+        manifests_root = (dataset_root / "_manifests").resolve()
+    else:
+        manifests_root = Path(globals_cfg.get("manifests_root", "./manifests")).expanduser().resolve()
+    if queues_override:
+        queues_root = Path(queues_override).expanduser().resolve()
+    elif dataset_root:
+        queues_root = (dataset_root / "_queues").resolve()
+    else:
+        queues_root = Path(globals_cfg.get("queues_root", "./queues")).expanduser().resolve()
     ensure_dir(manifests_root)
     ensure_dir(queues_root)
 
@@ -710,7 +749,8 @@ def main() -> None:
             evidence_snapshot = snapshot_evidence(
                 target_manifest_dir,
                 evidence_url,
-                max_retries=args.max_retries,
+                max_retries=retry_max,
+                backoff_base=retry_backoff,
                 headers=headers,
             )
             evidence_text = extract_text_for_scanning(evidence_snapshot)
