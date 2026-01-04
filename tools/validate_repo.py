@@ -117,7 +117,7 @@ def validate_pipeline_driver_versions(root: Path) -> list[dict[str, Any]]:
             "found": len(drivers),
         })
 
-    version_assignment = re.compile(r"^\\s*VERSION\\s*=", re.M)
+    version_assignment = re.compile(r"^\s*VERSION\s*=", re.M)
     for driver in drivers:
         text = driver.read_text(encoding="utf-8")
         if version_assignment.search(text):
@@ -146,7 +146,7 @@ def validate_versioned_modules(root: Path) -> list[dict[str, Any]]:
     if not versioned_files:
         return errors
 
-    hardcoded_version = re.compile(r"^\\s*VERSION\\s*=\\s*[\"']\\d", re.M)
+    hardcoded_version = re.compile(r"^\s*VERSION\s*=\s*[\"']\d", re.M)
     for path in versioned_files:
         text = path.read_text(encoding="utf-8")
         if hardcoded_version.search(text):
