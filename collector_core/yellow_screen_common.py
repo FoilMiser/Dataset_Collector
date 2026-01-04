@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import dataclasses
-import os
 import gzip
 import hashlib
 import json
+import os
 import re
 import time
 from collections.abc import Iterable, Iterator

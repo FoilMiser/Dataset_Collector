@@ -22,6 +22,7 @@ from collector_core.yellow_screen_common import (
     load_targets_cfg,
     merge_screening_config,
     read_jsonl,
+    resolve_dataset_root,
     resolve_roots,
     sha256_text,
     sharding_cfg,
