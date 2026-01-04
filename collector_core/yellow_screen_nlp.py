@@ -27,8 +27,9 @@ from typing import Any
 import yaml
 from datasets import DatasetDict, load_from_disk
 
-from collector_core.yellow_screen_common import resolve_dataset_root
 from collector_core.__version__ import __version__ as VERSION
+from collector_core.yellow_screen_common import resolve_dataset_root
+
 PITCH_SAMPLE_LIMIT = 25
 PITCH_TEXT_LIMIT = 400
 
