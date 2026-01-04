@@ -42,6 +42,12 @@ YELLOW items must be reviewed and approved before they are eligible for the comb
 
 The notebook prompts for missing environment variables (for example `GITHUB_TOKEN` or `CHEMSPIDER_API_KEY`) and can install each pipeline's requirements before starting its stages.
 
+## Single-command run, outputs, and clean-room reruns
+
+For the shortest single-command run, expected output folders, log/manifest/ledger locations,
+and clean-room rerun steps (what to delete vs. keep), see
+`docs/run_instructions.md`.
+
 ## Standard CLI contract (`run_pipeline.sh`)
 
 All `*_pipeline_v2` directories expose a `run_pipeline.sh` entrypoint with a shared CLI contract. Individual pipelines may add additional flags, but the following is standardized.
