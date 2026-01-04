@@ -4,6 +4,7 @@ import dataclasses
 import gzip
 import hashlib
 import json
+import os
 import re
 import time
 from collections.abc import Iterable, Iterator
@@ -153,14 +154,30 @@ def load_targets_cfg(path: Path) -> dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
 
-def resolve_roots(cfg: dict[str, Any], defaults: YellowRootDefaults) -> Roots:
+def resolve_dataset_root(explicit: str | None = None) -> Path | None:
+    value = explicit or os.getenv("DATASET_ROOT") or os.getenv("DATASET_COLLECTOR_ROOT")
+    if not value:
+        return None
+    return Path(value).expanduser().resolve()
+
+
+def resolve_roots(cfg: dict[str, Any], defaults: YellowRootDefaults, dataset_root: Path | None = None) -> Roots:
+    dataset_root = dataset_root or resolve_dataset_root()
+    if dataset_root:
+        defaults = YellowRootDefaults(
+            raw_root=str(dataset_root / "raw"),
+            screened_root=str(dataset_root / "screened_yellow"),
+            manifests_root=str(dataset_root / "_manifests"),
+            ledger_root=str(dataset_root / "_ledger"),
+            pitches_root=str(dataset_root / "_pitches"),
+        )
     g = (cfg.get("globals", {}) or {})
     return Roots(
-        raw_root=Path(g.get("raw_root", defaults.raw_root)),
-        screened_root=Path(g.get("screened_yellow_root", defaults.screened_root)),
-        manifests_root=Path(g.get("manifests_root", defaults.manifests_root)),
-        ledger_root=Path(g.get("ledger_root", defaults.ledger_root)),
-        pitches_root=Path(g.get("pitches_root", defaults.pitches_root)),
+        raw_root=Path(g.get("raw_root", defaults.raw_root)).expanduser().resolve(),
+        screened_root=Path(g.get("screened_yellow_root", defaults.screened_root)).expanduser().resolve(),
+        manifests_root=Path(g.get("manifests_root", defaults.manifests_root)).expanduser().resolve(),
+        ledger_root=Path(g.get("ledger_root", defaults.ledger_root)).expanduser().resolve(),
+        pitches_root=Path(g.get("pitches_root", defaults.pitches_root)).expanduser().resolve(),
     )
 
 

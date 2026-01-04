@@ -27,6 +27,8 @@ from typing import Any
 import yaml
 from datasets import DatasetDict, load_from_disk
 
+from collector_core.yellow_screen_common import resolve_dataset_root
+
 VERSION = "2.0"
 PITCH_SAMPLE_LIMIT = 25
 PITCH_TEXT_LIMIT = 400
@@ -163,14 +165,20 @@ def load_signoff(manifest_dir: Path) -> dict[str, Any] | None:
         return None
 
 
-def resolve_roots(cfg: dict[str, Any]) -> Roots:
+def resolve_roots(cfg: dict[str, Any], dataset_root: Path | None = None) -> Roots:
+    dataset_root = dataset_root or resolve_dataset_root()
+    default_raw = dataset_root / "raw" if dataset_root else Path("/data/kg_nav/raw")
+    default_screened = dataset_root / "screened_yellow" if dataset_root else Path("/data/kg_nav/screened_yellow")
+    default_manifests = dataset_root / "_manifests" if dataset_root else Path("/data/kg_nav/_manifests")
+    default_ledger = dataset_root / "_ledger" if dataset_root else Path("/data/kg_nav/_ledger")
+    default_pitches = dataset_root / "_pitches" if dataset_root else Path("/data/kg_nav/_pitches")
     g = (cfg.get("globals", {}) or {})
     return Roots(
-        raw_root=Path(g.get("raw_root", "/data/kg_nav/raw")),
-        screened_root=Path(g.get("screened_yellow_root", "/data/kg_nav/screened_yellow")),
-        manifests_root=Path(g.get("manifests_root", "/data/kg_nav/_manifests")),
-        ledger_root=Path(g.get("ledger_root", "/data/kg_nav/_ledger")),
-        pitches_root=Path(g.get("pitches_root", "/data/kg_nav/_pitches")),
+        raw_root=Path(g.get("raw_root", default_raw)).expanduser().resolve(),
+        screened_root=Path(g.get("screened_yellow_root", default_screened)).expanduser().resolve(),
+        manifests_root=Path(g.get("manifests_root", default_manifests)).expanduser().resolve(),
+        ledger_root=Path(g.get("ledger_root", default_ledger)).expanduser().resolve(),
+        pitches_root=Path(g.get("pitches_root", default_pitches)).expanduser().resolve(),
     )
 
 
@@ -643,11 +651,12 @@ def main() -> None:
     ap.add_argument("--targets", required=True, help="Path to targets_kg_nav.yaml")
     ap.add_argument("--queue", required=True, help="YELLOW queue JSONL")
     ap.add_argument("--execute", action="store_true", help="Write outputs (default: dry-run)")
+    ap.add_argument("--dataset-root", default=None, help="Override dataset root (raw/screened/_ledger/_pitches/_manifests)")
     args = ap.parse_args()
 
     targets_path = Path(args.targets).expanduser().resolve()
     cfg = load_targets_cfg(targets_path)
-    roots = resolve_roots(cfg)
+    roots = resolve_roots(cfg, dataset_root=resolve_dataset_root(args.dataset_root))
     ensure_dir(roots.screened_root)
     ensure_dir(roots.ledger_root)
     ensure_dir(roots.pitches_root)

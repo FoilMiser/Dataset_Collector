@@ -5,6 +5,7 @@ import dataclasses
 import gzip
 import hashlib
 import json
+import os
 import re
 import sqlite3
 import time
@@ -177,13 +178,28 @@ def write_json(path: Path, obj: dict[str, Any]) -> None:
     path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
-def resolve_roots(cfg: dict[str, Any], defaults: RootDefaults) -> Roots:
+def resolve_dataset_root(explicit: str | None = None) -> Path | None:
+    value = explicit or os.getenv("DATASET_ROOT") or os.getenv("DATASET_COLLECTOR_ROOT")
+    if not value:
+        return None
+    return Path(value).expanduser().resolve()
+
+
+def resolve_roots(cfg: dict[str, Any], defaults: RootDefaults, dataset_root: Path | None = None) -> Roots:
+    dataset_root = dataset_root or resolve_dataset_root()
+    if dataset_root:
+        defaults = RootDefaults(
+            raw_root=str(dataset_root / "raw"),
+            screened_root=str(dataset_root / "screened_yellow"),
+            combined_root=str(dataset_root / "combined"),
+            ledger_root=str(dataset_root / "_ledger"),
+        )
     g = (cfg.get("globals", {}) or {})
     return Roots(
-        raw_root=Path(g.get("raw_root", defaults.raw_root)),
-        screened_root=Path(g.get("screened_yellow_root", defaults.screened_root)),
-        combined_root=Path(g.get("combined_root", defaults.combined_root)),
-        ledger_root=Path(g.get("ledger_root", defaults.ledger_root)),
+        raw_root=Path(g.get("raw_root", defaults.raw_root)).expanduser().resolve(),
+        screened_root=Path(g.get("screened_yellow_root", defaults.screened_root)).expanduser().resolve(),
+        combined_root=Path(g.get("combined_root", defaults.combined_root)).expanduser().resolve(),
+        ledger_root=Path(g.get("ledger_root", defaults.ledger_root)).expanduser().resolve(),
     )
 
 
@@ -547,9 +563,10 @@ def main(*, pipeline_id: str, defaults: RootDefaults) -> None:
     ap = argparse.ArgumentParser(description=f"Merge Worker v{VERSION}")
     ap.add_argument("--targets", required=True, help="targets.yaml")
     ap.add_argument("--execute", action="store_true", help="Write combined shards")
+    ap.add_argument("--dataset-root", default=None, help="Override dataset root (raw/screened/combined/_ledger)")
     args = ap.parse_args()
 
     cfg = yaml.safe_load(Path(args.targets).read_text(encoding="utf-8")) or {}
-    roots = resolve_roots(cfg, defaults)
+    roots = resolve_roots(cfg, defaults, dataset_root=resolve_dataset_root(args.dataset_root))
     summary = merge_records(cfg, roots, args.execute, pipeline_id=pipeline_id)
     write_json(roots.ledger_root / "merge_summary.json", summary)

@@ -22,6 +22,7 @@ from collector_core.yellow_screen_common import (
     load_targets_cfg,
     merge_screening_config,
     read_jsonl,
+    resolve_dataset_root,
     resolve_roots,
     sha256_text,
     sharding_cfg,
@@ -306,11 +307,12 @@ def main(*, defaults: YellowRootDefaults) -> None:
     ap.add_argument("--targets", required=True, help="Path to targets.yaml")
     ap.add_argument("--queue", required=True, help="YELLOW queue JSONL")
     ap.add_argument("--execute", action="store_true", help="Write outputs (default: dry-run)")
+    ap.add_argument("--dataset-root", default=None, help="Override dataset root (raw/screened/_ledger/_pitches/_manifests)")
     args = ap.parse_args()
 
     targets_path = Path(args.targets).expanduser().resolve()
     cfg = load_targets_cfg(targets_path)
-    roots = resolve_roots(cfg, defaults)
+    roots = resolve_roots(cfg, defaults, dataset_root=resolve_dataset_root(args.dataset_root))
     ensure_dir(roots.screened_root)
     ensure_dir(roots.ledger_root)
     ensure_dir(roots.pitches_root)
