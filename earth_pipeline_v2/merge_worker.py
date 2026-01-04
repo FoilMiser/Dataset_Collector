@@ -19,15 +19,22 @@ import hashlib
 import json
 import re
 import sqlite3
+import sys
 import time
 from collections.abc import Iterable, Iterator
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from typing import Any
 
 import yaml
 from datasets import DatasetDict, load_from_disk
 
+from tools.output_contract import normalize_output_record, validate_output_contract
+
 VERSION = "2.0"
+PIPELINE_ID = Path(__file__).resolve().parent.name
 
 
 def utc_now() -> str:
@@ -229,7 +236,14 @@ def resolve_routing(raw: dict[str, Any]) -> dict[str, Any]:
     return {}
 
 
-def canonicalize_row(raw: dict[str, Any], target_id: str, pool: str, candidates: list[str], max_chars: int | None) -> tuple[dict[str, Any] | None, str | None]:
+def canonicalize_row(
+    raw: dict[str, Any],
+    target_id: str,
+    pool: str,
+    candidates: list[str],
+    max_chars: int | None,
+    target_meta: dict[str, Any] | None,
+) -> tuple[dict[str, Any] | None, str | None]:
     if not isinstance(raw, dict):
         return None, "unsupported_row_type"
     text = extract_text(raw, candidates)
@@ -237,28 +251,22 @@ def canonicalize_row(raw: dict[str, Any], target_id: str, pool: str, candidates:
         return None, "missing_text"
     if max_chars is not None and max_chars > 0 and len(text) > max_chars:
         text = text[:max_chars]
-    content_hash = ((raw.get("hash") or {}).get("content_sha256") or raw.get("content_sha256"))
-    if not content_hash:
-        content_hash = sha256_text(text)
-    record_id = str(raw.get("record_id") or raw.get("id") or sha256_text(f"{target_id}:{text}"))
-    source = raw.get("source", {}) or {}
-    license_profile = raw.get("license_profile") or source.get("license_profile") or pool
-    license_spdx = raw.get("license_spdx") or source.get("license_spdx")
-    return {
-        "record_id": record_id,
-        "text": text,
-        "source": {
-            "target_id": source.get("target_id", target_id),
-            "origin": source.get("origin", raw.get("origin", "unknown")),
-            "source_url": source.get("source_url") or raw.get("source_url"),
-            "license_spdx": license_spdx,
-            "license_profile": license_profile,
-            "license_evidence": source.get("license_evidence", raw.get("license_evidence")),
-            "retrieved_at_utc": source.get("retrieved_at_utc", raw.get("retrieved_at_utc")),
-        },
-        "routing": resolve_routing(raw),
-        "hash": {"content_sha256": content_hash},
-    }, None
+    record = dict(raw)
+    record.setdefault("text", text)
+    record_id = str(record.get("record_id") or record.get("id") or sha256_text(f"{target_id}:{text}"))
+    record.setdefault("record_id", record_id)
+    meta = target_meta or {}
+    record = normalize_output_record(
+        record,
+        target_id=target_id,
+        pool=pool,
+        pipeline=PIPELINE_ID,
+        dataset_id=meta.get("dataset_id"),
+        config=meta.get("config"),
+        now=utc_now(),
+    )
+    validate_output_contract(record, f"green/{target_id}")
+    return record, None
 
 
 def is_hf_dataset_dir(path: Path) -> bool:
@@ -319,14 +327,18 @@ def iter_green_records(roots: Roots) -> Iterator[GreenInput | GreenSkip]:
                         detail={"error": str(exc)},
                     )
                     continue
-                datasets = (
-                    [dataset_obj[name] for name in sorted(dataset_obj.keys())]
-                    if isinstance(dataset_obj, DatasetDict)
-                    else [dataset_obj]
-                )
-                for dataset in datasets:
-                    for raw in dataset:
-                        yield GreenInput(dict(raw), target_id, pool_dir.name, ds_path, "hf_dataset")
+                if isinstance(dataset_obj, DatasetDict):
+                    for split_name in sorted(dataset_obj.keys()):
+                        dataset = dataset_obj[split_name]
+                        for raw in dataset:
+                            row = dict(raw)
+                            row.setdefault("split", split_name)
+                            yield GreenInput(row, target_id, pool_dir.name, ds_path, "hf_dataset")
+                else:
+                    for raw in dataset_obj:
+                        row = dict(raw)
+                        row.setdefault("split", "train")
+                        yield GreenInput(row, target_id, pool_dir.name, ds_path, "hf_dataset")
 
             for fp in sorted([p for p in target_dir.rglob("*") if p.is_file()]):
                 resolved = fp.resolve()
@@ -403,6 +415,14 @@ def merge_records(cfg: dict[str, Any], roots: Roots, execute: bool) -> dict[str,
     shard_cfg = sharding_cfg(cfg)
     dedupe = DedupeIndex(roots.ledger_root / "combined_dedupe.sqlite")
     summary = {"written": 0, "deduped": 0, "skipped": 0, "shards": []}
+    target_meta = {
+        str(target.get("id")): {
+            "dataset_id": (target.get("download", {}) or {}).get("dataset_id") or target.get("dataset_id"),
+            "config": (target.get("download", {}) or {}).get("config"),
+        }
+        for target in (cfg.get("targets", []) or [])
+        if target.get("id") is not None
+    }
     target_canon = {
         str(target.get("id")): resolve_canonicalize_config(cfg, target)
         for target in (cfg.get("targets", []) or [])
@@ -426,29 +446,28 @@ def merge_records(cfg: dict[str, Any], roots: Roots, execute: bool) -> dict[str,
         target_id: str | None = None,
         pool_hint: str | None = None,
     ) -> None:
-        content_hash = ((rec.get("hash") or {}).get("content_sha256") or rec.get("content_sha256"))
-        if not content_hash:
-            summary["skipped"] += 1
-            resolved_target = target_id or (rec.get("source", {}) or {}).get("target_id") or "unknown"
-            pool = pool_hint or route_pool(rec)
-            record_skip(
-                roots,
-                resolved_target,
-                pool,
-                "missing_content_hash",
-                source_path,
-                source_kind,
-                execute,
-            )
-            return
+        resolved_target = target_id or (rec.get("source", {}) or {}).get("target_id") or "unknown"
+        pool_value = pool_hint or rec.get("pool") or route_pool(rec)
+        meta = target_meta.get(resolved_target, {})
+        record = normalize_output_record(
+            rec,
+            target_id=resolved_target,
+            pool=pool_value,
+            pipeline=PIPELINE_ID,
+            dataset_id=meta.get("dataset_id"),
+            config=meta.get("config"),
+            now=utc_now(),
+        )
+        validate_output_contract(record, f"{source_kind}/{resolved_target}")
+        content_hash = record["content_sha256"]
         if not dedupe.add_if_new(content_hash):
             summary["deduped"] += 1
             return
-        pool = route_pool(rec)
+        pool = record.get("pool") or pool_value
         sharder = get_sharder(pool)
         shard_path = str(sharder._path())
         if execute:
-            path = sharder.add(rec)
+            path = sharder.add(record)
             if path:
                 shard_path = str(path)
                 summary["shards"].append(shard_path)
@@ -456,13 +475,14 @@ def merge_records(cfg: dict[str, Any], roots: Roots, execute: bool) -> dict[str,
                 "content_sha256": content_hash,
                 "license_pool": pool,
                 "output_shard": shard_path,
-                "source": rec.get("source", {}),
+                "source": record.get("source", {}),
                 "seen_at_utc": utc_now(),
             }])
         summary["written"] += 1
 
     for item in iter_green_records(roots):
         candidates, max_chars = target_canon.get(item.target_id, default_canon)
+        meta = target_meta.get(item.target_id, {})
         if isinstance(item, GreenSkip):
             summary["skipped"] += 1
             record_skip(
@@ -476,7 +496,7 @@ def merge_records(cfg: dict[str, Any], roots: Roots, execute: bool) -> dict[str,
                 detail=item.detail,
             )
             continue
-        canonical, reason = canonicalize_row(item.raw, item.target_id, item.pool, candidates, max_chars)
+        canonical, reason = canonicalize_row(item.raw, item.target_id, item.pool, candidates, max_chars, meta)
         if not canonical:
             summary["skipped"] += 1
             record_skip(
