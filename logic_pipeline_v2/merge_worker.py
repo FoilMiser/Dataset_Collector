@@ -17,8 +17,8 @@ import dataclasses
 import gzip
 import hashlib
 import json
-import sqlite3
 import re
+import sqlite3
 import time
 from collections.abc import Iterable, Iterator
 from pathlib import Path
