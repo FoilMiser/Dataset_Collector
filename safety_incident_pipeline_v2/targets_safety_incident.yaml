@@ -682,6 +682,8 @@ targets:
   download:
     strategy: huggingface_datasets
     dataset_id: common-pile/regulations_filtered
+  canonicalize:
+    text_field_candidates: ["text", "content", "body", "document", "comment_text"]
   output:
     pool: quarantine
     formats:
@@ -729,6 +731,8 @@ targets:
   download:
     strategy: huggingface_datasets
     dataset_id: common-pile/usgpo_filtered
+  canonicalize:
+    text_field_candidates: ["text", "content", "body", "document", "plain_text"]
   output:
     pool: quarantine
     formats:

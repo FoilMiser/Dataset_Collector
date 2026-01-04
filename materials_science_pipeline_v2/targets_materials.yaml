@@ -409,6 +409,8 @@ targets:
     strategy: huggingface_datasets
     dataset_id: common-pile/wikipedia
     splits: [train]
+  canonicalize:
+    text_field_candidates: ["text", "content", "body", "document", "plain_text"]
   output:
     pool: copyleft
     formats: [hf_dataset]

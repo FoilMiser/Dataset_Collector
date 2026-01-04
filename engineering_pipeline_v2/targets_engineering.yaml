@@ -96,6 +96,8 @@ targets:
     strategy: huggingface_datasets
     dataset_id: common-pile/uspto_filtered
     splits: [train]
+  canonicalize:
+    text_field_candidates: ["text", "abstract", "description", "claims", "content", "body"]
   output:
     pool: record_level
   routing:
@@ -117,6 +119,8 @@ targets:
     strategy: huggingface_datasets
     dataset_id: common-pile/regulations_filtered
     splits: [train]
+  canonicalize:
+    text_field_candidates: ["text", "content", "body", "document", "comment_text"]
   output:
     pool: record_level
   routing:
@@ -138,6 +142,8 @@ targets:
     strategy: huggingface_datasets
     dataset_id: common-pile/usgpo_filtered
     splits: [train]
+  canonicalize:
+    text_field_candidates: ["text", "content", "body", "document", "plain_text"]
   output:
     pool: record_level
   routing:
@@ -159,6 +165,8 @@ targets:
     strategy: huggingface_datasets
     dataset_id: common-pile/arxiv_papers_filtered
     splits: [train]
+  canonicalize:
+    text_field_candidates: ["text", "abstract", "content", "body", "paper", "article"]
   output:
     pool: record_level
   routing:
@@ -180,6 +188,8 @@ targets:
     strategy: huggingface_datasets
     dataset_id: common-pile/arxiv_abstracts_filtered
     splits: [train]
+  canonicalize:
+    text_field_candidates: ["abstract", "summary", "description", "text"]
   output:
     pool: record_level
   routing:
@@ -201,6 +211,8 @@ targets:
     strategy: huggingface_datasets
     dataset_id: common-pile/stackexchange_filtered
     splits: [train]
+  canonicalize:
+    text_field_candidates: ["text", "content", "body", "question", "answer", "title"]
   output:
     pool: copyleft
   routing:
@@ -222,6 +234,8 @@ targets:
     strategy: huggingface_datasets
     dataset_id: common-pile/github_archive_filtered
     splits: [train]
+  canonicalize:
+    text_field_candidates: ["content", "text", "code", "body", "readme", "message", "comment"]
   output:
     pool: record_level
   routing:

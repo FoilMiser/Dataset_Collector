@@ -191,6 +191,8 @@ targets:
     config: null
     splits:
     - train
+  canonicalize:
+    text_field_candidates: ["text", "content", "body", "document", "plain_text"]
   output:
     pool: copyleft
     formats:
@@ -230,6 +232,8 @@ targets:
     config: null
     splits:
     - train
+  canonicalize:
+    text_field_candidates: ["text", "content", "body", "document", "plain_text"]
   output:
     pool: copyleft
     formats:
@@ -269,6 +273,8 @@ targets:
     config: null
     splits:
     - train
+  canonicalize:
+    text_field_candidates: ["text", "content", "body", "document", "plain_text"]
   output:
     pool: copyleft
     formats:
@@ -308,6 +314,8 @@ targets:
     config: null
     splits:
     - train
+  canonicalize:
+    text_field_candidates: ["text", "content", "body", "question", "answer", "title"]
   output:
     pool: copyleft
     formats:
@@ -348,6 +356,8 @@ targets:
     config: null
     splits:
     - train
+  canonicalize:
+    text_field_candidates: ["text", "abstract", "content", "body", "paper", "article"]
   output:
     pool: quarantine
     formats:
@@ -389,6 +399,8 @@ targets:
     config: null
     splits:
     - train
+  canonicalize:
+    text_field_candidates: ["text", "content", "body", "document", "plain_text", "summary", "description"]
   output:
     pool: quarantine
     formats:
@@ -430,6 +442,8 @@ targets:
     config: null
     splits:
     - train
+  canonicalize:
+    text_field_candidates: ["text", "content", "body", "document", "plain_text", "summary", "description"]
   output:
     pool: quarantine
     formats:
@@ -471,6 +485,8 @@ targets:
     config: null
     splits:
     - train
+  canonicalize:
+    text_field_candidates: ["text", "content", "body", "document", "plain_text", "summary", "description"]
   output:
     pool: quarantine
     formats:
@@ -512,6 +528,8 @@ targets:
     config: null
     splits:
     - train
+  canonicalize:
+    text_field_candidates: ["text", "content", "body", "document", "plain_text", "summary", "description"]
   output:
     pool: quarantine
     formats:
@@ -553,6 +571,8 @@ targets:
     config: null
     splits:
     - train
+  canonicalize:
+    text_field_candidates: ["text", "content", "body", "document", "plain_text", "summary", "description"]
   output:
     pool: quarantine
     formats:

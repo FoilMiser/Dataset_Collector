@@ -217,6 +217,8 @@ targets:
       strategy: "huggingface_datasets"
       config:
         dataset_id: "common-pile/github_archive"
+    canonicalize:
+      text_field_candidates: ["content", "text", "code", "body", "readme", "message", "comment"]
 
   - id: "common_pile_stackv2_edu_filtered"
     name: "Common Pile: Stack v2 (edu filtered)"
@@ -231,6 +233,8 @@ targets:
       strategy: "huggingface_datasets"
       config:
         dataset_id: "common-pile/stackv2_edu_filtered"
+    canonicalize:
+      text_field_candidates: ["text", "content", "body", "question", "answer", "title"]
 
   - id: "bigcode_the_stack"
     name: "BigCode The Stack (permissively-licensed code, with provenance)"
@@ -246,6 +250,8 @@ targets:
       strategy: "huggingface_datasets"
       config:
         dataset_id: "bigcode/the-stack"
+    canonicalize:
+      text_field_candidates: ["content", "text", "code"]
 
   - id: "bigcode_the_stack_v2"
     name: "BigCode The Stack v2 (very large; additional ToU/process constraints)"
@@ -261,6 +267,8 @@ targets:
       strategy: "huggingface_datasets"
       config:
         dataset_id: "bigcode/the-stack-v2"
+    canonicalize:
+      text_field_candidates: ["content", "text", "code"]
 
   - id: "code_search_net"
     name: "CodeSearchNet (comment-code pairs; mixed licenses)"
@@ -277,6 +285,8 @@ targets:
       config:
         dataset_id: "code_search_net"
         config: "python"
+    canonicalize:
+      text_field_candidates: ["func_code_string", "whole_func_string", "code", "text", "content", "docstring"]
 
   - id: "microsoft_codexglue"
     name: "CodeXGLUE (benchmark suite; C-UDA data license)"
@@ -308,5 +318,7 @@ targets:
       strategy: "huggingface_datasets"
       config:
         dataset_id: "xlangai/DS-1000"
+    canonicalize:
+      text_field_candidates: ["prompt", "solution", "reference_solution", "code", "text"]
 
   # (Intentionally no RED targets in this file; keep RED candidates in the markdown plan)

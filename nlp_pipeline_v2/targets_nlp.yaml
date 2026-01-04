@@ -202,6 +202,8 @@ targets:
     download:
       strategy: "huggingface_datasets"
       dataset_id: "common-pile/uspto_filtered"
+    canonicalize:
+      text_field_candidates: ["text", "abstract", "description", "claims", "content", "body"]
     output:
       pool: "permissive"
       formats: ["hf_disk"]
@@ -226,6 +228,8 @@ targets:
     download:
       strategy: "huggingface_datasets"
       dataset_id: "common-pile/libretexts_filtered"
+    canonicalize:
+      text_field_candidates: ["text", "content", "body", "document", "plain_text", "summary", "description"]
     output:
       pool: "permissive"
       formats: ["hf_disk"]
@@ -250,6 +254,8 @@ targets:
     download:
       strategy: "huggingface_datasets"
       dataset_id: "common-pile/pressbooks_filtered"
+    canonicalize:
+      text_field_candidates: ["text", "content", "body", "document", "plain_text", "summary", "description"]
     output:
       pool: "permissive"
       formats: ["hf_disk"]
@@ -276,6 +282,8 @@ targets:
     download:
       strategy: "huggingface_datasets"
       dataset_id: "common-pile/oercommons_filtered"
+    canonicalize:
+      text_field_candidates: ["text", "content", "body", "document", "plain_text", "summary", "description"]
     output:
       pool: "permissive"
       formats: ["hf_disk"]
@@ -302,6 +310,8 @@ targets:
     download:
       strategy: "huggingface_datasets"
       dataset_id: "common-pile/pubmed_filtered"
+    canonicalize:
+      text_field_candidates: ["text", "abstract", "body", "article", "content", "title"]
     output:
       pool: "permissive"
       formats: ["hf_disk"]
@@ -328,6 +338,8 @@ targets:
     download:
       strategy: "huggingface_datasets"
       dataset_id: "common-pile/python_enhancement_proposals_filtered"
+    canonicalize:
+      text_field_candidates: ["text", "content", "body", "summary", "title"]
     output:
       pool: "permissive"
       formats: ["hf_disk"]
@@ -352,6 +364,8 @@ targets:
     download:
       strategy: "huggingface_datasets"
       dataset_id: "common-pile/library_of_congress_filtered"
+    canonicalize:
+      text_field_candidates: ["text", "content", "body", "document", "plain_text", "summary", "description"]
     output:
       pool: "permissive"
       formats: ["hf_disk"]
@@ -377,6 +391,8 @@ targets:
     download:
       strategy: "huggingface_datasets"
       dataset_id: "common-pile/project_gutenberg_filtered"
+    canonicalize:
+      text_field_candidates: ["text", "content", "body", "document", "plain_text", "summary", "description"]
     output:
       pool: "permissive"
       formats: ["hf_disk"]
@@ -401,6 +417,8 @@ targets:
     download:
       strategy: "huggingface_datasets"
       dataset_id: "common-pile/pre_1929_books_filtered"
+    canonicalize:
+      text_field_candidates: ["text", "content", "body", "document", "plain_text", "summary", "description"]
     output:
       pool: "permissive"
       formats: ["hf_disk"]
@@ -575,6 +593,8 @@ targets:
     download:
       strategy: "huggingface_datasets"
       dataset_id: "common-pile/wikimedia_filtered"
+    canonicalize:
+      text_field_candidates: ["text", "content", "body", "document", "plain_text"]
     output:
       pool: "copyleft"
       formats: ["hf_disk"]
@@ -601,6 +621,8 @@ targets:
     download:
       strategy: "huggingface_datasets"
       dataset_id: "common-pile/stackexchange_filtered"
+    canonicalize:
+      text_field_candidates: ["text", "content", "body", "question", "answer", "title"]
     output:
       pool: "copyleft"
       formats: ["hf_disk"]
