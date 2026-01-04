@@ -1,4 +1,4 @@
-# Cybersecurity Corpus Pipeline v1.0 - Requirements
+# Cybersecurity Corpus Pipeline v2.0 - Requirements
 # Core dependencies
 pyyaml>=6.0
 requests>=2.31.0

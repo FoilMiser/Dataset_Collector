@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-pipeline_driver.py (v1.0)
+pipeline_driver.py (v2.0)
 
 Reads:
   - targets_nlp.yaml (schema v0.8)

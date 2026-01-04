@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-pipeline_driver.py (v1.0)
+pipeline_driver.py (v2.0)
 
 Reads:
   - targets_biology.yaml (schema v0.8)
@@ -24,11 +24,11 @@ What it does (safe by default):
 
 It does NOT download giant dataset payloads; that's handled by acquire_worker.py.
 
-v1.0 changes:
+v2.0 changes:
   - License confidence scoring with configurable minimum threshold
   - License evidence change detection to force manual review when terms change
   - Evidence fetcher supports custom headers for license-gated pages
-  - Run metadata upgraded to v1.0 and documentation refreshed
+  - Run metadata upgraded to v2.0 and documentation refreshed
 
 Not legal advice.
 """
