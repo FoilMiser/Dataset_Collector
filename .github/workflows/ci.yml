@@ -7,6 +7,8 @@ on:
 jobs:
   validate-min:
     runs-on: ${{ matrix.os }}
+    env:
+      PYTHONPATH: ${{ github.workspace }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
@@ -61,6 +63,8 @@ jobs:
 
   validate-lock:
     runs-on: ${{ matrix.os }}
+    env:
+      PYTHONPATH: ${{ github.workspace }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
