@@ -220,6 +220,12 @@ Validate all enabled targets across pipeline configs and emit a JSON summary:
 python -m tools.validate_repo --output tools/validate_report.json
 ```
 
+Fail the run if warnings are present:
+
+```bash
+python -m tools.validate_repo --strict --output tools/validate_report.json
+```
+
 ## Cleaning local artifacts
 
 If you ran pipelines inside the repo and need to reset the tree:
