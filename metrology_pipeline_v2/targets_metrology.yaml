@@ -421,6 +421,8 @@ targets:
       strategy: "huggingface_datasets"
       dataset_id: "common-pile/arxiv_abstracts"
       splits: ["train"]
+    canonicalize:
+      text_field_candidates: ["abstract", "summary", "description", "text"]
     output:
       pool: "quarantine"
       formats: ["hf_dataset"]
@@ -447,6 +449,8 @@ targets:
       strategy: "huggingface_datasets"
       dataset_id: "common-pile/doab"
       splits: ["train"]
+    canonicalize:
+      text_field_candidates: ["text", "content", "body", "description", "abstract", "summary"]
     output:
       pool: "quarantine"
       formats: ["hf_dataset"]

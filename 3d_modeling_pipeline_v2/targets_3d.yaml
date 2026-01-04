@@ -424,6 +424,8 @@ targets:
       strategy: "huggingface_datasets"
       dataset_id: "allenai/objaverse"
       split: "train"
+    canonicalize:
+      text_field_candidates: ["text", "description", "caption", "title"]
     gates_override:
       add: ["manual_legal_review", "record_level_filter", "mesh_validate", "mesh_sanitize", "weapon_trademark_filter"]
     record_level_policy:

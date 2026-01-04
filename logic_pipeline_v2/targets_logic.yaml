@@ -332,6 +332,8 @@ targets:
     download:
       strategy: "huggingface_datasets"
       dataset_id: "allenai/ruletaker"
+    canonicalize:
+      text_field_candidates: ["text", "context", "question", "rules", "story"]
     notes: "Confirm dataset_id + license in dataset card, then set license_evidence.url to the dataset card or repo LICENSE."
     output:
       pool: "permissive"
@@ -355,6 +357,8 @@ targets:
     download:
       strategy: "huggingface_datasets"
       dataset_id: "allenai/proofwriter"
+    canonicalize:
+      text_field_candidates: ["text", "context", "question", "theory", "proof"]
     notes: "Confirm license + dataset_id; then fill license_evidence.url."
     output:
       pool: "permissive"
@@ -378,6 +382,8 @@ targets:
     download:
       strategy: "huggingface_datasets"
       dataset_id: ""
+    canonicalize:
+      text_field_candidates: ["text", "story", "context", "question", "answer"]
     gates_override:
       add: ["manual_legal_review", "segregate_copyleft_pool"]
     output:

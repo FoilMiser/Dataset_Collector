@@ -500,6 +500,8 @@ targets:
       out_subdir: "commonpile"
       dataset_id: "common-pile/common-pile"
       configs: []
+    canonicalize:
+      text_field_candidates: ["text", "content", "body", "document", "plain_text", "summary", "description"]
     output:
       pool: "quarantine"
       formats: ["hf_dataset_cache"]

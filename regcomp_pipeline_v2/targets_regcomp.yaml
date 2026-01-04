@@ -544,6 +544,8 @@ targets:
     download:
       strategy: huggingface_datasets
       dataset_id: common-pile
+    canonicalize:
+      text_field_candidates: ["text", "content", "body", "document", "comment_text"]
     output:
       pool: quarantine
       formats: [jsonl]

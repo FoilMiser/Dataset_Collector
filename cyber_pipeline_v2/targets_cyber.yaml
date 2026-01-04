@@ -536,6 +536,8 @@ targets:
       splits:
         - "train[:5000]"
       output_format: "jsonl"
+    canonicalize:
+      text_field_candidates: ["text", "content", "body", "document", "plain_text"]
 
   - id: "commonpile_regulations_sample"
     name: "CommonPile — Regulations SAMPLE slice (verify HF repo_id/config before enabling)"
@@ -553,6 +555,8 @@ targets:
       splits:
         - "train[:5000]"
       output_format: "jsonl"
+    canonicalize:
+      text_field_candidates: ["text", "content", "body", "document", "comment_text"]
 
   - id: "commonpile_arxiv_abstracts_sample"
     name: "CommonPile — arXiv abstracts SAMPLE slice (verify HF repo_id/config before enabling)"
@@ -570,6 +574,8 @@ targets:
       splits:
         - "train[:5000]"
       output_format: "jsonl"
+    canonicalize:
+      text_field_candidates: ["abstract", "summary", "description", "text"]
 
   # D) RED / excluded (kept as documentation; disabled)
   - id: "exploitdb_excluded"

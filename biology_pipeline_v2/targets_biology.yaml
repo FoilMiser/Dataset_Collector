@@ -458,6 +458,8 @@ targets:
       dataset_id: "common-pile/common-pile"
       config: "pmc"
       splits: ["train"]
+    canonicalize:
+      text_field_candidates: ["text", "abstract", "body", "article", "content", "title"]
     gates_override:
       add: ["extract_text_chunks", "collect_statistics"]
     output:
@@ -480,6 +482,8 @@ targets:
       dataset_id: "common-pile/common-pile"
       config: "pes2o"
       splits: ["train"]
+    canonicalize:
+      text_field_candidates: ["text", "abstract", "body", "article", "content", "title"]
     gates_override:
       add: ["extract_text_chunks", "collect_statistics"]
     output:
@@ -502,6 +506,8 @@ targets:
       dataset_id: "common-pile/common-pile"
       config: "biodiversity_heritage_library"
       splits: ["train"]
+    canonicalize:
+      text_field_candidates: ["text", "content", "body", "document", "plain_text"]
     gates_override:
       add: ["extract_text_chunks", "collect_statistics"]
     output:
@@ -585,6 +591,8 @@ targets:
       dataset_id: "common-pile/common-pile"
       config: "usgpo"
       splits: ["train"]
+    canonicalize:
+      text_field_candidates: ["text", "content", "body", "document", "plain_text"]
     gates_override:
       add: ["extract_text_chunks"]
     output:
@@ -607,6 +615,8 @@ targets:
       dataset_id: "common-pile/common-pile"
       config: "regulations"
       splits: ["train"]
+    canonicalize:
+      text_field_candidates: ["text", "content", "body", "document", "comment_text"]
     gates_override:
       add: ["restriction_phrase_scan", "pii_phi_scan", "manual_legal_review"]
     output:

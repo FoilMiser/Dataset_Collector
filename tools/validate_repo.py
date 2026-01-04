@@ -36,7 +36,11 @@ EXPECTED_TARGETS_SCHEMA = "0.8"
 
 
 def read_yaml(path: Path) -> dict[str, Any]:
-    return yaml.safe_load(path.read_text(encoding="utf-8"))
+    text = path.read_text(encoding="utf-8")
+    try:
+        return yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        raise RuntimeError(f"YAML parse error in {path}: {exc}") from exc
 
 
 def normalize_download(download: dict[str, Any]) -> dict[str, Any]:
