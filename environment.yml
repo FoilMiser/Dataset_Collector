@@ -5,5 +5,5 @@ dependencies:
   - python=3.10
   - pip
   - pip:
-      - -r requirements.lock
-      - -r requirements-dev.lock
+      - -r requirements.constraints.txt
+      - -r requirements-dev.constraints.txt
