@@ -1,17 +1,19 @@
 import gzip
+import importlib.util
 import json
 import subprocess
-import sys
 from pathlib import Path
 
 import yaml
 from datasets import Dataset
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
+OUTPUT_CONTRACT_PATH = Path(__file__).resolve().parents[1] / "tools" / "output_contract.py"
+OUTPUT_CONTRACT_SPEC = importlib.util.spec_from_file_location("output_contract", OUTPUT_CONTRACT_PATH)
+OUTPUT_CONTRACT_MODULE = importlib.util.module_from_spec(OUTPUT_CONTRACT_SPEC)
+OUTPUT_CONTRACT_SPEC.loader.exec_module(OUTPUT_CONTRACT_MODULE)
 
-from tools.output_contract import REQUIRED_FIELDS, validate_output_contract
+REQUIRED_FIELDS = OUTPUT_CONTRACT_MODULE.REQUIRED_FIELDS
+validate_output_contract = OUTPUT_CONTRACT_MODULE.validate_output_contract
 
 
 def test_end_to_end_pipeline_contract(tmp_path: Path) -> None:
