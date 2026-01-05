@@ -2,6 +2,10 @@
 
 All notable changes to Dataset Collector v2 will be documented in this file.
 
+## [Unreleased]
+### Removed
+- `agri_circular_pipeline_v2/download_worker_legacy.py` and `agri_circular_pipeline_v2/yellow_scrubber_legacy.py`, which were unused legacy helpers.
+
 ## [2.0.1] - 2025-12-30
 ### Added
 - Repository governance files (`.gitignore`, `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`).

@@ -86,7 +86,6 @@ Additional helper stages:
 - `catalog_builder.py` — summarizes counts/bytes across stages into `_catalogs/catalog_v2.json`.
 
 Legacy/compatibility helpers:
-- `download_worker_legacy.py`, `yellow_scrubber_legacy.py` — kept for reference; not used in the v2 flow.
 - `yellow_scrubber.py` — lightweight planning helper for YELLOW queues (dry-run only).
 
 ---

@@ -166,8 +166,6 @@ dc-catalog = "collector_core.catalog_builder:main"
 **Problem:** Legacy files exist without clear documentation of whether they're deprecated or needed for migration.
 
 **Files Affected:**
-- `agri_circular_pipeline_v2/download_worker_legacy.py` (22KB)
-- `agri_circular_pipeline_v2/yellow_scrubber_legacy.py` (26KB)
 
 **Fix (Option A — Remove):**
 1. Verify no active code paths reference these files
