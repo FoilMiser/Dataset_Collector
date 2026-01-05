@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-import yaml
+from collector_core.config_validator import read_yaml
 
 try:
     import requests
@@ -599,7 +599,7 @@ def main() -> None:
     targets_path = Path(args.targets_yaml).expanduser().resolve() if args.targets_yaml else None
     cfg: dict[str, Any] = {}
     if targets_path and targets_path.exists():
-        cfg = yaml.safe_load(targets_path.read_text(encoding="utf-8")) or {}
+        cfg = read_yaml(targets_path, schema_name="targets") or {}
     roots = load_roots(cfg, args)
     ensure_dir(roots.logs_root)
 

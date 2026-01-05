@@ -24,10 +24,10 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
-import yaml
 from datasets import DatasetDict, load_from_disk
 
 from collector_core.__version__ import __version__ as VERSION
+from collector_core.config_validator import read_yaml
 from collector_core.yellow_screen_common import resolve_dataset_root
 
 PITCH_SAMPLE_LIMIT = 25
@@ -161,7 +161,7 @@ class Sharder:
 
 
 def load_targets_cfg(path: Path) -> dict[str, Any]:
-    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    return read_yaml(path, schema_name="targets") or {}
 
 
 def resolve_roots(cfg: dict[str, Any], dataset_root: Path | None = None) -> Roots:
@@ -223,7 +223,7 @@ def load_field_schemas(cfg: dict[str, Any], targets_path: Path) -> dict[str, dic
         path = targets_path.parent / path
     if not path.exists():
         return {}
-    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    return read_yaml(path, schema_name="field_schemas") or {}
 
 
 def find_text(row: dict[str, Any], candidates: list[str]) -> str | None:

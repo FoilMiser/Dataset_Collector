@@ -11,9 +11,9 @@ from pathlib import Path
 from typing import Any
 
 import requests
-import yaml
 
 from collector_core.__version__ import __version__ as VERSION
+from collector_core.config_validator import read_yaml
 
 
 def utc_now() -> str:
@@ -40,10 +40,6 @@ def resolve_dataset_root(explicit: str | None) -> Path | None:
     if not value:
         return None
     return Path(value).expanduser().resolve()
-
-
-def read_yaml(path: Path) -> dict[str, Any]:
-    return yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
 def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
@@ -94,7 +90,7 @@ class LicenseMap:
 
 
 def load_license_map(path: Path) -> LicenseMap:
-    m = read_yaml(path)
+    m = read_yaml(path, schema_name="license_map")
     spdx = m.get("spdx", {}) or {}
     normalization = m.get("normalization", {}) or {}
     restriction_scan = m.get("restriction_scan", {}) or {}
@@ -128,7 +124,7 @@ def load_denylist(path: Path) -> dict[str, Any]:
     if not path or not path.exists():
         return {"patterns": [], "domain_patterns": [], "publisher_patterns": []}
     try:
-        d = read_yaml(path) or {}
+        d = read_yaml(path, schema_name="denylist") or {}
         patterns = d.get("patterns", []) or []
         domain_patterns = d.get("domain_patterns", []) or []
         publisher_patterns = d.get("publisher_patterns", []) or []
@@ -716,7 +712,7 @@ class BasePipelineDriver:
                 headers[k.strip()] = v.strip()
 
         targets_path = Path(args.targets).resolve()
-        targets_cfg = read_yaml(targets_path)
+        targets_cfg = read_yaml(targets_path, schema_name="targets")
 
         companion = targets_cfg.get("companion_files", {}) or {}
         license_map_path = Path(args.license_map or companion.get("license_map", "./license_map.yaml")).resolve()

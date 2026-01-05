@@ -26,7 +26,7 @@ from typing import Any
 from urllib.parse import urljoin, urlparse
 from urllib.robotparser import RobotFileParser
 
-import yaml
+from collector_core.config_validator import read_yaml
 
 try:
     import requests
@@ -750,7 +750,7 @@ def run_target(ctx: AcquireContext, bucket: str, row: dict[str, Any]) -> dict[st
 def load_roots(targets_path: Path | None, overrides: argparse.Namespace) -> Roots:
     cfg: dict[str, Any] = {}
     if targets_path and targets_path.exists():
-        cfg = yaml.safe_load(targets_path.read_text(encoding="utf-8")) or {}
+        cfg = read_yaml(targets_path, schema_name="targets") or {}
     g = (cfg.get("globals", {}) or {})
     raw_root = Path(overrides.raw_root or g.get("raw_root", "/data/3d/raw"))
     manifests_root = Path(overrides.manifests_root or g.get("manifests_root", "/data/3d/_manifests"))

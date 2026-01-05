@@ -96,8 +96,21 @@ if [[ ! -f "$TARGETS" ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-QUEUES_ROOT=$(python -c "import yaml; print(yaml.safe_load(open('$TARGETS'))['globals'].get('queues_root', '/data/3d/_queues'))")
-CATALOGS_ROOT=$(python -c "import yaml; print(yaml.safe_load(open('$TARGETS'))['globals'].get('catalogs_root', '/data/3d/_catalogs'))")
+export PYTHONPATH="${SCRIPT_DIR}/..:${PYTHONPATH:-}"
+QUEUES_ROOT=$(python - << PY
+from pathlib import Path
+from collector_core.config_validator import read_yaml
+cfg = read_yaml(Path("${TARGETS}"), schema_name="targets") or {}
+print(cfg.get("globals", {}).get("queues_root", "/data/3d/_queues"))
+PY
+)
+CATALOGS_ROOT=$(python - << PY
+from pathlib import Path
+from collector_core.config_validator import read_yaml
+cfg = read_yaml(Path("${TARGETS}"), schema_name="targets") or {}
+print(cfg.get("globals", {}).get("catalogs_root", "/data/3d/_catalogs"))
+PY
+)
 LIMIT_TARGETS_ARG=""; [[ -n "$LIMIT_TARGETS" ]] && LIMIT_TARGETS_ARG="--limit-targets $LIMIT_TARGETS"
 LIMIT_FILES_ARG=""; [[ -n "$LIMIT_FILES" ]] && LIMIT_FILES_ARG="--limit-files $LIMIT_FILES"
 

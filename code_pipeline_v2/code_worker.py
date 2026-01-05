@@ -29,7 +29,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-import yaml
+from collector_core.config_validator import read_yaml as read_yaml_config
 
 VERSION = "0.2"
 
@@ -48,7 +48,7 @@ def sha256_text(text: str) -> str:
 
 
 def read_yaml(path: Path) -> dict[str, Any]:
-    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    return read_yaml_config(path, schema_name="targets") or {}
 
 
 def load_targets_cfg(path: Path | None) -> dict[str, Any]:

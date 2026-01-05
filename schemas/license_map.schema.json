@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "License map configuration",
+  "type": "object",
+  "required": ["schema_version", "spdx"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "updated_utc": { "type": "string" },
+    "spdx": {
+      "type": "object",
+      "properties": {
+        "allow": { "type": "array", "items": { "type": "string" } },
+        "conditional": { "type": "array", "items": { "type": "string" } },
+        "deny_prefixes": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+    "normalization": {
+      "type": "object",
+      "properties": {
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "match_any": { "type": "array", "items": { "type": "string" } },
+              "spdx": { "type": "string" }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "restriction_scan": {
+      "type": "object",
+      "properties": {
+        "phrases": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+    "gating": { "type": "object" },
+    "profiles": { "type": "object" },
+    "license_profiles": { "type": "object" }
+  },
+  "additionalProperties": true
+}

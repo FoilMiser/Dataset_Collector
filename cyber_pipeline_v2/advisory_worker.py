@@ -10,12 +10,11 @@ import json
 from collections.abc import Iterable
 from pathlib import Path
 
-import yaml
+from collector_core.config_validator import read_yaml
 
 
 def load_yaml(path: Path) -> dict:
-    with path.open("r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+    return read_yaml(path)
 
 
 def iter_advisories(root: Path) -> Iterable[dict]:

@@ -13,10 +13,10 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
-import yaml
 from datasets import DatasetDict, load_from_disk
 
 from collector_core.__version__ import __version__ as VERSION
+from collector_core.config_validator import read_yaml
 from tools.output_contract import normalize_output_record, validate_output_contract
 
 
@@ -565,7 +565,7 @@ def main(*, pipeline_id: str, defaults: RootDefaults) -> None:
     ap.add_argument("--dataset-root", default=None, help="Override dataset root (raw/screened/combined/_ledger)")
     args = ap.parse_args()
 
-    cfg = yaml.safe_load(Path(args.targets).read_text(encoding="utf-8")) or {}
+    cfg = read_yaml(Path(args.targets), schema_name="targets") or {}
     roots = resolve_roots(cfg, defaults, dataset_root=resolve_dataset_root(args.dataset_root))
     summary = merge_records(cfg, roots, args.execute, pipeline_id=pipeline_id)
     write_json(roots.ledger_root / "merge_summary.json", summary)

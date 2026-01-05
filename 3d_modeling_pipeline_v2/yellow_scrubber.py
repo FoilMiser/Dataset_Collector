@@ -29,9 +29,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 from collector_core.__version__ import __schema_version__ as VERSION
+from collector_core.config_validator import read_yaml as read_yaml_config
 
 
 @dataclass
@@ -70,7 +69,7 @@ def utc_now() -> str:
 
 
 def read_yaml(path: Path) -> dict[str, Any]:
-    return yaml.safe_load(path.read_text(encoding="utf-8"))
+    return read_yaml_config(path, schema_name="targets") or {}
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
