@@ -31,6 +31,11 @@ from typing import Any
 
 from collector_core.config_validator import read_yaml
 from collector_core.dependencies import _try_import, requires
+from collector_core.exceptions import (
+    CollectorError,
+    DependencyMissingError,
+    OutputPathsBuilderError,
+)
 
 requests = _try_import("requests")
 FTP = _try_import("ftplib", "FTP")
@@ -136,7 +141,11 @@ def chunk_text(text: str, max_chars: int, min_chars: int) -> list[str]:
 def http_get_bytes(url: str, timeout_s: int = 120, user_agent_version: str = VERSION) -> tuple[bytes, dict]:
     missing = requires("requests", requests, install="pip install requests")
     if missing:
-        raise RuntimeError(missing)
+        raise DependencyMissingError(
+            missing,
+            dependency="requests",
+            install="pip install requests",
+        )
     with requests.get(
         url,
         stream=True,
@@ -150,7 +159,11 @@ def http_get_bytes(url: str, timeout_s: int = 120, user_agent_version: str = VER
 def ftp_get_bytes(host: str, remote_path: str) -> bytes:
     missing = requires("ftplib", FTP, install="use a standard Python build that includes ftplib")
     if missing:
-        raise RuntimeError(missing)
+        raise DependencyMissingError(
+            missing,
+            dependency="ftplib",
+            install="use a standard Python build that includes ftplib",
+        )
     ftp = FTP(host, timeout=120)
     ftp.login()
     parts = remote_path.lstrip("/").split("/")
@@ -203,7 +216,10 @@ def fetch_pmc_package(
         meta["bytes"] = len(content)
         return content, meta
     except Exception as e:
-        return None, {"status": "error", "error": repr(e)}
+        meta: dict[str, Any] = {"status": "error", "error": repr(e)}
+        if isinstance(e, CollectorError):
+            meta.update(e.as_log_fields())
+        return None, meta
 
 
 def extract_nxml(pkg_bytes: bytes) -> tuple[bytes | None, list[str]]:
@@ -436,7 +452,10 @@ def run_pmc_worker(
 
     if output_paths_builder is None:
         if not include_pools_root_arg:
-            raise ValueError("output_paths_builder is required when --pools-root is disabled.")
+            raise OutputPathsBuilderError(
+                "output_paths_builder is required when --pools-root is disabled.",
+                context={"include_pools_root_arg": False},
+            )
         pools_root = Path(parsed.pools_root).expanduser().resolve()
 
         def output_paths_builder(parsed_args: argparse.Namespace, target_path: Path) -> tuple[Path, Path | None]:

@@ -7,6 +7,8 @@ from typing import Any
 
 import yaml
 
+from collector_core.exceptions import ConfigValidationError, YamlParseError
+
 try:
     from jsonschema import Draft7Validator, FormatChecker
 except ImportError:  # pragma: no cover - optional in some environments
@@ -14,10 +16,6 @@ except ImportError:  # pragma: no cover - optional in some environments
     FormatChecker = None
 
 SCHEMA_DIR = Path(__file__).resolve().parents[1] / "schemas"
-
-
-class ConfigValidationError(ValueError):
-    pass
 
 
 @cache
@@ -38,12 +36,22 @@ def validate_config(config: Any, schema_name: str, *, config_path: Path | None =
         return
     location = str(config_path) if config_path else "<config>"
     lines = [f"Schema validation failed for {location} ({schema_name})."]
+    error_details: list[dict[str, str]] = []
     for error in errors[:10]:
         path = ".".join(str(p) for p in error.path) if error.path else "<root>"
         lines.append(f"- {path}: {error.message}")
+        error_details.append({"path": path, "message": error.message})
     if len(errors) > 10:
         lines.append(f"... and {len(errors) - 10} more errors.")
-    raise ConfigValidationError("\n".join(lines))
+    raise ConfigValidationError(
+        "\n".join(lines),
+        context={
+            "path": location,
+            "schema": schema_name,
+            "errors": error_details,
+            "truncated": len(errors) > 10,
+        },
+    )
 
 
 def read_yaml(path: Path, schema_name: str | None = None) -> Any:
@@ -51,7 +59,10 @@ def read_yaml(path: Path, schema_name: str | None = None) -> Any:
     try:
         data = yaml.safe_load(text)
     except yaml.YAMLError as exc:
-        raise RuntimeError(f"YAML parse error in {path}: {exc}") from exc
+        raise YamlParseError(
+            f"YAML parse error in {path}: {exc}",
+            context={"path": str(path), "error": str(exc)},
+        ) from exc
     if data is None:
         data = {}
     if schema_name:
