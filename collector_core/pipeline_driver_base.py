@@ -4,6 +4,7 @@ import argparse
 import dataclasses
 import hashlib
 import json
+import logging
 import os
 import re
 import time
@@ -14,7 +15,9 @@ import requests
 
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.config_validator import read_yaml
+from collector_core.logging_config import add_logging_args, configure_logging
 
+logger = logging.getLogger(__name__)
 
 def utc_now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
@@ -1025,7 +1028,7 @@ class BasePipelineDriver:
             warnings=warnings,
         )
         if not args.quiet:
-            print(report)
+            logger.info(report)
 
     @classmethod
     def build_arg_parser(cls) -> argparse.ArgumentParser:
@@ -1066,9 +1069,11 @@ class BasePipelineDriver:
             help="Custom header for evidence fetcher (KEY=VALUE). Useful for license-gated pages",
         )
         ap.add_argument("--quiet", action="store_true", help="Suppress dry-run report output")
+        add_logging_args(ap)
         return ap
 
     @classmethod
     def main(cls) -> None:
         args = cls.build_arg_parser().parse_args()
+        configure_logging(level=args.log_level, fmt=args.log_format)
         cls().run(args)

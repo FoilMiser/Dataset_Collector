@@ -21,6 +21,7 @@ import gzip
 import hashlib
 import io
 import json
+import logging
 import re
 import tarfile
 import time
@@ -36,11 +37,13 @@ from collector_core.exceptions import (
     DependencyMissingError,
     OutputPathsBuilderError,
 )
+from collector_core.logging_config import add_logging_args, configure_logging
 
 requests = _try_import("requests")
 FTP = _try_import("ftplib", "FTP")
 
 VERSION = "0.9"
+logger = logging.getLogger(__name__)
 
 
 def utc_now() -> str:
@@ -439,9 +442,11 @@ def run_pmc_worker(
     ap.add_argument("--emit-train-split", type=float, default=None)
     ap.add_argument("--enable-cache", action="store_true")
     ap.add_argument("--log-dir", default=log_dir_default)
+    add_logging_args(ap)
     if configure_parser:
         configure_parser(ap)
     parsed = ap.parse_args(args=args)
+    configure_logging(level=parsed.log_level, fmt=parsed.log_format)
 
     targets_path = Path(parsed.targets).expanduser().resolve()
     chunk_cfg = chunk_defaults_loader(targets_path)
@@ -628,8 +633,9 @@ def run_pmc_worker(
     write_json(out_root / "dataset_index.json", index)
     write_json(manifests_dir / f"pmc_run_{int(time.time())}.json", index)
 
-    print(f"\n{'=' * 50}\nPMC Worker v{version}\n{'=' * 50}")
-    print(f"Mode: {'EXECUTE' if parsed.execute else 'DRY-RUN'}")
-    print(f"Downloads: {successful}, Train: {total_train}, Valid: {total_valid}")
-    print(f"{'=' * 50}\n")
-    print(json.dumps(index, indent=2))
+    logger.info("%s", "=" * 50)
+    logger.info("PMC Worker v%s", version)
+    logger.info("Mode: %s", "EXECUTE" if parsed.execute else "DRY-RUN")
+    logger.info("Downloads: %s, Train: %s, Valid: %s", successful, total_train, total_valid)
+    logger.info("%s", "=" * 50)
+    logger.info(json.dumps(index, indent=2))
