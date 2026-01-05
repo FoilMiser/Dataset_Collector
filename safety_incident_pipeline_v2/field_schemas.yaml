@@ -1,184 +1,186 @@
 # Field schemas for safety engineering & incident analysis
-incident_report_chunk_v1.0.0:
-  description: Chunked text extracted from an incident report (PDF/HTML/etc.) with
-    normalized metadata for safety engineering tasks.
-  schema:
-    type: object
-    required:
-    - record_id
-    - source
-    - doc_id
-    - chunk_id
-    - text
-    - meta
-    properties:
-      record_id:
-        type: string
-        description: Globally unique record identifier (UUID or stable hash).
-      source:
-        type: object
-        required:
-        - source_id
-        - url
-        - retrieved_at
-        properties:
-          source_id:
-            type: string
-            description: Target id from targets.yaml.
-          url:
-            type: string
-          retrieved_at:
-            type: string
-            description: ISO timestamp.
-          license:
-            type: string
-            description: Resolved license label if available.
-          provenance:
-            type: object
-            description: Arbitrary provenance metadata.
-      doc_id:
-        type: string
-        description: Identifier for the source document (e.g., filename, report number).
-      chunk_id:
-        type: string
-        description: Chunk identifier within doc (e.g., page+offset).
-      text:
-        type: string
-        description: Extracted text content for this chunk (PII-redacted).
-      meta:
-        type: object
-        required:
-        - domain
-        properties:
-          domain:
-            type: string
-            description: e.g., aviation, pipeline, mining, rail, chemical.
-          country:
-            type: string
-          language:
-            type: string
-          report_title:
-            type: string
-          report_date:
-            type: string
-          event_date:
-            type: string
-          location_general:
-            type: string
-            description: Coarse location (state/province/country), not precise address.
-          severity:
-            type: string
-            description: Normalized severity class (e.g., minor/serious/fatal/catastrophic).
-          event_type:
-            type: string
-            description: e.g., fire, explosion, release, collision, fall, electrical,
-              structural.
-          hazards:
-            type: array
-            items:
+schema_version: "0.1"
+schemas:
+  incident_report_chunk_v1.0.0:
+    description: Chunked text extracted from an incident report (PDF/HTML/etc.) with
+      normalized metadata for safety engineering tasks.
+    schema:
+      type: object
+      required:
+      - record_id
+      - source
+      - doc_id
+      - chunk_id
+      - text
+      - meta
+      properties:
+        record_id:
+          type: string
+          description: Globally unique record identifier (UUID or stable hash).
+        source:
+          type: object
+          required:
+          - source_id
+          - url
+          - retrieved_at
+          properties:
+            source_id:
               type: string
-          causal_factors:
-            type: array
-            items:
+              description: Target id from targets.yaml.
+            url:
               type: string
-          recommendations:
-            type: array
-            items:
+            retrieved_at:
               type: string
-          entities_redacted:
-            type: array
-            items:
+              description: ISO timestamp.
+            license:
               type: string
-            description: Types of PII removed.
-          source_record_refs:
-            type: array
-            items:
+              description: Resolved license label if available.
+            provenance:
+              type: object
+              description: Arbitrary provenance metadata.
+        doc_id:
+          type: string
+          description: Identifier for the source document (e.g., filename, report number).
+        chunk_id:
+          type: string
+          description: Chunk identifier within doc (e.g., page+offset).
+        text:
+          type: string
+          description: Extracted text content for this chunk (PII-redacted).
+        meta:
+          type: object
+          required:
+          - domain
+          properties:
+            domain:
               type: string
-            description: Links/ids back to original for audit.
-incident_event_row_v1.0.0:
-  description: Structured incident row for analytics (one record = one occurrence/incident/event).
-  schema:
-    type: object
-    required:
-    - record_id
-    - source
-    - event
-    properties:
-      record_id:
-        type: string
-      source:
-        type: object
-        required:
-        - source_id
-        - url
-        - retrieved_at
-        properties:
-          source_id:
-            type: string
-          url:
-            type: string
-          retrieved_at:
-            type: string
-          license:
-            type: string
-          provenance:
-            type: object
-      event:
-        type: object
-        required:
-        - event_id
-        - domain
-        - event_date
-        properties:
-          event_id:
-            type: string
-            description: Native event identifier if available (e.g., PHMSA report
-              number).
-          domain:
-            type: string
-          event_date:
-            type: string
-          report_date:
-            type: string
-          country:
-            type: string
-          location_general:
-            type: string
-          coordinates_coarse:
-            type: object
-            properties:
-              lat:
-                type: number
-              lon:
-                type: number
-            description: Optional coarse coords rounded to reduce sensitivity.
-          severity:
-            type: string
-          fatalities:
-            type: integer
-          injuries:
-            type: integer
-          property_damage_usd:
-            type: number
-          release_quantity:
-            type: number
-          substance:
-            type: string
-          event_type:
-            type: string
-          primary_cause:
-            type: string
-          contributing_factors:
-            type: array
-            items:
+              description: e.g., aviation, pipeline, mining, rail, chemical.
+            country:
               type: string
-          corrective_actions:
-            type: array
-            items:
+            language:
               type: string
-          narrative:
-            type: string
-            description: Optional short narrative; redact PII.
-          raw_fields:
-            type: object
-            description: Raw source columns preserved for audit (safe subset only).
+            report_title:
+              type: string
+            report_date:
+              type: string
+            event_date:
+              type: string
+            location_general:
+              type: string
+              description: Coarse location (state/province/country), not precise address.
+            severity:
+              type: string
+              description: Normalized severity class (e.g., minor/serious/fatal/catastrophic).
+            event_type:
+              type: string
+              description: e.g., fire, explosion, release, collision, fall, electrical,
+                structural.
+            hazards:
+              type: array
+              items:
+                type: string
+            causal_factors:
+              type: array
+              items:
+                type: string
+            recommendations:
+              type: array
+              items:
+                type: string
+            entities_redacted:
+              type: array
+              items:
+                type: string
+              description: Types of PII removed.
+            source_record_refs:
+              type: array
+              items:
+                type: string
+              description: Links/ids back to original for audit.
+  incident_event_row_v1.0.0:
+    description: Structured incident row for analytics (one record = one occurrence/incident/event).
+    schema:
+      type: object
+      required:
+      - record_id
+      - source
+      - event
+      properties:
+        record_id:
+          type: string
+        source:
+          type: object
+          required:
+          - source_id
+          - url
+          - retrieved_at
+          properties:
+            source_id:
+              type: string
+            url:
+              type: string
+            retrieved_at:
+              type: string
+            license:
+              type: string
+            provenance:
+              type: object
+        event:
+          type: object
+          required:
+          - event_id
+          - domain
+          - event_date
+          properties:
+            event_id:
+              type: string
+              description: Native event identifier if available (e.g., PHMSA report
+                number).
+            domain:
+              type: string
+            event_date:
+              type: string
+            report_date:
+              type: string
+            country:
+              type: string
+            location_general:
+              type: string
+            coordinates_coarse:
+              type: object
+              properties:
+                lat:
+                  type: number
+                lon:
+                  type: number
+              description: Optional coarse coords rounded to reduce sensitivity.
+            severity:
+              type: string
+            fatalities:
+              type: integer
+            injuries:
+              type: integer
+            property_damage_usd:
+              type: number
+            release_quantity:
+              type: number
+            substance:
+              type: string
+            event_type:
+              type: string
+            primary_cause:
+              type: string
+            contributing_factors:
+              type: array
+              items:
+                type: string
+            corrective_actions:
+              type: array
+              items:
+                type: string
+            narrative:
+              type: string
+              description: Optional short narrative; redact PII.
+            raw_fields:
+              type: object
+              description: Raw source columns preserved for audit (safe subset only).

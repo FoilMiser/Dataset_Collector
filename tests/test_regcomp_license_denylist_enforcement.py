@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -96,6 +97,8 @@ def test_regcomp_license_map_and_denylist_enforced(tmp_path: Path) -> None:
     targets_path.write_text(yaml.safe_dump(targets_cfg), encoding="utf-8")
 
     driver_path = Path("regcomp_pipeline_v2/pipeline_driver.py").resolve()
+    env = dict(**os.environ)
+    env["PYTHONPATH"] = str(Path(".").resolve())
     subprocess.run(
         [
             sys.executable,
@@ -109,6 +112,7 @@ def test_regcomp_license_map_and_denylist_enforced(tmp_path: Path) -> None:
         ],
         check=True,
         cwd=Path(".").resolve(),
+        env=env,
     )
 
     green_rows = read_jsonl(queues_root / "green_download.jsonl")

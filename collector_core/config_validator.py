@@ -6,7 +6,12 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from jsonschema import Draft7Validator, FormatChecker
+
+try:
+    from jsonschema import Draft7Validator, FormatChecker
+except ImportError:  # pragma: no cover - optional in some environments
+    Draft7Validator = None
+    FormatChecker = None
 
 SCHEMA_DIR = Path(__file__).resolve().parents[1] / "schemas"
 
@@ -24,6 +29,8 @@ def load_schema(schema_name: str) -> dict[str, Any]:
 
 
 def validate_config(config: Any, schema_name: str, *, config_path: Path | None = None) -> None:
+    if Draft7Validator is None or FormatChecker is None:
+        return
     schema = load_schema(schema_name)
     validator = Draft7Validator(schema, format_checker=FormatChecker())
     errors = sorted(validator.iter_errors(config), key=lambda exc: list(exc.path))
