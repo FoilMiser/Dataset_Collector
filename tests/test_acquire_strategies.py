@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -10,8 +11,13 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
-
-from kg_nav_pipeline_v2 import acquire_worker as aw
+WORKER_PATH = REPO_ROOT / "kg_nav_pipeline_v2" / "acquire_worker.py"
+SPEC = importlib.util.spec_from_file_location("kg_nav_acquire_worker", WORKER_PATH)
+if SPEC is None or SPEC.loader is None:
+    raise RuntimeError("Unable to load kg_nav acquire worker module for tests.")
+aw = importlib.util.module_from_spec(SPEC)
+sys.modules["kg_nav_acquire_worker"] = aw
+SPEC.loader.exec_module(aw)
 
 
 class StreamResponse:
@@ -26,7 +32,7 @@ class StreamResponse:
     def iter_content(self, chunk_size: int = 1024 * 1024):
         yield self._content
 
-    def __enter__(self) -> "StreamResponse":
+    def __enter__(self) -> StreamResponse:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> bool:
@@ -60,7 +66,7 @@ class FakeFTP:
         self.host = host
         self.cwd_path: str | None = None
 
-    def __enter__(self) -> "FakeFTP":
+    def __enter__(self) -> FakeFTP:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> bool:
