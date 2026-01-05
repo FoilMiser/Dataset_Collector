@@ -35,6 +35,19 @@ def is_sensitive_key(key: str) -> bool:
 
 
 class SecretStr:
+    """
+    String-like wrapper for sensitive values that should be redacted in logs.
+
+    The constructor always stores a string representation of the input. If
+    ``value`` is ``None``, it is normalized to the empty string ``""``:
+
+        - ``SecretStr(None).reveal()`` returns ``""``.
+        - ``SecretStr("")`` also results in ``reveal()`` returning ``""``.
+
+    As a result, ``reveal()`` cannot be used to distinguish between an
+    explicitly empty secret and a ``None`` value; both appear as the empty
+    string. This behavior is intentional for redaction purposes.
+    """
     def __init__(self, value: Any) -> None:
         self._value = "" if value is None else str(value)
 
