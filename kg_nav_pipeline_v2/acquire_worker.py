@@ -159,18 +159,27 @@ def _http_download_with_resume(ctx: AcquireContext, url: str, out_path: Path, ex
     if existing and ctx.mode.enable_resume:
         headers["Range"] = f"bytes={existing}-"
         mode = "ab"
-    with requests.get(url, stream=True, headers=headers, timeout=(15, 300)) as r:
-        r.raise_for_status()
-        with out_path.open(mode) as f:
-            for chunk in r.iter_content(chunk_size=1024 * 1024):
-                if chunk:
-                    f.write(chunk)
-    result: dict[str, Any] = {"status": "ok", "path": str(out_path)}
-    if ctx.mode.verify_sha256 and expected_size and out_path.stat().st_size != expected_size:
-        result = {"status": "error", "error": "size_mismatch"}
-    elif ctx.mode.verify_sha256:
-        result["sha256"] = sha256_file(out_path)
-    return result
+    attempts = max(1, ctx.retry.max_attempts)
+    for attempt in range(attempts):
+        try:
+            with requests.get(url, stream=True, headers=headers, timeout=(15, 300)) as r:
+                r.raise_for_status()
+                with out_path.open(mode) as f:
+                    for chunk in r.iter_content(chunk_size=1024 * 1024):
+                        if chunk:
+                            f.write(chunk)
+            result: dict[str, Any] = {"status": "ok", "path": str(out_path)}
+            if ctx.mode.verify_sha256 and expected_size and out_path.stat().st_size != expected_size:
+                result = {"status": "error", "error": "size_mismatch"}
+            elif ctx.mode.verify_sha256:
+                result["sha256"] = sha256_file(out_path)
+            return result
+        except Exception:
+            if attempt + 1 >= attempts:
+                raise
+            backoff = min(ctx.retry.backoff_base * (2**attempt), ctx.retry.backoff_max)
+            time.sleep(backoff)
+    return {"status": "error", "error": "download_failed"}
 
 
 def handle_http(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:

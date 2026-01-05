@@ -1,0 +1,296 @@
+from __future__ import annotations
+
+import hashlib
+import sys
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from kg_nav_pipeline_v2 import acquire_worker as aw
+
+
+class StreamResponse:
+    def __init__(self, content: bytes, status_code: int = 200) -> None:
+        self._content = content
+        self.status_code = status_code
+
+    def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            raise RuntimeError(f"HTTP {self.status_code}")
+
+    def iter_content(self, chunk_size: int = 1024 * 1024):
+        yield self._content
+
+    def __enter__(self) -> "StreamResponse":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> bool:
+        return False
+
+
+class JsonResponse:
+    def __init__(self, payload: dict | list) -> None:
+        self._payload = payload
+
+    def raise_for_status(self) -> None:
+        return None
+
+    def json(self) -> dict | list:
+        return self._payload
+
+
+class FakeDataset:
+    def __init__(self) -> None:
+        self.saved: list[Path] = []
+
+    def save_to_disk(self, path: str) -> None:
+        target = Path(path)
+        target.mkdir(parents=True, exist_ok=True)
+        (target / "state.json").write_text("{}", encoding="utf-8")
+        self.saved.append(target)
+
+
+class FakeFTP:
+    def __init__(self, host: str) -> None:
+        self.host = host
+        self.cwd_path: str | None = None
+
+    def __enter__(self) -> "FakeFTP":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> bool:
+        return False
+
+    def login(self) -> None:
+        return None
+
+    def cwd(self, path: str) -> None:
+        self.cwd_path = path
+
+    def nlst(self, glob: str) -> list[str]:
+        return ["dataset.csv"]
+
+    def retrbinary(self, cmd: str, callback) -> None:
+        callback(b"ftp-data")
+
+
+def make_ctx(
+    tmp_path: Path,
+    *,
+    execute: bool = True,
+    verify_sha256: bool = False,
+    verify_zenodo_md5: bool = False,
+    max_attempts: int = 1,
+) -> aw.AcquireContext:
+    roots = aw.Roots(
+        raw_root=tmp_path / "raw",
+        manifests_root=tmp_path / "_manifests",
+        logs_root=tmp_path / "_logs",
+    )
+    limits = aw.Limits(limit_targets=None, limit_files=None, max_bytes_per_target=None)
+    mode = aw.RunMode(
+        execute=execute,
+        overwrite=True,
+        verify_sha256=verify_sha256,
+        verify_zenodo_md5=verify_zenodo_md5,
+        enable_resume=False,
+        workers=1,
+    )
+    retry = aw.RetryConfig(max_attempts=max_attempts, backoff_base=0.0, backoff_max=0.0)
+    return aw.AcquireContext(roots=roots, limits=limits, mode=mode, retry=retry)
+
+
+def test_http_download_retries_and_sha256(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = {"count": 0}
+
+    def fake_get(url: str, stream: bool, headers: dict, timeout: tuple[int, int]):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise RuntimeError("transient")
+        return StreamResponse(b"hello")
+
+    monkeypatch.setattr(aw, "requests", SimpleNamespace(get=fake_get))
+    monkeypatch.setattr(aw.time, "sleep", lambda *_: None)
+
+    ctx = make_ctx(tmp_path, verify_sha256=True, max_attempts=2)
+    out_path = tmp_path / "out.txt"
+    result = aw._http_download_with_resume(ctx, "https://example.com/file.txt", out_path)
+
+    assert calls["count"] == 2
+    assert result["status"] == "ok"
+    assert result["sha256"] == hashlib.sha256(b"hello").hexdigest()
+    assert out_path.read_bytes() == b"hello"
+
+
+def test_http_download_size_mismatch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_get(url: str, stream: bool, headers: dict, timeout: tuple[int, int]):
+        return StreamResponse(b"hello")
+
+    monkeypatch.setattr(aw, "requests", SimpleNamespace(get=fake_get))
+
+    ctx = make_ctx(tmp_path, verify_sha256=True)
+    out_path = tmp_path / "out.txt"
+    result = aw._http_download_with_resume(ctx, "https://example.com/file.txt", out_path, expected_size=10)
+
+    assert result["status"] == "error"
+    assert result["error"] == "size_mismatch"
+
+
+def test_zenodo_md5_mismatch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    expected_md5 = hashlib.md5(b"expected").hexdigest()
+
+    def fake_api_get(url: str, timeout: int = 60):
+        return JsonResponse(
+            {
+                "files": [
+                    {
+                        "links": {"self": "https://zenodo.org/file.bin"},
+                        "checksum": f"md5:{expected_md5}",
+                        "key": "file.bin",
+                    }
+                ]
+            }
+        )
+
+    def fake_download(ctx: aw.AcquireContext, url: str, out_path: Path, expected_size: int | None = None):
+        out_path.write_bytes(b"actual")
+        return {"status": "ok", "path": str(out_path)}
+
+    monkeypatch.setattr(aw, "requests", SimpleNamespace(get=fake_api_get))
+    monkeypatch.setattr(aw, "_http_download_with_resume", fake_download)
+
+    ctx = make_ctx(tmp_path, verify_zenodo_md5=True)
+    row = {"id": "zenodo", "download": {"strategy": "zenodo", "record_id": "123"}}
+    results = aw.handle_zenodo(ctx, row, tmp_path / "zenodo")
+
+    assert results[0]["status"] == "error"
+    assert results[0]["error"] == "md5_mismatch"
+
+
+def test_figshare_download(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_api_get(url: str, timeout: int = 120):
+        return JsonResponse(
+            [
+                {
+                    "name": "data.csv",
+                    "download_url": "https://figshare.com/data.csv",
+                }
+            ]
+        )
+
+    def fake_download(ctx: aw.AcquireContext, url: str, out_path: Path, expected_size: int | None = None):
+        out_path.write_bytes(b"figshare")
+        return {"status": "ok", "path": str(out_path)}
+
+    monkeypatch.setattr(aw, "requests", SimpleNamespace(get=fake_api_get))
+    monkeypatch.setattr(aw, "_http_download_with_resume", fake_download)
+
+    ctx = make_ctx(tmp_path)
+    row = {"id": "figshare", "download": {"strategy": "figshare", "article_id": "42"}}
+    results = aw.handle_figshare(ctx, row, tmp_path / "figshare")
+
+    assert results[0]["status"] == "ok"
+    assert (tmp_path / "figshare" / "data.csv").exists()
+
+
+def test_hf_datasets_splits(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple] = []
+
+    def load_dataset(dataset_id: str, **kwargs):
+        calls.append((dataset_id, kwargs))
+        return FakeDataset()
+
+    fake_module = SimpleNamespace(load_dataset=load_dataset)
+    monkeypatch.setitem(sys.modules, "datasets", fake_module)
+
+    ctx = make_ctx(tmp_path)
+    row = {
+        "id": "hf",
+        "download": {
+            "strategy": "huggingface_datasets",
+            "dataset_id": "my-ds",
+            "splits": ["train", "test"],
+        },
+    }
+    out_dir = tmp_path / "hf"
+    results = aw.handle_hf_datasets(ctx, row, out_dir)
+
+    assert len(results) == 2
+    assert (out_dir / "split_train" / "state.json").exists()
+    assert (out_dir / "split_test" / "state.json").exists()
+    assert calls[0][0] == "my-ds"
+
+
+def test_ftp_download(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(aw, "FTP", FakeFTP)
+
+    ctx = make_ctx(tmp_path)
+    row = {
+        "id": "ftp",
+        "download": {
+            "strategy": "ftp",
+            "base_url": "ftp://example.com/data",
+            "globs": ["*.csv"],
+        },
+    }
+    out_dir = tmp_path / "ftp"
+    results = aw.handle_ftp(ctx, row, out_dir)
+
+    assert results[0]["status"] == "ok"
+    assert (out_dir / "dataset.csv").read_bytes() == b"ftp-data"
+
+
+def test_s3_sync_mock(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[list[str]] = []
+
+    def fake_run_cmd(cmd: list[str], cwd: Path | None = None) -> str:
+        calls.append(cmd)
+        return "synced"
+
+    monkeypatch.setattr(aw, "run_cmd", fake_run_cmd)
+
+    ctx = make_ctx(tmp_path)
+    row = {
+        "id": "s3",
+        "download": {
+            "strategy": "s3_sync",
+            "urls": ["s3://bucket/data"],
+            "no_sign_request": True,
+            "request_payer": "requester",
+            "extra_args": ["--exclude", "*.tmp"],
+        },
+    }
+    out_dir = tmp_path / "s3"
+    results = aw.handle_s3_sync(ctx, row, out_dir)
+
+    assert results[0]["status"] == "ok"
+    assert calls[0][:4] == ["aws", "s3", "sync", "s3://bucket/data"]
+    assert "--no-sign-request" in calls[0]
+    assert "--request-payer" in calls[0]
+
+
+@pytest.mark.parametrize(
+    "handler,row,error",
+    [
+        (aw.handle_http, {"id": "http", "download": {"strategy": "http"}}, "missing url"),
+        (aw.handle_figshare, {"id": "fig", "download": {"strategy": "figshare"}}, "missing article_id"),
+        (aw.handle_hf_datasets, {"id": "hf", "download": {"strategy": "huggingface_datasets"}}, "missing dataset_id"),
+        (aw.handle_s3_sync, {"id": "s3", "download": {"strategy": "s3_sync"}}, "missing urls"),
+    ],
+)
+def test_strategy_error_paths(
+    tmp_path: Path,
+    handler,
+    row: dict,
+    error: str,
+) -> None:
+    ctx = make_ctx(tmp_path)
+    results = handler(ctx, row, tmp_path / "out")
+
+    assert results[0]["status"] == "error"
+    assert results[0]["error"] == error
