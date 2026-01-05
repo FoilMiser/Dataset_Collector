@@ -67,7 +67,7 @@ def test_json_formatter_redacts_exception_info() -> None:
     
     # Create an exception with a sensitive value in it
     try:
-        api_key = "ghp_1234567890abcdefghijklmnopqrstu"
+        api_key = "ghp_FakeTestToken1234567890abcdefghijklmnopqrstuvwxyz"
         raise ValueError(f"API call failed with key: {api_key}")
     except ValueError:
         import sys
@@ -90,7 +90,7 @@ def test_json_formatter_redacts_exception_info() -> None:
     assert "exc_info" in payload
     
     # Verify the sensitive API key is redacted in the exception traceback
-    assert "ghp_1234567890abcdefghijklmnopqrstu" not in payload["exc_info"]
+    assert "ghp_FakeTestToken1234567890abcdefghijklmnopqrstuvwxyz" not in payload["exc_info"]
     assert REDACTED in payload["exc_info"]
     assert "ValueError" in payload["exc_info"]
 
@@ -101,7 +101,7 @@ def test_text_formatter_redacts_exception_info() -> None:
     
     # Create an exception with a sensitive value in it
     try:
-        token = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"
+        token = "Bearer eyJfYWtlIjoiVGVzdCIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJGYWtlVGVzdFRva2VuIn0.FakeSigForTestingPurposesOnly"
         raise RuntimeError(f"Authentication failed: {token}")
     except RuntimeError:
         import sys
@@ -120,6 +120,6 @@ def test_text_formatter_redacts_exception_info() -> None:
     output = formatter.format(record)
     
     # Verify the JWT token is redacted in the output
-    assert "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9" not in output
+    assert "eyJfYWtlIjoiVGVzdCIsInR5cCI6IkpXVCJ9" not in output
     assert REDACTED in output
     assert "RuntimeError" in output
