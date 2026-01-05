@@ -24,18 +24,12 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from collector_core.config_validator import read_yaml
-
-try:
-    import requests
-except ImportError:  # pragma: no cover - optional dependency
-    requests = None
-
-try:
-    from ftplib import FTP
-except ImportError:  # pragma: no cover - optional dependency
-    FTP = None
 from collector_core.__version__ import __version__ as VERSION
+from collector_core.config_validator import read_yaml
+from collector_core.dependencies import _try_import, requires
+
+requests = _try_import("requests")
+FTP = _try_import("ftplib", "FTP")
 
 
 def utc_now() -> str:
@@ -150,8 +144,9 @@ class AcquireContext:
 # ---------------------------------
 
 def _http_download_with_resume(ctx: AcquireContext, url: str, out_path: Path, expected_size: int | None = None) -> dict[str, Any]:
-    if requests is None:
-        raise RuntimeError("requests is required for http downloads")
+    missing = requires("requests", requests, install="pip install requests")
+    if missing:
+        raise RuntimeError(missing)
     ensure_dir(out_path.parent)
     headers = {}
     mode = "wb"
@@ -202,8 +197,9 @@ def handle_ftp(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
     download = normalize_download(row.get("download", {}) or {})
     base = download.get("base_url")
     globs = download.get("globs", ["*"])
-    if FTP is None:
-        return [{"status": "error", "error": "ftplib missing"}]
+    missing = requires("ftplib", FTP, install="use a standard Python build that includes ftplib")
+    if missing:
+        return [{"status": "error", "error": missing}]
     if not base:
         return [{"status": "error", "error": "missing base_url"}]
     url = urlparse(base)
@@ -258,8 +254,9 @@ def handle_zenodo(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> li
             api_url = url
     if not api_url:
         return [{"status": "error", "error": "missing api/record_url/record_id/doi/url"}]
-    if requests is None:
-        return [{"status": "error", "error": "requests missing"}]
+    missing = requires("requests", requests, install="pip install requests")
+    if missing:
+        return [{"status": "error", "error": missing}]
     if not ctx.mode.execute:
         return [{"status": "noop", "path": str(out_dir)}]
     resp = requests.get(api_url, timeout=60)
@@ -292,8 +289,9 @@ def handle_dataverse(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) ->
     instance = download.get("instance") or "https://dataverse.harvard.edu"
     if not pid:
         return [{"status": "error", "error": "missing persistent_id"}]
-    if requests is None:
-        return [{"status": "error", "error": "requests missing"}]
+    missing = requires("requests", requests, install="pip install requests")
+    if missing:
+        return [{"status": "error", "error": missing}]
     if not ctx.mode.execute:
         return [{"status": "noop", "path": str(out_dir)}]
     url = f"{instance}/api/access/dvobject/{pid}"
@@ -313,8 +311,9 @@ def handle_figshare(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> 
     api = download.get("api") or (f"https://api.figshare.com/v2/articles/{article_id}/files" if article_id else None)
     if not article_id or not api:
         return [{"status": "error", "error": "missing article_id"}]
-    if requests is None:
-        return [{"status": "error", "error": "requests missing"}]
+    missing = requires("requests", requests, install="pip install requests")
+    if missing:
+        return [{"status": "error", "error": missing}]
     if not ctx.mode.execute:
         return [{"status": "noop", "path": str(out_dir)}]
     resp = requests.get(api, timeout=120)
