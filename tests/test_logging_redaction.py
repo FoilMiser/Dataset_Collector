@@ -65,7 +65,7 @@ def test_redact_headers_wraps_sensitive_values() -> None:
 def test_json_formatter_redacts_exception_info() -> None:
     """Test that JsonFormatter redacts sensitive values in exception tracebacks."""
     formatter = JsonFormatter()
-    
+
     # Create an exception with a sensitive value in it
     try:
         api_key = "ghp_FakeTestToken1234567890abcdefghijklmnopqrstuvwxyz"
@@ -98,7 +98,7 @@ def test_json_formatter_redacts_exception_info() -> None:
 def test_text_formatter_redacts_exception_info() -> None:
     """Test that TextFormatter redacts sensitive values in exception tracebacks."""
     formatter = TextFormatter()
-    
+
     # Create an exception with a sensitive value in it
     try:
         token = "Bearer eyJfYWtlIjoiVGVzdCIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJGYWtlVGVzdFRva2VuIn0.FakeSigForTestingPurposesOnly"
