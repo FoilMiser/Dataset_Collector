@@ -30,12 +30,15 @@ import argparse
 import csv
 import json
 import time
+import logging
 from pathlib import Path
 from typing import Any
 
 from collector_core.config_validator import read_yaml
+from collector_core.logging_config import add_logging_args, configure_logging
 
 VERSION = "0.9"
+logger = logging.getLogger(__name__)
 
 
 def utc_now() -> str:
@@ -128,7 +131,7 @@ def load_existing_signoff(manifest_dir: Path) -> dict[str, Any]:
 def cmd_list(args: argparse.Namespace) -> int:
     yellow_rows = read_jsonl(Path(args.queue))
     if not yellow_rows:
-        print("No YELLOW items found.")
+        logger.info("No YELLOW items found.")
         return 0
 
     pending = []
@@ -140,27 +143,31 @@ def cmd_list(args: argparse.Namespace) -> int:
             pending.append((r, status or "pending"))
 
     if not pending:
-        print("No pending YELLOW items (all have signoffs).")
+        logger.info("No pending YELLOW items (all have signoffs).")
         return 0
 
-    print("=" * 78)
-    print(f"YELLOW REVIEW QUEUE (pending) — v{VERSION} — {utc_now()}")
-    print("=" * 78)
+    logger.info("%s", "=" * 78)
+    logger.info("YELLOW REVIEW QUEUE (pending) — v%s — %s", VERSION, utc_now())
+    logger.info("%s", "=" * 78)
     for r, status in pending[: args.limit]:
-        print(f"- {r.get('id')}  [{status}]")
-        print(f"  name: {r.get('name')}")
-        print(f"  license_profile: {r.get('license_profile')}  resolved_spdx: {r.get('resolved_spdx')}")
+        logger.info("- %s  [%s]", r.get("id"), status)
+        logger.info("  name: %s", r.get("name"))
+        logger.info(
+            "  license_profile: %s  resolved_spdx: %s",
+            r.get("license_profile"),
+            r.get("resolved_spdx"),
+        )
         rh = r.get("restriction_hits") or []
         if rh:
-            print(f"  restriction_hits: {rh[:3]}")
+            logger.info("  restriction_hits: %s", rh[:3])
         dl = r.get("denylist_hits") or []
         if dl:
-            print(f"  denylist_hits: {dl[:2]}")
-        print(f"  license_evidence_url: {r.get('license_evidence_url')}")
-        print(f"  manifest_dir: {r.get('manifest_dir')}")
-        print()
+            logger.info("  denylist_hits: %s", dl[:2])
+        logger.info("  license_evidence_url: %s", r.get("license_evidence_url"))
+        logger.info("  manifest_dir: %s", r.get("manifest_dir"))
+        logger.info("")
     if len(pending) > args.limit:
-        print(f"... and {len(pending) - args.limit} more")
+        logger.info("... and %s more", len(pending) - args.limit)
     return 0
 
 
@@ -211,12 +218,12 @@ def cmd_set(args: argparse.Namespace, status: str) -> int:
     qpath = Path(args.queue)
     row = find_target_in_queue(qpath, args.target)
     if not row:
-        print(f"Target not found in queue: {args.target}")
+        logger.error("Target not found in queue: %s", args.target)
         return 2
 
     mdir = Path(row.get("manifest_dir", ""))
     if not mdir.exists():
-        print(f"Manifest dir does not exist: {mdir}")
+        logger.error("Manifest dir does not exist: %s", mdir)
         return 2
 
     promote_to = ""
@@ -240,7 +247,7 @@ def cmd_set(args: argparse.Namespace, status: str) -> int:
         constraints=getattr(args, "constraints", "") or "",
         notes=getattr(args, "notes", "") or "",
     )
-    print(f"Wrote signoff: {mdir / 'review_signoff.json'}")
+    logger.info("Wrote signoff: %s", mdir / "review_signoff.json")
     return 0
 
 
@@ -250,7 +257,7 @@ def cmd_export(args: argparse.Namespace) -> int:
     yellow_rows = read_jsonl(qpath)
 
     if not yellow_rows:
-        print("No YELLOW items found.")
+        logger.info("No YELLOW items found.")
         return 0
 
     reviewed: list[dict[str, Any]] = []
@@ -278,7 +285,7 @@ def cmd_export(args: argparse.Namespace) -> int:
             })
 
     if not reviewed:
-        print("No reviewed targets found.")
+        logger.info("No reviewed targets found.")
         return 0
 
     out_path = Path(args.output)
@@ -295,10 +302,10 @@ def cmd_export(args: argparse.Namespace) -> int:
                 writer.writeheader()
                 writer.writerows(reviewed)
     else:
-        print(f"Unknown format: {fmt}. Use 'json' or 'csv'.")
+        logger.error("Unknown format: %s. Use 'json' or 'csv'.", fmt)
         return 1
 
-    print(f"Exported {len(reviewed)} reviewed targets to: {out_path}")
+    logger.info("Exported %s reviewed targets to: %s", len(reviewed), out_path)
     return 0
 
 
@@ -314,6 +321,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional targets YAML to derive queue defaults",
     )
+    add_logging_args(ap)
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     p_list = sub.add_parser("list", help="List pending YELLOW items")
@@ -356,6 +364,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(*, pipeline_id: str | None = None) -> int:
     ap = build_parser()
     args = ap.parse_args()
+    configure_logging(level=args.log_level, fmt=args.log_format)
 
     cfg: dict[str, Any] = {}
     if args.targets:
