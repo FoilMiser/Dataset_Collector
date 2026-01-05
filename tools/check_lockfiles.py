@@ -24,9 +24,7 @@ def _parse_requirement_name(raw: str) -> str | None:
         return None
     if cleaned.startswith("-"):
         return None
-    match = re.split(r"[<>=!~\[\s]", cleaned, 1)
-    if not match:
-        return None
+    match = re.split(r"[<>=!~\[\s]", cleaned, maxsplit=1)
     return match[0].strip() or None
 
 
