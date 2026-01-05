@@ -26,14 +26,12 @@ from typing import Any
 from urllib.parse import urljoin, urlparse
 from urllib.robotparser import RobotFileParser
 
+from collector_core.__version__ import __version__ as VERSION
 from collector_core.config_validator import read_yaml
-
 from collector_core.dependencies import _try_import, requires
 
 requests = _try_import("requests")
 FTP = _try_import("ftplib", "FTP")
-
-from collector_core.__version__ import __version__ as VERSION
 
 
 def utc_now() -> str:

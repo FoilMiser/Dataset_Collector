@@ -25,8 +25,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+from collector_core.__version__ import __version__ as VERSION
 from collector_core.config_validator import read_yaml
-
 from collector_core.dependencies import _try_import, requires
 
 requests = _try_import("requests")
@@ -35,8 +35,6 @@ PdfReader = _try_import("pypdf", "PdfReader")
 pdfminer_extract_text = _try_import("pdfminer.high_level", "extract_text")
 BeautifulSoup = _try_import("bs4", "BeautifulSoup")
 trafilatura = _try_import("trafilatura")
-
-from collector_core.__version__ import __version__ as VERSION
 
 
 def utc_now() -> str:
