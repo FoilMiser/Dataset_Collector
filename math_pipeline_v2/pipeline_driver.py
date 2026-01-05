@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from collector_core.__version__ import __version__ as VERSION
 from collector_core.pipeline_driver_base import (
     BasePipelineDriver,
     RoutingBlockSpec,
@@ -11,6 +12,7 @@ from collector_core.pipeline_driver_base import (
 
 class MathPipelineDriver(BasePipelineDriver):
     DOMAIN = 'math'
+    PIPELINE_VERSION = VERSION
     TARGETS_LABEL = 'targets_math.yaml'
     USER_AGENT = 'math-corpus-pipeline'
     ROUTING_KEYS = ['math_routing']

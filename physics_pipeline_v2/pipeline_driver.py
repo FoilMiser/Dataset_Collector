@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from collector_core.__version__ import __version__ as VERSION
 from collector_core.pipeline_driver_base import (
     BasePipelineDriver,
     RoutingBlockSpec,
@@ -12,6 +13,7 @@ from collector_core.pipeline_driver_base import (
 
 class PhysicsPipelineDriver(BasePipelineDriver):
     DOMAIN = 'physics'
+    PIPELINE_VERSION = VERSION
     TARGETS_LABEL = 'targets_physics.yaml'
     USER_AGENT = 'physics-corpus-pipeline'
     ROUTING_KEYS = ['physics_routing', 'math_routing']

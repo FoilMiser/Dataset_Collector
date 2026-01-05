@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+from collector_core.__version__ import __version__ as VERSION
 from collector_core.pipeline_driver_base import (
     BasePipelineDriver,
     RoutingBlockSpec,
@@ -9,6 +10,7 @@ from collector_core.pipeline_driver_base import (
 
 class EngineeringPipelineDriver(BasePipelineDriver):
     DOMAIN = 'engineering'
+    PIPELINE_VERSION = VERSION
     TARGETS_LABEL = 'targets_engineering.yaml'
     USER_AGENT = 'engineering-corpus-pipeline'
     ROUTING_KEYS = ['engineering_routing']

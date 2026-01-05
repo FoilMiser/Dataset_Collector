@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+from collector_core.__version__ import __version__ as VERSION
 from collector_core.pipeline_driver_base import (
     BasePipelineDriver,
     RoutingBlockSpec,
@@ -9,6 +10,7 @@ from collector_core.pipeline_driver_base import (
 
 class SafetyIncidentPipelineDriver(BasePipelineDriver):
     DOMAIN = 'safety_incident'
+    PIPELINE_VERSION = VERSION
     TARGETS_LABEL = 'targets_safety_incident.yaml'
     USER_AGENT = 'safety-incident-pipeline'
     ROUTING_KEYS = ['safety_routing']

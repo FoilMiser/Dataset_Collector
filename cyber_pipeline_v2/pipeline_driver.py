@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+from collector_core.__version__ import __version__ as VERSION
 from collector_core.pipeline_driver_base import (
     BasePipelineDriver,
 )
@@ -8,6 +9,7 @@ from collector_core.pipeline_driver_base import (
 
 class CyberPipelineDriver(BasePipelineDriver):
     DOMAIN = 'cyber'
+    PIPELINE_VERSION = VERSION
     TARGETS_LABEL = 'targets_cyber.yaml'
     USER_AGENT = 'cyber-corpus-pipeline'
     ROUTING_KEYS = ['cyber_routing', 'math_routing']

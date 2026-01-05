@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+from collector_core.__version__ import __version__ as VERSION
 from collector_core.pipeline_driver_base import (
     BasePipelineDriver,
     RoutingBlockSpec,
@@ -9,6 +10,7 @@ from collector_core.pipeline_driver_base import (
 
 class AgriCircularPipelineDriver(BasePipelineDriver):
     DOMAIN = 'agri_circular'
+    PIPELINE_VERSION = VERSION
     TARGETS_LABEL = 'targets_agri_circular.yaml'
     USER_AGENT = 'agri-circular-pipeline'
     ROUTING_KEYS = ['agri_routing', 'math_routing']

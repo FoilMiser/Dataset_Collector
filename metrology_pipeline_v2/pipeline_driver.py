@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from collector_core.__version__ import __version__ as VERSION
 from collector_core.pipeline_driver_base import (
     BasePipelineDriver,
     RoutingBlockSpec,
@@ -11,6 +12,7 @@ from collector_core.pipeline_driver_base import (
 
 class MetrologyPipelineDriver(BasePipelineDriver):
     DOMAIN = 'metrology'
+    PIPELINE_VERSION = VERSION
     TARGETS_LABEL = 'targets_metrology.yaml'
     USER_AGENT = 'metrology-corpus-pipeline'
     ROUTING_KEYS = ['metrology_routing', 'math_routing']

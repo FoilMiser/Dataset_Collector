@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+from collector_core.__version__ import __version__ as VERSION
 from collector_core.pipeline_driver_base import (
     BasePipelineDriver,
     RoutingBlockSpec,
@@ -9,6 +10,7 @@ from collector_core.pipeline_driver_base import (
 
 class BiologyPipelineDriver(BasePipelineDriver):
     DOMAIN = 'biology'
+    PIPELINE_VERSION = VERSION
     TARGETS_LABEL = 'targets_biology.yaml'
     USER_AGENT = 'bio-corpus-pipeline'
     ROUTING_KEYS = ['bio_routing', 'math_routing']
