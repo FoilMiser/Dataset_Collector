@@ -31,7 +31,11 @@ from typing import Any
 
 from collector_core.config_validator import read_yaml
 from collector_core.dependencies import _try_import, requires
-from collector_core.exceptions import CollectorError, DependencyMissingError, OutputPathsBuilderError
+from collector_core.exceptions import (
+    CollectorError,
+    DependencyMissingError,
+    OutputPathsBuilderError,
+)
 
 requests = _try_import("requests")
 FTP = _try_import("ftplib", "FTP")
