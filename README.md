@@ -204,9 +204,11 @@ pip install -r requirements-dev.constraints.txt
 
 ### Regenerate the lock files
 
+These constraints are version-pinned but do not use hash checking.
+
 ```bash
-uv pip compile requirements.in -o requirements.constraints.txt --generate-hashes
-uv pip compile requirements-dev.in -o requirements-dev.constraints.txt --generate-hashes
+uv pip compile requirements.in -o requirements.constraints.txt
+uv pip compile requirements-dev.in -o requirements-dev.constraints.txt
 ```
 
 ## Preflight validation

@@ -43,6 +43,9 @@ jobs:
       - name: Install tooling
         run: |
           python -m pip install pytest pytest-cov ruff
+      - name: Check lockfiles up to date
+        run: |
+          python -m tools.check_lockfiles
       - name: Ruff
         run: |
           ruff check .
