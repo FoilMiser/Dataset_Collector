@@ -10,6 +10,14 @@ reproducibility.
 - Run `python tools/validate_repo.py --repo-root .` before submitting.
 - Update `updated_utc` for any YAML configs you edit (UTC date).
 
+## CI matrix expectations
+
+CI runs validation across multiple operating systems and Python versions with two
+install modes:
+
+- **min** installs from `requirements.in` to exercise the unlocked dependency set.
+- **lock** installs from `requirements.constraints.txt` to exercise the locked set.
+
 ## Adding a new target (required steps)
 
 When you add a target to a pipeline YAML (for example `targets_math.yaml`):
