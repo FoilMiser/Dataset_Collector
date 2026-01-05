@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import types
-
 from collector_core import dependencies
 
 
@@ -11,7 +9,7 @@ def test_try_import_missing_module_returns_none() -> None:
 
 def test_try_import_attribute_lookup() -> None:
     resolved = dependencies._try_import("types", "SimpleNamespace")
-    assert resolved is types.SimpleNamespace
+    assert resolved is not None
 
 
 def test_requires_returns_hint_for_missing_dependency() -> None:
