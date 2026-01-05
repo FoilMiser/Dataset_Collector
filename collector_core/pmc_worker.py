@@ -24,11 +24,11 @@ import json
 import re
 import tarfile
 import time
+import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from collector_core.config_validator import read_yaml
 try:
     import requests
 except ImportError:
@@ -39,7 +39,7 @@ try:
 except ImportError:
     FTP = None
 
-import xml.etree.ElementTree as ET
+from collector_core.config_validator import read_yaml
 
 VERSION = "0.9"
 

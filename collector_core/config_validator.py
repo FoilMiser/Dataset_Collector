@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +15,7 @@ class ConfigValidationError(ValueError):
     pass
 
 
-@lru_cache(maxsize=None)
+@cache
 def load_schema(schema_name: str) -> dict[str, Any]:
     schema_path = SCHEMA_DIR / f"{schema_name}.schema.json"
     if not schema_path.exists():

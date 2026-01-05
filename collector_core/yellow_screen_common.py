@@ -11,9 +11,8 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
-from collector_core.config_validator import read_yaml
-
 from collector_core.__version__ import __version__ as VERSION
+from collector_core.config_validator import read_yaml
 
 __all__ = ["VERSION"]
 

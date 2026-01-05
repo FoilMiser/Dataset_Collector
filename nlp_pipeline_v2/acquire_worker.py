@@ -27,9 +27,9 @@ from typing import Any
 from urllib.parse import urlparse
 
 import requests
-from collector_core.config_validator import read_yaml
 
 from collector_core.__version__ import __version__ as VERSION
+from collector_core.config_validator import read_yaml
 
 
 def utc_now() -> str:
