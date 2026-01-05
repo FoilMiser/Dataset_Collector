@@ -23,6 +23,7 @@ def test_text_formatter_redacts_sensitive_headers() -> None:
             },
         ),
         exc_info=None,
+        func=None,
     )
     output = formatter.format(record)
     assert "secret-token" not in output
@@ -40,6 +41,7 @@ def test_json_formatter_redacts_inline_tokens() -> None:
         msg="Authorization: Bearer abc123 token=xyz456",
         args=(),
         exc_info=None,
+        func=None,
     )
     payload = json.loads(formatter.format(record))
     message = payload["message"]
