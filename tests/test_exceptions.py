@@ -9,6 +9,7 @@ from collector_core.exceptions import (
     ConfigValidationError,
     OutputPathsBuilderError,
     YamlParseError,
+    DependencyMissingError,
 )
 from collector_core.pmc_worker import run_pmc_worker
 
@@ -53,3 +54,13 @@ def test_output_paths_builder_error(tmp_path: Path) -> None:
             ],
         )
     assert excinfo.value.code == "output_paths_builder_required"
+
+
+def test_dependency_missing_error_includes_install() -> None:
+    err = DependencyMissingError(
+        "missing dependency: demo",
+        dependency="demo",
+        install="pip install demo",
+    )
+    assert err.context["dependency"] == "demo"
+    assert err.context["install"] == "pip install demo"
