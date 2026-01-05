@@ -21,15 +21,16 @@ import os
 import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from ftplib import FTP
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-import requests
-
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.config_validator import read_yaml
+from collector_core.dependencies import _try_import, requires
+
+requests = _try_import("requests")
+FTP = _try_import("ftplib", "FTP")
 
 
 def utc_now() -> str:
@@ -185,8 +186,9 @@ def handle_ftp(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
     download = normalize_download(row.get("download", {}) or {})
     base = download.get("base_url")
     globs = download.get("globs", ["*"])
-    if FTP is None:
-        return [{"status": "error", "error": "ftplib missing"}]
+    missing = requires("ftplib", FTP, install="use a standard Python build that includes ftplib")
+    if missing:
+        return [{"status": "error", "error": missing}]
     if not base:
         return [{"status": "error", "error": "missing base_url"}]
     url = urlparse(base)
@@ -241,8 +243,9 @@ def handle_zenodo(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> li
             api_url = url
     if not api_url:
         return [{"status": "error", "error": "missing api/record_url/record_id/doi/url"}]
-    if requests is None:
-        return [{"status": "error", "error": "requests missing"}]
+    missing = requires("requests", requests, install="pip install requests")
+    if missing:
+        return [{"status": "error", "error": missing}]
     if not ctx.mode.execute:
         return [{"status": "noop", "path": str(out_dir)}]
     resp = requests.get(api_url, timeout=60)

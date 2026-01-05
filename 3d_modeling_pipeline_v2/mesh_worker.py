@@ -24,24 +24,13 @@ import time
 from pathlib import Path
 from typing import Any
 
-try:
-    import numpy as np
-    import trimesh
-except ImportError:  # pragma: no cover - runtime check below
-    trimesh = None
-    np = None
+from collector_core.dependencies import _try_import, requires
 
-try:
-    from PIL import Image
-except ImportError:  # pragma: no cover - optional
-    Image = None
-
-try:
-    import pyarrow as pa
-    import pyarrow.parquet as pq
-except ImportError:  # pragma: no cover - optional
-    pa = None
-    pq = None
+np = _try_import("numpy")
+trimesh = _try_import("trimesh")
+Image = _try_import("PIL.Image")
+pa = _try_import("pyarrow")
+pq = _try_import("pyarrow.parquet")
 
 
 ALLOWED_EXTS = {".stl", ".obj", ".ply", ".glb", ".gltf", ".step", ".stp"}
@@ -64,8 +53,9 @@ def ensure_dir(path: Path) -> None:
 
 
 def load_mesh(path: Path) -> trimesh.Trimesh | None:
-    if trimesh is None:
-        raise RuntimeError("trimesh is required for mesh_worker.py")
+    missing = requires("trimesh", trimesh, install="pip install trimesh")
+    if missing:
+        raise RuntimeError(missing)
     try:
         return trimesh.load(path, force="mesh")
     except Exception:
@@ -157,8 +147,9 @@ def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
 
 
 def write_parquet(path: Path, rows: list[dict[str, Any]]) -> None:
-    if pa is None or pq is None:
-        raise RuntimeError("pyarrow not installed; cannot emit parquet")
+    missing = requires("pyarrow", pa, install="pip install pyarrow")
+    if missing or pq is None:
+        raise RuntimeError(missing or "missing dependency: pyarrow.parquet (install: pip install pyarrow)")
     ensure_dir(path.parent)
     table = pa.Table.from_pylist(rows)
     pq.write_table(table, path)

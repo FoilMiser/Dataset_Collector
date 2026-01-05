@@ -29,15 +29,10 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-try:
-    import requests
-except ImportError:
-    requests = None
+from collector_core.dependencies import _try_import, requires
 
-try:
-    from ftplib import FTP
-except ImportError:
-    FTP = None
+requests = _try_import("requests")
+FTP = _try_import("ftplib", "FTP")
 
 from collector_core.config_validator import read_yaml
 
@@ -140,8 +135,9 @@ def chunk_text(text: str, max_chars: int, min_chars: int) -> list[str]:
 
 
 def http_get_bytes(url: str, timeout_s: int = 120, user_agent_version: str = VERSION) -> tuple[bytes, dict]:
-    if requests is None:
-        raise RuntimeError("requests not installed")
+    missing = requires("requests", requests, install="pip install requests")
+    if missing:
+        raise RuntimeError(missing)
     with requests.get(
         url,
         stream=True,
@@ -153,8 +149,9 @@ def http_get_bytes(url: str, timeout_s: int = 120, user_agent_version: str = VER
 
 
 def ftp_get_bytes(host: str, remote_path: str) -> bytes:
-    if FTP is None:
-        raise RuntimeError("ftplib not available")
+    missing = requires("ftplib", FTP, install="use a standard Python build that includes ftplib")
+    if missing:
+        raise RuntimeError(missing)
     ftp = FTP(host, timeout=120)
     ftp.login()
     parts = remote_path.lstrip("/").split("/")
