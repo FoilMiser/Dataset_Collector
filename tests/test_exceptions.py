@@ -7,9 +7,9 @@ import pytest
 from collector_core.config_validator import Draft7Validator, read_yaml
 from collector_core.exceptions import (
     ConfigValidationError,
+    DependencyMissingError,
     OutputPathsBuilderError,
     YamlParseError,
-    DependencyMissingError,
 )
 from collector_core.pmc_worker import run_pmc_worker
 
