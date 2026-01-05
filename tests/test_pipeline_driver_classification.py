@@ -41,6 +41,7 @@ class PipelineTestConfig:
             companion_cfg.update(companion_override)
 
         cfg = {
+            "schema_version": "0.8",
             "globals": globals_cfg,
             "companion_files": companion_cfg,
             "targets": targets,
@@ -54,6 +55,7 @@ class PipelineTestConfig:
 def minimal_license_map(tmp_path: Path) -> Path:
     license_map_path = tmp_path / "license_map.yaml"
     license_map = {
+        "schema_version": "0.3",
         "spdx": {
             "allow": ["MIT"],
             "conditional": ["LGPL-2.1-only"],
@@ -77,7 +79,14 @@ def minimal_license_map(tmp_path: Path) -> Path:
 def minimal_config(tmp_path: Path, minimal_license_map: Path) -> PipelineTestConfig:
     denylist_path = tmp_path / "denylist.yaml"
     denylist_path.write_text(
-        yaml.safe_dump({"patterns": [], "domain_patterns": [], "publisher_patterns": []}),
+        yaml.safe_dump(
+            {
+                "schema_version": "0.2",
+                "patterns": [],
+                "domain_patterns": [],
+                "publisher_patterns": [],
+            }
+        ),
         encoding="utf-8",
     )
     return PipelineTestConfig(
@@ -178,6 +187,7 @@ def test_denylist_overrides_bucket(tmp_path: Path, minimal_config: PipelineTestC
     denylist_path.write_text(
         yaml.safe_dump(
             {
+                "schema_version": "0.2",
                 "patterns": [
                     {
                         "type": "substring",

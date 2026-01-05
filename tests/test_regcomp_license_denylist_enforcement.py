@@ -20,6 +20,7 @@ def test_regcomp_license_map_and_denylist_enforced(tmp_path: Path) -> None:
     targets_path = tmp_path / "targets_regcomp.yaml"
 
     license_map = {
+        "schema_version": "0.3",
         "spdx": {
             "allow": ["MIT"],
             "conditional": [],
@@ -39,6 +40,7 @@ def test_regcomp_license_map_and_denylist_enforced(tmp_path: Path) -> None:
     license_map_path.write_text(yaml.safe_dump(license_map), encoding="utf-8")
 
     denylist = {
+        "schema_version": "0.2",
         "patterns": [
             {
                 "type": "substring",
@@ -60,6 +62,7 @@ def test_regcomp_license_map_and_denylist_enforced(tmp_path: Path) -> None:
     denylist_path.write_text(yaml.safe_dump(denylist), encoding="utf-8")
 
     targets_cfg = {
+        "schema_version": "0.8",
         "globals": {
             "manifests_root": str(manifests_root),
             "queues_root": str(queues_root),
