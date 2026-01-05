@@ -11,7 +11,8 @@ if __package__ in (None, ""):
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
 
-from collector_core.config_validator import ConfigValidationError, read_yaml
+from collector_core.config_validator import read_yaml
+from collector_core.exceptions import ConfigValidationError, YamlParseError
 
 
 def iter_targets_files(root: Path) -> Iterable[Path]:
@@ -46,7 +47,7 @@ def validate_file(path: Path, schema_name: str) -> list[str]:
     try:
         read_yaml(path, schema_name=schema_name)
         return []
-    except (ConfigValidationError, RuntimeError, FileNotFoundError) as exc:
+    except (ConfigValidationError, YamlParseError, FileNotFoundError) as exc:
         return [f"{path}: {exc}"]
 
 
