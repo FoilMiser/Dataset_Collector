@@ -21,10 +21,10 @@ import gzip
 import hashlib
 import io
 import json
+import logging
 import re
 import tarfile
 import time
-import logging
 import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from pathlib import Path
