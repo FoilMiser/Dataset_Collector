@@ -22,5 +22,9 @@ ignore = ["E501"]
 [project]
 dynamic = ["version"]
 
+[project.scripts]
+dc-review = "collector_core.review_queue:main"
+dc-catalog = "collector_core.catalog_builder:main"
+
 [tool.setuptools.dynamic]
 version = { attr = "collector_core.__version__.__version__" }
