@@ -38,15 +38,39 @@ class SecretStr:
     """
     String-like wrapper for sensitive values that should be redacted in logs.
 
-    The constructor always stores a string representation of the input. If
-    ``value`` is ``None``, it is normalized to the empty string ``""``:
+    This class provides a way to handle sensitive data (API keys, tokens, passwords,
+    etc.) safely within the application. When logged or converted to a string, the
+    actual value is replaced with ``<REDACTED>`` to prevent accidental exposure of
+    secrets in logs, error messages, or debugging output.
 
-        - ``SecretStr(None).reveal()`` returns ``""``.
-        - ``SecretStr("")`` also results in ``reveal()`` returning ``""``.
+    **When to use:**
+        - Wrap API keys, access tokens, passwords, or other sensitive credentials
+        - Store values that should never appear in logs or stack traces
+        - Pass sensitive data through the application safely
 
-    As a result, ``reveal()`` cannot be used to distinguish between an
-    explicitly empty secret and a ``None`` value; both appear as the empty
-    string. This behavior is intentional for redaction purposes.
+    **Usage:**
+        Create a SecretStr by passing any value to the constructor. Use the ``reveal()``
+        method to access the actual value when needed for API calls or authentication::
+
+            secret = SecretStr("my-api-key-12345")
+            print(secret)           # Output: <REDACTED>
+            print(str(secret))      # Output: <REDACTED>
+            print(secret.reveal())  # Output: my-api-key-12345
+
+    **Behavior:**
+        - The constructor stores a string representation of the input value
+        - ``__str__()`` and ``__repr__()`` return ``<REDACTED>`` instead of the actual value
+        - ``reveal()`` returns the actual value as a string - use this when you need
+          the real value for authentication or API calls
+        - If ``value`` is ``None``, it is normalized to the empty string ``""``:
+            - ``SecretStr(None).reveal()`` returns ``""``
+            - ``SecretStr("")`` also results in ``reveal()`` returning ``""``
+        - As a result, ``reveal()`` cannot distinguish between an explicitly empty
+          secret and a ``None`` value; both appear as the empty string
+
+    **Note:** The ``reveal()`` method should only be called when the actual value is
+    needed for authentication, API calls, or similar operations. Avoid using ``reveal()``
+    in contexts where the value might be logged or displayed.
     """
     def __init__(self, value: Any) -> None:
         self._value = "" if value is None else str(value)
