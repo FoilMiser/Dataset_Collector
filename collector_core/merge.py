@@ -62,6 +62,17 @@ class GreenSkip:
     detail: dict[str, Any] | None = None
 
 
+@dataclasses.dataclass
+class MergeState:
+    summary: dict[str, Any]
+    dedupe: DedupeIndex
+    shard_cfg: ShardingConfig
+    pool_sharders: dict[str, Sharder]
+    target_meta: dict[str, dict[str, Any]]
+    pipeline_id: str
+    execute: bool
+
+
 class Sharder:
     def __init__(self, base_dir: Path, cfg: ShardingConfig):
         self.base_dir = base_dir
@@ -431,11 +442,8 @@ def record_skip(
     append_jsonl(roots.ledger_root / "combined_skipped.jsonl", [row])
 
 
-def merge_records(cfg: dict[str, Any], roots: Roots, execute: bool, *, pipeline_id: str) -> dict[str, Any]:
-    shard_cfg = sharding_cfg(cfg)
-    dedupe = DedupeIndex(roots.ledger_root / "combined_dedupe.sqlite")
-    summary = {"written": 0, "deduped": 0, "skipped": 0, "shards": []}
-    target_meta = {
+def build_target_meta(cfg: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    return {
         str(target.get("id")): {
             "dataset_id": (target.get("download", {}) or {}).get("dataset_id") or target.get("dataset_id"),
             "config": (target.get("download", {}) or {}).get("config"),
@@ -443,73 +451,86 @@ def merge_records(cfg: dict[str, Any], roots: Roots, execute: bool, *, pipeline_
         for target in (cfg.get("targets", []) or [])
         if target.get("id") is not None
     }
+
+
+def build_target_canon(cfg: dict[str, Any]) -> tuple[dict[str, tuple[list[str], int | None]], tuple[list[str], int | None]]:
     target_canon = {
         str(target.get("id")): resolve_canonicalize_config(cfg, target)
         for target in (cfg.get("targets", []) or [])
         if target.get("id") is not None
     }
     default_canon = resolve_canonicalize_config(cfg, None)
+    return target_canon, default_canon
 
-    pool_sharders: dict[str, Sharder] = {}
 
-    def get_sharder(pool: str) -> Sharder:
-        if pool not in pool_sharders:
-            sharder = Sharder(roots.combined_root / pool / "shards", shard_cfg)
-            pool_sharders[pool] = sharder
-            ensure_dir(sharder.base_dir)
-        return pool_sharders[pool]
+def get_sharder(pool: str, roots: Roots, state: MergeState) -> Sharder:
+    if pool not in state.pool_sharders:
+        sharder = Sharder(roots.combined_root / pool / "shards", state.shard_cfg)
+        state.pool_sharders[pool] = sharder
+        ensure_dir(sharder.base_dir)
+    return state.pool_sharders[pool]
 
-    def handle_record(
-        rec: dict[str, Any],
-        source_kind: str,
-        source_path: Path | None,
-        target_id: str | None = None,
-        pool_hint: str | None = None,
-    ) -> None:
-        resolved_target = target_id or (rec.get("source", {}) or {}).get("target_id") or "unknown"
-        pool_value = pool_hint or rec.get("pool") or route_pool(rec)
-        meta = target_meta.get(resolved_target, {})
-        record = normalize_output_record(
-            rec,
-            target_id=resolved_target,
-            pool=pool_value,
-            pipeline=pipeline_id,
-            dataset_id=meta.get("dataset_id"),
-            config=meta.get("config"),
-            now=utc_now(),
+
+def handle_record(
+    rec: dict[str, Any],
+    source_kind: str,
+    source_path: Path | None,
+    roots: Roots,
+    state: MergeState,
+    target_id: str | None = None,
+    pool_hint: str | None = None,
+) -> None:
+    resolved_target = target_id or (rec.get("source", {}) or {}).get("target_id") or "unknown"
+    pool_value = pool_hint or rec.get("pool") or route_pool(rec)
+    meta = state.target_meta.get(resolved_target, {})
+    record = normalize_output_record(
+        rec,
+        target_id=resolved_target,
+        pool=pool_value,
+        pipeline=state.pipeline_id,
+        dataset_id=meta.get("dataset_id"),
+        config=meta.get("config"),
+        now=utc_now(),
+    )
+    validate_output_contract(record, f"{source_kind}/{resolved_target}")
+    content_hash = record["content_sha256"]
+    if not state.dedupe.add_if_new(content_hash):
+        state.summary["deduped"] += 1
+        return
+    pool = record.get("pool") or pool_value
+    sharder = get_sharder(pool, roots, state)
+    shard_path = str(sharder._path())
+    if state.execute:
+        path = sharder.add(record)
+        if path:
+            shard_path = str(path)
+            state.summary["shards"].append(shard_path)
+        append_jsonl(
+            roots.ledger_root / "combined_index.jsonl",
+            [
+                {
+                    "content_sha256": content_hash,
+                    "license_pool": pool,
+                    "output_shard": shard_path,
+                    "source": record.get("source", {}),
+                    "seen_at_utc": utc_now(),
+                }
+            ],
         )
-        validate_output_contract(record, f"{source_kind}/{resolved_target}")
-        content_hash = record["content_sha256"]
-        if not dedupe.add_if_new(content_hash):
-            summary["deduped"] += 1
-            return
-        pool = record.get("pool") or pool_value
-        sharder = get_sharder(pool)
-        shard_path = str(sharder._path())
-        if execute:
-            path = sharder.add(record)
-            if path:
-                shard_path = str(path)
-                summary["shards"].append(shard_path)
-            append_jsonl(
-                roots.ledger_root / "combined_index.jsonl",
-                [
-                    {
-                        "content_sha256": content_hash,
-                        "license_pool": pool,
-                        "output_shard": shard_path,
-                        "source": record.get("source", {}),
-                        "seen_at_utc": utc_now(),
-                    }
-                ],
-            )
-        summary["written"] += 1
+    state.summary["written"] += 1
 
+
+def process_green_records(
+    roots: Roots,
+    state: MergeState,
+    target_canon: dict[str, tuple[list[str], int | None]],
+    default_canon: tuple[list[str], int | None],
+) -> None:
     for item in iter_green_records(roots):
         candidates, max_chars = target_canon.get(item.target_id, default_canon)
-        meta = target_meta.get(item.target_id, {})
+        meta = state.target_meta.get(item.target_id, {})
         if isinstance(item, GreenSkip):
-            summary["skipped"] += 1
+            state.summary["skipped"] += 1
             record_skip(
                 roots,
                 item.target_id,
@@ -517,7 +538,7 @@ def merge_records(cfg: dict[str, Any], roots: Roots, execute: bool, *, pipeline_
                 item.reason,
                 item.source_path,
                 item.source_kind,
-                execute,
+                state.execute,
                 detail=item.detail,
             )
             continue
@@ -528,10 +549,10 @@ def merge_records(cfg: dict[str, Any], roots: Roots, execute: bool, *, pipeline_
             candidates,
             max_chars,
             meta,
-            pipeline_id=pipeline_id,
+            pipeline_id=state.pipeline_id,
         )
         if not canonical:
-            summary["skipped"] += 1
+            state.summary["skipped"] += 1
             record_skip(
                 roots,
                 item.target_id,
@@ -539,20 +560,45 @@ def merge_records(cfg: dict[str, Any], roots: Roots, execute: bool, *, pipeline_
                 reason or "canonicalize_failed",
                 item.source_path,
                 item.source_kind,
-                execute,
+                state.execute,
             )
             continue
-        handle_record(canonical, item.source_kind, item.source_path, item.target_id, item.pool)
+        handle_record(canonical, item.source_kind, item.source_path, roots, state, item.target_id, item.pool)
+
+
+def process_screened_yellow(roots: Roots, state: MergeState) -> None:
     for rec in iter_screened_yellow(roots):
         target_id = (rec.get("source", {}) or {}).get("target_id") or "unknown"
-        handle_record(rec, "screened_yellow", None, target_id)
+        handle_record(rec, "screened_yellow", None, roots, state, target_id)
 
-    if execute:
-        for sharder in pool_sharders.values():
-            flushed = sharder.flush()
-            if flushed:
-                summary["shards"].append(str(flushed))
 
+def finalize_shards(state: MergeState) -> None:
+    if not state.execute:
+        return
+    for sharder in state.pool_sharders.values():
+        flushed = sharder.flush()
+        if flushed:
+            state.summary["shards"].append(str(flushed))
+
+
+def merge_records(cfg: dict[str, Any], roots: Roots, execute: bool, *, pipeline_id: str) -> dict[str, Any]:
+    shard_cfg = sharding_cfg(cfg)
+    dedupe = DedupeIndex(roots.ledger_root / "combined_dedupe.sqlite")
+    summary = {"written": 0, "deduped": 0, "skipped": 0, "shards": []}
+    target_meta = build_target_meta(cfg)
+    target_canon, default_canon = build_target_canon(cfg)
+    state = MergeState(
+        summary=summary,
+        dedupe=dedupe,
+        shard_cfg=shard_cfg,
+        pool_sharders={},
+        target_meta=target_meta,
+        pipeline_id=pipeline_id,
+        execute=execute,
+    )
+    process_green_records(roots, state, target_canon, default_canon)
+    process_screened_yellow(roots, state)
+    finalize_shards(state)
     dedupe.close()
     summary["finished_at_utc"] = utc_now()
     return summary

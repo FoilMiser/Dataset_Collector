@@ -92,6 +92,61 @@ class LicenseMap:
     profiles: dict[str, dict[str, Any]]
 
 
+@dataclasses.dataclass(frozen=True)
+class DriverConfig:
+    args: argparse.Namespace
+    retry_max: int
+    retry_backoff: float
+    headers: dict[str, str]
+    targets_path: Path
+    targets_cfg: dict[str, Any]
+    license_map_path: Path
+    license_map: LicenseMap
+    denylist: dict[str, Any]
+    manifests_root: Path
+    queues_root: Path
+    default_gates: list[Any]
+    targets: list[dict[str, Any]]
+    require_yellow_signoff: bool
+
+
+@dataclasses.dataclass(frozen=True)
+class EvidenceResult:
+    snapshot: dict[str, Any]
+    text: str
+    license_change_detected: bool
+    no_fetch_missing_evidence: bool
+
+
+@dataclasses.dataclass(frozen=True)
+class TargetContext:
+    target: dict[str, Any]
+    tid: str
+    name: str
+    profile: str
+    evidence_url: str
+    spdx_hint: str
+    download_blob: str
+    review_required: bool
+    gates: dict[str, Any]
+    target_manifest_dir: Path
+    signoff: dict[str, Any]
+    review_status: str
+    promote_to: str
+    routing: dict[str, Any]
+    dl_hits: list[dict[str, Any]]
+    enabled: bool
+    split_group_id: str
+
+
+@dataclasses.dataclass
+class ClassificationResult:
+    green_rows: list[dict[str, Any]]
+    yellow_rows: list[dict[str, Any]]
+    red_rows: list[dict[str, Any]]
+    warnings: list[dict[str, Any]]
+
+
 def load_license_map(path: Path) -> LicenseMap:
     m = read_yaml(path, schema_name="license_map")
     spdx = m.get("spdx", {}) or {}
@@ -109,6 +164,225 @@ def load_license_map(path: Path) -> LicenseMap:
         gating=gating,
         profiles=profiles,
     )
+
+
+def resolve_retry_config(args: argparse.Namespace) -> tuple[int, float]:
+    retry_max_env = os.getenv("PIPELINE_RETRY_MAX")
+    retry_backoff_env = os.getenv("PIPELINE_RETRY_BACKOFF")
+    retry_max = args.retry_max if args.retry_max is not None else args.max_retries
+    if retry_max is None:
+        retry_max = int(retry_max_env) if retry_max_env else 3
+    retry_backoff = (
+        args.retry_backoff
+        if args.retry_backoff is not None
+        else (float(retry_backoff_env) if retry_backoff_env else 2.0)
+    )
+    return retry_max, retry_backoff
+
+
+def build_evidence_headers(raw_headers: list[str]) -> dict[str, str]:
+    headers: dict[str, str] = {}
+    for raw in raw_headers:
+        if "=" not in raw:
+            continue
+        key, value = raw.split("=", 1)
+        if key.strip():
+            headers[key.strip()] = value.strip()
+    return headers
+
+
+def resolve_output_roots(args: argparse.Namespace, globals_cfg: dict[str, Any]) -> tuple[Path, Path]:
+    dataset_root = resolve_dataset_root(args.dataset_root)
+    manifests_override = args.manifests_root or args.out_manifests
+    queues_override = args.queues_root or args.out_queues
+    if manifests_override:
+        manifests_root = Path(manifests_override).expanduser().resolve()
+    elif dataset_root:
+        manifests_root = (dataset_root / "_manifests").resolve()
+    else:
+        manifests_root = Path(globals_cfg.get("manifests_root", "./manifests")).expanduser().resolve()
+    if queues_override:
+        queues_root = Path(queues_override).expanduser().resolve()
+    elif dataset_root:
+        queues_root = (dataset_root / "_queues").resolve()
+    else:
+        queues_root = Path(globals_cfg.get("queues_root", "./queues")).expanduser().resolve()
+    return manifests_root, queues_root
+
+
+def load_driver_config(args: argparse.Namespace) -> DriverConfig:
+    retry_max, retry_backoff = resolve_retry_config(args)
+    headers = build_evidence_headers(args.evidence_header)
+    targets_path = Path(args.targets).resolve()
+    targets_cfg = read_yaml(targets_path, schema_name="targets")
+    companion = targets_cfg.get("companion_files", {}) or {}
+    license_map_path = Path(args.license_map or companion.get("license_map", "./license_map.yaml")).resolve()
+    license_map = load_license_map(license_map_path)
+    denylist_path = Path(companion.get("denylist", "./denylist.yaml")).resolve()
+    denylist = load_denylist(denylist_path)
+    globals_cfg = targets_cfg.get("globals", {}) or {}
+    manifests_root, queues_root = resolve_output_roots(args, globals_cfg)
+    ensure_dir(manifests_root)
+    ensure_dir(queues_root)
+    return DriverConfig(
+        args=args,
+        retry_max=retry_max,
+        retry_backoff=retry_backoff,
+        headers=headers,
+        targets_path=targets_path,
+        targets_cfg=targets_cfg,
+        license_map_path=license_map_path,
+        license_map=license_map,
+        denylist=denylist,
+        manifests_root=manifests_root,
+        queues_root=queues_root,
+        default_gates=globals_cfg.get("default_gates", []) or [],
+        targets=targets_cfg.get("targets", []) or [],
+        require_yellow_signoff=bool(globals_cfg.get("require_yellow_signoff", False)),
+    )
+
+
+def find_existing_evidence(manifest_dir: Path) -> Path | None:
+    for ext in [".html", ".pdf", ".txt", ".json"]:
+        candidate = manifest_dir / f"license_evidence{ext}"
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def apply_denylist_bucket(dl_hits: list[dict[str, Any]], eff_bucket: str) -> str:
+    for hit in dl_hits:
+        severity = hit.get("severity", "hard_red")
+        if severity == "hard_red":
+            return "RED"
+        if severity == "force_yellow":
+            eff_bucket = "YELLOW"
+    return eff_bucket
+
+
+def apply_review_gates(
+    eff_bucket: str,
+    review_required: bool,
+    review_status: str,
+    promote_to: str,
+    restriction_hits: list[str],
+) -> str:
+    if review_status == "rejected":
+        return "RED"
+    if review_required and eff_bucket != "RED" and review_status != "approved":
+        if eff_bucket == "GREEN":
+            return "YELLOW"
+        return eff_bucket
+    if review_status == "approved" and promote_to == "GREEN" and not restriction_hits and eff_bucket != "RED":
+        return "GREEN"
+    return eff_bucket
+
+
+def resolve_effective_bucket(
+    license_map: LicenseMap,
+    gates: dict[str, Any],
+    evidence: EvidenceResult,
+    spdx: str,
+    restriction_hits: list[str],
+    min_confidence: float,
+    resolved_confidence: float,
+    review_required: bool,
+    review_status: str,
+    promote_to: str,
+    denylist_hits: list[dict[str, Any]],
+) -> str:
+    eff_bucket = compute_effective_bucket(
+        license_map,
+        gates,
+        spdx,
+        restriction_hits,
+        evidence.snapshot,
+        min_confidence,
+        resolved_confidence,
+    )
+    eff_bucket = apply_denylist_bucket(denylist_hits, eff_bucket)
+    if evidence.no_fetch_missing_evidence and eff_bucket == "GREEN":
+        eff_bucket = "YELLOW"
+    return apply_review_gates(eff_bucket, review_required, review_status, promote_to, restriction_hits)
+
+
+def apply_yellow_signoff_requirement(
+    eff_bucket: str,
+    review_status: str,
+    review_required: bool,
+    require_yellow_signoff: bool,
+) -> bool:
+    if require_yellow_signoff and eff_bucket == "YELLOW" and review_status not in {"approved", "rejected"}:
+        return True
+    return review_required
+
+
+def resolve_output_pool(profile: str, eff_bucket: str, target: dict[str, Any]) -> str:
+    out_pool = (target.get("output", {}) or {}).get("pool")
+    if out_pool:
+        return out_pool
+    if profile == "copyleft":
+        return "copyleft"
+    if eff_bucket == "GREEN":
+        return "permissive"
+    return "quarantine"
+
+
+def sort_queue_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def sort_key(row: dict[str, Any]) -> tuple[int, str]:
+        p = row.get("priority", None)
+        try:
+            pi = int(p) if p is not None else -999999
+        except Exception:
+            pi = -999999
+        return (-pi, str(row.get("id", "")))
+
+    return sorted(rows, key=sort_key)
+
+
+def build_target_identity(
+    target: dict[str, Any],
+    license_map: LicenseMap,
+) -> tuple[str, str, str, bool, list[dict[str, Any]]]:
+    enabled = bool(target.get("enabled", True))
+    tid = str(target.get("id", "")).strip() or "unknown_id"
+    name = str(target.get("name", tid))
+    profile = str(target.get("license_profile", "unknown"))
+    warnings: list[dict[str, Any]] = []
+    if profile not in license_map.profiles:
+        warnings.append(
+            {
+                "type": "unknown_license_profile",
+                "target_id": tid,
+                "license_profile": profile,
+                "known_profiles": sorted(license_map.profiles.keys()),
+                "message": f"Target {tid} uses license_profile '{profile}' not present in license_map profiles.",
+            }
+        )
+    return tid, name, profile, enabled, warnings
+
+
+def extract_evidence_fields(target: dict[str, Any]) -> tuple[str, str]:
+    evidence = target.get("license_evidence", {}) or {}
+    spdx_hint = str(evidence.get("spdx_hint", "UNKNOWN"))
+    evidence_url = str(evidence.get("url", ""))
+    return spdx_hint, evidence_url
+
+
+def build_denylist_haystack(
+    tid: str,
+    name: str,
+    evidence_url: str,
+    download_blob: str,
+    target: dict[str, Any],
+) -> dict[str, str]:
+    return {
+        "id": tid,
+        "name": name,
+        "license_evidence_url": evidence_url,
+        "download_blob": download_blob,
+        "publisher": str(target.get("publisher", "") or ""),
+    }
 
 
 def extract_domain(url: str) -> str:
@@ -695,339 +969,281 @@ class BasePipelineDriver:
         return result
 
     def run(self, args: argparse.Namespace) -> None:
-        retry_max_env = os.getenv("PIPELINE_RETRY_MAX")
-        retry_backoff_env = os.getenv("PIPELINE_RETRY_BACKOFF")
-        retry_max = args.retry_max if args.retry_max is not None else args.max_retries
-        if retry_max is None:
-            retry_max = int(retry_max_env) if retry_max_env else 3
-        retry_backoff = (
-            args.retry_backoff
-            if args.retry_backoff is not None
-            else (float(retry_backoff_env) if retry_backoff_env else 2.0)
+        cfg = load_driver_config(args)
+        results = self.classify_targets(cfg)
+        self.emit_queues(cfg.queues_root, results)
+        self.emit_summary(cfg, results)
+        self.emit_report(cfg, results)
+
+    def classify_targets(self, cfg: DriverConfig) -> ClassificationResult:
+        results = ClassificationResult([], [], [], [])
+        for target in cfg.targets:
+            ctx, warnings = self.prepare_target_context(target, cfg)
+            results.warnings.extend(warnings)
+            evaluation, row = self.classify_target(ctx, cfg)
+            write_json(ctx.target_manifest_dir / "evaluation.json", evaluation)
+            if not ctx.enabled:
+                continue
+            if row["effective_bucket"] == "GREEN":
+                results.green_rows.append(row)
+            elif row["effective_bucket"] == "YELLOW":
+                results.yellow_rows.append(row)
+            else:
+                results.red_rows.append(row)
+        return results
+
+    def prepare_target_context(self, target: dict[str, Any], cfg: DriverConfig) -> tuple[TargetContext, list[dict[str, Any]]]:
+        tid, name, profile, enabled, warnings = build_target_identity(target, cfg.license_map)
+        spdx_hint, evidence_url = extract_evidence_fields(target)
+        download_cfg = target.get("download", {}) or {}
+        download_blob = json.dumps(download_cfg, ensure_ascii=False)
+        review_required = bool(target.get("review_required", False))
+        gates = merge_gates(cfg.default_gates, target.get("gates_override", {}) or {})
+        target_manifest_dir = cfg.manifests_root / tid
+        ensure_dir(target_manifest_dir)
+        signoff = read_review_signoff(target_manifest_dir)
+        review_status = str(signoff.get("status", "") or "").lower()
+        promote_to = str(signoff.get("promote_to", "") or "").upper()
+        dl_hits = denylist_hits(cfg.denylist, build_denylist_haystack(tid, name, evidence_url, download_blob, target))
+        routing = self.resolve_routing_fields(target)
+        split_group_id = str(target.get("split_group_id", "") or tid)
+        ctx = TargetContext(
+            target=target,
+            tid=tid,
+            name=name,
+            profile=profile,
+            evidence_url=evidence_url,
+            spdx_hint=spdx_hint,
+            download_blob=download_blob,
+            review_required=review_required,
+            gates=gates,
+            target_manifest_dir=target_manifest_dir,
+            signoff=signoff,
+            review_status=review_status,
+            promote_to=promote_to,
+            routing=routing,
+            dl_hits=dl_hits,
+            enabled=enabled,
+            split_group_id=split_group_id,
+        )
+        return ctx, warnings
+
+    def classify_target(self, ctx: TargetContext, cfg: DriverConfig) -> tuple[dict[str, Any], dict[str, Any]]:
+        evidence = self.fetch_evidence(ctx, cfg)
+        restriction_hits = contains_any(evidence.text, cfg.license_map.restriction_phrases)
+        resolved, resolved_confidence, confidence_reason = resolve_spdx_with_confidence(
+            cfg.license_map, evidence.text, ctx.spdx_hint
+        )
+        eff_bucket = resolve_effective_bucket(
+            cfg.license_map,
+            ctx.gates,
+            evidence,
+            resolved,
+            restriction_hits,
+            cfg.args.min_license_confidence,
+            resolved_confidence,
+            ctx.review_required,
+            ctx.review_status,
+            ctx.promote_to,
+            ctx.dl_hits,
+        )
+        review_required = apply_yellow_signoff_requirement(
+            eff_bucket,
+            ctx.review_status,
+            ctx.review_required,
+            cfg.require_yellow_signoff,
+        )
+        out_pool = resolve_output_pool(ctx.profile, eff_bucket, ctx.target)
+        evaluation = self.build_evaluation(
+            ctx,
+            cfg,
+            evidence,
+            restriction_hits,
+            resolved,
+            resolved_confidence,
+            confidence_reason,
+            eff_bucket,
+            review_required,
+            out_pool,
+        )
+        row = self.build_row(
+            ctx,
+            evidence,
+            restriction_hits,
+            resolved,
+            resolved_confidence,
+            eff_bucket,
+            review_required,
+            out_pool,
+        )
+        return evaluation, row
+
+    def fetch_evidence(self, ctx: TargetContext, cfg: DriverConfig) -> EvidenceResult:
+        evidence_snapshot = {"status": "skipped", "url": ctx.evidence_url}
+        evidence_text = ""
+        license_change_detected = False
+        no_fetch_missing_evidence = False
+        if "snapshot_terms" in ctx.gates and not cfg.args.no_fetch:
+            evidence_snapshot = self.snapshot_evidence(
+                ctx.target_manifest_dir,
+                ctx.evidence_url,
+                max_retries=cfg.retry_max,
+                backoff_base=cfg.retry_backoff,
+                headers=cfg.headers,
+            )
+            evidence_text = extract_text_for_scanning(evidence_snapshot)
+            license_change_detected = bool(evidence_snapshot.get("changed_from_previous"))
+        elif "snapshot_terms" in ctx.gates and cfg.args.no_fetch:
+            existing_evidence_path = find_existing_evidence(ctx.target_manifest_dir)
+            if existing_evidence_path:
+                evidence_snapshot = {
+                    "status": "ok",
+                    "url": ctx.evidence_url,
+                    "saved_path": str(existing_evidence_path),
+                    "fetched_at_utc": utc_now(),
+                    "offline_mode": True,
+                }
+                evidence_text = extract_text_for_scanning(evidence_snapshot)
+            else:
+                evidence_snapshot = {"status": "offline_missing", "url": ctx.evidence_url}
+                no_fetch_missing_evidence = True
+        return EvidenceResult(
+            snapshot=evidence_snapshot,
+            text=evidence_text,
+            license_change_detected=license_change_detected,
+            no_fetch_missing_evidence=no_fetch_missing_evidence,
         )
 
-        headers: dict[str, str] = {}
-        for raw in args.evidence_header:
-            if "=" not in raw:
-                continue
-            k, v = raw.split("=", 1)
-            if k.strip():
-                headers[k.strip()] = v.strip()
+    def build_evaluation(
+        self,
+        ctx: TargetContext,
+        cfg: DriverConfig,
+        evidence: EvidenceResult,
+        restriction_hits: list[str],
+        resolved: str,
+        resolved_confidence: float,
+        confidence_reason: str,
+        eff_bucket: str,
+        review_required: bool,
+        out_pool: str,
+    ) -> dict[str, Any]:
+        evaluation = {
+            "id": ctx.tid,
+            "name": ctx.name,
+            "enabled": ctx.enabled,
+            "evaluated_at_utc": utc_now(),
+            "pipeline_version": VERSION,
+            "review_required": review_required,
+            "review_signoff": ctx.signoff or None,
+            "review_status": ctx.review_status or "pending",
+            "denylist_hits": ctx.dl_hits,
+            "license_profile": ctx.profile,
+            "spdx_hint": ctx.spdx_hint,
+            "resolved_spdx": resolved,
+            "resolved_spdx_confidence": resolved_confidence,
+            "resolved_spdx_confidence_reason": confidence_reason,
+            "restriction_hits": restriction_hits,
+            "gates": ctx.gates,
+            "effective_bucket": eff_bucket,
+            "queue_bucket": eff_bucket,
+            "license_evidence_url": ctx.evidence_url,
+            "evidence_snapshot": evidence.snapshot,
+            "evidence_headers_used": cfg.headers,
+            "license_change_detected": evidence.license_change_detected,
+            "download": ctx.target.get("download", {}),
+            "build": ctx.target.get("build", {}),
+            "data_type": ctx.target.get("data_type", []),
+            "priority": ctx.target.get("priority", None),
+            "statistics": ctx.target.get("statistics", {}),
+            "split_group_id": ctx.split_group_id,
+            "no_fetch_missing_evidence": evidence.no_fetch_missing_evidence,
+            "require_yellow_signoff": cfg.require_yellow_signoff,
+            "output_pool": out_pool,
+        }
+        evaluation.update(self.build_evaluation_extras(ctx.target, ctx.routing))
+        evaluation["routing"] = ctx.routing
+        return evaluation
 
-        targets_path = Path(args.targets).resolve()
-        targets_cfg = read_yaml(targets_path, schema_name="targets")
+    def build_row(
+        self,
+        ctx: TargetContext,
+        evidence: EvidenceResult,
+        restriction_hits: list[str],
+        resolved: str,
+        resolved_confidence: float,
+        eff_bucket: str,
+        review_required: bool,
+        out_pool: str,
+    ) -> dict[str, Any]:
+        row = {
+            "id": ctx.tid,
+            "name": ctx.name,
+            "effective_bucket": eff_bucket,
+            "queue_bucket": eff_bucket,
+            "license_profile": ctx.profile,
+            "resolved_spdx": resolved,
+            "resolved_spdx_confidence": resolved_confidence,
+            "restriction_hits": restriction_hits,
+            "license_evidence_url": ctx.evidence_url,
+            "manifest_dir": str(ctx.target_manifest_dir),
+            "download": ctx.target.get("download", {}),
+            "build": ctx.target.get("build", {}),
+            "data_type": ctx.target.get("data_type", []),
+            "priority": ctx.target.get("priority", None),
+            "enabled": ctx.enabled,
+            "statistics": ctx.target.get("statistics", {}),
+            "split_group_id": ctx.split_group_id,
+            "denylist_hits": ctx.dl_hits,
+            "review_required": review_required,
+            "license_change_detected": evidence.license_change_detected,
+            "output_pool": out_pool,
+            "routing_subject": ctx.routing.get("subject"),
+            "routing_domain": ctx.routing.get("domain"),
+            "routing_category": ctx.routing.get("category"),
+            "routing_level": ctx.routing.get("level"),
+            "routing_granularity": ctx.routing.get("granularity"),
+            "routing_confidence": ctx.routing.get("confidence"),
+            "routing_reason": ctx.routing.get("reason"),
+        }
+        row.update(self.build_row_extras(ctx.target, ctx.routing))
+        if self.INCLUDE_ROUTING_DICT_IN_ROW and "routing" not in row:
+            row["routing"] = ctx.routing
+        return row
 
-        companion = targets_cfg.get("companion_files", {}) or {}
-        license_map_path = Path(args.license_map or companion.get("license_map", "./license_map.yaml")).resolve()
-        license_map = load_license_map(license_map_path)
+    def emit_queues(self, queues_root: Path, results: ClassificationResult) -> None:
+        results.green_rows = sort_queue_rows(results.green_rows)
+        results.yellow_rows = sort_queue_rows(results.yellow_rows)
+        results.red_rows = sort_queue_rows(results.red_rows)
+        write_jsonl(queues_root / "green_download.jsonl", results.green_rows)
+        write_jsonl(queues_root / "yellow_pipeline.jsonl", results.yellow_rows)
+        write_jsonl(queues_root / "red_rejected.jsonl", results.red_rows)
 
-        denylist_path = Path(companion.get("denylist", "./denylist.yaml")).resolve()
-        denylist = load_denylist(denylist_path)
-
-        globals_cfg = targets_cfg.get("globals", {}) or {}
-        dataset_root = resolve_dataset_root(args.dataset_root)
-        manifests_override = args.manifests_root or args.out_manifests
-        queues_override = args.queues_root or args.out_queues
-        if manifests_override:
-            manifests_root = Path(manifests_override).expanduser().resolve()
-        elif dataset_root:
-            manifests_root = (dataset_root / "_manifests").resolve()
-        else:
-            manifests_root = Path(globals_cfg.get("manifests_root", "./manifests")).expanduser().resolve()
-        if queues_override:
-            queues_root = Path(queues_override).expanduser().resolve()
-        elif dataset_root:
-            queues_root = (dataset_root / "_queues").resolve()
-        else:
-            queues_root = Path(globals_cfg.get("queues_root", "./queues")).expanduser().resolve()
-        ensure_dir(manifests_root)
-        ensure_dir(queues_root)
-
-        default_gates = globals_cfg.get("default_gates", []) or []
-        targets = targets_cfg.get("targets", []) or []
-
-        # v0.9: Global setting to require signoff for all YELLOW items
-        require_yellow_signoff = bool(globals_cfg.get("require_yellow_signoff", False))
-
-        green_rows: list[dict[str, Any]] = []
-        yellow_rows: list[dict[str, Any]] = []
-        red_rows: list[dict[str, Any]] = []
-        warnings: list[dict[str, Any]] = []
-
-        for t in targets:
-            enabled = bool(t.get("enabled", True))
-            tid = str(t.get("id", "")).strip() or "unknown_id"
-            name = str(t.get("name", tid))
-            profile = str(t.get("license_profile", "unknown"))
-            if profile not in license_map.profiles:
-                warnings.append(
-                    {
-                        "type": "unknown_license_profile",
-                        "target_id": tid,
-                        "license_profile": profile,
-                        "known_profiles": sorted(license_map.profiles.keys()),
-                        "message": (
-                            f"Target {tid} uses license_profile '{profile}' not present in license_map profiles."
-                        ),
-                    }
-                )
-            evidence = t.get("license_evidence", {}) or {}
-            spdx_hint = str(evidence.get("spdx_hint", "UNKNOWN"))
-            evidence_url = str(evidence.get("url", ""))
-
-            # Flatten download config into a searchable blob for denylist scanning
-            download_cfg = t.get("download", {}) or {}
-            download_blob = json.dumps(download_cfg, ensure_ascii=False)
-            review_required = bool(t.get("review_required", False))
-
-            gates = merge_gates(default_gates, t.get("gates_override", {}) or {})
-
-            target_manifest_dir = manifests_root / tid
-            ensure_dir(target_manifest_dir)
-
-            signoff = read_review_signoff(target_manifest_dir)
-            review_status = str(signoff.get("status", "") or "").lower()  # approved | rejected | deferred
-            promote_to = str(signoff.get("promote_to", "") or "").upper()
-
-            # Build haystack for denylist scanning (fixed: dl_hits moved after definition)
-            dl_hay = {
-                "id": tid,
-                "name": name,
-                "license_evidence_url": evidence_url,
-                "download_blob": download_blob,
-                "publisher": str(t.get("publisher", "") or ""),  # v0.9: publisher metadata for denylist
-            }
-            dl_hits = denylist_hits(denylist, dl_hay)
-
-            evidence_snapshot = {"status": "skipped", "url": evidence_url}
-            evidence_text = ""
-            license_change_detected = False
-
-            # v0.9: Check for existing evidence snapshot in --no-fetch mode
-            no_fetch_missing_evidence = False
-            if "snapshot_terms" in gates and not args.no_fetch:
-                evidence_snapshot = self.snapshot_evidence(
-                    target_manifest_dir,
-                    evidence_url,
-                    max_retries=retry_max,
-                    backoff_base=retry_backoff,
-                    headers=headers,
-                )
-                evidence_text = extract_text_for_scanning(evidence_snapshot)
-                license_change_detected = bool(evidence_snapshot.get("changed_from_previous"))
-            elif "snapshot_terms" in gates and args.no_fetch:
-                # v0.9: In offline mode, check for existing snapshot
-                existing_evidence_path = None
-                for ext in [".html", ".pdf", ".txt", ".json"]:
-                    candidate = target_manifest_dir / f"license_evidence{ext}"
-                    if candidate.exists():
-                        existing_evidence_path = candidate
-                        break
-
-                if existing_evidence_path:
-                    evidence_snapshot = {
-                        "status": "ok",
-                        "url": evidence_url,
-                        "saved_path": str(existing_evidence_path),
-                        "fetched_at_utc": utc_now(),
-                        "offline_mode": True,
-                    }
-                    evidence_text = extract_text_for_scanning(evidence_snapshot)
-                else:
-                    evidence_snapshot = {"status": "offline_missing", "url": evidence_url}
-                    no_fetch_missing_evidence = True
-
-            # Restriction scan
-            restriction_hits = contains_any(evidence_text, license_map.restriction_phrases)
-
-            # SPDX normalization + confidence scoring
-            resolved, resolved_confidence, confidence_reason = resolve_spdx_with_confidence(
-                license_map, evidence_text, spdx_hint
-            )
-
-            eff_bucket = compute_effective_bucket(
-                license_map,
-                gates,
-                resolved,
-                restriction_hits,
-                evidence_snapshot,
-                args.min_license_confidence,
-                resolved_confidence,
-            )
-
-            denylist_forced_bucket = None
-            for hit in dl_hits:
-                severity = hit.get("severity", "hard_red")
-                if severity == "hard_red":
-                    denylist_forced_bucket = "RED"
-                    break
-                if severity == "force_yellow":
-                    denylist_forced_bucket = "YELLOW"
-
-            if denylist_forced_bucket:
-                eff_bucket = denylist_forced_bucket
-
-            # v0.9: --no-fetch safety: force YELLOW if missing evidence in offline mode
-            if no_fetch_missing_evidence and eff_bucket == "GREEN":
-                eff_bucket = "YELLOW"
-
-            # Manual review gating:
-            # - If explicitly rejected: force RED
-            # - If review_required and not approved: at least YELLOW (unless already RED)
-            # - If approved with promote_to=GREEN: allow promotion to GREEN (conservative: only if no restriction hits)
-            if review_status == "rejected":
-                eff_bucket = "RED"
-            elif review_required and eff_bucket != "RED" and review_status != "approved":
-                if eff_bucket == "GREEN":
-                    eff_bucket = "YELLOW"
-            elif review_status == "approved" and promote_to == "GREEN" and not restriction_hits and eff_bucket != "RED":
-                eff_bucket = "GREEN"
-
-            # v0.9: require_yellow_signoff - if enabled and bucket is YELLOW without signoff, stay YELLOW
-            if require_yellow_signoff and eff_bucket == "YELLOW" and review_status not in {
-                "approved",
-                "rejected",
-            }:
-                review_required = True  # Ensure review_required is set
-
-            # v0.9: Dataset-aware splitting support
-            split_group_id = str(t.get("split_group_id", "") or tid)
-
-            # Output pool selection (difficulty recorded as metadata only)
-            out_pool = (t.get("output", {}) or {}).get("pool")
-            if not out_pool:
-                if profile == "copyleft":
-                    out_pool = "copyleft"
-                elif eff_bucket == "GREEN":
-                    out_pool = "permissive"
-                else:
-                    out_pool = "quarantine"
-
-            routing = self.resolve_routing_fields(t)
-            evaluation = {
-                "id": tid,
-                "name": name,
-                "enabled": enabled,
-                "evaluated_at_utc": utc_now(),
-                "pipeline_version": VERSION,
-                "review_required": review_required,
-                "review_signoff": signoff or None,
-                "review_status": review_status or "pending",
-                "denylist_hits": dl_hits,
-                "license_profile": profile,
-                "spdx_hint": spdx_hint,
-                "resolved_spdx": resolved,
-                "resolved_spdx_confidence": resolved_confidence,
-                "resolved_spdx_confidence_reason": confidence_reason,
-                "restriction_hits": restriction_hits,
-                "gates": gates,
-                "effective_bucket": eff_bucket,
-                "queue_bucket": eff_bucket,
-                "license_evidence_url": evidence_url,
-                "evidence_snapshot": evidence_snapshot,
-                "evidence_headers_used": headers,
-                "license_change_detected": license_change_detected,
-                "download": t.get("download", {}),
-                "build": t.get("build", {}),
-                "data_type": t.get("data_type", []),
-                "priority": t.get("priority", None),
-                "statistics": t.get("statistics", {}),
-                # v0.9: New fields
-                "split_group_id": split_group_id,  # For dataset-aware splitting
-                "no_fetch_missing_evidence": no_fetch_missing_evidence,
-                "require_yellow_signoff": require_yellow_signoff,
-                "output_pool": out_pool,
-            }
-            evaluation.update(self.build_evaluation_extras(t, routing))
-            evaluation["routing"] = routing
-            write_json(target_manifest_dir / "evaluation.json", evaluation)
-
-            row = {
-                "id": tid,
-                "name": name,
-                "effective_bucket": eff_bucket,
-                "queue_bucket": eff_bucket,
-                "license_profile": profile,
-                "resolved_spdx": resolved,
-                "resolved_spdx_confidence": resolved_confidence,
-                "restriction_hits": restriction_hits,
-                "license_evidence_url": evidence_url,
-                "manifest_dir": str(target_manifest_dir),
-                "download": t.get("download", {}),
-                "build": t.get("build", {}),
-                "data_type": t.get("data_type", []),
-                "priority": t.get("priority", None),
-                "enabled": enabled,
-                "statistics": t.get("statistics", {}),
-                # v0.9: New fields
-                "split_group_id": split_group_id,
-                "denylist_hits": dl_hits,
-                "review_required": review_required,
-                "license_change_detected": license_change_detected,
-                "output_pool": out_pool,
-                # Generic routing (v2)
-                "routing_subject": routing.get("subject"),
-                "routing_domain": routing.get("domain"),
-                "routing_category": routing.get("category"),
-                "routing_level": routing.get("level"),
-                "routing_granularity": routing.get("granularity"),
-                "routing_confidence": routing.get("confidence"),
-                "routing_reason": routing.get("reason"),
-            }
-            row.update(self.build_row_extras(t, routing))
-            if self.INCLUDE_ROUTING_DICT_IN_ROW and "routing" not in row:
-                row["routing"] = routing
-
-            if not enabled:
-                continue
-
-            if eff_bucket == "GREEN":
-                green_rows.append(row)
-            elif eff_bucket == "YELLOW":
-                yellow_rows.append(row)
-            else:
-                red_rows.append(row)
-
-        def sort_key(r: dict[str, Any]) -> tuple[int, str]:
-            p = r.get("priority", None)
-            try:
-                pi = int(p) if p is not None else -999999
-            except Exception:
-                pi = -999999
-            return (-pi, str(r.get("id", "")))
-
-        green_rows.sort(key=sort_key)
-        yellow_rows.sort(key=sort_key)
-        red_rows.sort(key=sort_key)
-
-        write_jsonl(queues_root / "green_download.jsonl", green_rows)
-        write_jsonl(queues_root / "yellow_pipeline.jsonl", yellow_rows)
-        write_jsonl(queues_root / "red_rejected.jsonl", red_rows)
-
+    def emit_summary(self, cfg: DriverConfig, results: ClassificationResult) -> None:
         summary = {
             "run_at_utc": utc_now(),
             "pipeline_version": VERSION,
-            "targets_total": len(targets),
-            "queued_green": len(green_rows),
-            "queued_yellow": len(yellow_rows),
-            "queued_red": len(red_rows),
-            "targets_path": str(targets_path),
-            "license_map_path": str(license_map_path),
-            "manifests_root": str(manifests_root),
-            "queues_root": str(queues_root),
-            "warnings": warnings,
+            "targets_total": len(cfg.targets),
+            "queued_green": len(results.green_rows),
+            "queued_yellow": len(results.yellow_rows),
+            "queued_red": len(results.red_rows),
+            "targets_path": str(cfg.targets_path),
+            "license_map_path": str(cfg.license_map_path),
+            "manifests_root": str(cfg.manifests_root),
+            "queues_root": str(cfg.queues_root),
+            "warnings": results.warnings,
         }
-        write_json(queues_root / "run_summary.json", summary)
+        write_json(cfg.queues_root / "run_summary.json", summary)
 
+    def emit_report(self, cfg: DriverConfig, results: ClassificationResult) -> None:
         report = generate_dry_run_report(
-            queues_root=queues_root,
-            targets=targets,
-            green_rows=green_rows,
-            yellow_rows=yellow_rows,
-            red_rows=red_rows,
-            warnings=warnings,
+            queues_root=cfg.queues_root,
+            targets=cfg.targets,
+            green_rows=results.green_rows,
+            yellow_rows=results.yellow_rows,
+            red_rows=results.red_rows,
+            warnings=results.warnings,
         )
-        if not args.quiet:
+        if not cfg.args.quiet:
             logger.info(report)
 
     @classmethod
