@@ -5,6 +5,8 @@ import logging
 import time
 from typing import Any
 
+from collector_core.secrets import redact_string, redact_structure
+
 _CONFIGURED = False
 
 
@@ -13,6 +15,18 @@ class TextFormatter(logging.Formatter):
         super().__init__("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
         self.converter = time.gmtime
 
+    def format(self, record: logging.LogRecord) -> str:
+        original_msg = record.msg
+        original_args = record.args
+        record.msg = redact_structure(record.msg)
+        record.args = redact_structure(record.args)
+        try:
+            formatted = super().format(record)
+        finally:
+            record.msg = original_msg
+            record.args = original_args
+        return redact_string(formatted)
+
 
 class JsonFormatter(logging.Formatter):
     def __init__(self) -> None:
@@ -20,15 +34,27 @@ class JsonFormatter(logging.Formatter):
         self.converter = time.gmtime
 
     def format(self, record: logging.LogRecord) -> str:
+        message = self._format_message(record)
         payload: dict[str, Any] = {
             "timestamp": self.formatTime(record, "%Y-%m-%dT%H:%M:%SZ"),
             "level": record.levelname,
             "logger": record.name,
-            "message": record.getMessage(),
+            "message": message,
         }
         if record.exc_info:
-            payload["exc_info"] = self.formatException(record.exc_info)
+            payload["exc_info"] = redact_string(self.formatException(record.exc_info))
         return json.dumps(payload, ensure_ascii=False)
+
+    @staticmethod
+    def _format_message(record: logging.LogRecord) -> str:
+        msg = redact_structure(record.msg)
+        args = redact_structure(record.args)
+        if args:
+            try:
+                return redact_string(str(msg) % args)
+            except Exception:
+                return redact_string(str(msg))
+        return redact_string(str(msg))
 
 
 def _resolve_level(level: str | int | None) -> int:
