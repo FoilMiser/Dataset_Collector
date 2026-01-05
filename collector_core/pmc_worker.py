@@ -24,8 +24,9 @@ import json
 import re
 import tarfile
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import yaml
 

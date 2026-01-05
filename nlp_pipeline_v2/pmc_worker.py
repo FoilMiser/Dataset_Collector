@@ -3,14 +3,13 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from collector_core.pmc_worker import run_pmc_worker
-
+from collector_core.pmc_worker import run_pmc_worker  # noqa: E402
 
 if __name__ == "__main__":
     run_pmc_worker(

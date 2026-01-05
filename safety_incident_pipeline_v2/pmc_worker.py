@@ -3,13 +3,13 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from collector_core.pmc_worker import (
+from collector_core.pmc_worker import (  # noqa: E402
     chunk_defaults_from_targets_yaml_v2,
     extract_article_text_v2,
     extract_nxml_v2,
