@@ -40,7 +40,6 @@ jobs:
           pytest --cov=collector_core --cov=tools --cov-report=xml --cov-report=term-missing
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
-        if: ${{ secrets.CODECOV_TOKEN != '' }}
         with:
           files: ./coverage.xml
           fail_ci_if_error: true
@@ -93,7 +92,6 @@ jobs:
           pytest --cov=collector_core --cov=tools --cov-report=xml --cov-report=term-missing
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
-        if: ${{ secrets.CODECOV_TOKEN != '' }}
         with:
           files: ./coverage.xml
           fail_ci_if_error: true
