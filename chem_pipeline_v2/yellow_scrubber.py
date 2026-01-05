@@ -41,13 +41,12 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 try:
     import requests
 except ImportError:
     requests = None
 from collector_core.__version__ import __schema_version__ as VERSION
+from collector_core.config_validator import read_yaml as read_yaml_config
 
 
 def utc_now() -> str:
@@ -57,7 +56,7 @@ def ensure_dir(p: Path) -> None:
     p.mkdir(parents=True, exist_ok=True)
 
 def read_yaml(path: Path) -> dict[str, Any]:
-    return yaml.safe_load(path.read_text(encoding="utf-8"))
+    return read_yaml_config(path, schema_name="targets") or {}
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []

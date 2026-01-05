@@ -24,10 +24,10 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
-import yaml
 from datasets import DatasetDict, load_from_disk
 
 from collector_core.__version__ import __version__ as VERSION
+from collector_core.config_validator import read_yaml
 from collector_core.yellow_screen_common import resolve_dataset_root
 
 PITCH_SAMPLE_LIMIT = 25
@@ -85,8 +85,8 @@ def append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
                 f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
-def load_yaml(path: Path) -> dict[str, Any]:
-    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+def load_yaml(path: Path, schema_name: str | None = None) -> dict[str, Any]:
+    return read_yaml(path, schema_name=schema_name) or {}
 
 
 # ------------------------------
@@ -105,7 +105,7 @@ class FieldSpec:
 def load_field_schemas(path: Path) -> dict[str, dict[str, FieldSpec]]:
     if not path.exists():
         return {}
-    cfg = load_yaml(path)
+    cfg = load_yaml(path, schema_name="field_schemas")
     schemas: dict[str, dict[str, FieldSpec]] = {}
     for schema_name, schema_def in (cfg.get("schemas") or {}).items():
         fields: dict[str, FieldSpec] = {}
@@ -356,7 +356,7 @@ class ScreenContext:
 
 
 def load_targets_cfg(path: Path) -> dict[str, Any]:
-    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    return read_yaml(path, schema_name="targets") or {}
 
 
 def load_signoff(manifest_dir: Path) -> dict[str, Any] | None:

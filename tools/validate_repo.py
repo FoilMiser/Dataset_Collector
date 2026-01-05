@@ -20,13 +20,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 if __package__ in (None, ""):
     repo_root = Path(__file__).resolve().parents[1]
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
 
+from collector_core.config_validator import read_yaml
 from tools.strategy_registry import (
     get_strategy_requirement_errors,
     get_strategy_spec,
@@ -34,14 +33,6 @@ from tools.strategy_registry import (
 )
 
 EXPECTED_TARGETS_SCHEMA = "0.8"
-
-
-def read_yaml(path: Path) -> dict[str, Any]:
-    text = path.read_text(encoding="utf-8")
-    try:
-        return yaml.safe_load(text)
-    except yaml.YAMLError as exc:
-        raise RuntimeError(f"YAML parse error in {path}: {exc}") from exc
 
 
 def normalize_download(download: dict[str, Any]) -> dict[str, Any]:
@@ -168,7 +159,7 @@ def validate_versioned_modules(root: Path) -> list[dict[str, Any]]:
 def load_profiles(license_map_path: Path) -> dict[str, Any]:
     if not license_map_path.exists():
         return {}
-    data = read_yaml(license_map_path)
+    data = read_yaml(license_map_path, schema_name="license_map")
     return data.get("profiles", {}) or data.get("license_profiles", {}) or {}
 
 def _parse_updated_utc(value: str) -> datetime | None:
@@ -178,9 +169,9 @@ def _parse_updated_utc(value: str) -> datetime | None:
         return None
 
 
-def _collect_updated_utc_warnings(path: Path) -> list[dict[str, Any]]:
+def _collect_updated_utc_warnings(path: Path, schema_name: str) -> list[dict[str, Any]]:
     warnings: list[dict[str, Any]] = []
-    cfg = read_yaml(path) or {}
+    cfg = read_yaml(path, schema_name=schema_name) or {}
     updated = str(cfg.get("updated_utc", "")).strip()
     if not updated:
         return warnings
@@ -215,8 +206,8 @@ def validate_targets_file(path: Path) -> tuple[list[dict[str, Any]], list[dict[s
     errors: list[dict[str, Any]] = []
     warnings: list[dict[str, Any]] = []
 
-    cfg = read_yaml(path) or {}
-    warnings.extend(_collect_updated_utc_warnings(path))
+    cfg = read_yaml(path, schema_name="targets") or {}
+    warnings.extend(_collect_updated_utc_warnings(path, "targets"))
     schema_version = str(cfg.get("schema_version", ""))
     if schema_version and schema_version != EXPECTED_TARGETS_SCHEMA:
         errors.append({
@@ -231,20 +222,20 @@ def validate_targets_file(path: Path) -> tuple[list[dict[str, Any]], list[dict[s
     if not license_map_path.is_absolute():
         license_map_path = path.parent / license_map_path
     if license_map_path.exists():
-        warnings.extend(_collect_updated_utc_warnings(license_map_path))
+        warnings.extend(_collect_updated_utc_warnings(license_map_path, "license_map"))
     profiles = load_profiles(license_map_path)
 
     field_schemas_path = Path(companion.get("field_schemas", "field_schemas.yaml"))
     if not field_schemas_path.is_absolute():
         field_schemas_path = path.parent / field_schemas_path
     if field_schemas_path.exists():
-        warnings.extend(_collect_updated_utc_warnings(field_schemas_path))
+        warnings.extend(_collect_updated_utc_warnings(field_schemas_path, "field_schemas"))
 
     denylist_path = Path(companion.get("denylist", "denylist.yaml"))
     if not denylist_path.is_absolute():
         denylist_path = path.parent / denylist_path
     if denylist_path.exists():
-        warnings.extend(_collect_updated_utc_warnings(denylist_path))
+        warnings.extend(_collect_updated_utc_warnings(denylist_path, "denylist"))
 
     for target in cfg.get("targets", []) or []:
         if not target.get("enabled", True):

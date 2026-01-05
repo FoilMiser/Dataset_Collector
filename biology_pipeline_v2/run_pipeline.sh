@@ -47,12 +47,16 @@ EOF
 }
 
 # Read a value from the targets YAML using python
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PYTHONPATH="${SCRIPT_DIR}/..:${PYTHONPATH:-}"
+
 get_yaml_value() {
   local key="$1"
   python - << PY
-import yaml, pathlib
-path = pathlib.Path("${TARGETS}").expanduser()
-cfg = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+from pathlib import Path
+from collector_core.config_validator import read_yaml
+path = Path("${TARGETS}").expanduser()
+cfg = read_yaml(path, schema_name="targets") or {}
 value = cfg
 for part in "${key}".split('.'):
     value = value.get(part, {}) if isinstance(value, dict) else {}

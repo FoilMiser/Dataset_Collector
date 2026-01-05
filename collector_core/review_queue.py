@@ -33,7 +33,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-import yaml
+from collector_core.config_validator import read_yaml
 
 VERSION = "0.9"
 
@@ -359,7 +359,7 @@ def main(*, pipeline_id: str | None = None) -> int:
 
     cfg: dict[str, Any] = {}
     if args.targets:
-        cfg = yaml.safe_load(Path(args.targets).read_text(encoding="utf-8")) or {}
+        cfg = read_yaml(Path(args.targets), schema_name="targets") or {}
 
     pipeline_slug = pipeline_slug_from_id(pipeline_id) or derive_pipeline_slug_from_cfg(cfg)
     args.queue = args.queue or resolve_default_queue(pipeline_slug, cfg)

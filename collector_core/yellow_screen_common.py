@@ -11,9 +11,8 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 from collector_core.__version__ import __version__ as VERSION
+from collector_core.config_validator import read_yaml
 
 __all__ = ["VERSION"]
 
@@ -154,7 +153,7 @@ def append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
 
 
 def load_targets_cfg(path: Path) -> dict[str, Any]:
-    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    return read_yaml(path, schema_name="targets") or {}
 
 
 def resolve_dataset_root(explicit: str | None = None) -> Path | None:

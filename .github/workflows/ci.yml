@@ -47,6 +47,9 @@ jobs:
       - name: Validate repo
         run: |
           python -m tools.validate_repo --root .
+      - name: Validate YAML schemas
+        run: |
+          python -m tools.validate_yaml_schemas --root .
       - name: Preflight
         run: |
           python -m tools.preflight --repo-root .
@@ -99,6 +102,9 @@ jobs:
       - name: Validate repo
         run: |
           python -m tools.validate_repo --root .
+      - name: Validate YAML schemas
+        run: |
+          python -m tools.validate_yaml_schemas --root .
       - name: Preflight
         run: |
           python -m tools.preflight --repo-root .

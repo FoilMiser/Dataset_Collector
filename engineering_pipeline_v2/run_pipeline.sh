@@ -68,8 +68,9 @@ if [[ ! -f "$TARGETS" ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PYTHONPATH="${SCRIPT_DIR}/..:${PYTHONPATH:-}"
 
-QUEUES_ROOT="$(python - <<'PY'\nimport yaml,sys\ncfg=yaml.safe_load(open(sys.argv[1],encoding='utf-8')) or {}\nprint((cfg.get('globals',{}) or {}).get('queues_root','/data/engineering/_queues'))\nPY\n"$TARGETS")"
+QUEUES_ROOT="$(python - <<'PY'\nimport sys\nfrom pathlib import Path\nfrom collector_core.config_validator import read_yaml\ncfg = read_yaml(Path(sys.argv[1]), schema_name=\"targets\") or {}\nprint((cfg.get('globals', {}) or {}).get('queues_root', '/data/engineering/_queues'))\nPY\n"$TARGETS")"
 
 LIMIT_TARGETS_ARG=""; [[ -n "$LIMIT_TARGETS" ]] && LIMIT_TARGETS_ARG="--limit-targets $LIMIT_TARGETS"
 LIMIT_FILES_ARG=""; [[ -n "$LIMIT_FILES" ]] && LIMIT_FILES_ARG="--limit-files $LIMIT_FILES"

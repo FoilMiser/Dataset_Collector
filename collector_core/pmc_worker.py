@@ -24,11 +24,10 @@ import json
 import re
 import tarfile
 import time
+import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
-
-import yaml
 
 try:
     import requests
@@ -40,7 +39,7 @@ try:
 except ImportError:
     FTP = None
 
-import xml.etree.ElementTree as ET
+from collector_core.config_validator import read_yaml
 
 VERSION = "0.9"
 
@@ -51,10 +50,6 @@ def utc_now() -> str:
 
 def ensure_dir(p: Path) -> None:
     p.mkdir(parents=True, exist_ok=True)
-
-
-def read_yaml(path: Path) -> dict[str, Any]:
-    return yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -98,7 +93,7 @@ def stable_unit_interval(key: str) -> float:
 
 
 def pools_from_targets_yaml(targets_yaml: Path, fallback: Path):
-    cfg = read_yaml(targets_yaml)
+    cfg = read_yaml(targets_yaml, schema_name="targets")
     pools = cfg.get("globals", {}).get("pools", {})
 
     class Pools:
@@ -110,7 +105,7 @@ def pools_from_targets_yaml(targets_yaml: Path, fallback: Path):
 
 
 def chunk_defaults_from_targets_yaml(targets_yaml: Path) -> dict[str, Any]:
-    cfg = read_yaml(targets_yaml)
+    cfg = read_yaml(targets_yaml, schema_name="targets")
     d = cfg.get("globals", {}).get("text_processing_defaults", {})
     return {
         "max_chars": int(d.get("max_chunk_chars", 6000)),
@@ -314,13 +309,13 @@ def extract_article_text(nxml: bytes, drop_refs: bool, include_section_headers: 
 
 
 def raw_root_from_targets_yaml(targets_yaml: Path, fallback: Path) -> Path:
-    cfg = read_yaml(targets_yaml)
+    cfg = read_yaml(targets_yaml, schema_name="targets")
     raw_root = cfg.get("globals", {}).get("raw_root")
     return Path(raw_root or fallback).expanduser()
 
 
 def chunk_defaults_from_targets_yaml_v2(targets_yaml: Path) -> dict[str, Any]:
-    cfg = read_yaml(targets_yaml)
+    cfg = read_yaml(targets_yaml, schema_name="targets")
     d = cfg.get("globals", {}).get("text_processing_defaults", {})
     screening = cfg.get("globals", {}).get("screening", {})
     return {

@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-import yaml
+from collector_core.config_validator import read_yaml
 
 VERSION = "2.0"
 
@@ -136,7 +136,7 @@ def main(*, pipeline_id: str | None = None) -> None:
     ap.add_argument("--output", required=True, help="Output JSON path")
     args = ap.parse_args()
 
-    cfg = yaml.safe_load(Path(args.targets).read_text(encoding="utf-8")) or {}
+    cfg = read_yaml(Path(args.targets), schema_name="targets") or {}
     pipeline_slug = pipeline_slug_from_id(pipeline_id) or derive_pipeline_slug_from_cfg(cfg)
     catalog = build_catalog(cfg, pipeline_slug=pipeline_slug)
     out_path = Path(args.output).expanduser().resolve()

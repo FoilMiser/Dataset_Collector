@@ -102,19 +102,22 @@ if [[ ! -f "$TARGETS" ]]; then
   fail "targets file not found: $TARGETS"
 fi
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PYTHONPATH="${SCRIPT_DIR}/..:${PYTHONPATH:-}"
+
 get_yaml_value() {
   local key="$1"
   local default="$2"
   python - "$TARGETS" "$key" "$default" <<'PY'
 import sys
-import yaml
+from pathlib import Path
+from collector_core.config_validator import read_yaml
 
-targets_path = sys.argv[1]
+targets_path = Path(sys.argv[1])
 key = sys.argv[2]
 default = sys.argv[3]
 
-with open(targets_path, "r", encoding="utf-8") as handle:
-    cfg = yaml.safe_load(handle) or {}
+cfg = read_yaml(targets_path, schema_name="targets") or {}
 
 value = cfg
 for part in key.split("."):

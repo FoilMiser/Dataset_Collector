@@ -29,9 +29,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 from collector_core.__version__ import __schema_version__ as VERSION
+from collector_core.config_validator import read_yaml
 
 
 @dataclass
@@ -66,7 +65,7 @@ def load_queue(queue_path: Path) -> list[dict[str, Any]]:
 
 
 def queue_root_from_targets(targets_path: Path) -> Path:
-    cfg = yaml.safe_load(targets_path.read_text(encoding="utf-8")) or {}
+    cfg = read_yaml(targets_path, schema_name="targets") or {}
     queues_root = cfg.get("globals", {}).get("queues_root", "/data/code/_queues")
     return Path(queues_root)
 

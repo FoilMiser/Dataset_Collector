@@ -8,13 +8,12 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 if __package__ in (None, ""):
     repo_root = Path(__file__).resolve().parents[1]
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
 
+from collector_core.config_validator import read_yaml
 from tools.strategy_registry import get_external_tools, get_strategy_spec
 
 TOOL_INSTALL_HINTS = {
@@ -24,8 +23,8 @@ TOOL_INSTALL_HINTS = {
 }
 
 
-def _load_yaml(path: Path) -> dict[str, Any]:
-    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+def _load_yaml(path: Path, schema_name: str) -> dict[str, Any]:
+    return read_yaml(path, schema_name=schema_name) or {}
 
 
 def _load_strategy_handlers(acquire_worker_path: Path) -> set[str]:
@@ -50,7 +49,7 @@ def _iter_enabled_targets(targets: Iterable[dict[str, Any]]) -> Iterable[dict[st
 
 
 def run_preflight(repo_root: Path, pipeline_map_path: Path, strict: bool = False) -> int:
-    pipeline_map = _load_yaml(pipeline_map_path)
+    pipeline_map = _load_yaml(pipeline_map_path, "pipeline_map")
     pipelines_cfg = pipeline_map.get("pipelines", {}) or {}
     errors: list[str] = []
     warnings: list[str] = []
@@ -85,7 +84,7 @@ def run_preflight(repo_root: Path, pipeline_map_path: Path, strict: bool = False
             errors.append(str(exc))
             continue
 
-        targets_cfg = _load_yaml(targets_path)
+        targets_cfg = _load_yaml(targets_path, "targets")
         targets = targets_cfg.get("targets", []) or []
         for target in _iter_enabled_targets(targets):
             target_id = target.get("id", "<unknown>")

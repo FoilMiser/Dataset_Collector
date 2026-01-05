@@ -70,15 +70,18 @@ if [[ ! -f "$TARGETS" ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PYTHONPATH="${SCRIPT_DIR}/..:${PYTHONPATH:-}"
 QUEUES_ROOT=$(python - << PY
-import yaml
-cfg = yaml.safe_load(open("${TARGETS}")) or {}
+from pathlib import Path
+from collector_core.config_validator import read_yaml
+cfg = read_yaml(Path("${TARGETS}"), schema_name="targets") or {}
 print(cfg.get("globals", {}).get("queues_root", "/data/econ/_queues"))
 PY
 )
 CATALOGS_ROOT=$(python - << PY
-import yaml
-cfg = yaml.safe_load(open("${TARGETS}")) or {}
+from pathlib import Path
+from collector_core.config_validator import read_yaml
+cfg = read_yaml(Path("${TARGETS}"), schema_name="targets") or {}
 print(cfg.get("globals", {}).get("catalogs_root", "/data/econ/_catalogs"))
 PY
 )

@@ -97,16 +97,19 @@ if [[ ! -f "$TARGETS" ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PYTHONPATH="${SCRIPT_DIR}/..:${PYTHONPATH:-}"
 
 cfg_value() {
   local key="$1"
   local default="$2"
   python - "$TARGETS" "$key" "$default" <<'PY'
-import sys, yaml
+import sys
+from pathlib import Path
+from collector_core.config_validator import read_yaml
 path = sys.argv[1]
 key = sys.argv[2]
 default = sys.argv[3]
-cfg = yaml.safe_load(open(path, "r", encoding="utf-8")) or {}
+cfg = read_yaml(Path(path), schema_name="targets") or {}
 print((cfg.get("globals", {}) or {}).get(key, default))
 PY
 }

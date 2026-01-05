@@ -6,13 +6,12 @@ import sys
 from collections.abc import Iterable, Sequence
 from pathlib import Path, PurePath, PureWindowsPath
 
-import yaml
-
 if __package__ in (None, ""):
     repo_root = Path(__file__).resolve().parents[1]
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
 
+from collector_core.config_validator import read_yaml
 from tools.init_layout import init_layout
 from tools.patch_targets import patch_targets_yaml
 from tools.preflight import run_preflight
@@ -48,7 +47,7 @@ def _normalize_stages(stages: Sequence[str]) -> list[str]:
 
 
 def _load_pipeline_map(path: Path) -> dict[str, object]:
-    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    return read_yaml(path, schema_name="pipeline_map") or {}
 
 
 def _validate_pipeline_map_destination(dest_root: str | None, pipeline_map_path: Path) -> None:

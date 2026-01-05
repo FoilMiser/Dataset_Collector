@@ -41,6 +41,7 @@ def test_end_to_end_pipeline_contract(tmp_path: Path) -> None:
     dataset.save_to_disk(dataset_dir)
 
     targets_cfg = {
+        "schema_version": "0.8",
         "globals": {
             "raw_root": str(raw_root),
             "screened_yellow_root": str(screened_root),
