@@ -2,3 +2,4 @@
 -r requirements.constraints.txt
 jupyterlab==4.2.5
 ipykernel==6.29.5
+pytest-cov==5.0.0
