@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import sys
 
 from collector_core.logging_config import JsonFormatter, TextFormatter
 from collector_core.secrets import REDACTED, SecretStr, redact_headers
@@ -70,7 +71,6 @@ def test_json_formatter_redacts_exception_info() -> None:
         api_key = "ghp_FakeTestToken1234567890abcdefghijklmnopqrstuvwxyz"
         raise ValueError(f"API call failed with key: {api_key}")
     except ValueError:
-        import sys
         exc_info = sys.exc_info()
     
     record = logging.LogRecord(
@@ -104,7 +104,6 @@ def test_text_formatter_redacts_exception_info() -> None:
         token = "Bearer eyJfYWtlIjoiVGVzdCIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJGYWtlVGVzdFRva2VuIn0.FakeSigForTestingPurposesOnly"
         raise RuntimeError(f"Authentication failed: {token}")
     except RuntimeError:
-        import sys
         exc_info = sys.exc_info()
     
     record = logging.LogRecord(
