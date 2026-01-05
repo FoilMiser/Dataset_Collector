@@ -28,8 +28,11 @@ from datasets import DatasetDict, load_from_disk
 
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.config_validator import read_yaml
-from collector_core.yellow_screen_common import PitchConfig, resolve_dataset_root, resolve_pitch_config
-
+from collector_core.yellow_screen_common import (
+    PitchConfig,
+    resolve_dataset_root,
+    resolve_pitch_config,
+)
 
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 PHONE_RE = re.compile(r"\b(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}\b")
