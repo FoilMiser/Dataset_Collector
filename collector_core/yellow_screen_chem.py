@@ -28,10 +28,7 @@ from datasets import DatasetDict, load_from_disk
 
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.config_validator import read_yaml
-from collector_core.yellow_screen_common import resolve_dataset_root
-
-PITCH_SAMPLE_LIMIT = 25
-PITCH_TEXT_LIMIT = 400
+from collector_core.yellow_screen_common import PitchConfig, resolve_dataset_root, resolve_pitch_config
 
 
 def utc_now() -> str:
@@ -353,6 +350,7 @@ class ScreenContext:
     execute: bool
     field_schemas: dict[str, dict[str, FieldSpec]]
     pitch_counts: dict[tuple[str, str], int]
+    pitch_cfg: PitchConfig
 
 
 def load_targets_cfg(path: Path) -> dict[str, Any]:
@@ -482,13 +480,13 @@ def log_pitch(
     append_jsonl(ctx.roots.ledger_root / "yellow_pitched.jsonl", [row])
 
     key = (ctx.queue_row["id"], reason)
-    if ctx.pitch_counts.get(key, 0) >= PITCH_SAMPLE_LIMIT:
+    if ctx.pitch_counts.get(key, 0) >= ctx.pitch_cfg.sample_limit:
         return
     sample = {"target_id": ctx.queue_row["id"], "reason": reason}
     if sample_id:
         sample["sample_id"] = sample_id
     if text:
-        sample["text"] = text[:PITCH_TEXT_LIMIT]
+        sample["text"] = text[:ctx.pitch_cfg.text_limit]
     if sample_extra:
         sample.update(sample_extra)
     append_jsonl(ctx.roots.pitches_root / "yellow_pitch.jsonl", [sample])
@@ -794,10 +792,13 @@ def main() -> None:
     ap.add_argument("--queue", required=True, help="YELLOW queue JSONL")
     ap.add_argument("--execute", action="store_true", help="Write outputs (default: dry-run)")
     ap.add_argument("--dataset-root", default=None, help="Override dataset root (raw/screened/_ledger/_pitches/_manifests)")
+    ap.add_argument("--pitch-sample-limit", type=int, default=None, help="Max pitch samples per reason (override)")
+    ap.add_argument("--pitch-text-limit", type=int, default=None, help="Max chars stored in pitch samples (override)")
     args = ap.parse_args()
 
     targets_path = Path(args.targets).expanduser().resolve()
     cfg = load_targets_cfg(targets_path)
+    pitch_cfg = resolve_pitch_config(cfg, args.pitch_sample_limit, args.pitch_text_limit)
     roots = resolve_roots(cfg, dataset_root=resolve_dataset_root(args.dataset_root))
     ensure_dir(roots.screened_root)
     ensure_dir(roots.ledger_root)
@@ -835,6 +836,7 @@ def main() -> None:
             execute=args.execute,
             field_schemas=schemas,
             pitch_counts={},
+            pitch_cfg=pitch_cfg,
         )
         res = process_target(ctx)
         summary["results"].append(res)

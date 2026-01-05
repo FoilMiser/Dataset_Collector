@@ -16,8 +16,8 @@ from collector_core.config_validator import read_yaml
 
 __all__ = ["VERSION"]
 
-PITCH_SAMPLE_LIMIT = 25
-PITCH_TEXT_LIMIT = 400
+PITCH_SAMPLE_LIMIT_DEFAULT = 25
+PITCH_TEXT_LIMIT_DEFAULT = 400
 
 
 @dataclasses.dataclass(frozen=True)
@@ -54,6 +54,12 @@ class ShardingConfig:
     max_records_per_shard: int
     compression: str
     prefix: str
+
+
+@dataclasses.dataclass(frozen=True)
+class PitchConfig:
+    sample_limit: int
+    text_limit: int
 
 
 class Sharder:
@@ -219,6 +225,24 @@ def sharding_cfg(cfg: dict[str, Any], prefix: str) -> ShardingConfig:
         compression=str(g.get("compression", "gzip")),
         prefix=prefix,
     )
+
+
+def resolve_pitch_config(
+    cfg: dict[str, Any],
+    sample_limit_override: int | None = None,
+    text_limit_override: int | None = None,
+) -> PitchConfig:
+    g = (cfg.get("globals", {}) or {})
+    pitch_cfg = (g.get("pitch_limits", {}) or {})
+    sample_limit = (
+        sample_limit_override
+        if sample_limit_override is not None
+        else int(pitch_cfg.get("sample_limit", PITCH_SAMPLE_LIMIT_DEFAULT))
+    )
+    text_limit = (
+        text_limit_override if text_limit_override is not None else int(pitch_cfg.get("text_limit", PITCH_TEXT_LIMIT_DEFAULT))
+    )
+    return PitchConfig(sample_limit=sample_limit, text_limit=text_limit)
 
 
 def find_text(row: dict[str, Any], candidates: list[str]) -> str | None:

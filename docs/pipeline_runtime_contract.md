@@ -23,6 +23,17 @@ All runtime stages resolve output roots in the same order:
 4. **Targets YAML** (`globals.*`).
 5. **Built-in defaults**.
 
+## Targets YAML globals
+
+These `globals` keys tune runtime defaults without changing CLI usage:
+
+- `globals.pitch_limits.sample_limit` — max pitch samples per `(target, reason)` (default: `25`).
+- `globals.pitch_limits.text_limit` — max chars stored for pitched samples (default: `400`).
+- `globals.retry.max` — default retry count for evidence/download fetchers (default: `3`).
+- `globals.retry.backoff` — base for exponential backoff (default: `2.0`).
+- `globals.sharding.max_records_per_shard` — shard size for screened/merged JSONL (default: `50000`).
+- `globals.sharding.compression` — shard compression (`gzip` by default).
+
 ### `--dataset-root` / `DATASET_ROOT`
 
 When provided, the dataset root is expanded and resolved, then used to derive
@@ -86,6 +97,8 @@ Required:
 Optional (standardized):
 
 - `--dataset-root PATH`
+- `--pitch-sample-limit INT` (yellow screen only)
+- `--pitch-text-limit INT` (yellow screen only)
 
 ## Environment variables
 
@@ -110,8 +123,8 @@ See `docs/output_contract.md` for the full layout; key stage outputs are:
 
 All stages that perform network I/O use **exponential backoff** with:
 
-- `max_retries` controlled by `--retry-max` or `PIPELINE_RETRY_MAX`.
-- `backoff_base` controlled by `--retry-backoff` or `PIPELINE_RETRY_BACKOFF`.
+- `max_retries` controlled by `--retry-max`, `globals.retry.max`, or `PIPELINE_RETRY_MAX`.
+- `backoff_base` controlled by `--retry-backoff`, `globals.retry.backoff`, or `PIPELINE_RETRY_BACKOFF`.
 
 The pipeline driver’s evidence fetcher and the acquire worker’s download
 retries now share the same defaults and naming.

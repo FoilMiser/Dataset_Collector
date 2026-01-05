@@ -166,16 +166,25 @@ def load_license_map(path: Path) -> LicenseMap:
     )
 
 
-def resolve_retry_config(args: argparse.Namespace) -> tuple[int, float]:
+def resolve_retry_config(args: argparse.Namespace, globals_cfg: dict[str, Any]) -> tuple[int, float]:
     retry_max_env = os.getenv("PIPELINE_RETRY_MAX")
     retry_backoff_env = os.getenv("PIPELINE_RETRY_BACKOFF")
+    retry_cfg = globals_cfg.get("retry", {}) or {}
     retry_max = args.retry_max if args.retry_max is not None else args.max_retries
     if retry_max is None:
-        retry_max = int(retry_max_env) if retry_max_env else 3
+        retry_max = (
+            int(retry_cfg.get("max"))
+            if retry_cfg.get("max") is not None
+            else (int(retry_max_env) if retry_max_env else 3)
+        )
     retry_backoff = (
         args.retry_backoff
         if args.retry_backoff is not None
-        else (float(retry_backoff_env) if retry_backoff_env else 2.0)
+        else (
+            float(retry_cfg.get("backoff"))
+            if retry_cfg.get("backoff") is not None
+            else (float(retry_backoff_env) if retry_backoff_env else 2.0)
+        )
     )
     return retry_max, retry_backoff
 
@@ -211,16 +220,16 @@ def resolve_output_roots(args: argparse.Namespace, globals_cfg: dict[str, Any]) 
 
 
 def load_driver_config(args: argparse.Namespace) -> DriverConfig:
-    retry_max, retry_backoff = resolve_retry_config(args)
     headers = build_evidence_headers(args.evidence_header)
     targets_path = Path(args.targets).resolve()
     targets_cfg = read_yaml(targets_path, schema_name="targets")
+    globals_cfg = targets_cfg.get("globals", {}) or {}
+    retry_max, retry_backoff = resolve_retry_config(args, globals_cfg)
     companion = targets_cfg.get("companion_files", {}) or {}
     license_map_path = Path(args.license_map or companion.get("license_map", "./license_map.yaml")).resolve()
     license_map = load_license_map(license_map_path)
     denylist_path = Path(companion.get("denylist", "./denylist.yaml")).resolve()
     denylist = load_denylist(denylist_path)
-    globals_cfg = targets_cfg.get("globals", {}) or {}
     manifests_root, queues_root = resolve_output_roots(args, globals_cfg)
     ensure_dir(manifests_root)
     ensure_dir(queues_root)

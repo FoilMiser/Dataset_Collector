@@ -15,7 +15,36 @@
       },
       "additionalProperties": true
     },
-    "globals": { "type": "object" },
+    "globals": {
+      "type": "object",
+      "properties": {
+        "pitch_limits": {
+          "type": "object",
+          "properties": {
+            "sample_limit": { "type": "integer", "minimum": 0 },
+            "text_limit": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": true
+        },
+        "retry": {
+          "type": "object",
+          "properties": {
+            "max": { "type": "integer", "minimum": 0 },
+            "backoff": { "type": "number", "minimum": 0 }
+          },
+          "additionalProperties": true
+        },
+        "sharding": {
+          "type": "object",
+          "properties": {
+            "max_records_per_shard": { "type": "integer", "minimum": 1 },
+            "compression": { "type": "string" }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
     "queues": { "type": "object" },
     "gates_catalog": { "type": "object" },
     "resolvers": { "type": "object" },
