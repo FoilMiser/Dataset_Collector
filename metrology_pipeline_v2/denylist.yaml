@@ -14,7 +14,7 @@ schema_version: "0.2"
 updated_utc: "2025-12-20"
 
 # v0.9: Domain extraction patterns (match against extracted domain from URLs)
-domain_patterns:
+domain_patterns: []
   # Example:
   # - domain: "example.com"
   #   severity: "hard_red"
@@ -22,7 +22,7 @@ domain_patterns:
   #   rationale: "Terms explicitly prohibit ML training"
 
 # v0.9: Publisher/provider tags (match against publisher metadata if available)
-publisher_patterns:
+publisher_patterns: []
   # Example:
   # - publisher: "Example Publisher"
   #   severity: "force_yellow"
