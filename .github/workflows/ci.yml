@@ -5,7 +5,8 @@ on:
   pull_request:
 
 jobs:
-  validate-min:
+  validate:
+    name: validate (${{ matrix.install-mode }}, py${{ matrix.python-version }}, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     env:
       PYTHONPATH: ${{ github.workspace }}
@@ -13,6 +14,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         python-version: ["3.10", "3.11"]
+        install-mode: [min, lock]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -24,68 +26,22 @@ jobs:
           path: |
             ~/.cache/pip
             ~\AppData\Local\pip\Cache
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements*.in','requirements*.lock') }}
+          key: ${{ runner.os }}-pip-${{ matrix.install-mode }}-${{ hashFiles('requirements*.in','requirements*.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
-      - name: Install deps (locked)
+      - name: Upgrade pip
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.constraints.txt
-          python -m pip install pytest pytest-cov ruff
-      - name: Ruff
+      - name: Install deps (min)
+        if: matrix.install-mode == 'min'
         run: |
-          ruff check .
-      - name: Tests
+          python -m pip install -r requirements.in
+      - name: Install deps (lock)
+        if: matrix.install-mode == 'lock'
         run: |
-          pytest --cov=collector_core --cov=tools --cov-report=xml --cov-report=term-missing
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          files: ./coverage.xml
-          fail_ci_if_error: true
-          token: ${{ secrets.CODECOV_TOKEN }}
-      - name: Validate repo
+          python -m pip install -r requirements.constraints.txt
+      - name: Install tooling
         run: |
-          python -m tools.validate_repo --root .
-      - name: Validate YAML schemas
-        run: |
-          python -m tools.validate_yaml_schemas --root .
-      - name: Preflight
-        run: |
-          python -m tools.preflight --repo-root .
-      - name: Remove Python cache artifacts
-        run: |
-          python -c "from pathlib import Path; import shutil; root=Path('.'); [shutil.rmtree(p, ignore_errors=True) for p in root.rglob('__pycache__') if p.is_dir()]; [shutil.rmtree(p, ignore_errors=True) for p in root.rglob('.pytest_cache') if p.is_dir()]; [p.unlink(missing_ok=True) for p in root.rglob('*.pyc') if p.is_file()]"
-      - name: Check for Python cache artifacts
-        run: |
-          python -c "from pathlib import Path; import sys; root=Path('.'); bad=[p for p in root.rglob('__pycache__') if p.is_dir()]; bad += [p for p in root.rglob('.pytest_cache') if p.is_dir()]; bad += [p for p in root.rglob('*.pyc') if p.is_file()]; print('Found cache artifacts:') if bad else print('No cache artifacts found.'); [print(f' - {p}') for p in bad]; sys.exit(1 if bad else 0)"
-
-  validate-lock:
-    runs-on: ${{ matrix.os }}
-    env:
-      PYTHONPATH: ${{ github.workspace }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-        python-version: ["3.10", "3.11"]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/pip
-            ~\AppData\Local\pip\Cache
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements*.in','requirements*.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-      - name: Install deps (locked)
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.constraints.txt
           python -m pip install pytest pytest-cov ruff
       - name: Ruff
         run: |
