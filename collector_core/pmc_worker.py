@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """
-pmc_worker.py (v0.9)
+pmc_worker.py
 
 Downloads and chunks allowlisted PMC Open Access articles.
 
-v0.9 features:
-  - NEW: Parquet output option (--emit-parquet)
-  - NEW: Dataset-aware splitting (split_group_id)
+Tool/version metadata comes from collector_core.__version__.__version__ and
+collector_core.__version__.__schema_version__ (source of truth).
+
+Features:
+  - Parquet output option (--emit-parquet)
+  - Dataset-aware splitting (split_group_id)
   - Tarball caching in quarantine with resume support
   - Enhanced JATS parsing: section headers, figure/table captions
   - Improved error handling and logging

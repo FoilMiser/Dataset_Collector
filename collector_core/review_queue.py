@@ -1,29 +1,34 @@
 #!/usr/bin/env python3
 """
-review_queue.py (v0.9)
+review_queue.py
 
 Manual review helper for YELLOW targets.
+
+Tool/version metadata comes from collector_core.__version__.__version__ and
+collector_core.__version__.__schema_version__ (source of truth).
 
 This script is intentionally lightweight and conservative:
 - It reads YELLOW queue JSONL (emitted by pipeline_driver.py)
 - It shows a summary of pending items
 - It can write a review_signoff.json into each target's manifest dir
-- NEW in v0.9: Export reviewed targets to CSV/JSON, extended signoff schema
+- Export reviewed targets to CSV/JSON, extended signoff schema
 
-Signoff file schema (v0.2):
+Signoff file schema (see collector_core.__version__.__schema_version__):
 {
   "target_id": "...",
   "status": "approved" | "rejected" | "deferred",
   "reviewer": "Name",
-  "reviewer_contact": "contact info",           # NEW in v0.9 (optional)
+  "reviewer_contact": "contact info",             # optional
   "reason": "Why",
-  "promote_to": "GREEN" | "" ,                  # optional
-  "license_evidence_sha256": "...",             # NEW (optional)
-  "license_evidence_url": "...",                # NEW (optional)
-  "license_evidence_fetched_at_utc": "...",     # NEW (optional)
-  "evidence_links_checked": ["url1", "url2"],   # NEW in v0.9 (optional)
-  "constraints": "Attribution requirements...",  # NEW in v0.9 (optional)
-  "notes": "Additional notes...",               # NEW in v0.9 (optional)
+  "promote_to": "GREEN" | "" ,                    # optional
+  "signoff_schema_version": "...",               # tool-managed
+  "tool_version": "...",                          # tool-managed
+  "license_evidence_sha256": "...",               # evidence-hash binding (optional)
+  "license_evidence_url": "...",                  # evidence-hash binding (optional)
+  "license_evidence_fetched_at_utc": "...",       # evidence-hash binding (optional)
+  "evidence_links_checked": ["url1", "url2"],     # optional
+  "constraints": "Attribution requirements...",  # optional
+  "notes": "Additional notes...",                 # optional
   "reviewed_at_utc": "YYYY-MM-DDTHH:MM:SSZ"
 }
 """
