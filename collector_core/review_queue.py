@@ -23,7 +23,9 @@ Signoff file schema (see collector_core.__version__.__schema_version__):
   "promote_to": "GREEN" | "" ,                    # optional
   "signoff_schema_version": "...",               # tool-managed
   "tool_version": "...",                          # tool-managed
-  "license_evidence_sha256": "...",               # evidence-hash binding (optional)
+  "license_evidence_sha256": "...",               # evidence-hash binding (optional, raw bytes)
+  "license_evidence_sha256_raw_bytes": "...",     # evidence-hash binding (optional)
+  "license_evidence_sha256_normalized_text": "...", # evidence-hash binding (optional)
   "license_evidence_url": "...",                  # evidence-hash binding (optional)
   "license_evidence_fetched_at_utc": "...",       # evidence-hash binding (optional)
   "evidence_links_checked": ["url1", "url2"],     # optional
@@ -213,9 +215,13 @@ def write_signoff(
         "signoff_schema_version": "0.2",
         "tool_version": TOOL_VERSION,
     }
-    evidence_sha = meta.get("sha256")
-    if evidence_sha:
-        signoff["license_evidence_sha256"] = evidence_sha
+    evidence_sha_raw = meta.get("sha256_raw_bytes") or meta.get("sha256")
+    if evidence_sha_raw:
+        signoff["license_evidence_sha256"] = evidence_sha_raw
+        signoff["license_evidence_sha256_raw_bytes"] = evidence_sha_raw
+    evidence_sha_normalized = meta.get("sha256_normalized_text")
+    if evidence_sha_normalized:
+        signoff["license_evidence_sha256_normalized_text"] = evidence_sha_normalized
     evidence_url = meta.get("url")
     if evidence_url:
         signoff["license_evidence_url"] = evidence_url
@@ -301,6 +307,8 @@ def cmd_export(args: argparse.Namespace) -> int:
                 "license_profile": r.get("license_profile", ""),
                 "resolved_spdx": r.get("resolved_spdx", ""),
                 "license_evidence_url": r.get("license_evidence_url", ""),
+                "license_evidence_sha256_raw_bytes": signoff.get("license_evidence_sha256_raw_bytes", ""),
+                "license_evidence_sha256_normalized_text": signoff.get("license_evidence_sha256_normalized_text", ""),
                 "status": status,
                 "reviewer": signoff.get("reviewer", ""),
                 "reviewer_contact": signoff.get("reviewer_contact", ""),
