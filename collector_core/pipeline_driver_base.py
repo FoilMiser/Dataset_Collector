@@ -16,10 +16,19 @@ import requests
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.config_validator import read_yaml
 from collector_core.dependencies import _try_import
+from collector_core.exceptions import ConfigValidationError
 from collector_core.logging_config import add_logging_args, configure_logging
 
 logger = logging.getLogger(__name__)
 PdfReader = _try_import("pypdf", "PdfReader")
+
+SUPPORTED_GATES = {
+    "manual_legal_review",
+    "manual_review",
+    "no_restrictions",
+    "restriction_phrase_scan",
+    "snapshot_terms",
+}
 
 def utc_now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
@@ -371,6 +380,35 @@ def build_target_identity(
             }
         )
     return tid, name, profile, enabled, warnings
+
+
+def validate_target_gates(
+    gates: list[str],
+    target_id: str,
+    *,
+    strict: bool,
+) -> list[dict[str, Any]]:
+    unknown_gates = sorted({gate for gate in gates if gate not in SUPPORTED_GATES})
+    if not unknown_gates:
+        return []
+    message = f"Target {target_id} uses unsupported gates: {', '.join(unknown_gates)}."
+    warning = {
+        "type": "unknown_gate",
+        "target_id": target_id,
+        "unknown_gates": unknown_gates,
+        "supported_gates": sorted(SUPPORTED_GATES),
+        "message": message,
+    }
+    if strict:
+        raise ConfigValidationError(
+            message,
+            context={
+                "target_id": target_id,
+                "unknown_gates": unknown_gates,
+                "supported_gates": sorted(SUPPORTED_GATES),
+            },
+        )
+    return [warning]
 
 
 def extract_evidence_fields(target: dict[str, Any]) -> tuple[str, str]:
@@ -1087,7 +1125,9 @@ class BasePipelineDriver:
         download_cfg = target.get("download", {}) or {}
         download_blob = json.dumps(download_cfg, ensure_ascii=False)
         review_required = bool(target.get("review_required", False))
-        gates = canonicalize_gates(merge_gates(cfg.default_gates, target.get("gates_override", {}) or {}))
+        merged_gates = merge_gates(cfg.default_gates, target.get("gates_override", {}) or {})
+        warnings.extend(validate_target_gates(merged_gates, tid, strict=cfg.args.strict))
+        gates = canonicalize_gates(merged_gates)
         target_manifest_dir = cfg.manifests_root / tid
         ensure_dir(target_manifest_dir)
         signoff = read_review_signoff(target_manifest_dir)
@@ -1403,6 +1443,11 @@ class BasePipelineDriver:
             action="append",
             default=[],
             help="Custom header for evidence fetcher (KEY=VALUE). Useful for license-gated pages",
+        )
+        ap.add_argument(
+            "--strict",
+            action="store_true",
+            help="Treat config warnings (such as unknown gates) as errors.",
         )
         ap.add_argument("--quiet", action="store_true", help="Suppress dry-run report output")
         add_logging_args(ap)
