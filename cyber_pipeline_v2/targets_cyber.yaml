@@ -6,7 +6,7 @@
 # - Several targets are intentionally YELLOW because their licensing is "Terms of Use" (non-SPDX) or because dual-use risk requires extra filtering.
 # - CommonPile targets are included but DISABLED by default because the exact HF dataset IDs/configs should be verified before running.
 #
-schema_version: "0.8"
+schema_version: "0.9"
 updated_utc: "2025-12-30"
 
 companion_files:

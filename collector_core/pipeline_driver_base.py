@@ -1563,7 +1563,7 @@ class BasePipelineDriver:
         ap.add_argument(
             "--targets",
             required=True,
-            help=f"Path to {cls.TARGETS_LABEL} (v0.8)",
+            help=f"Path to {cls.TARGETS_LABEL} (v0.9)",
         )
         ap.add_argument(
             "--license-map",

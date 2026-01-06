@@ -9,7 +9,7 @@
 # - Some international government licences may not map cleanly to SPDX in your current license_map.yaml.
 #   Keep those targets disabled until you add mappings (or treat as YELLOW + manual review).
 
-schema_version: "0.8"
+schema_version: "0.9"
 updated_utc: "2025-12-16"
 
 companion_files:

@@ -10,7 +10,7 @@
 # - Isolate copyleft (CC-BY-SA / GPL/AGPL) into its own pool and don’t mix it into permissive training.
 # - Default-deny “NC”, “ND”, “NoAI”, or “unknown” licenses; also filter obvious trademark/character rips.
 
-schema_version: "0.8"
+schema_version: "0.9"
 updated_utc: "2025-12-30"
 
 companion_files:

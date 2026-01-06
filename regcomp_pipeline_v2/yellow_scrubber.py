@@ -626,7 +626,7 @@ def plan_pmc_allowlist(
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=f"Yellow Scrubber v{TOOL_VERSION} (schema {SCHEMA_VERSION})")
-    ap.add_argument("--targets", required=True, help="targets_regcomp.yaml (v0.8)")
+    ap.add_argument("--targets", required=True, help="targets_regcomp.yaml (v0.9)")
     ap.add_argument("--license-map", default=None)
     ap.add_argument("--field-schemas", default=None, help="field_schemas.yaml")
     ap.add_argument("--pools-root", default="/data/regcomp/pools")

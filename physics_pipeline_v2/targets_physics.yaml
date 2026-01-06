@@ -1,4 +1,4 @@
-schema_version: "0.8"
+schema_version: "0.9"
 updated_utc: "2025-12-30"
 companion_files:
   license_map: "./license_map.yaml"

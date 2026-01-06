@@ -21,7 +21,7 @@ pytest.importorskip("pytest_httpserver")
 
 def _write_targets(path: Path, roots: dict[str, Path], target_id: str) -> None:
     targets_cfg = {
-        "schema_version": "0.8",
+        "schema_version": "0.9",
         "globals": {
             "raw_root": str(roots["raw_root"]),
             "screened_yellow_root": str(roots["screened_root"]),

@@ -63,7 +63,7 @@ def test_regcomp_license_map_and_denylist_enforced(tmp_path: Path) -> None:
     denylist_path.write_text(yaml.safe_dump(denylist), encoding="utf-8")
 
     targets_cfg = {
-        "schema_version": "0.8",
+        "schema_version": "0.9",
         "globals": {
             "manifests_root": str(manifests_root),
             "queues_root": str(queues_root),
