@@ -933,6 +933,7 @@ class BasePipelineDriver:
     DOMAIN = "base"
     TARGETS_LABEL = "targets.yaml"
     USER_AGENT = "dataset-collector-pipeline"
+    EVIDENCE_MAX_BYTES = 20 * 1024 * 1024
     ROUTING_KEYS: list[str] = []
     ROUTING_CONFIDENCE_KEYS: list[str] = []
     ROUTING_BLOCKS: list[RoutingBlockSpec] = []
@@ -1014,25 +1015,76 @@ class BasePipelineDriver:
     def fetch_url_with_retry(
         self,
         url: str,
-        timeout_s: int = 30,
+        timeout_s: float | tuple[float, float] = (15.0, 60.0),
         max_retries: int = 3,
         backoff_base: float = 2.0,
         headers: dict[str, str] | None = None,
+        max_bytes: int | None = None,
     ) -> tuple[bytes | None, str | None, dict[str, Any]]:
         """Fetch URL with retry and exponential backoff."""
-        meta: dict[str, Any] = {"retries": 0, "errors": []}
+        meta: dict[str, Any] = {"retries": 0, "errors": [], "timeout": timeout_s, "max_bytes": max_bytes}
 
         for attempt in range(max_retries):
             try:
-                r = requests.get(
+                with requests.get(
                     url,
                     timeout=timeout_s,
                     headers={"User-Agent": f"{self.USER_AGENT}/{VERSION}", **(headers or {})},
-                )
-                r.raise_for_status()
-                ctype = r.headers.get("Content-Type", "")
-                meta["final_status"] = r.status_code
-                return r.content, ctype, meta
+                    stream=True,
+                ) as r:
+                    r.raise_for_status()
+                    ctype = r.headers.get("Content-Type", "")
+                    final_url = r.url
+                    meta["final_status"] = r.status_code
+                    meta["final_url"] = final_url
+                    meta["content_type"] = ctype
+                    content_length = r.headers.get("Content-Length")
+                    if max_bytes and content_length:
+                        try:
+                            if int(content_length) > max_bytes:
+                                meta["size_exceeded"] = True
+                                meta["bytes"] = int(content_length)
+                                logger.warning(
+                                    "Evidence fetch aborted: url=%s final_url=%s content_type=%s bytes=%s limit=%s",
+                                    url,
+                                    final_url,
+                                    ctype,
+                                    content_length,
+                                    max_bytes,
+                                )
+                                return None, "response_too_large", meta
+                        except ValueError:
+                            pass
+
+                    chunks: list[bytes] = []
+                    total = 0
+                    for chunk in r.iter_content(chunk_size=1024 * 1024):
+                        if not chunk:
+                            continue
+                        total += len(chunk)
+                        if max_bytes and total > max_bytes:
+                            meta["size_exceeded"] = True
+                            meta["bytes"] = total
+                            logger.warning(
+                                "Evidence fetch aborted: url=%s final_url=%s content_type=%s bytes=%s limit=%s",
+                                url,
+                                final_url,
+                                ctype,
+                                total,
+                                max_bytes,
+                            )
+                            return None, "response_too_large", meta
+                        chunks.append(chunk)
+                    content = b"".join(chunks)
+                    meta["bytes"] = total
+                    logger.info(
+                        "Evidence fetched: url=%s final_url=%s content_type=%s bytes=%s",
+                        url,
+                        final_url,
+                        ctype,
+                        total,
+                    )
+                    return content, ctype, meta
             except Exception as e:
                 meta["retries"] = attempt + 1
                 meta["errors"].append({"attempt": attempt + 1, "error": repr(e)})
@@ -1085,15 +1137,22 @@ class BasePipelineDriver:
             max_retries=max_retries,
             backoff_base=backoff_base,
             headers=headers,
+            max_bytes=self.EVIDENCE_MAX_BYTES,
         )
         result["fetch_meta"] = meta
 
         if content is None:
-            result["status"] = "error"
-            result["error"] = info
+            if meta.get("size_exceeded"):
+                result["status"] = "needs_manual_evidence"
+                result["error"] = info
+            else:
+                result["status"] = "error"
+                result["error"] = info
             return result
 
         ctype = info or ""
+        if meta.get("final_url"):
+            result["final_url"] = meta.get("final_url")
         digest = sha256_bytes(content)
         result.update(
             {
