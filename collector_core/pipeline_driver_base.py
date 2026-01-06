@@ -692,6 +692,9 @@ def compute_effective_bucket(
         # If we require snapshot and failed, force YELLOW
         bucket = "YELLOW"
 
+    if evidence_snapshot.get("changed_from_previous"):
+        bucket = "YELLOW"
+
     if ("restriction_phrase_scan" in gates or "no_restrictions" in gates) and restriction_hits:
         bucket = "YELLOW"
 
@@ -1052,6 +1055,15 @@ class BasePipelineDriver:
 
     def classify_target(self, ctx: TargetContext, cfg: DriverConfig) -> tuple[dict[str, Any], dict[str, Any]]:
         evidence = self.fetch_evidence(ctx, cfg)
+        review_status = ctx.review_status
+        promote_to = ctx.promote_to
+        review_required = ctx.review_required
+        evidence_sha = evidence.snapshot.get("sha256")
+        signoff_sha = ctx.signoff.get("license_evidence_sha256")
+        if evidence_sha and signoff_sha and evidence_sha != signoff_sha:
+            review_status = "pending"
+            promote_to = ""
+            review_required = True
         restriction_hits = contains_any(evidence.text, cfg.license_map.restriction_phrases)
         resolved, resolved_confidence, confidence_reason = resolve_spdx_with_confidence(
             cfg.license_map, evidence.text, ctx.spdx_hint
@@ -1064,15 +1076,15 @@ class BasePipelineDriver:
             restriction_hits,
             cfg.args.min_license_confidence,
             resolved_confidence,
-            ctx.review_required,
-            ctx.review_status,
-            ctx.promote_to,
+            review_required,
+            review_status,
+            promote_to,
             ctx.dl_hits,
         )
         review_required = apply_yellow_signoff_requirement(
             eff_bucket,
-            ctx.review_status,
-            ctx.review_required,
+            review_status,
+            review_required,
             cfg.require_yellow_signoff,
         )
         out_pool = resolve_output_pool(ctx.profile, eff_bucket, ctx.target)
@@ -1086,6 +1098,7 @@ class BasePipelineDriver:
             confidence_reason,
             eff_bucket,
             review_required,
+            review_status,
             out_pool,
         )
         row = self.build_row(
@@ -1147,6 +1160,7 @@ class BasePipelineDriver:
         confidence_reason: str,
         eff_bucket: str,
         review_required: bool,
+        review_status: str,
         out_pool: str,
     ) -> dict[str, Any]:
         evaluation = {
@@ -1157,7 +1171,7 @@ class BasePipelineDriver:
             "pipeline_version": VERSION,
             "review_required": review_required,
             "review_signoff": ctx.signoff or None,
-            "review_status": ctx.review_status or "pending",
+            "review_status": review_status or "pending",
             "denylist_hits": ctx.dl_hits,
             "license_profile": ctx.profile,
             "spdx_hint": ctx.spdx_hint,
