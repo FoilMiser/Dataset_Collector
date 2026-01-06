@@ -15,9 +15,11 @@ import requests
 
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.config_validator import read_yaml
+from collector_core.dependencies import _try_import
 from collector_core.logging_config import add_logging_args, configure_logging
 
 logger = logging.getLogger(__name__)
+PdfReader = _try_import("pypdf", "PdfReader")
 
 def utc_now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
@@ -637,7 +639,24 @@ def extract_text_for_scanning(evidence: dict[str, Any]) -> str:
     if not path.exists():
         return ""
     if path.suffix.lower() == ".pdf":
-        return ""
+        evidence["pdf_text_extraction_failed"] = False
+        if PdfReader is None:
+            evidence["pdf_text_extraction_failed"] = True
+            return ""
+        try:
+            reader = PdfReader(str(path))
+            pages = []
+            for page in list(reader.pages)[:5]:
+                text = page.extract_text() or ""
+                if text:
+                    pages.append(text)
+            extracted = "\n\n".join(pages).strip()
+            if not extracted:
+                evidence["pdf_text_extraction_failed"] = True
+            return extracted
+        except Exception:
+            evidence["pdf_text_extraction_failed"] = True
+            return ""
     try:
         return path.read_text(encoding="utf-8", errors="ignore")
     except Exception:
@@ -696,6 +715,10 @@ def compute_effective_bucket(
         bucket = "YELLOW"
 
     if ("restriction_phrase_scan" in gates or "no_restrictions" in gates) and restriction_hits:
+        bucket = "YELLOW"
+    if ("restriction_phrase_scan" in gates or "no_restrictions" in gates) and evidence_snapshot.get(
+        "pdf_text_extraction_failed"
+    ):
         bucket = "YELLOW"
 
     if "manual_legal_review" in gates or "manual_review" in gates:
