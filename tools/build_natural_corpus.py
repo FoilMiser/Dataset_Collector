@@ -169,7 +169,11 @@ def _run_stage(
 def main(argv: Iterable[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Build the Natural corpus across all pipelines.")
     ap.add_argument("--repo-root", default=".", help="Repository root containing pipelines")
-    ap.add_argument("--pipeline-map", default="tools/pipeline_map.yaml", help="Pipeline map YAML")
+    ap.add_argument(
+        "--pipeline-map",
+        default="tools/pipeline_map.sample.yaml",
+        help="Pipeline map YAML",
+    )
     ap.add_argument("--dest-root", default=None, help="Destination root for Natural corpus")
     ap.add_argument("--pipelines", nargs="+", default=["all"], help="Pipelines to run or 'all'")
     ap.add_argument("--stages", nargs="+", default=DEFAULT_STAGES, help="Stages to execute")

@@ -48,7 +48,7 @@ Populate `license_map.yaml` with any required license metadata so merge stages c
 
 ## 6. Register the pipeline
 
-Update `tools/pipeline_map.yaml` so the orchestrators and notebook can discover the new pipeline:
+Update `tools/pipeline_map.sample.yaml` so the orchestrators and notebook can discover the new pipeline:
 
 ```yaml
 pipelines:

@@ -4,6 +4,7 @@ from pathlib import Path
 
 import yaml
 
+from tools import preflight
 from tools.preflight import run_preflight
 
 
@@ -32,7 +33,7 @@ def test_preflight_pipeline_filter_skips_unselected(tmp_path, capsys) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     _write_pipeline(repo_root, "good_pipeline", [{"id": "ok", "download": {"strategy": "http"}}])
-    pipeline_map_path = repo_root / "pipeline_map.yaml"
+    pipeline_map_path = repo_root / "pipeline_map.sample.yaml"
     _write_pipeline_map(
         pipeline_map_path,
         {
@@ -56,7 +57,7 @@ def test_preflight_reports_missing_pipeline_entries(tmp_path, capsys) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     _write_pipeline(repo_root, "good_pipeline", [{"id": "ok", "download": {"strategy": "http"}}])
-    pipeline_map_path = repo_root / "pipeline_map.yaml"
+    pipeline_map_path = repo_root / "pipeline_map.sample.yaml"
     _write_pipeline_map(
         pipeline_map_path,
         {"good_pipeline": {"targets_yaml": "targets.yaml"}},
@@ -77,7 +78,7 @@ def test_preflight_quiet_suppresses_disabled_warnings(tmp_path, capsys) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     _write_pipeline(repo_root, "quiet_pipeline", [{"id": "off", "enabled": False}])
-    pipeline_map_path = repo_root / "pipeline_map.yaml"
+    pipeline_map_path = repo_root / "pipeline_map.sample.yaml"
     _write_pipeline_map(
         pipeline_map_path,
         {"quiet_pipeline": {"targets_yaml": "targets.yaml"}},
@@ -96,3 +97,23 @@ def test_preflight_quiet_suppresses_disabled_warnings(tmp_path, capsys) -> None:
     assert result == 0
     assert "Preflight warnings" not in output
     assert "disabled with missing/none download.strategy" not in output
+
+
+def test_preflight_main_defaults_to_sample_pipeline_map(monkeypatch, tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+
+    captured: dict[str, Path] = {}
+
+    def fake_run_preflight(*, repo_root: Path, pipeline_map_path: Path, **_kwargs) -> int:
+        captured["pipeline_map_path"] = pipeline_map_path
+        return 0
+
+    monkeypatch.setattr(preflight, "run_preflight", fake_run_preflight)
+
+    result = preflight.main(["--repo-root", str(repo_root)])
+
+    assert result == 0
+    assert captured["pipeline_map_path"] == (
+        repo_root / "tools" / "pipeline_map.sample.yaml"
+    ).resolve()
