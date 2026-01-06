@@ -1,4 +1,4 @@
-# Math Corpus Pipeline v2.0 - Requirements
+# Knowledge Graph & Navigation Corpus Pipeline v2.0.0 - Requirements
 -r ../requirements.constraints.txt
 
 # Optional: for accurate token counting in catalog_builder
