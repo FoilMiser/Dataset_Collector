@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import hashlib
+import html
 import json
 import logging
 import os
@@ -74,6 +75,34 @@ def normalize_whitespace(text: str) -> str:
 
 def lower(text: str) -> str:
     return (text or "").lower()
+
+
+_HTML_SCRIPT_STYLE_RE = re.compile(r"(?is)<(script|style)[^>]*>.*?</\1>")
+_HTML_COMMENT_RE = re.compile(r"(?s)<!--.*?-->")
+_HTML_TAG_RE = re.compile(r"(?s)<[^>]+>")
+_URL_QUERYSTRING_RE = re.compile(r"(https?://[^\s?#]+)\?[^\s#]+")
+_TIMESTAMP_PATTERNS = [
+    re.compile(r"\b\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\b"),
+    re.compile(r"\b\d{4}-\d{2}-\d{2}\b"),
+    re.compile(r"\b\d{1,2}/\d{1,2}/\d{4}\b"),
+    re.compile(r"\b\d{2}:\d{2}:\d{2}\b"),
+    re.compile(r"\b\d{2}:\d{2}\b"),
+]
+
+
+def html_to_text(text: str) -> str:
+    cleaned = html.unescape(text or "")
+    cleaned = _HTML_SCRIPT_STYLE_RE.sub(" ", cleaned)
+    cleaned = _HTML_COMMENT_RE.sub(" ", cleaned)
+    cleaned = _HTML_TAG_RE.sub(" ", cleaned)
+    return cleaned
+
+
+def normalize_evidence_text(text: str) -> str:
+    cleaned = _URL_QUERYSTRING_RE.sub(r"\1", text or "")
+    for pattern in _TIMESTAMP_PATTERNS:
+        cleaned = pattern.sub(" ", cleaned)
+    return normalize_whitespace(cleaned)
 
 
 def contains_any(haystack: str, needles: list[str]) -> list[str]:
@@ -669,17 +698,15 @@ def spdx_bucket(license_map: LicenseMap, spdx: str) -> str:
     return license_map.gating.get("unknown_spdx_bucket", "YELLOW")
 
 
-def extract_text_for_scanning(evidence: dict[str, Any]) -> str:
-    saved = str(evidence.get("saved_path") or "")
-    if not saved:
-        return ""
-    path = Path(saved)
+def extract_text_from_path(path: Path, evidence: dict[str, Any] | None = None) -> str:
     if not path.exists():
         return ""
     if path.suffix.lower() == ".pdf":
-        evidence["pdf_text_extraction_failed"] = False
+        if evidence is not None:
+            evidence["pdf_text_extraction_failed"] = False
         if PdfReader is None:
-            evidence["pdf_text_extraction_failed"] = True
+            if evidence is not None:
+                evidence["pdf_text_extraction_failed"] = True
             return ""
         try:
             reader = PdfReader(str(path))
@@ -689,16 +716,44 @@ def extract_text_for_scanning(evidence: dict[str, Any]) -> str:
                 if text:
                     pages.append(text)
             extracted = "\n\n".join(pages).strip()
-            if not extracted:
+            if not extracted and evidence is not None:
                 evidence["pdf_text_extraction_failed"] = True
             return extracted
         except Exception:
-            evidence["pdf_text_extraction_failed"] = True
+            if evidence is not None:
+                evidence["pdf_text_extraction_failed"] = True
             return ""
     try:
-        return path.read_text(encoding="utf-8", errors="ignore")
+        raw = path.read_text(encoding="utf-8", errors="ignore")
     except Exception:
         return ""
+    if path.suffix.lower() in {".html", ".htm"}:
+        return html_to_text(raw)
+    return raw
+
+
+def extract_text_for_scanning(evidence: dict[str, Any]) -> str:
+    saved = str(evidence.get("saved_path") or "")
+    if not saved:
+        return ""
+    return extract_text_from_path(Path(saved), evidence)
+
+
+def compute_normalized_text_hash(text: str, extraction_failed: bool = False) -> str | None:
+    if extraction_failed:
+        return None
+    normalized = normalize_evidence_text(text)
+    return sha256_bytes(normalized.encode("utf-8"))
+
+
+def compute_file_hashes(path: Path, evidence: dict[str, Any] | None = None) -> tuple[str | None, str | None]:
+    raw_hash = sha256_file(path)
+    extracted = extract_text_from_path(path, evidence)
+    extraction_failed = bool(evidence and evidence.get("pdf_text_extraction_failed"))
+    if not extraction_failed and evidence is None and path.suffix.lower() == ".pdf" and PdfReader is None:
+        extraction_failed = True
+    normalized_hash = compute_normalized_text_hash(extracted, extraction_failed=extraction_failed)
+    return raw_hash, normalized_hash
 
 
 def merge_gates(default_gates: list[str], gates_override: dict[str, Any]) -> list[str]:
@@ -1006,6 +1061,7 @@ class BasePipelineDriver:
             return result
 
         previous_digest = None
+        previous_normalized_digest = None
         existing_path = None
         existing_meta: dict[str, Any] = {}
         for ext in [".html", ".pdf", ".txt", ".json"]:
@@ -1020,6 +1076,9 @@ class BasePipelineDriver:
                 existing_meta = json.loads(meta_path.read_text(encoding="utf-8"))
             except Exception:
                 existing_meta = {}
+        previous_normalized_digest = existing_meta.get("sha256_normalized_text")
+        if previous_normalized_digest is None and existing_path:
+            _, previous_normalized_digest = compute_file_hashes(existing_path)
 
         content, info, meta = self.fetch_url_with_retry(
             url,
@@ -1041,10 +1100,12 @@ class BasePipelineDriver:
                 "status": "ok",
                 "content_type": ctype,
                 "sha256": digest,
+                "sha256_raw_bytes": digest,
                 "bytes": len(content),
                 "previous_sha256": previous_digest,
+                "previous_sha256_raw_bytes": previous_digest,
+                "previous_sha256_normalized_text": previous_normalized_digest,
                 "previous_path": str(existing_path) if existing_path else None,
-                "changed_from_previous": bool(previous_digest and previous_digest != digest),
             }
         )
 
@@ -1058,12 +1119,13 @@ class BasePipelineDriver:
 
         ensure_dir(manifest_dir)
         out_path = manifest_dir / f"license_evidence{ext}"
+        raw_changed_from_previous = bool(previous_digest and previous_digest != digest)
         history: list[dict[str, Any]] = []
         if isinstance(existing_meta.get("history"), list):
             history = list(existing_meta.get("history", []))
         previous_entry = None
         previous_renamed_path = None
-        if result["changed_from_previous"] and existing_path and previous_digest:
+        if raw_changed_from_previous and existing_path and previous_digest:
             prev_ext = existing_path.suffix
             prev_prefix = f"license_evidence.prev_{previous_digest[:8]}"
             prev_path = manifest_dir / f"{prev_prefix}{prev_ext}"
@@ -1075,12 +1137,39 @@ class BasePipelineDriver:
             previous_renamed_path = prev_path
             previous_entry = {
                 "sha256": previous_digest,
+                "sha256_raw_bytes": previous_digest,
+                "sha256_normalized_text": previous_normalized_digest,
                 "filename": prev_path.name,
                 "fetched_at_utc": existing_meta.get("fetched_at_utc"),
             }
             history.append(previous_entry)
         out_path.write_bytes(content)
         result["saved_path"] = str(out_path)
+        normalized_text = extract_text_for_scanning(result)
+        normalized_digest = compute_normalized_text_hash(
+            normalized_text,
+            extraction_failed=bool(result.get("pdf_text_extraction_failed")),
+        )
+        normalized_changed_from_previous = bool(
+            previous_normalized_digest
+            and normalized_digest
+            and previous_normalized_digest != normalized_digest
+        )
+        cosmetic_change = bool(
+            raw_changed_from_previous
+            and not normalized_changed_from_previous
+            and normalized_digest
+            and previous_normalized_digest
+        )
+        result.update(
+            {
+                "sha256_normalized_text": normalized_digest,
+                "raw_changed_from_previous": raw_changed_from_previous,
+                "normalized_changed_from_previous": normalized_changed_from_previous,
+                "cosmetic_change": cosmetic_change,
+                "changed_from_previous": bool(raw_changed_from_previous or normalized_changed_from_previous),
+            }
+        )
         if previous_renamed_path:
             result["previous_renamed_path"] = str(previous_renamed_path)
         result["history"] = history
@@ -1162,9 +1251,15 @@ class BasePipelineDriver:
         review_status = ctx.review_status
         promote_to = ctx.promote_to
         review_required = ctx.review_required
-        evidence_sha = evidence.snapshot.get("sha256")
-        signoff_sha = ctx.signoff.get("license_evidence_sha256")
-        if evidence_sha and signoff_sha and evidence_sha != signoff_sha:
+        evidence_raw_sha = evidence.snapshot.get("sha256_raw_bytes") or evidence.snapshot.get("sha256")
+        evidence_normalized_sha = evidence.snapshot.get("sha256_normalized_text")
+        signoff_raw_sha = ctx.signoff.get("license_evidence_sha256_raw_bytes") or ctx.signoff.get("license_evidence_sha256")
+        signoff_normalized_sha = ctx.signoff.get("license_evidence_sha256_normalized_text")
+        raw_mismatch = bool(signoff_raw_sha and evidence_raw_sha and signoff_raw_sha != evidence_raw_sha)
+        normalized_mismatch = bool(
+            signoff_normalized_sha and evidence_normalized_sha and signoff_normalized_sha != evidence_normalized_sha
+        )
+        if raw_mismatch or normalized_mismatch:
             review_status = "pending"
             promote_to = ""
             review_required = True
@@ -1231,7 +1326,7 @@ class BasePipelineDriver:
                 headers=cfg.headers,
             )
             evidence_text = extract_text_for_scanning(evidence_snapshot)
-            license_change_detected = bool(evidence_snapshot.get("changed_from_previous"))
+            license_change_detected = bool(evidence_snapshot.get("normalized_changed_from_previous"))
         elif "snapshot_terms" in ctx.gates and cfg.args.no_fetch:
             existing_evidence_path = find_existing_evidence(ctx.target_manifest_dir)
             if existing_evidence_path:
@@ -1242,6 +1337,14 @@ class BasePipelineDriver:
                     "fetched_at_utc": utc_now(),
                     "offline_mode": True,
                 }
+                raw_hash, normalized_hash = compute_file_hashes(existing_evidence_path, evidence_snapshot)
+                evidence_snapshot.update(
+                    {
+                        "sha256": raw_hash,
+                        "sha256_raw_bytes": raw_hash,
+                        "sha256_normalized_text": normalized_hash,
+                    }
+                )
                 evidence_text = extract_text_for_scanning(evidence_snapshot)
             else:
                 evidence_snapshot = {"status": "offline_missing", "url": ctx.evidence_url}
@@ -1268,12 +1371,28 @@ class BasePipelineDriver:
         out_pool: str,
     ) -> dict[str, Any]:
         signoff_evidence_sha256 = (ctx.signoff or {}).get("license_evidence_sha256")
+        signoff_evidence_sha256_raw = (ctx.signoff or {}).get("license_evidence_sha256_raw_bytes") or signoff_evidence_sha256
+        signoff_evidence_sha256_normalized = (ctx.signoff or {}).get("license_evidence_sha256_normalized_text")
         current_evidence_sha256 = evidence.snapshot.get("sha256")
-        signoff_is_stale = bool(
-            signoff_evidence_sha256
-            and current_evidence_sha256
-            and signoff_evidence_sha256 != current_evidence_sha256
+        current_evidence_sha256_raw = evidence.snapshot.get("sha256_raw_bytes") or current_evidence_sha256
+        current_evidence_sha256_normalized = evidence.snapshot.get("sha256_normalized_text")
+        raw_mismatch = bool(
+            signoff_evidence_sha256_raw
+            and current_evidence_sha256_raw
+            and signoff_evidence_sha256_raw != current_evidence_sha256_raw
         )
+        normalized_mismatch = bool(
+            signoff_evidence_sha256_normalized
+            and current_evidence_sha256_normalized
+            and signoff_evidence_sha256_normalized != current_evidence_sha256_normalized
+        )
+        cosmetic_change = bool(
+            raw_mismatch
+            and not normalized_mismatch
+            and signoff_evidence_sha256_normalized
+            and current_evidence_sha256_normalized
+        )
+        signoff_is_stale = bool(normalized_mismatch)
         evaluation = {
             "id": ctx.tid,
             "name": ctx.name,
@@ -1298,8 +1417,16 @@ class BasePipelineDriver:
             "evidence_headers_used": cfg.headers,
             "license_change_detected": evidence.license_change_detected,
             "signoff_evidence_sha256": signoff_evidence_sha256,
+            "signoff_evidence_sha256_raw_bytes": signoff_evidence_sha256_raw,
+            "signoff_evidence_sha256_normalized_text": signoff_evidence_sha256_normalized,
             "current_evidence_sha256": current_evidence_sha256,
+            "current_evidence_sha256_raw_bytes": current_evidence_sha256_raw,
+            "current_evidence_sha256_normalized_text": current_evidence_sha256_normalized,
             "signoff_is_stale": signoff_is_stale,
+            "signoff_cosmetic_change": cosmetic_change,
+            "evidence_raw_changed": evidence.snapshot.get("raw_changed_from_previous"),
+            "evidence_normalized_changed": evidence.snapshot.get("normalized_changed_from_previous"),
+            "evidence_cosmetic_change": evidence.snapshot.get("cosmetic_change"),
             "download": ctx.target.get("download", {}),
             "build": ctx.target.get("build", {}),
             "data_type": ctx.target.get("data_type", []),
@@ -1326,12 +1453,28 @@ class BasePipelineDriver:
         out_pool: str,
     ) -> dict[str, Any]:
         signoff_evidence_sha256 = (ctx.signoff or {}).get("license_evidence_sha256")
+        signoff_evidence_sha256_raw = (ctx.signoff or {}).get("license_evidence_sha256_raw_bytes") or signoff_evidence_sha256
+        signoff_evidence_sha256_normalized = (ctx.signoff or {}).get("license_evidence_sha256_normalized_text")
         current_evidence_sha256 = evidence.snapshot.get("sha256")
-        signoff_is_stale = bool(
-            signoff_evidence_sha256
-            and current_evidence_sha256
-            and signoff_evidence_sha256 != current_evidence_sha256
+        current_evidence_sha256_raw = evidence.snapshot.get("sha256_raw_bytes") or current_evidence_sha256
+        current_evidence_sha256_normalized = evidence.snapshot.get("sha256_normalized_text")
+        raw_mismatch = bool(
+            signoff_evidence_sha256_raw
+            and current_evidence_sha256_raw
+            and signoff_evidence_sha256_raw != current_evidence_sha256_raw
         )
+        normalized_mismatch = bool(
+            signoff_evidence_sha256_normalized
+            and current_evidence_sha256_normalized
+            and signoff_evidence_sha256_normalized != current_evidence_sha256_normalized
+        )
+        cosmetic_change = bool(
+            raw_mismatch
+            and not normalized_mismatch
+            and signoff_evidence_sha256_normalized
+            and current_evidence_sha256_normalized
+        )
+        signoff_is_stale = bool(normalized_mismatch)
         row = {
             "id": ctx.tid,
             "name": ctx.name,
@@ -1354,8 +1497,16 @@ class BasePipelineDriver:
             "review_required": review_required,
             "license_change_detected": evidence.license_change_detected,
             "signoff_evidence_sha256": signoff_evidence_sha256,
+            "signoff_evidence_sha256_raw_bytes": signoff_evidence_sha256_raw,
+            "signoff_evidence_sha256_normalized_text": signoff_evidence_sha256_normalized,
             "current_evidence_sha256": current_evidence_sha256,
+            "current_evidence_sha256_raw_bytes": current_evidence_sha256_raw,
+            "current_evidence_sha256_normalized_text": current_evidence_sha256_normalized,
             "signoff_is_stale": signoff_is_stale,
+            "signoff_cosmetic_change": cosmetic_change,
+            "evidence_raw_changed": evidence.snapshot.get("raw_changed_from_previous"),
+            "evidence_normalized_changed": evidence.snapshot.get("normalized_changed_from_previous"),
+            "evidence_cosmetic_change": evidence.snapshot.get("cosmetic_change"),
             "output_pool": out_pool,
             "routing_subject": ctx.routing.get("subject"),
             "routing_domain": ctx.routing.get("domain"),
