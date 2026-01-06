@@ -28,6 +28,9 @@ from collector_core.acquire_strategies import (
     run_acquire_worker,
 )
 
+handle_http = handle_http_multi
+handle_figshare = handle_figshare_files
+
 STRATEGY_HANDLERS = {
     "http": handle_http_multi,
     "ftp": handle_ftp,
