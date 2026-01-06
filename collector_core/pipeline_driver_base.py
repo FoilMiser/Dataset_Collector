@@ -107,7 +107,7 @@ class DriverConfig:
     denylist: dict[str, Any]
     manifests_root: Path
     queues_root: Path
-    default_gates: list[Any]
+    default_gates: list[str]
     targets: list[dict[str, Any]]
     require_yellow_signoff: bool
 
@@ -130,7 +130,7 @@ class TargetContext:
     spdx_hint: str
     download_blob: str
     review_required: bool
-    gates: dict[str, Any]
+    gates: list[str]
     target_manifest_dir: Path
     signoff: dict[str, Any]
     review_status: str
