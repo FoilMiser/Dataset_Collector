@@ -46,7 +46,10 @@
       "additionalProperties": true
     },
     "queues": { "type": "object" },
-    "gates_catalog": { "type": "object" },
+    "gates_catalog": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
     "resolvers": { "type": "object" },
     "targets": {
       "type": "array",
