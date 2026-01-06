@@ -5,6 +5,7 @@ from pathlib import Path
 import yaml
 
 from tools.preflight import run_preflight
+from tools import preflight
 
 
 def _write_yaml(path: Path, payload: dict) -> None:
@@ -96,3 +97,23 @@ def test_preflight_quiet_suppresses_disabled_warnings(tmp_path, capsys) -> None:
     assert result == 0
     assert "Preflight warnings" not in output
     assert "disabled with missing/none download.strategy" not in output
+
+
+def test_preflight_main_defaults_to_sample_pipeline_map(monkeypatch, tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+
+    captured: dict[str, Path] = {}
+
+    def fake_run_preflight(*, repo_root: Path, pipeline_map_path: Path, **_kwargs) -> int:
+        captured["pipeline_map_path"] = pipeline_map_path
+        return 0
+
+    monkeypatch.setattr(preflight, "run_preflight", fake_run_preflight)
+
+    result = preflight.main(["--repo-root", str(repo_root)])
+
+    assert result == 0
+    assert captured["pipeline_map_path"] == (
+        repo_root / "tools" / "pipeline_map.sample.yaml"
+    ).resolve()
