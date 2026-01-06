@@ -31,8 +31,9 @@ Use this when you are starting on a fresh machine or want the most explicit sequ
 ```powershell
 py -3.11 -m venv .venv
 .venv\Scripts\activate
+pip install -r requirements.constraints.txt
 pip install -r math_pipeline_v2\requirements.txt
-# repeat for other pipeline requirements as needed
+# repeat for other pipeline extras as needed
 
 python tools\build_natural_corpus.py --dest-root "E:\AI-Research\datasets\Natural" --pipelines all --execute
 ```

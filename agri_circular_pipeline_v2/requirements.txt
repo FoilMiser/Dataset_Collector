@@ -1,4 +1,4 @@
-# Agri Circular Pipeline v2.0 - Requirements
+# Agri Circular Pipeline v2.0.0 - Requirements
 -r ../requirements.constraints.txt
 
 # Optional: for accurate token counting in catalog_builder
@@ -7,10 +7,10 @@
 # Optional: for parallel processing improvements
 # concurrent-futures (included in Python 3.2+)
 
-# v0.9: Optional for Parquet output
+# Optional: for Parquet output
 
-# v0.9: Optional for near-duplicate detection
+# Optional: for near-duplicate detection
 # datasketch>=1.6.0
 
-# v0.9: Optional for InChIKey/SMILES normalization
+# Optional: for InChIKey/SMILES normalization
 # rdkit>=2023.9.0

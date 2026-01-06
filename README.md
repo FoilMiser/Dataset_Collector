@@ -198,18 +198,21 @@ Update these in the pipeline’s configuration files (for example `targets_*.yam
 
 - **Python**: Each pipeline depends on Python; version and additional tools may vary by pipeline.
   Tested on Python 3.10 and 3.11.
-- **Requirements**: Install per-pipeline dependencies via that pipeline’s `requirements.txt`. Each pipeline requirements file includes shared core dependencies (`pyyaml`, `requests`, `datasets`, `pyarrow`, `jsonschema`) plus pipeline-specific extras.
+- **Requirements**: Install base dependencies once from `requirements.constraints.txt`, then layer pipeline-specific extras from each pipeline’s `requirements.txt`.
 - **Notebook dependencies**: `jupyterlab` and `ipykernel` are tracked in `requirements-dev.in` and installed from `requirements-dev.constraints.txt`.
 - **External tools**: `git` is required when a target uses `download.strategy: git`. The AWS CLI is required for `s3_sync` or `aws_requester_pays` download modes. `aria2c` is required for `download.strategy: torrent`.
 - **Dry-run vs execute**: dry-run is the default when `--execute` is absent. Use `--execute` only when you intend to modify data or produce outputs.
 
 ## Reproducible installs (recommended)
 
+Use the base + extras flow: install the shared base constraints once, then layer in the
+pipeline-specific extras you need.
+
 ```bash
 pip install -r requirements.constraints.txt
 pip install -r requirements-dev.constraints.txt
 pip install -r math_pipeline_v2/requirements.txt
-# repeat for other pipeline requirements as needed
+# repeat for other pipeline extras as needed
 ```
 
 ### Regenerate the constraints files
