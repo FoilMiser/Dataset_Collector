@@ -9,6 +9,8 @@ reproducibility.
 - Keep changes scoped and reproducible.
 - Run `python tools/validate_repo.py --repo-root .` before submitting.
 - Update `updated_utc` for any YAML configs you edit (UTC date).
+- Track work in GitHub Issues (or `docs/pipeline_backlog.md` if working offline).
+- Do not add `todo.txt` files; migrate any ad-hoc notes into the tracker instead.
 
 ## CI matrix expectations
 
