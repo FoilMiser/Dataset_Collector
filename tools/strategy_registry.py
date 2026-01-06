@@ -7,6 +7,7 @@ StrategySpec = dict[str, Any]
 
 STRATEGY_REGISTRY: dict[str, StrategySpec] = {
     "http": {
+        "status": "supported",
         "required": [
             {
                 "keys": ("url", "urls", "base_url"),
@@ -16,6 +17,7 @@ STRATEGY_REGISTRY: dict[str, StrategySpec] = {
         "external_tools": [],
     },
     "ftp": {
+        "status": "supported",
         "required": [
             {
                 "keys": ("url", "urls", "base_url"),
@@ -25,6 +27,7 @@ STRATEGY_REGISTRY: dict[str, StrategySpec] = {
         "external_tools": [],
     },
     "git": {
+        "status": "supported",
         "required": [
             {
                 "keys": ("repo", "repo_url", "url"),
@@ -34,6 +37,7 @@ STRATEGY_REGISTRY: dict[str, StrategySpec] = {
         "external_tools": ["git"],
     },
     "huggingface_datasets": {
+        "status": "supported",
         "required": [
             {
                 "keys": ("dataset_id",),
@@ -43,6 +47,7 @@ STRATEGY_REGISTRY: dict[str, StrategySpec] = {
         "external_tools": [],
     },
     "zenodo": {
+        "status": "supported",
         "required": [
             {
                 "keys": ("record_id", "doi", "url"),
@@ -52,6 +57,7 @@ STRATEGY_REGISTRY: dict[str, StrategySpec] = {
         "external_tools": [],
     },
     "dataverse": {
+        "status": "supported",
         "required": [
             {
                 "keys": ("persistent_id", "url"),
@@ -61,6 +67,7 @@ STRATEGY_REGISTRY: dict[str, StrategySpec] = {
         "external_tools": [],
     },
     "figshare": {
+        "status": "supported",
         "required": [
             {
                 "keys": ("article_id", "article_url"),
@@ -70,6 +77,7 @@ STRATEGY_REGISTRY: dict[str, StrategySpec] = {
         "external_tools": [],
     },
     "github_release": {
+        "status": "supported",
         "required": [
             {
                 "keys": ("repo", "repository"),
@@ -79,6 +87,7 @@ STRATEGY_REGISTRY: dict[str, StrategySpec] = {
         "external_tools": [],
     },
     "s3_public": {
+        "status": "supported",
         "required": [
             {
                 "keys": ("bucket",),
@@ -88,6 +97,7 @@ STRATEGY_REGISTRY: dict[str, StrategySpec] = {
         "external_tools": [],
     },
     "s3_sync": {
+        "status": "supported",
         "required": [
             {
                 "keys": ("urls",),
@@ -97,6 +107,7 @@ STRATEGY_REGISTRY: dict[str, StrategySpec] = {
         "external_tools": ["aws"],
     },
     "aws_requester_pays": {
+        "status": "supported",
         "required": [
             {
                 "keys": ("bucket",),
@@ -110,6 +121,7 @@ STRATEGY_REGISTRY: dict[str, StrategySpec] = {
         "external_tools": ["aws"],
     },
     "torrent": {
+        "status": "supported",
         "required": [
             {
                 "keys": ("magnet", "torrent"),
@@ -119,6 +131,7 @@ STRATEGY_REGISTRY: dict[str, StrategySpec] = {
         "external_tools": ["aria2c"],
     },
     "api": {
+        "status": "supported",
         "required": [
             {
                 "keys": ("base_url",),
@@ -128,6 +141,7 @@ STRATEGY_REGISTRY: dict[str, StrategySpec] = {
         "external_tools": [],
     },
     "web_crawl": {
+        "status": "supported",
         "required": [
             {
                 "keys": ("seed_urls",),

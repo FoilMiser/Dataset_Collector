@@ -102,6 +102,8 @@ def run_preflight(
         targets = targets_cfg.get("targets", []) or []
         for target in targets:
             enabled = target.get("enabled", True)
+            if not enabled and not warn_disabled:
+                continue
             target_id = target.get("id", "<unknown>")
             download = target.get("download", {}) or {}
             strategy = (download.get("strategy") or "").strip()
@@ -125,15 +127,28 @@ def run_preflight(
                         f"{pipeline_name}:{target_id} disabled uses unsupported strategy '{strategy}'"
                     )
                 continue
-            if get_strategy_spec(strategy) is None:
+            spec = get_strategy_spec(strategy)
+            if spec is None:
                 if enabled:
                     registry_misses_enabled.setdefault(strategy, []).append(
                         f"{pipeline_name}:{target_id}"
                     )
-                else:
+                elif warn_disabled:
                     registry_misses_disabled.setdefault(strategy, []).append(
                         f"{pipeline_name}:{target_id}"
                     )
+            else:
+                status = (spec.get("status") or "supported").strip().lower()
+                if status != "supported":
+                    if enabled:
+                        errors.append(
+                            f"{pipeline_name}:{target_id} uses {status} strategy '{strategy}'"
+                        )
+                    elif warn_disabled:
+                        warnings.append(
+                            f"{pipeline_name}:{target_id} disabled uses {status} strategy '{strategy}'"
+                        )
+                    continue
             if enabled:
                 strategies_in_use_enabled.add(strategy)
                 strategy_targets_enabled.setdefault(strategy, []).append(
