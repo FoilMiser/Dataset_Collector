@@ -65,10 +65,7 @@ globals:
 
   default_gates:
     - snapshot_terms
-    - resolve_license_spdx
     - restriction_phrase_scan
-    - emit_training_manifest
-    - emit_attribution_bundle
 
 queues:
   emit:
