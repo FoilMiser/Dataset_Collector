@@ -14,7 +14,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         python-version: ["3.10", "3.11"]
-        install-mode: [min, lock]
+        install-mode: [min, constraints]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -36,16 +36,16 @@ jobs:
         if: matrix.install-mode == 'min'
         run: |
           python -m pip install -r requirements.in
-      - name: Install deps (lock)
-        if: matrix.install-mode == 'lock'
+      - name: Install deps (constraints)
+        if: matrix.install-mode == 'constraints'
         run: |
           python -m pip install -r requirements.constraints.txt
       - name: Install tooling
         run: |
           python -m pip install pytest pytest-cov ruff
-      - name: Check lockfiles up to date
+      - name: Check constraints up to date
         run: |
-          python -m tools.check_lockfiles
+          python -m tools.check_constraints
       - name: Ruff
         run: |
           ruff check .

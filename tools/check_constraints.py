@@ -80,12 +80,12 @@ def main() -> int:
         )
 
     if missing:
-        print("Lockfile validation failed:")
+        print("Constraints validation failed:")
         for item in missing:
             print(f" - {item}")
         return 1
 
-    print("Lockfile validation passed.")
+    print("Constraints validation passed.")
     return 0
 
 

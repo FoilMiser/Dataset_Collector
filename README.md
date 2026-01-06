@@ -212,9 +212,10 @@ pip install -r math_pipeline_v2/requirements.txt
 # repeat for other pipeline requirements as needed
 ```
 
-### Regenerate the lock files
+### Regenerate the constraints files
 
-These constraints are version-pinned but do not use hash checking.
+These constraints are version-pinned but do not use hash checking, and they are not a
+full lockfile that pins every transitive dependency.
 
 ```bash
 uv pip compile requirements.in -o requirements.constraints.txt
