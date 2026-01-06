@@ -155,8 +155,10 @@ def run_preflight(
                 targets = ", ".join(sorted(enabled_targets + disabled_targets))
                 hint = TOOL_INSTALL_HINTS.get(tool)
                 warnings.append(
-                    f"Missing external tool '{tool}' required by strategy '{strategy}'."
+                    f"Missing external tool '{tool}' required by strategy '{strategy}'"
+                    " for enabled targets."
                     + (f" Targets: {targets}." if targets else "")
+                    + (" Disable those targets or install the tool." if targets else "")
                     + (f" {hint}" if hint else "")
                 )
 
@@ -168,8 +170,14 @@ def run_preflight(
                     targets = ", ".join(sorted(strategy_targets_disabled.get(strategy, [])))
                     hint = TOOL_INSTALL_HINTS.get(tool)
                     warnings.append(
-                        f"Missing external tool '{tool}' required by strategy '{strategy}'."
+                        f"Missing external tool '{tool}' required by strategy '{strategy}'"
+                        " for disabled targets."
                         + (f" Targets: {targets}." if targets else "")
+                        + (
+                            " Install the tool before enabling these targets."
+                            if targets
+                            else ""
+                        )
                         + (f" {hint}" if hint else "")
                     )
 

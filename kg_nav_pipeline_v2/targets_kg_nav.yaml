@@ -132,7 +132,7 @@ targets:
 
   - id: openalex_snapshot
     name: OpenAlex monthly snapshot (scholarly graph)
-    enabled: true
+    enabled: false
     priority: 7
     license_profile: permissive
     license_evidence:
@@ -159,7 +159,7 @@ targets:
 
   - id: crossref_public_data_file
     name: Crossref public data file (DOI metadata)
-    enabled: true
+    enabled: false
     priority: 6
     license_profile: permissive
     license_evidence:
