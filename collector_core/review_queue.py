@@ -18,6 +18,9 @@ Signoff file schema (v0.2):
   "reviewer_contact": "contact info",           # NEW in v0.9 (optional)
   "reason": "Why",
   "promote_to": "GREEN" | "" ,                  # optional
+  "license_evidence_sha256": "...",             # NEW (optional)
+  "license_evidence_url": "...",                # NEW (optional)
+  "license_evidence_fetched_at_utc": "...",     # NEW (optional)
   "evidence_links_checked": ["url1", "url2"],   # NEW in v0.9 (optional)
   "constraints": "Attribution requirements...",  # NEW in v0.9 (optional)
   "notes": "Additional notes...",               # NEW in v0.9 (optional)
@@ -127,6 +130,16 @@ def load_existing_signoff(manifest_dir: Path) -> dict[str, Any]:
         return {}
 
 
+def load_license_evidence_meta(manifest_dir: Path) -> dict[str, Any]:
+    p = manifest_dir / "license_evidence_meta.json"
+    if not p.exists():
+        return {}
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
 def cmd_list(args: argparse.Namespace) -> int:
     yellow_rows = read_jsonl(Path(args.queue))
     if not yellow_rows:
@@ -183,6 +196,7 @@ def write_signoff(
     notes: str = "",
 ) -> None:
     """Write signoff with extended schema (v0.2)."""
+    meta = load_license_evidence_meta(manifest_dir)
     signoff: dict[str, Any] = {
         "target_id": target_id,
         "status": status,
@@ -193,6 +207,15 @@ def write_signoff(
         "signoff_schema_version": "0.2",
         "tool_version": TOOL_VERSION,
     }
+    evidence_sha = meta.get("sha256")
+    if evidence_sha:
+        signoff["license_evidence_sha256"] = evidence_sha
+    evidence_url = meta.get("url")
+    if evidence_url:
+        signoff["license_evidence_url"] = evidence_url
+    evidence_fetched_at = meta.get("fetched_at_utc")
+    if evidence_fetched_at:
+        signoff["license_evidence_fetched_at_utc"] = evidence_fetched_at
     # v0.9: Extended fields (optional)
     if reviewer_contact:
         signoff["reviewer_contact"] = reviewer_contact
