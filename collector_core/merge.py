@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import argparse
+import cProfile
 import dataclasses
 import gzip
 import hashlib
+import importlib.util
 import json
 import os
+import pstats
 import re
 import sqlite3
 import time
+import tracemalloc
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
@@ -18,6 +22,11 @@ from datasets import DatasetDict, load_from_disk
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.config_validator import read_yaml
 from tools.output_contract import normalize_output_record, validate_output_contract
+
+if importlib.util.find_spec("tqdm"):
+    from tqdm import tqdm as tqdm_progress
+else:  # pragma: no cover - optional dependency
+    tqdm_progress = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -65,12 +74,25 @@ class GreenSkip:
 @dataclasses.dataclass
 class MergeState:
     summary: dict[str, Any]
-    dedupe: DedupeIndex
+    dedupe: DedupeIndex | PartitionedDedupeIndex
     shard_cfg: ShardingConfig
     pool_sharders: dict[str, Sharder]
     target_meta: dict[str, dict[str, Any]]
     pipeline_id: str
     execute: bool
+    progress: bool
+    progress_interval: int
+
+
+@dataclasses.dataclass
+class MergeRuntimeConfig:
+    progress: bool = False
+    progress_interval: int = 10000
+    trace_memory: bool = False
+    profile: bool = False
+    profile_path: Path | None = None
+    profile_sort: str = "tottime"
+    dedupe_partitions: int = 1
 
 
 class Sharder:
@@ -122,6 +144,34 @@ class DedupeIndex:
     def close(self) -> None:
         self.conn.commit()
         self.conn.close()
+
+
+class PartitionedDedupeIndex:
+    def __init__(self, path: Path, partitions: int) -> None:
+        if partitions < 2:
+            raise ValueError("PartitionedDedupeIndex requires at least 2 partitions.")
+        self.partitions = partitions
+        self.paths = [self._partition_path(path, idx) for idx in range(partitions)]
+        self.indices = [DedupeIndex(part_path) for part_path in self.paths]
+
+    @staticmethod
+    def _partition_path(path: Path, idx: int) -> Path:
+        suffix = path.suffix or ".sqlite"
+        stem = path.stem
+        return path.with_name(f"{stem}_part{idx:03d}{suffix}")
+
+    def _partition_index(self, content_hash: str) -> int:
+        if not content_hash:
+            return 0
+        return int(content_hash[:8], 16) % self.partitions
+
+    def add_if_new(self, content_hash: str) -> bool:
+        idx = self._partition_index(content_hash)
+        return self.indices[idx].add_if_new(content_hash)
+
+    def close(self) -> None:
+        for index in self.indices:
+            index.close()
 
 
 LICENSE_POOL_MAP = {
@@ -219,6 +269,46 @@ def sharding_cfg(cfg: dict[str, Any]) -> ShardingConfig:
         max_records_per_shard=int(g.get("max_records_per_shard", 50000)),
         compression=str(g.get("compression", "gzip")),
         prefix="combined",
+    )
+
+
+def resolve_merge_runtime(
+    cfg: dict[str, Any],
+    *,
+    progress: bool | None = None,
+    progress_interval: int | None = None,
+    trace_memory: bool | None = None,
+    profile: bool | None = None,
+    profile_path: str | None = None,
+    profile_sort: str | None = None,
+    dedupe_partitions: int | None = None,
+    ledger_root: Path | None = None,
+) -> MergeRuntimeConfig:
+    g = (cfg.get("globals", {}) or {})
+    g_merge = (g.get("merge", {}) or {})
+    resolved_progress = bool(progress if progress is not None else g_merge.get("progress", False))
+    interval_value = progress_interval if progress_interval is not None else g_merge.get("progress_interval", 10000)
+    resolved_interval = max(int(interval_value or 10000), 1)
+    resolved_trace = bool(trace_memory if trace_memory is not None else g_merge.get("trace_memory", False))
+    resolved_profile = bool(profile if profile is not None else g_merge.get("profile", False))
+    resolved_profile_sort = str(profile_sort or g_merge.get("profile_sort", "tottime"))
+    partitions_value = dedupe_partitions if dedupe_partitions is not None else g_merge.get("dedupe_partitions", 1)
+    resolved_partitions = max(int(partitions_value or 1), 1)
+    resolved_profile_path: Path | None = None
+    if resolved_profile:
+        profile_value = profile_path or g_merge.get("profile_path")
+        if profile_value:
+            resolved_profile_path = Path(profile_value).expanduser().resolve()
+        elif ledger_root:
+            resolved_profile_path = ledger_root / "merge_profile.prof"
+    return MergeRuntimeConfig(
+        progress=resolved_progress,
+        progress_interval=resolved_interval,
+        trace_memory=resolved_trace,
+        profile=resolved_profile,
+        profile_path=resolved_profile_path,
+        profile_sort=resolved_profile_sort,
+        dedupe_partitions=resolved_partitions,
     )
 
 
@@ -471,6 +561,28 @@ def get_sharder(pool: str, roots: Roots, state: MergeState) -> Sharder:
     return state.pool_sharders[pool]
 
 
+def iter_with_progress(
+    iterable: Iterable[Any],
+    *,
+    enabled: bool,
+    desc: str,
+    interval: int,
+) -> Iterator[Any]:
+    if not enabled:
+        yield from iterable
+        return
+    if tqdm_progress is not None:
+        yield from tqdm_progress(iterable, desc=desc, unit="records")
+        return
+    count = 0
+    for item in iterable:
+        yield item
+        count += 1
+        if count % interval == 0:
+            print(f"[merge] {desc}: {count} records processed")
+    print(f"[merge] {desc}: {count} records processed")
+
+
 def handle_record(
     rec: dict[str, Any],
     source_kind: str,
@@ -526,7 +638,12 @@ def process_green_records(
     target_canon: dict[str, tuple[list[str], int | None]],
     default_canon: tuple[list[str], int | None],
 ) -> None:
-    for item in iter_green_records(roots):
+    for item in iter_with_progress(
+        iter_green_records(roots),
+        enabled=state.progress,
+        desc="GREEN merge",
+        interval=state.progress_interval,
+    ):
         candidates, max_chars = target_canon.get(item.target_id, default_canon)
         meta = state.target_meta.get(item.target_id, {})
         if isinstance(item, GreenSkip):
@@ -567,7 +684,12 @@ def process_green_records(
 
 
 def process_screened_yellow(roots: Roots, state: MergeState) -> None:
-    for rec in iter_screened_yellow(roots):
+    for rec in iter_with_progress(
+        iter_screened_yellow(roots),
+        enabled=state.progress,
+        desc="screened YELLOW merge",
+        interval=state.progress_interval,
+    ):
         target_id = (rec.get("source", {}) or {}).get("target_id") or "unknown"
         handle_record(rec, "screened_yellow", None, roots, state, target_id)
 
@@ -581,9 +703,35 @@ def finalize_shards(state: MergeState) -> None:
             state.summary["shards"].append(str(flushed))
 
 
-def merge_records(cfg: dict[str, Any], roots: Roots, execute: bool, *, pipeline_id: str) -> dict[str, Any]:
+def build_dedupe_index(roots: Roots, partitions: int) -> DedupeIndex | PartitionedDedupeIndex:
+    base_path = roots.ledger_root / "combined_dedupe.sqlite"
+    if partitions > 1:
+        return PartitionedDedupeIndex(base_path, partitions)
+    return DedupeIndex(base_path)
+
+
+def write_profile_stats(profile: cProfile.Profile, path: Path, sort: str) -> tuple[Path, Path]:
+    ensure_dir(path.parent)
+    profile.dump_stats(str(path))
+    text_path = path.with_suffix(path.suffix + ".txt")
+    with text_path.open("w", encoding="utf-8") as f:
+        stats = pstats.Stats(profile, stream=f)
+        stats.sort_stats(sort)
+        stats.print_stats(50)
+    return path, text_path
+
+
+def merge_records(
+    cfg: dict[str, Any],
+    roots: Roots,
+    execute: bool,
+    *,
+    pipeline_id: str,
+    runtime: MergeRuntimeConfig | None = None,
+) -> dict[str, Any]:
+    runtime = runtime or resolve_merge_runtime(cfg, ledger_root=roots.ledger_root)
     shard_cfg = sharding_cfg(cfg)
-    dedupe = DedupeIndex(roots.ledger_root / "combined_dedupe.sqlite")
+    dedupe = build_dedupe_index(roots, runtime.dedupe_partitions)
     summary = {"written": 0, "deduped": 0, "skipped": 0, "shards": []}
     target_meta = build_target_meta(cfg)
     target_canon, default_canon = build_target_canon(cfg)
@@ -595,11 +743,37 @@ def merge_records(cfg: dict[str, Any], roots: Roots, execute: bool, *, pipeline_
         target_meta=target_meta,
         pipeline_id=pipeline_id,
         execute=execute,
+        progress=runtime.progress,
+        progress_interval=runtime.progress_interval,
     )
-    process_green_records(roots, state, target_canon, default_canon)
-    process_screened_yellow(roots, state)
-    finalize_shards(state)
-    dedupe.close()
+    summary["dedupe_partitions"] = runtime.dedupe_partitions
+    profiler: cProfile.Profile | None = None
+    if runtime.profile:
+        profiler = cProfile.Profile()
+        profiler.enable()
+    if runtime.trace_memory:
+        tracemalloc.start()
+    try:
+        process_green_records(roots, state, target_canon, default_canon)
+        process_screened_yellow(roots, state)
+        finalize_shards(state)
+    finally:
+        dedupe.close()
+        if runtime.trace_memory:
+            current, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+            summary["memory_current_mb"] = round(current / 1024 / 1024, 2)
+            summary["memory_peak_mb"] = round(peak / 1024 / 1024, 2)
+        if profiler is not None:
+            profiler.disable()
+            if runtime.profile_path:
+                profile_path, text_path = write_profile_stats(
+                    profiler,
+                    runtime.profile_path,
+                    runtime.profile_sort,
+                )
+                summary["profile_path"] = str(profile_path)
+                summary["profile_text_path"] = str(text_path)
     summary["finished_at_utc"] = utc_now()
     return summary
 
@@ -609,9 +783,45 @@ def main(*, pipeline_id: str, defaults: RootDefaults) -> None:
     ap.add_argument("--targets", required=True, help="targets.yaml")
     ap.add_argument("--execute", action="store_true", help="Write combined shards")
     ap.add_argument("--dataset-root", default=None, help="Override dataset root (raw/screened/combined/_ledger)")
+    ap.add_argument("--progress", action="store_true", help="Show merge progress")
+    ap.add_argument(
+        "--progress-interval",
+        type=int,
+        default=None,
+        help="Log progress every N items when tqdm is unavailable",
+    )
+    ap.add_argument("--trace-memory", action="store_true", help="Track memory usage with tracemalloc")
+    ap.add_argument("--profile-merge", action="store_true", help="Enable cProfile for merge paths")
+    ap.add_argument(
+        "--profile-path",
+        default=None,
+        help="Write cProfile stats to path (default: <ledger_root>/merge_profile.prof)",
+    )
+    ap.add_argument(
+        "--profile-sort",
+        default=None,
+        help="Sort key for profile text output (default: tottime)",
+    )
+    ap.add_argument(
+        "--dedupe-partitions",
+        type=int,
+        default=None,
+        help="Number of SQLite partitions for dedupe index",
+    )
     args = ap.parse_args()
 
     cfg = read_yaml(Path(args.targets), schema_name="targets") or {}
     roots = resolve_roots(cfg, defaults, dataset_root=resolve_dataset_root(args.dataset_root))
-    summary = merge_records(cfg, roots, args.execute, pipeline_id=pipeline_id)
+    runtime = resolve_merge_runtime(
+        cfg,
+        progress=args.progress,
+        progress_interval=args.progress_interval,
+        trace_memory=args.trace_memory,
+        profile=args.profile_merge,
+        profile_path=args.profile_path,
+        profile_sort=args.profile_sort,
+        dedupe_partitions=args.dedupe_partitions,
+        ledger_root=roots.ledger_root,
+    )
+    summary = merge_records(cfg, roots, args.execute, pipeline_id=pipeline_id, runtime=runtime)
     write_json(roots.ledger_root / "merge_summary.json", summary)

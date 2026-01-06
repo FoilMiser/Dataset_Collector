@@ -36,6 +36,8 @@ def test_get_sharder_reuses_instance(tmp_path) -> None:
         target_meta={},
         pipeline_id="test",
         execute=False,
+        progress=False,
+        progress_interval=10000,
     )
     sharder_a = merge.get_sharder("permissive", roots, state)
     sharder_b = merge.get_sharder("permissive", roots, state)
@@ -59,6 +61,8 @@ def test_handle_record_writes_index_and_shard(tmp_path) -> None:
         target_meta={},
         pipeline_id="test",
         execute=True,
+        progress=False,
+        progress_interval=10000,
     )
     record = {"text": "hello", "source": {"target_id": "t1", "license_profile": "permissive"}}
     merge.handle_record(record, "green", None, roots, state, target_id="t1", pool_hint="permissive")
