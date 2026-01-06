@@ -29,8 +29,9 @@ from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
+from collector_core.__version__ import __version__ as TOOL_VERSION, __schema_version__ as SCHEMA_VERSION
 
-from collector_core.__version__ import __schema_version__ as VERSION
+
 from collector_core.config_validator import read_yaml as read_yaml_config
 
 
@@ -124,7 +125,8 @@ def write_plan(output_path: Path, entries: list[QueueEntry], summary: dict[str, 
     ensure_dir(output_path.parent)
     plan = {
         "generated_utc": utc_now(),
-        "pipeline_version": VERSION,
+        "tool_version": TOOL_VERSION,
+        "schema_version": SCHEMA_VERSION,
         "targets_path": str(targets_path),
         "total_entries": len(entries),
         "summary": summary,

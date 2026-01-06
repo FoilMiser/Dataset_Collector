@@ -28,8 +28,9 @@ from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
+from collector_core.__version__ import __version__ as TOOL_VERSION, __schema_version__ as SCHEMA_VERSION
 
-from collector_core.__version__ import __schema_version__ as VERSION
+
 from collector_core.config_validator import read_yaml
 
 
@@ -80,7 +81,8 @@ def summary_stats(entries: Iterable[QueueEntry]) -> dict[str, Any]:
 def build_review_plan(entries: Iterable[QueueEntry]) -> dict[str, Any]:
     plan = {
         "generated_at_utc": utc_now(),
-        "version": VERSION,
+        "tool_version": TOOL_VERSION,
+        "schema_version": SCHEMA_VERSION,
         "entries": [asdict(e) for e in entries],
     }
     return plan
@@ -119,7 +121,7 @@ def queue_entry_from_row(row: dict[str, Any]) -> QueueEntry:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description=f"Yellow scrubber v{VERSION}")
+    ap = argparse.ArgumentParser(description=f"Yellow scrubber v{TOOL_VERSION} (schema {SCHEMA_VERSION})")
     ap.add_argument("--targets", required=True, help="targets_code.yaml")
     ap.add_argument("--queue", default=None, help="Override queue path (defaults to globals.queues_root/yellow_pipeline.jsonl)")
     ap.add_argument("--limit", type=int, default=None, help="Limit number of entries")
