@@ -1,10 +1,10 @@
 # Regulation & Compliance Corpus Pipeline v0.9 - Requirements (adapted from chemistry)
 # Core dependencies
 pyyaml>=6.0
-requests>=2.31.0
-
-# Optional: for HuggingFace datasets strategy
-datasets>=2.20.0
+requests>=2.32.2,<2.33
+datasets>=2.20.0,<2.21
+pyarrow>=15.0.0
+jsonschema>=4.22.0
 
 # Optional: for accurate token counting in catalog_builder
 # tiktoken>=0.5.0
@@ -13,7 +13,6 @@ datasets>=2.20.0
 # concurrent-futures (included in Python 3.2+)
 
 # v0.9: Optional for Parquet output
-pyarrow>=15.0.0
 
 # v0.9: Optional for near-duplicate detection
 # datasketch>=1.6.0
