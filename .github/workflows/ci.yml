@@ -71,6 +71,9 @@ jobs:
       - name: Preflight
         run: |
           python -m tools.preflight --repo-root . --quiet
+      - name: Check for tracked cache artifacts
+        run: |
+          python -c "import subprocess, re, sys; out=subprocess.check_output(['git','ls-files'], text=True).splitlines(); bad=[p for p in out if re.search(r'(__pycache__/|\\.pyc$|\\.pytest_cache/|\\.ruff_cache/)', p)]; [print('Tracked cache artifact:', p) for p in bad]; sys.exit(1 if bad else 0)"
       - name: Remove Python cache artifacts
         run: |
           python -c "from pathlib import Path; import shutil; root=Path('.'); [shutil.rmtree(p, ignore_errors=True) for p in root.rglob('__pycache__') if p.is_dir()]; [shutil.rmtree(p, ignore_errors=True) for p in root.rglob('.pytest_cache') if p.is_dir()]; [p.unlink(missing_ok=True) for p in root.rglob('*.pyc') if p.is_file()]"
