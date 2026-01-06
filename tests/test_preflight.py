@@ -4,8 +4,8 @@ from pathlib import Path
 
 import yaml
 
-from tools.preflight import run_preflight
 from tools import preflight
+from tools.preflight import run_preflight
 
 
 def _write_yaml(path: Path, payload: dict) -> None:
