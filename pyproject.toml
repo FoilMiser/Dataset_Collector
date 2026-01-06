@@ -28,6 +28,16 @@ license = { file = "LICENSE" }
 dynamic = ["version"]
 dependencies = ["PyYAML>=6.0"]
 
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "pytest-cov",
+  "ruff",
+  "pytest_httpserver",
+  "jupyterlab",
+  "ipykernel",
+]
+
 [project.scripts]
 dc-review = "collector_core.review_queue:main"
 dc-catalog = "collector_core.catalog_builder:main"
