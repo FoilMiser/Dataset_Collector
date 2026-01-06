@@ -5,7 +5,10 @@ from functools import cache
 from pathlib import Path
 from typing import Any
 
-import yaml
+try:
+    import yaml
+except ModuleNotFoundError:  # pragma: no cover - fallback for minimal environments
+    from collector_core import yaml_lite as yaml
 
 from collector_core.exceptions import ConfigValidationError, YamlParseError
 

@@ -26,6 +26,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 dynamic = ["version"]
+dependencies = ["PyYAML>=6.0"]
 
 [project.scripts]
 dc-review = "collector_core.review_queue:main"
