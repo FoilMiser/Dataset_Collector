@@ -37,9 +37,12 @@ single domain folder must include the following structure:
 The merge worker uses a SQLite-backed index (`_ledger/combined_dedupe.sqlite`) keyed by
 `content_sha256` to enforce deterministic, first-seen wins deduplication without keeping all
 hashes in memory. Tradeoffs: this keeps memory bounded and determinism stable across runs, but
-adds local disk I/O and uses a single-writer index. Alternatives like hash-bucket partitioning
-reduce DB overhead but create many intermediate files, while Bloom filter + verify can be faster
-but introduces probabilistic false positives and requires a second pass to confirm duplicates.
+adds local disk I/O and uses a single-writer index.
+
+For large merges, the dedupe index can be partitioned into multiple SQLite files by setting
+`globals.merge.dedupe_partitions` (or `--dedupe-partitions`). This creates
+`_ledger/combined_dedupe_partNNN.sqlite` files, routing hashes by prefix to reduce per-file
+index size while retaining deterministic behavior.
 
 ## Ledger and manifests
 

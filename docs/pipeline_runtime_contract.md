@@ -33,6 +33,13 @@ These `globals` keys tune runtime defaults without changing CLI usage:
 - `globals.retry.backoff` — base for exponential backoff (default: `2.0`).
 - `globals.sharding.max_records_per_shard` — shard size for screened/merged JSONL (default: `50000`).
 - `globals.sharding.compression` — shard compression (`gzip` by default).
+- `globals.merge.dedupe_partitions` — number of SQLite partitions for merge dedupe (default: `1`).
+- `globals.merge.progress` — enable merge progress reporting (default: `false`).
+- `globals.merge.progress_interval` — log interval for progress when tqdm is unavailable (default: `10000`).
+- `globals.merge.trace_memory` — enable tracemalloc memory reporting (default: `false`).
+- `globals.merge.profile` — enable cProfile around merge paths (default: `false`).
+- `globals.merge.profile_path` — optional path for cProfile output (defaults to `<ledger_root>/merge_profile.prof`).
+- `globals.merge.profile_sort` — sort key for profile text output (default: `tottime`).
 
 ### `--dataset-root` / `DATASET_ROOT`
 
@@ -99,6 +106,13 @@ Optional (standardized):
 - `--dataset-root PATH`
 - `--pitch-sample-limit INT` (yellow screen only)
 - `--pitch-text-limit INT` (yellow screen only)
+- `--progress` (merge only)
+- `--progress-interval INT` (merge only)
+- `--trace-memory` (merge only)
+- `--profile-merge` (merge only)
+- `--profile-path PATH` (merge only)
+- `--profile-sort KEY` (merge only)
+- `--dedupe-partitions INT` (merge only)
 
 ## Environment variables
 
