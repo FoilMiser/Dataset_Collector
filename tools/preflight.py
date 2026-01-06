@@ -207,7 +207,11 @@ def run_preflight(
 def main(argv: Iterable[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Preflight validation for dataset collector pipelines.")
     ap.add_argument("--repo-root", default=".", help="Repository root containing pipelines")
-    ap.add_argument("--pipeline-map", default="tools/pipeline_map.yaml", help="Pipeline map YAML")
+    ap.add_argument(
+        "--pipeline-map",
+        default="tools/pipeline_map.sample.yaml",
+        help="Pipeline map YAML",
+    )
     ap.add_argument(
         "--pipelines",
         nargs="*",

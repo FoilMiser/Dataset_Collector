@@ -72,11 +72,11 @@ Each item includes: **impact**, **where**, **fix**, and **done when** acceptance
 
 ---
 
-### 4) Default `tools/pipeline_map.yaml` is a placeholder but also the implicit default
+### 4) Default `tools/pipeline_map.sample.yaml` is a placeholder but also the implicit default
 **Impact:** New users run the orchestrator and immediately get confusing behavior because `destination_root` is `"YOUR_DATASET_ROOT_HERE"`.
 
 **Where:**
-- `tools/pipeline_map.yaml`
+- `tools/pipeline_map.sample.yaml`
 - `tools/build_natural_corpus.py` uses pipeline maps by default
 
 **Fix options:**
@@ -189,7 +189,7 @@ Each item includes: **impact**, **where**, **fix**, and **done when** acceptance
 - `tools/validate_repo.py` expects exactly 18 `pipeline_driver.py`
 
 **Fix:**
-- Derive expected pipelines from `tools/pipeline_map.yaml` (or from directory glob + allow any count)
+- Derive expected pipelines from `tools/pipeline_map.sample.yaml` (or from directory glob + allow any count)
 - If you want strictness, validate that every pipeline in the map exists and has required files, rather than enforcing a fixed count.
 
 **Done when:**

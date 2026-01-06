@@ -37,7 +37,7 @@ YELLOW items must be reviewed and approved before they are eligible for the comb
 ## Known Limitations
 
 - **Yellow-screen boundaries**: The `acquire_yellow` and `screen_yellow` stages only apply to targets explicitly marked as YELLOW in pipeline target YAMLs. Anything not labeled YELLOW is outside the yellow-screen workflow, and no automatic promotion to GREEN occurs without human review.
-- **Excluded sources**: RED-labeled sources are excluded by design and are not collected or merged. Some targets may be disabled in `targets_*.yaml` or omitted from `tools/pipeline_map.yaml`, which means they are intentionally not part of the run.
+- **Excluded sources**: RED-labeled sources are excluded by design and are not collected or merged. Some targets may be disabled in `targets_*.yaml` or omitted from `tools/pipeline_map.sample.yaml`, which means they are intentionally not part of the run.
 - **Non-goals**: This repository does not perform data cleaning, deduplication across domains, or final dataset curation beyond the per-pipeline merge step. It also does not guarantee license compatibility checks outside the configured `license_map.yaml` entries.
 - **Corpus constraints**: Outputs are constrained to the `combined/` stage described in `docs/output_contract.md`; there is no final, unified post-processing stage here. Downstream consumers should expect per-pipeline catalogs and manifests with varying completeness based on enabled targets and available credentials.
 
@@ -238,7 +238,7 @@ python -m tools.preflight --pipelines chem_pipeline_v2 biology_pipeline_v2
 To point at a custom pipeline map location:
 
 ```bash
-python -m tools.preflight --pipeline-map tools/pipeline_map.yaml
+python -m tools.preflight --pipeline-map tools/pipeline_map.sample.yaml
 ```
 
 To suppress warnings for disabled targets:

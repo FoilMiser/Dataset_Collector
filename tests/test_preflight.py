@@ -32,7 +32,7 @@ def test_preflight_pipeline_filter_skips_unselected(tmp_path, capsys) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     _write_pipeline(repo_root, "good_pipeline", [{"id": "ok", "download": {"strategy": "http"}}])
-    pipeline_map_path = repo_root / "pipeline_map.yaml"
+    pipeline_map_path = repo_root / "pipeline_map.sample.yaml"
     _write_pipeline_map(
         pipeline_map_path,
         {
@@ -56,7 +56,7 @@ def test_preflight_reports_missing_pipeline_entries(tmp_path, capsys) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     _write_pipeline(repo_root, "good_pipeline", [{"id": "ok", "download": {"strategy": "http"}}])
-    pipeline_map_path = repo_root / "pipeline_map.yaml"
+    pipeline_map_path = repo_root / "pipeline_map.sample.yaml"
     _write_pipeline_map(
         pipeline_map_path,
         {"good_pipeline": {"targets_yaml": "targets.yaml"}},
@@ -77,7 +77,7 @@ def test_preflight_quiet_suppresses_disabled_warnings(tmp_path, capsys) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     _write_pipeline(repo_root, "quiet_pipeline", [{"id": "off", "enabled": False}])
-    pipeline_map_path = repo_root / "pipeline_map.yaml"
+    pipeline_map_path = repo_root / "pipeline_map.sample.yaml"
     _write_pipeline_map(
         pipeline_map_path,
         {"quiet_pipeline": {"targets_yaml": "targets.yaml"}},
