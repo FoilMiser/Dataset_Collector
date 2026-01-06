@@ -13,6 +13,8 @@ root.
 
 from __future__ import annotations
 
+from collector_core.__version__ import __version__ as VERSION
+
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +32,8 @@ from collector_core.acquire_strategies import (
     resolve_license_pool,
     run_acquire_worker,
 )
+
+__all__ = ["main", "VERSION"]
 
 GITHUB_RELEASE_HANDLER = make_github_release_handler("code-corpus-acquire")
 

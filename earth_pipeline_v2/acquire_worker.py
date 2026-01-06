@@ -13,6 +13,8 @@ root.
 
 from __future__ import annotations
 
+from collector_core.__version__ import __version__ as VERSION
+
 from collector_core.acquire_strategies import (
     RootsDefaults,
     handle_dataverse,
@@ -23,6 +25,8 @@ from collector_core.acquire_strategies import (
     handle_zenodo,
     run_acquire_worker,
 )
+
+__all__ = ["main", "VERSION"]
 
 STRATEGY_HANDLERS = {
     "http": handle_http_multi,

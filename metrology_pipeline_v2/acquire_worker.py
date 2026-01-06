@@ -13,6 +13,8 @@ root.
 
 from __future__ import annotations
 
+from collector_core.__version__ import __version__ as VERSION
+
 import dataclasses
 import gzip
 import hashlib
@@ -34,6 +36,8 @@ from collector_core.acquire_strategies import (
     run_acquire_worker,
     utc_now,
 )
+
+__all__ = ["main", "VERSION"]
 from collector_core.dependencies import _try_import
 
 PdfReader = _try_import("pypdf", "PdfReader")

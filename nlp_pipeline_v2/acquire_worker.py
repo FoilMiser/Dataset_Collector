@@ -13,6 +13,8 @@ root.
 
 from __future__ import annotations
 
+from collector_core.__version__ import __version__ as VERSION
+
 from collector_core.acquire_strategies import (
     RootsDefaults,
     handle_dataverse,
@@ -25,6 +27,8 @@ from collector_core.acquire_strategies import (
     make_github_release_handler,
     run_acquire_worker,
 )
+
+__all__ = ["main", "VERSION"]
 
 GITHUB_RELEASE_HANDLER = make_github_release_handler("nlp-corpus-acquire")
 
