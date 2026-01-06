@@ -45,10 +45,7 @@ globals:
     - "no machine learning"
   default_gates:
   - snapshot_terms
-  - resolve_license_spdx
   - restriction_phrase_scan
-  - emit_training_manifest
-  - emit_attribution_bundle
 queues:
   emit:
   - id: green_download
@@ -68,10 +65,10 @@ queues:
       enabled: true
 gates_catalog:
   snapshot_terms: Save Terms/ToS + license page HTML/PDF/TXT + retrieval timestamp.
-  resolve_license_spdx: Normalize license to SPDX via license_map.yaml rules; store evidence.
+  resolve_license_spdx: Future work: Normalize license to SPDX via license_map.yaml rules; store evidence.
   restriction_phrase_scan: Scan terms/content for restriction phrases (no-LLM/no-TDM/etc.).
-  emit_training_manifest: Manifest of included files/records + checksums + license evidence.
-  emit_attribution_bundle: Generate ATTRIBUTION.md + CITATIONS.bib for included sources.
+  emit_training_manifest: Future work: Manifest of included files/records + checksums + license evidence.
+  emit_attribution_bundle: Future work: Generate ATTRIBUTION.md + CITATIONS.bib for included sources.
 resolvers:
   huggingface_datasets:
     mode: dataset_id
