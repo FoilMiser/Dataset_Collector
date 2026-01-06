@@ -1,4 +1,6 @@
 -r requirements.in
 jupyterlab
 ipykernel
+pytest
 pytest-cov
+ruff
