@@ -943,12 +943,19 @@ class BasePipelineDriver:
 
         previous_digest = None
         existing_path = None
+        existing_meta: dict[str, Any] = {}
         for ext in [".html", ".pdf", ".txt", ".json"]:
             candidate = manifest_dir / f"license_evidence{ext}"
             if candidate.exists():
                 existing_path = candidate
                 previous_digest = sha256_file(candidate)
                 break
+        meta_path = manifest_dir / "license_evidence_meta.json"
+        if meta_path.exists():
+            try:
+                existing_meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            except Exception:
+                existing_meta = {}
 
         content, info, meta = self.fetch_url_with_retry(
             url,
@@ -987,8 +994,39 @@ class BasePipelineDriver:
 
         ensure_dir(manifest_dir)
         out_path = manifest_dir / f"license_evidence{ext}"
+        history: list[dict[str, Any]] = []
+        if isinstance(existing_meta.get("history"), list):
+            history = list(existing_meta.get("history", []))
+        previous_entry = None
+        previous_renamed_path = None
+        if result["changed_from_previous"] and existing_path and previous_digest:
+            prev_ext = existing_path.suffix
+            prev_prefix = f"license_evidence.prev_{previous_digest[:8]}"
+            prev_path = manifest_dir / f"{prev_prefix}{prev_ext}"
+            counter = 1
+            while prev_path.exists():
+                prev_path = manifest_dir / f"{prev_prefix}_{counter}{prev_ext}"
+                counter += 1
+            existing_path.rename(prev_path)
+            previous_renamed_path = prev_path
+            previous_entry = {
+                "sha256": previous_digest,
+                "filename": prev_path.name,
+                "fetched_at_utc": existing_meta.get("fetched_at_utc"),
+            }
+            history.append(previous_entry)
         out_path.write_bytes(content)
         result["saved_path"] = str(out_path)
+        if previous_renamed_path:
+            result["previous_renamed_path"] = str(previous_renamed_path)
+        result["history"] = history
+        if result["changed_from_previous"]:
+            result["evidence_files_verified"] = bool(
+                (previous_renamed_path and previous_renamed_path.exists()) and out_path.exists()
+            )
+            if not result["evidence_files_verified"]:
+                result["status"] = "error"
+                result["error"] = "Evidence file rename/write verification failed."
 
         write_json(manifest_dir / "license_evidence_meta.json", result)
         return result
