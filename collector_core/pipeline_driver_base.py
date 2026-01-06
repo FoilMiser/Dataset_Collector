@@ -787,6 +787,9 @@ def generate_dry_run_report(
                 reason = f"restriction phrase: {r['restriction_hits'][0]}"
             lines.append(f"  ⚠ {r['id']}: {r['name'][:50]}")
             lines.append(f"      Reason: {reason}")
+            lines.append(f"      Signoff SHA256: {r.get('signoff_evidence_sha256')}")
+            lines.append(f"      Current SHA256: {r.get('current_evidence_sha256')}")
+            lines.append(f"      Signoff stale: {r.get('signoff_is_stale')}")
         if len(yellow_rows) > 20:
             lines.append(f"  ... and {len(yellow_rows) - 20} more")
         lines.append("")
@@ -1224,6 +1227,13 @@ class BasePipelineDriver:
         review_status: str,
         out_pool: str,
     ) -> dict[str, Any]:
+        signoff_evidence_sha256 = (ctx.signoff or {}).get("license_evidence_sha256")
+        current_evidence_sha256 = evidence.snapshot.get("sha256")
+        signoff_is_stale = bool(
+            signoff_evidence_sha256
+            and current_evidence_sha256
+            and signoff_evidence_sha256 != current_evidence_sha256
+        )
         evaluation = {
             "id": ctx.tid,
             "name": ctx.name,
@@ -1247,6 +1257,9 @@ class BasePipelineDriver:
             "evidence_snapshot": evidence.snapshot,
             "evidence_headers_used": cfg.headers,
             "license_change_detected": evidence.license_change_detected,
+            "signoff_evidence_sha256": signoff_evidence_sha256,
+            "current_evidence_sha256": current_evidence_sha256,
+            "signoff_is_stale": signoff_is_stale,
             "download": ctx.target.get("download", {}),
             "build": ctx.target.get("build", {}),
             "data_type": ctx.target.get("data_type", []),
@@ -1272,6 +1285,13 @@ class BasePipelineDriver:
         review_required: bool,
         out_pool: str,
     ) -> dict[str, Any]:
+        signoff_evidence_sha256 = (ctx.signoff or {}).get("license_evidence_sha256")
+        current_evidence_sha256 = evidence.snapshot.get("sha256")
+        signoff_is_stale = bool(
+            signoff_evidence_sha256
+            and current_evidence_sha256
+            and signoff_evidence_sha256 != current_evidence_sha256
+        )
         row = {
             "id": ctx.tid,
             "name": ctx.name,
@@ -1293,6 +1313,9 @@ class BasePipelineDriver:
             "denylist_hits": ctx.dl_hits,
             "review_required": review_required,
             "license_change_detected": evidence.license_change_detected,
+            "signoff_evidence_sha256": signoff_evidence_sha256,
+            "current_evidence_sha256": current_evidence_sha256,
+            "signoff_is_stale": signoff_is_stale,
             "output_pool": out_pool,
             "routing_subject": ctx.routing.get("subject"),
             "routing_domain": ctx.routing.get("domain"),
