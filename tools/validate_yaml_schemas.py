@@ -11,7 +11,7 @@ if __package__ in (None, ""):
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
 
-from collector_core.config_validator import read_yaml
+from collector_core.config_validator import Draft7Validator, read_yaml
 from collector_core.exceptions import ConfigValidationError, YamlParseError
 
 
@@ -55,6 +55,10 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Validate checked-in YAML files against JSON schemas.")
     ap.add_argument("--root", default=".", help="Repository root")
     args = ap.parse_args(argv)
+
+    if Draft7Validator is None:
+        print("Install jsonschema for schema validation.")
+        return 1
 
     root = Path(args.root).resolve()
     errors: list[str] = []
