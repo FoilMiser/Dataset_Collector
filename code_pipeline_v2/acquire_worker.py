@@ -13,11 +13,10 @@ root.
 
 from __future__ import annotations
 
-from collector_core.__version__ import __version__ as VERSION
-
 from pathlib import Path
 from typing import Any
 
+from collector_core.__version__ import __version__ as VERSION
 from collector_core.acquire_strategies import (
     AcquireContext,
     RootsDefaults,

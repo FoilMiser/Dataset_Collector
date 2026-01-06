@@ -7,9 +7,10 @@ import json
 import os
 import subprocess
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 from urllib.parse import urlparse
 
 from collector_core.__version__ import __version__ as VERSION

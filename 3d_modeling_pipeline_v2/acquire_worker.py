@@ -33,11 +33,11 @@ from collector_core.acquire_strategies import (
     handle_http_single,
     handle_zenodo,
     normalize_download,
+    run_acquire_worker,
     safe_name,
     sha256_file,
     write_json,
     write_jsonl,
-    run_acquire_worker,
 )
 from collector_core.dependencies import _try_import, requires
 
