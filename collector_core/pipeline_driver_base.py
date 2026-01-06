@@ -289,7 +289,7 @@ def apply_review_gates(
 
 def resolve_effective_bucket(
     license_map: LicenseMap,
-    gates: dict[str, Any],
+    gates: list[str],
     evidence: EvidenceResult,
     spdx: str,
     restriction_hits: list[str],
@@ -659,6 +659,19 @@ def merge_gates(default_gates: list[str], gates_override: dict[str, Any]) -> lis
     return merged
 
 
+def canonicalize_gates(gates: list[str]) -> list[str]:
+    canonical_map = {
+        "no_restrictions": "restriction_phrase_scan",
+        "manual_review": "manual_legal_review",
+    }
+    canonicalized: list[str] = []
+    for gate in gates:
+        mapped = canonical_map.get(gate, gate)
+        if mapped not in canonicalized:
+            canonicalized.append(mapped)
+    return canonicalized
+
+
 def compute_effective_bucket(
     license_map: LicenseMap,
     gates: list[str],
@@ -679,10 +692,10 @@ def compute_effective_bucket(
         # If we require snapshot and failed, force YELLOW
         bucket = "YELLOW"
 
-    if "no_restrictions" in gates and restriction_hits:
+    if ("restriction_phrase_scan" in gates or "no_restrictions" in gates) and restriction_hits:
         bucket = "YELLOW"
 
-    if "manual_review" in gates:
+    if "manual_legal_review" in gates or "manual_review" in gates:
         bucket = "YELLOW"
 
     return bucket
@@ -1007,7 +1020,7 @@ class BasePipelineDriver:
         download_cfg = target.get("download", {}) or {}
         download_blob = json.dumps(download_cfg, ensure_ascii=False)
         review_required = bool(target.get("review_required", False))
-        gates = merge_gates(cfg.default_gates, target.get("gates_override", {}) or {})
+        gates = canonicalize_gates(merge_gates(cfg.default_gates, target.get("gates_override", {}) or {}))
         target_manifest_dir = cfg.manifests_root / tid
         ensure_dir(target_manifest_dir)
         signoff = read_review_signoff(target_manifest_dir)
