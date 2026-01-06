@@ -30,6 +30,10 @@ You can also run the Jupyter notebook, which invokes the same workflow. Use `run
 
 ## Directory layout
 
+Targets YAML defaults to `/data/...`; the orchestrator patches to your `--dest-root`.
+For standalone runs, pass `--dataset-root` or use `tools/patch_targets.py`.
+
+
 The recommended roots live in `targets_materials.yaml -> globals`:
 
 ```
