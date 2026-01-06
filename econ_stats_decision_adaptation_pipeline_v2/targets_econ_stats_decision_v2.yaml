@@ -67,7 +67,7 @@ queues:
 
 gates_catalog:
   snapshot_terms: Save Terms/ToS + license page HTML/PDF/TXT + retrieval timestamp.
-  resolve_license_spdx: Future work: Normalize license to SPDX via license_map.yaml rules; store evidence.
+  resolve_license_spdx: "Future work: Normalize license to SPDX via license_map.yaml rules; store evidence."
   restriction_phrase_scan: Scan terms/content for restriction phrases (no-LLM/no-TDM/etc.).
   emit_training_manifest: Future work: Manifest of included files/records + checksums + license evidence.
   emit_attribution_bundle: Future work: Generate ATTRIBUTION.md + CITATIONS.bib for included sources.
