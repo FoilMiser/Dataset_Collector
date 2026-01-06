@@ -3,4 +3,5 @@ jupyterlab
 ipykernel
 pytest
 pytest-cov
+pytest_httpserver
 ruff
