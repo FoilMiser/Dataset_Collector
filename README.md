@@ -241,10 +241,10 @@ To point at a custom pipeline map location:
 python -m tools.preflight --pipeline-map tools/pipeline_map.sample.yaml
 ```
 
-To suppress warnings for disabled targets:
+To emit warnings for disabled targets:
 
 ```bash
-python -m tools.preflight --quiet
+python -m tools.preflight --warn-disabled
 ```
 
 For local runs, copy `tools/pipeline_map.sample.yaml` to something like `tools/pipeline_map.local.yaml`, set `destination_root` to your dataset folder, and pass it via `--pipeline-map` (or use `--dest-root` when running `tools/build_natural_corpus.py`). This keeps user-specific paths out of version control.

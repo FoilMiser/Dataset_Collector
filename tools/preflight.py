@@ -46,7 +46,7 @@ def run_preflight(
     pipeline_map_path: Path,
     strict: bool = False,
     pipelines: list[str] | None = None,
-    quiet: bool = False,
+    warn_disabled: bool = False,
 ) -> int:
     pipeline_map = _load_yaml(pipeline_map_path, "pipeline_map")
     pipelines_cfg = pipeline_map.get("pipelines", {}) or {}
@@ -110,7 +110,7 @@ def run_preflight(
                     errors.append(
                         f"{pipeline_name}:{target_id} enabled with missing/none download.strategy"
                     )
-                elif not quiet:
+                elif warn_disabled:
                     warnings.append(
                         f"{pipeline_name}:{target_id} disabled with missing/none download.strategy"
                     )
@@ -120,7 +120,7 @@ def run_preflight(
                     errors.append(
                         f"{pipeline_name}:{target_id} uses unsupported strategy '{strategy}'"
                     )
-                elif not quiet:
+                elif warn_disabled:
                     warnings.append(
                         f"{pipeline_name}:{target_id} disabled uses unsupported strategy '{strategy}'"
                     )
@@ -149,7 +149,9 @@ def run_preflight(
         for tool in get_external_tools(strategy):
             if shutil.which(tool) is None:
                 enabled_targets = strategy_targets_enabled.get(strategy, [])
-                disabled_targets = [] if quiet else strategy_targets_disabled.get(strategy, [])
+                disabled_targets = (
+                    strategy_targets_disabled.get(strategy, []) if warn_disabled else []
+                )
                 targets = ", ".join(sorted(enabled_targets + disabled_targets))
                 hint = TOOL_INSTALL_HINTS.get(tool)
                 warnings.append(
@@ -158,7 +160,7 @@ def run_preflight(
                     + (f" {hint}" if hint else "")
                 )
 
-    if not quiet:
+    if warn_disabled:
         disabled_only_strategies = strategies_in_use_disabled - strategies_in_use_enabled
         for strategy in sorted(disabled_only_strategies):
             for tool in get_external_tools(strategy):
@@ -176,7 +178,7 @@ def run_preflight(
     )
     for strategy in sorted(registry_strategies):
         targets = list(registry_misses_enabled.get(strategy, []))
-        if not quiet:
+        if warn_disabled:
             targets.extend(registry_misses_disabled.get(strategy, []))
         if not targets:
             continue
@@ -219,10 +221,16 @@ def main(argv: Iterable[str] | None = None) -> int:
         help="Specific pipelines to check (default: all)",
     )
     ap.add_argument("--strict", action="store_true", help="Treat warnings as failures")
-    ap.add_argument(
+    warn_group = ap.add_mutually_exclusive_group()
+    warn_group.add_argument(
+        "--warn-disabled",
+        action="store_true",
+        help="Emit warnings for disabled targets",
+    )
+    warn_group.add_argument(
         "--quiet",
         action="store_true",
-        help="Suppress warnings for disabled targets",
+        help="Deprecated alias for suppressing warnings for disabled targets",
     )
     args = ap.parse_args(argv)
 
@@ -237,7 +245,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         pipeline_map_path=pipeline_map_path,
         strict=args.strict,
         pipelines=args.pipelines,
-        quiet=args.quiet,
+        warn_disabled=args.warn_disabled,
     )
 
 
