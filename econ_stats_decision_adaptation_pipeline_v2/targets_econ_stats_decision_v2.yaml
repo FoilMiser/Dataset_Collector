@@ -66,15 +66,15 @@ queues:
         enabled: true
 
 gates_catalog:
-  snapshot_terms: Save Terms/ToS + license page HTML/PDF/TXT + retrieval timestamp.
+  snapshot_terms: "Save Terms/ToS + license page HTML/PDF/TXT + retrieval timestamp."
   resolve_license_spdx: "Future work: Normalize license to SPDX via license_map.yaml rules; store evidence."
-  restriction_phrase_scan: Scan terms/content for restriction phrases (no-LLM/no-TDM/etc.).
-  emit_training_manifest: Future work: Manifest of included files/records + checksums + license evidence.
-  emit_attribution_bundle: Future work: Generate ATTRIBUTION.md + CITATIONS.bib for included sources.
-  manual_legal_review: Human review required before training.
-  segregate_copyleft_pool: Force output into copyleft pool and keep isolated.
-  near_duplicate_detection: Run MinHash/LSH deduplication pass.
-  split_aware_partition: Partition data respecting split_group_id for leak prevention.
+  restriction_phrase_scan: "Scan terms/content for restriction phrases (no-LLM/no-TDM/etc.)."
+  emit_training_manifest: "Future work: Manifest of included files/records + checksums + license evidence."
+  emit_attribution_bundle: "Future work: Generate ATTRIBUTION.md + CITATIONS.bib for included sources."
+  manual_legal_review: "Human review required before training."
+  segregate_copyleft_pool: "Force output into copyleft pool and keep isolated."
+  near_duplicate_detection: "Run MinHash/LSH deduplication pass."
+  split_aware_partition: "Partition data respecting split_group_id for leak prevention."
 
 resolvers:
   http:

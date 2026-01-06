@@ -60,33 +60,33 @@ queues:
       effective_bucket: RED
       enabled: true
 gates_catalog:
-  snapshot_terms: Save Terms/ToS + license page HTML/PDF/TXT + retrieval timestamp.
+  snapshot_terms: "Save Terms/ToS + license page HTML/PDF/TXT + retrieval timestamp."
   resolve_license_spdx: "Future work: Normalize license to SPDX via license_map.yaml rules; store evidence."
-  restriction_phrase_scan: Scan terms/content for restriction phrases (no-LLM/no-TDM/etc.).
-  record_level_filter: Require per-record license metadata; keep only allowlist.
-  domain_filter_math_stackexchange: Keep StackExchange rows limited to Math.SE/MathOverflow/CrossValidated.
-  domain_filter_arxiv_math: Keep arXiv records where category starts with math.*.
-  domain_filter_math_textbooks: Keep OER/open textbook rows with math subjects and
-    visible formulas.
-  extract_text_chunks: Extract text into JSONL chunks using globals.text_processing_defaults
-    unless overridden.
-  extract_latex_aware_chunks: Preserve LaTeX blocks and math symbols; keep page ranges
-    and equation density.
-  formal_chunk_by_theorem: Chunk formal libraries by theorem/definition with optional
-    proof text.
-  formal_chunk_by_lemma: Chunk formal libraries by lemma/theorem boundaries.
-  formal_chunk_by_module: Chunk formal libraries by module/file with itemized statements.
-  formal_chunk_by_entry: Chunk Isabelle AFP entries as standalone units with license
-    metadata.
-  code_and_docs_chunking: Chunk code and docs together for math software (e.g., CAS
-    libraries).
-  emit_training_manifest: Future work: Manifest of included files/records + checksums + license
-    evidence.
-  emit_attribution_bundle: Future work: Generate ATTRIBUTION.md + CITATIONS.bib for included sources.
-  manual_legal_review: Human review required before training.
-  segregate_copyleft_pool: Force output into copyleft pool and keep isolated.
-  near_duplicate_detection: Run MinHash/LSH deduplication pass.
-  split_aware_partition: Partition data respecting split_group_id for leak prevention.
+  restriction_phrase_scan: "Scan terms/content for restriction phrases (no-LLM/no-TDM/etc.)."
+  record_level_filter: "Require per-record license metadata; keep only allowlist."
+  domain_filter_math_stackexchange: "Keep StackExchange rows limited to Math.SE/MathOverflow/CrossValidated."
+  domain_filter_arxiv_math: "Keep arXiv records where category starts with math.*."
+  domain_filter_math_textbooks: >-
+    Keep OER/open textbook rows with math subjects and visible formulas.
+  extract_text_chunks: >-
+    Extract text into JSONL chunks using globals.text_processing_defaults unless overridden.
+  extract_latex_aware_chunks: >-
+    Preserve LaTeX blocks and math symbols; keep page ranges and equation density.
+  formal_chunk_by_theorem: >-
+    Chunk formal libraries by theorem/definition with optional proof text.
+  formal_chunk_by_lemma: "Chunk formal libraries by lemma/theorem boundaries."
+  formal_chunk_by_module: "Chunk formal libraries by module/file with itemized statements."
+  formal_chunk_by_entry: >-
+    Chunk Isabelle AFP entries as standalone units with license metadata.
+  code_and_docs_chunking: >-
+    Chunk code and docs together for math software (e.g., CAS libraries).
+  emit_training_manifest: >-
+    Future work: Manifest of included files/records + checksums + license evidence.
+  emit_attribution_bundle: "Future work: Generate ATTRIBUTION.md + CITATIONS.bib for included sources."
+  manual_legal_review: "Human review required before training."
+  segregate_copyleft_pool: "Force output into copyleft pool and keep isolated."
+  near_duplicate_detection: "Run MinHash/LSH deduplication pass."
+  split_aware_partition: "Partition data respecting split_group_id for leak prevention."
 resolvers:
   github:
     mode: release

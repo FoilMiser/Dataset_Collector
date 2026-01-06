@@ -75,16 +75,16 @@ queues:
         effective_bucket: RED
         enabled: true
 gates_catalog:
-  snapshot_terms: Save Terms/ToS + license page HTML/PDF/TXT + retrieval timestamp.
+  snapshot_terms: "Save Terms/ToS + license page HTML/PDF/TXT + retrieval timestamp."
   resolve_license_spdx: "Future work: Normalize license to SPDX via license_map.yaml rules; store evidence."
-  restriction_phrase_scan: Scan terms/content for restriction phrases (no-LLM/no-TDM/etc.).
-  record_level_filter: Require per-record license metadata; keep only allowlist.
-  pii_redaction: Remove emails/phones/addresses; coarsen location and redact named entities.
-  privacy_screen: Drop records with precise coordinates or personal medical details.
-  emit_training_manifest: Future work: Manifest of included files/records + checksums + license evidence.
-  emit_attribution_bundle: Future work: Generate ATTRIBUTION.md + CITATIONS.bib for included sources.
-  manual_legal_review: Human review required before training.
-  segregate_copyleft_pool: Force output into copyleft pool and keep isolated.
+  restriction_phrase_scan: "Scan terms/content for restriction phrases (no-LLM/no-TDM/etc.)."
+  record_level_filter: "Require per-record license metadata; keep only allowlist."
+  pii_redaction: "Remove emails/phones/addresses; coarsen location and redact named entities."
+  privacy_screen: "Drop records with precise coordinates or personal medical details."
+  emit_training_manifest: "Future work: Manifest of included files/records + checksums + license evidence."
+  emit_attribution_bundle: "Future work: Generate ATTRIBUTION.md + CITATIONS.bib for included sources."
+  manual_legal_review: "Human review required before training."
+  segregate_copyleft_pool: "Force output into copyleft pool and keep isolated."
 resolvers:
   github:
     mode: release
