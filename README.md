@@ -227,10 +227,22 @@ Run the preflight checker to validate pipeline map entries, verify target YAML p
 python -m tools.preflight
 ```
 
+To run checks for specific pipelines:
+
+```bash
+python -m tools.preflight --pipelines chem_pipeline_v2 biology_pipeline_v2
+```
+
 To point at a custom pipeline map location:
 
 ```bash
 python -m tools.preflight --pipeline-map tools/pipeline_map.yaml
+```
+
+To suppress warnings for disabled targets:
+
+```bash
+python -m tools.preflight --quiet
 ```
 
 For local runs, copy `tools/pipeline_map.sample.yaml` to something like `tools/pipeline_map.local.yaml`, set `destination_root` to your dataset folder, and pass it via `--pipeline-map` (or use `--dest-root` when running `tools/build_natural_corpus.py`). This keeps user-specific paths out of version control.
