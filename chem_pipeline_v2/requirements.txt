@@ -1,10 +1,5 @@
 # Chemistry Corpus Pipeline v2 - Requirements
-# Core dependencies
-pyyaml>=6.0
-requests>=2.32.2,<2.33
-datasets>=2.20.0,<2.21
-pyarrow>=15.0.0
-jsonschema>=4.22.0
+-r ../requirements.constraints.txt
 
 # Optional: for accurate token counting in catalog_builder
 # tiktoken>=0.5.0
