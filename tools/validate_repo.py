@@ -32,7 +32,7 @@ from tools.strategy_registry import (
     iter_registry_strategies,
 )
 
-EXPECTED_TARGETS_SCHEMA = "0.8"
+EXPECTED_TARGETS_SCHEMA = "0.9"
 
 
 def normalize_download(download: dict[str, Any]) -> dict[str, Any]:

@@ -41,7 +41,7 @@ class PipelineTestConfig:
             companion_cfg.update(companion_override)
 
         cfg = {
-            "schema_version": "0.8",
+            "schema_version": "0.9",
             "globals": globals_cfg,
             "companion_files": companion_cfg,
             "targets": targets,

@@ -26,7 +26,7 @@ def test_yellow_screen_hf_dataset(tmp_path: Path) -> None:
     dataset.save_to_disk(dataset_dir)
 
     targets_cfg = {
-        "schema_version": "0.8",
+        "schema_version": "0.9",
         "globals": {
             "raw_root": str(raw_root),
             "screened_yellow_root": str(screened_root),
@@ -98,7 +98,7 @@ def test_yellow_screen_target_text_candidates_override(tmp_path: Path) -> None:
     dataset.save_to_disk(dataset_dir)
 
     targets_cfg = {
-        "schema_version": "0.8",
+        "schema_version": "0.9",
         "globals": {
             "raw_root": str(raw_root),
             "screened_yellow_root": str(screened_root),

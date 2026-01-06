@@ -4,7 +4,7 @@
   "type": "object",
   "required": ["schema_version", "schemas"],
   "properties": {
-    "schema_version": { "type": "string" },
+    "schema_version": { "type": "string", "enum": ["0.9"] },
     "updated_utc": { "type": "string" },
     "schemas": {
       "type": "object",
