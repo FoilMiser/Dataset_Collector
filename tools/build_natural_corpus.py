@@ -4,6 +4,7 @@ import argparse
 import subprocess
 import sys
 from collections.abc import Iterable, Sequence
+from datetime import datetime
 from pathlib import Path, PurePath, PureWindowsPath
 
 if __package__ in (None, ""):
@@ -231,7 +232,12 @@ def main(argv: Iterable[str] | None = None) -> int:
         catalogs_root = dataset_root_fs / "_catalogs"
 
         for stage in stages:
-            log_path = dataset_root_fs / "_logs" / f"orchestrator_{stage}.log"
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            log_path = (
+                dataset_root_fs
+                / "_logs"
+                / f"orchestrator_{pipeline_name}_{stage}_{timestamp}.log"
+            )
             _run_stage(
                 pipeline_dir=pipeline_dir,
                 stage=stage,
