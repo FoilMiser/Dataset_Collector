@@ -74,7 +74,7 @@ def test_preflight_reports_missing_pipeline_entries(tmp_path, capsys) -> None:
     assert "Pipeline map missing entries for: missing_pipeline" in output
 
 
-def test_preflight_quiet_suppresses_disabled_warnings(tmp_path, capsys) -> None:
+def test_preflight_warn_disabled_emits_disabled_warnings(tmp_path, capsys) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     _write_pipeline(repo_root, "quiet_pipeline", [{"id": "off", "enabled": False}])
@@ -84,19 +84,21 @@ def test_preflight_quiet_suppresses_disabled_warnings(tmp_path, capsys) -> None:
         {"quiet_pipeline": {"targets_yaml": "targets.yaml"}},
     )
 
-    result = run_preflight(repo_root=repo_root, pipeline_map_path=pipeline_map_path, quiet=False)
-
-    output = capsys.readouterr().out
-    assert result == 0
-    assert "Preflight warnings" in output
-    assert "disabled with missing/none download.strategy" in output
-
-    result = run_preflight(repo_root=repo_root, pipeline_map_path=pipeline_map_path, quiet=True)
+    result = run_preflight(repo_root=repo_root, pipeline_map_path=pipeline_map_path)
 
     output = capsys.readouterr().out
     assert result == 0
     assert "Preflight warnings" not in output
     assert "disabled with missing/none download.strategy" not in output
+
+    result = run_preflight(
+        repo_root=repo_root, pipeline_map_path=pipeline_map_path, warn_disabled=True
+    )
+
+    output = capsys.readouterr().out
+    assert result == 0
+    assert "Preflight warnings" in output
+    assert "disabled with missing/none download.strategy" in output
 
 
 def test_preflight_main_defaults_to_sample_pipeline_map(monkeypatch, tmp_path) -> None:
