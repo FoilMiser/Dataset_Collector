@@ -20,6 +20,11 @@ select = ["E", "F", "I", "B", "UP"]
 ignore = ["E501"]
 
 [project]
+name = "dataset-collector"
+description = "Dataset collection pipelines and tooling."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
 dynamic = ["version"]
 
 [project.scripts]
@@ -28,3 +33,7 @@ dc-catalog = "collector_core.catalog_builder:main"
 
 [tool.setuptools.dynamic]
 version = { attr = "collector_core.__version__.__version__" }
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
