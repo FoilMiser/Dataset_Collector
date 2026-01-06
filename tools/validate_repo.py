@@ -60,10 +60,8 @@ def iter_targets_files(root: Path) -> Iterable[Path]:
         yield from sorted(pipeline_dir.glob("targets_*.yaml"))
 
 
-def iter_pipeline_drivers(root: Path) -> Iterable[Path]:
-    for pipeline_dir in sorted(root.glob("*_pipeline_v2")):
-        if not pipeline_dir.is_dir():
-            continue
+def iter_pipeline_drivers(pipeline_dirs: Iterable[Path]) -> Iterable[Path]:
+    for pipeline_dir in pipeline_dirs:
         driver = pipeline_dir / "pipeline_driver.py"
         if driver.exists():
             yield driver
@@ -98,15 +96,89 @@ def iter_collector_core_versioned_modules(root: Path) -> Iterable[Path]:
         yield pipeline_version
 
 
-def validate_pipeline_driver_versions(root: Path) -> list[dict[str, Any]]:
+def _load_pipeline_map(root: Path) -> tuple[Path, dict[str, Any]] | None:
+    pipeline_map_path = root / "tools" / "pipeline_map.yaml"
+    if not pipeline_map_path.exists():
+        return None
+    pipeline_map = read_yaml(pipeline_map_path, schema_name="pipeline_map") or {}
+    return pipeline_map_path, pipeline_map
+
+
+def validate_pipeline_layout(root: Path) -> tuple[list[dict[str, Any]], list[Path]]:
     errors: list[dict[str, Any]] = []
-    drivers = list(iter_pipeline_drivers(root))
-    if len(drivers) != 18:
-        errors.append({
-            "type": "unexpected_pipeline_driver_count",
-            "expected": 18,
-            "found": len(drivers),
-        })
+    pipeline_dirs: list[Path] = []
+
+    pipeline_map_entry = _load_pipeline_map(root)
+    if pipeline_map_entry is not None:
+        pipeline_map_path, pipeline_map = pipeline_map_entry
+        pipelines_cfg = pipeline_map.get("pipelines", {}) or {}
+        for pipeline_name, pipeline_entry in pipelines_cfg.items():
+            pipeline_dir = root / pipeline_name
+            if not pipeline_dir.is_dir():
+                errors.append({
+                    "type": "missing_pipeline_directory",
+                    "pipeline": pipeline_name,
+                    "path": str(pipeline_dir),
+                    "pipeline_map": str(pipeline_map_path),
+                })
+                continue
+            pipeline_dirs.append(pipeline_dir)
+            required_files = [
+                pipeline_dir / "pipeline_driver.py",
+                pipeline_dir / "acquire_worker.py",
+            ]
+            for required_path in required_files:
+                if not required_path.exists():
+                    errors.append({
+                        "type": "missing_pipeline_file",
+                        "pipeline": pipeline_name,
+                        "path": str(required_path),
+                    })
+            targets_yaml = pipeline_entry.get("targets_yaml")
+            if not targets_yaml:
+                errors.append({
+                    "type": "missing_pipeline_targets_yaml",
+                    "pipeline": pipeline_name,
+                    "pipeline_map": str(pipeline_map_path),
+                })
+            else:
+                targets_path = pipeline_dir / targets_yaml
+                if not targets_path.exists():
+                    errors.append({
+                        "type": "missing_pipeline_targets_file",
+                        "pipeline": pipeline_name,
+                        "path": str(targets_path),
+                    })
+    else:
+        for pipeline_dir in sorted(root.glob("*_pipeline_v2")):
+            if not pipeline_dir.is_dir():
+                continue
+            pipeline_dirs.append(pipeline_dir)
+            required_files = [
+                pipeline_dir / "pipeline_driver.py",
+                pipeline_dir / "acquire_worker.py",
+            ]
+            for required_path in required_files:
+                if not required_path.exists():
+                    errors.append({
+                        "type": "missing_pipeline_file",
+                        "pipeline": pipeline_dir.name,
+                        "path": str(required_path),
+                    })
+            targets_files = list(pipeline_dir.glob("targets_*.yaml"))
+            if not targets_files:
+                errors.append({
+                    "type": "missing_pipeline_targets_file",
+                    "pipeline": pipeline_dir.name,
+                    "path": str(pipeline_dir),
+                })
+
+    return errors, pipeline_dirs
+
+
+def validate_pipeline_driver_versions(pipeline_dirs: Iterable[Path]) -> list[dict[str, Any]]:
+    errors: list[dict[str, Any]] = []
+    drivers = list(iter_pipeline_drivers(pipeline_dirs))
 
     version_assignment = re.compile(r"^\s*VERSION\s*=", re.M)
     for driver in drivers:
@@ -161,6 +233,7 @@ def load_profiles(license_map_path: Path) -> dict[str, Any]:
         return {}
     data = read_yaml(license_map_path, schema_name="license_map")
     return data.get("profiles", {}) or data.get("license_profiles", {}) or {}
+
 
 def _parse_updated_utc(value: str) -> datetime | None:
     try:
@@ -348,7 +421,9 @@ def main() -> int:
         report["errors"].extend(errors)
         report["warnings"].extend(warnings)
 
-    report["errors"].extend(validate_pipeline_driver_versions(root))
+    layout_errors, pipeline_dirs = validate_pipeline_layout(root)
+    report["errors"].extend(layout_errors)
+    report["errors"].extend(validate_pipeline_driver_versions(pipeline_dirs))
     report["errors"].extend(validate_versioned_modules(root))
 
     output_path = None
