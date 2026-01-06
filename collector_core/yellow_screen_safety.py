@@ -28,11 +28,11 @@ from datasets import DatasetDict, load_from_disk
 
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.config_validator import read_yaml
-from collector_core.yellow_screen_common import resolve_dataset_root
-
-PITCH_SAMPLE_LIMIT = 25
-PITCH_TEXT_LIMIT = 400
-
+from collector_core.yellow_screen_common import (
+    PitchConfig,
+    resolve_dataset_root,
+    resolve_pitch_config,
+)
 
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 PHONE_RE = re.compile(r"\b(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}\b")
@@ -271,6 +271,7 @@ def contains_deny(text: str, phrases: list[str]) -> bool:
 def record_pitch(
     roots: Roots,
     pitch_counts: dict[tuple[str, str], int],
+    pitch_cfg: PitchConfig,
     target_id: str,
     reason: str,
     raw: dict[str, Any] | None = None,
@@ -289,7 +290,7 @@ def record_pitch(
     append_jsonl(roots.ledger_root / "yellow_pitched.jsonl", [row])
 
     key = (target_id, reason)
-    if pitch_counts.get(key, 0) >= PITCH_SAMPLE_LIMIT:
+    if pitch_counts.get(key, 0) >= pitch_cfg.sample_limit:
         return
     sample = {"target_id": target_id, "reason": reason}
     if sample_id:
@@ -300,7 +301,7 @@ def record_pitch(
         if source_url:
             sample["source_url"] = source_url
     if text:
-        sample["text"] = text[:PITCH_TEXT_LIMIT]
+        sample["text"] = text[:pitch_cfg.text_limit]
     if sample_extra:
         sample.update(sample_extra)
     append_jsonl(roots.pitches_root / "yellow_pitch.jsonl", [sample])
@@ -425,6 +426,7 @@ def process_target(
     roots: Roots,
     queue_row: dict[str, Any],
     execute: bool,
+    pitch_cfg: PitchConfig,
 ) -> dict[str, Any]:
     target_id = queue_row["id"]
     target_cfg = next((t for t in cfg.get("targets", []) if t.get("id") == target_id), {})
@@ -450,6 +452,7 @@ def process_target(
                 record_pitch(
                     roots,
                     pitch_counts,
+                    pitch_cfg,
                     target_id,
                     "yellow_signoff_rejected",
                     sample_extra={"details": f"manifest_dir={manifest_dir}"},
@@ -472,6 +475,7 @@ def process_target(
                 record_pitch(
                     roots,
                     pitch_counts,
+                    pitch_cfg,
                     target_id,
                     "yellow_signoff_missing",
                     sample_extra={"details": f"manifest_dir={manifest_dir}"},
@@ -503,6 +507,7 @@ def process_target(
                 record_pitch(
                     roots,
                     pitch_counts,
+                    pitch_cfg,
                     target_id,
                     "unsupported_format",
                     sample_extra={"details": f"no jsonl found in {raw_dir}"},
@@ -520,28 +525,28 @@ def process_target(
             if not text:
                 pitched += 1
                 if execute:
-                    record_pitch(roots, pitch_counts, target_id, "no_text", raw=raw)
+                    record_pitch(roots, pitch_counts, pitch_cfg, target_id, "no_text", raw=raw)
                 return
             
             sensitive_reason = has_sensitive_markers(text)
             if sensitive_reason:
                 pitched += 1
                 if execute:
-                    record_pitch(roots, pitch_counts, target_id, sensitive_reason, raw=raw, text=text)
+                    record_pitch(roots, pitch_counts, pitch_cfg, target_id, sensitive_reason, raw=raw, text=text)
                 return
             
             redacted_text, redactions = redact_text(text)
             if len(redacted_text) < screen_cfg.min_chars or len(redacted_text) > screen_cfg.max_chars:
                 pitched += 1
                 if execute:
-                    record_pitch(roots, pitch_counts, target_id, "length_bounds", raw=raw, text=redacted_text)
+                    record_pitch(roots, pitch_counts, pitch_cfg, target_id, "length_bounds", raw=raw, text=redacted_text)
                 return
             
             lic = find_license(raw, screen_cfg.license_fields)
             if screen_cfg.require_record_license and not lic:
                 pitched += 1
                 if execute:
-                    record_pitch(roots, pitch_counts, target_id, "missing_record_license", raw=raw)
+                    record_pitch(roots, pitch_counts, pitch_cfg, target_id, "missing_record_license", raw=raw)
                 return
             if lic and screen_cfg.allow_spdx and lic not in screen_cfg.allow_spdx:
                 pitched += 1
@@ -549,6 +554,7 @@ def process_target(
                     record_pitch(
                         roots,
                         pitch_counts,
+                        pitch_cfg,
                         target_id,
                         "license_not_allowlisted",
                         raw=raw,
@@ -559,7 +565,7 @@ def process_target(
             if contains_deny(redacted_text, screen_cfg.deny_phrases):
                 pitched += 1
                 if execute:
-                    record_pitch(roots, pitch_counts, target_id, "deny_phrase", raw=raw, text=redacted_text)
+                    record_pitch(roots, pitch_counts, pitch_cfg, target_id, "deny_phrase", raw=raw, text=redacted_text)
                 return
             
             license_profile = str(raw.get("license_profile") or queue_row.get("license_profile") or pool or "quarantine")
@@ -574,6 +580,7 @@ def process_target(
                     record_pitch(
                         roots,
                         pitch_counts,
+                        pitch_cfg,
                         target_id,
                         "schema_missing",
                         raw=record,
@@ -613,6 +620,7 @@ def process_target(
                     record_pitch(
                         roots,
                         pitch_counts,
+                        pitch_cfg,
                         target_id,
                         "hf_load_failed",
                         extra={{"path": str(ds_path), "error": str(exc)}},
@@ -649,11 +657,14 @@ def main() -> None:
     ap.add_argument("--queue", required=True, help="YELLOW queue JSONL")
     ap.add_argument("--execute", action="store_true", help="Write outputs (default: dry-run)")
     ap.add_argument("--dataset-root", default=None, help="Override dataset root (raw/screened/_ledger/_pitches/_manifests)")
+    ap.add_argument("--pitch-sample-limit", type=int, default=None, help="Max pitch samples per reason (override)")
+    ap.add_argument("--pitch-text-limit", type=int, default=None, help="Max chars stored in pitch samples (override)")
     args = ap.parse_args()
 
     targets_path = Path(args.targets).expanduser().resolve()
     cfg = load_targets_cfg(targets_path)
     schemas = load_field_schemas(cfg, targets_path)
+    pitch_cfg = resolve_pitch_config(cfg, args.pitch_sample_limit, args.pitch_text_limit)
     roots = resolve_roots(cfg, dataset_root=resolve_dataset_root(args.dataset_root))
     ensure_dir(roots.screened_root)
     ensure_dir(roots.ledger_root)
@@ -671,7 +682,7 @@ def main() -> None:
     }
 
     for row in queue_rows:
-        res = process_target(cfg, schemas, roots, row, args.execute)
+        res = process_target(cfg, schemas, roots, row, args.execute, pitch_cfg)
         summary["results"].append(res)
 
     write_json(roots.ledger_root / "yellow_screen_summary.json", summary)

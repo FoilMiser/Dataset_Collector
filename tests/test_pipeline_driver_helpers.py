@@ -27,7 +27,7 @@ def test_resolve_retry_config_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     args = SimpleNamespace(retry_max=None, retry_backoff=None, max_retries=None)
     monkeypatch.setenv("PIPELINE_RETRY_MAX", "5")
     monkeypatch.setenv("PIPELINE_RETRY_BACKOFF", "4.5")
-    retry_max, retry_backoff = resolve_retry_config(args)
+    retry_max, retry_backoff = resolve_retry_config(args, {})
     assert retry_max == 5
     assert retry_backoff == 4.5
 
