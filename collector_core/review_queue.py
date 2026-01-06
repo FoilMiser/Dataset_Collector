@@ -40,6 +40,7 @@ from typing import Any
 from collector_core.__version__ import __version__ as TOOL_VERSION
 from collector_core.config_validator import read_yaml
 from collector_core.logging_config import add_logging_args, configure_logging
+
 logger = logging.getLogger(__name__)
 
 

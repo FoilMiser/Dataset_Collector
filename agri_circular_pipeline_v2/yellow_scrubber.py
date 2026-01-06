@@ -29,9 +29,9 @@ from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
-from collector_core.__version__ import __version__ as TOOL_VERSION, __schema_version__ as SCHEMA_VERSION
 
-
+from collector_core.__version__ import __schema_version__ as SCHEMA_VERSION
+from collector_core.__version__ import __version__ as TOOL_VERSION
 from collector_core.config_validator import read_yaml as read_yaml_config
 
 
