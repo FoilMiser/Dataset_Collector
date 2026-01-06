@@ -40,12 +40,13 @@ import time
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
+from collector_core.__version__ import __version__ as TOOL_VERSION, __schema_version__ as SCHEMA_VERSION
 
 try:
     import requests
 except ImportError:
     requests = None
-from collector_core.__version__ import __schema_version__ as VERSION
+
 from collector_core.config_validator import read_yaml as read_yaml_config
 
 
@@ -359,7 +360,8 @@ def extract_pubchem_computed_only(
 
     manifest = {
         "task": "pubchem_computed_only_extraction",
-        "pipeline_version": VERSION,
+        "tool_version": TOOL_VERSION,
+        "schema_version": SCHEMA_VERSION,
         "input_dir": str(quarantine_dir),
         "output_dir": str(permissive_out_dir),
         "include_fields": include_fields,
@@ -434,7 +436,7 @@ def fetch_text_with_fallback(urls: list[str], timeout_s: int = 30) -> tuple[str,
     for url in urls:
         try:
             r = requests.get(url, timeout=timeout_s, 
-                           headers={"User-Agent": f"regcomp-corpus-scrubber/{VERSION}"})
+                           headers={"User-Agent": f"regcomp-corpus-scrubber/{TOOL_VERSION}"})
             r.raise_for_status()
             return r.text, url
         except Exception:
@@ -447,7 +449,7 @@ def download_file(url: str, out_path: Path, timeout_s: int = 60) -> dict[str, An
     ensure_dir(out_path.parent)
     
     with requests.get(url, stream=True, timeout=timeout_s,
-                     headers={"User-Agent": f"regcomp-corpus-scrubber/{VERSION}"}) as r:
+                     headers={"User-Agent": f"regcomp-corpus-scrubber/{TOOL_VERSION}"}) as r:
         r.raise_for_status()
         tmp = out_path.with_suffix(out_path.suffix + ".part")
         with tmp.open("wb") as f:
@@ -492,7 +494,8 @@ def plan_pmc_allowlist(
 
     plan = {
         "task": "pmc_allowlist_plan",
-        "pipeline_version": VERSION,
+        "tool_version": TOOL_VERSION,
+        "schema_version": SCHEMA_VERSION,
         "oa_list_urls_tried": PMC_OA_LIST_URLS,
         "picked_list_url": None,
         "downloaded_list_path": None,
@@ -620,7 +623,7 @@ def plan_pmc_allowlist(
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description=f"Yellow Scrubber v{VERSION}")
+    ap = argparse.ArgumentParser(description=f"Yellow Scrubber v{TOOL_VERSION} (schema {SCHEMA_VERSION})")
     ap.add_argument("--targets", required=True, help="targets_regcomp.yaml (v0.8)")
     ap.add_argument("--license-map", default=None)
     ap.add_argument("--field-schemas", default=None, help="field_schemas.yaml")
@@ -649,7 +652,8 @@ def main() -> None:
 
     run_report: dict[str, Any] = {
         "run_at_utc": utc_now(),
-        "pipeline_version": VERSION,
+        "tool_version": TOOL_VERSION,
+        "schema_version": SCHEMA_VERSION,
         "targets_yaml": str(targets_path),
         "pubchem_ran": False,
         "pmc_ran": False,
@@ -717,7 +721,7 @@ def main() -> None:
     out_path = logs_dir / f"yellow_scrubber_run_{int(time.time())}.json"
     write_json(out_path, run_report)
     
-    print(f"\n{'='*50}\nYellow Scrubber v{VERSION}\n{'='*50}")
+    print(f"\n{'='*50}\nYellow Scrubber v{TOOL_VERSION} (schema {SCHEMA_VERSION})\n{'='*50}")
     print(f"PubChem: {'ran' if run_report['pubchem_ran'] else 'skipped'}")
     print(f"PMC: {'ran' if run_report['pmc_ran'] else 'skipped'}")
     print(f"Report: {out_path}\n{'='*50}\n")

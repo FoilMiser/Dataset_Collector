@@ -34,10 +34,9 @@ import time
 from pathlib import Path
 from typing import Any
 
+from collector_core.__version__ import __version__ as TOOL_VERSION
 from collector_core.config_validator import read_yaml
 from collector_core.logging_config import add_logging_args, configure_logging
-
-VERSION = "0.9"
 logger = logging.getLogger(__name__)
 
 
@@ -147,7 +146,7 @@ def cmd_list(args: argparse.Namespace) -> int:
         return 0
 
     logger.info("%s", "=" * 78)
-    logger.info("YELLOW REVIEW QUEUE (pending) — v%s — %s", VERSION, utc_now())
+    logger.info("YELLOW REVIEW QUEUE (pending) — v%s — %s", TOOL_VERSION, utc_now())
     logger.info("%s", "=" * 78)
     for r, status in pending[: args.limit]:
         logger.info("- %s  [%s]", r.get("id"), status)
@@ -192,7 +191,7 @@ def write_signoff(
         "promote_to": promote_to,
         "reviewed_at_utc": utc_now(),
         "signoff_schema_version": "0.2",
-        "tool_version": VERSION,
+        "tool_version": TOOL_VERSION,
     }
     # v0.9: Extended fields (optional)
     if reviewer_contact:

@@ -30,6 +30,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from collector_core.__version__ import __version__ as TOOL_VERSION
 from collector_core.config_validator import read_yaml
 from collector_core.dependencies import _try_import, requires
 from collector_core.exceptions import (
@@ -42,7 +43,6 @@ from collector_core.logging_config import add_logging_args, configure_logging
 requests = _try_import("requests")
 FTP = _try_import("ftplib", "FTP")
 
-VERSION = "0.9"
 logger = logging.getLogger(__name__)
 
 
@@ -141,7 +141,7 @@ def chunk_text(text: str, max_chars: int, min_chars: int) -> list[str]:
     return [c for c in chunks if len(c) >= min_chars]
 
 
-def http_get_bytes(url: str, timeout_s: int = 120, user_agent_version: str = VERSION) -> tuple[bytes, dict]:
+def http_get_bytes(url: str, timeout_s: int = 120, user_agent_version: str = TOOL_VERSION) -> tuple[bytes, dict]:
     missing = requires("requests", requests, install="pip install requests")
     if missing:
         raise DependencyMissingError(
@@ -184,7 +184,7 @@ def fetch_pmc_package(
     max_bytes: int,
     cache_dir: Path | None,
     *,
-    user_agent_version: str = VERSION,
+    user_agent_version: str = TOOL_VERSION,
 ) -> tuple[bytes | None, dict]:
     fr = safe_text(file_ref).strip()
     meta: dict[str, Any] = {"file_ref": fr}
@@ -419,7 +419,7 @@ def run_pmc_worker(
     pools_root_default: str,
     log_dir_default: str,
     output_subdir: str = "pmc_oa_fulltext_chunks",
-    version: str = VERSION,
+    version: str = TOOL_VERSION,
     args: list[str] | None = None,
     configure_parser: Callable[[argparse.ArgumentParser], None] | None = None,
     log_path_builder: Callable[[Path], Path] | None = None,
