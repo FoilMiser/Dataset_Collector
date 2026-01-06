@@ -47,10 +47,12 @@ python tools\build_natural_corpus.py --dest-root "E:\AI-Research\datasets\Natura
 
 ## Expected output folders
 
-Each pipeline produces a dataset root under the destination folder. Example locations:
+Each pipeline produces a dataset root under the destination folder. The dataset root name
+comes from the `dest_folder` value in your `pipeline_map` (for example,
+`tools/pipeline_map.sample.yaml`). Example locations:
 
-- Windows: `E:\AI-Research\datasets\Natural\math_pipeline_v2\`
-- macOS/Linux: `/data/Natural/math_pipeline_v2/`
+- Windows: `E:\AI-Research\datasets\Natural\math\`
+- macOS/Linux: `/data/Natural/math/`
 
 The canonical layout for each pipeline’s dataset root is documented in
 `docs/output_contract.md`. At a high level you will see:
@@ -89,8 +91,8 @@ your environment and configuration intact.
 Delete the entire per-pipeline dataset root under your destination folder. Example for the
 math pipeline:
 
-- Windows: `E:\AI-Research\datasets\Natural\math_pipeline_v2\`
-- macOS/Linux: `/data/Natural/math_pipeline_v2/`
+- Windows: `E:\AI-Research\datasets\Natural\math\`
+- macOS/Linux: `/data/Natural/math/`
 
 This removes raw downloads, queues, manifests, ledgers, logs, catalogs, and merged outputs.
 If you want a full clean-room rerun across all pipelines, delete each pipeline’s dataset
