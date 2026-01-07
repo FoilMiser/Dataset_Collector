@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import json
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -300,3 +301,50 @@ def test_strategy_error_paths(
 
     assert results[0]["status"] == "error"
     assert results[0]["error"] == error
+
+
+def test_run_acquire_worker_strict_exits_on_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    queue_path = tmp_path / "queue.jsonl"
+    queue_path.write_text(
+        json.dumps({"id": "bad-target", "download": {"strategy": "fail"}}) + "\n", encoding="utf-8"
+    )
+
+    raw_root = tmp_path / "raw"
+    manifests_root = tmp_path / "manifests"
+    logs_root = tmp_path / "logs"
+
+    def fail_handler(ctx: aw.AcquireContext, row: dict, out_dir: Path) -> list[dict[str, str]]:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "acquire_worker.py",
+            "--queue",
+            str(queue_path),
+            "--bucket",
+            "yellow",
+            "--raw-root",
+            str(raw_root),
+            "--manifests-root",
+            str(manifests_root),
+            "--logs-root",
+            str(logs_root),
+            "--execute",
+            "--strict",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as excinfo:
+        aw.run_acquire_worker(
+            defaults=aw.RootsDefaults(
+                raw_root=str(raw_root),
+                manifests_root=str(manifests_root),
+                logs_root=str(logs_root),
+            ),
+            targets_yaml_label="targets_kg_nav.yaml",
+            strategy_handlers={"fail": fail_handler},
+        )
+
+    assert excinfo.value.code == 1
