@@ -382,18 +382,20 @@ def handle_git(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
     if not ctx.mode.execute:
         return [{"status": "noop", "path": str(out_dir)}]
     if out_dir.exists() and any(out_dir.iterdir()) and not ctx.mode.overwrite:
+        git_dir = out_dir / ".git"
+        if not git_dir.exists():
+            return [{"status": "error", "error": "missing_git_repo", "path": str(out_dir)}]
         if revision:
-            git_dir = out_dir / ".git"
-            if not git_dir.exists():
-                return [{"status": "error", "error": "missing_git_repo", "path": str(out_dir)}]
             if tag:
                 run_cmd(["git", "-C", str(out_dir), "fetch", "--tags", "--force"])
+            else:
+                run_cmd(["git", "-C", str(out_dir), "fetch", "--all", "--prune"])
             run_cmd(["git", "-C", str(out_dir), "checkout", revision])
-            resolved = run_cmd(["git", "-C", str(out_dir), "rev-parse", "HEAD"]).strip()
-            return [
-                {"status": "ok", "path": str(out_dir), "cached": True, "git_revision": revision, "git_commit": resolved}
-            ]
-        return [{"status": "ok", "path": str(out_dir), "cached": True}]
+        resolved = run_cmd(["git", "-C", str(out_dir), "rev-parse", "HEAD"]).strip()
+        result = {"status": "ok", "path": str(out_dir), "cached": True, "git_commit": resolved}
+        if revision:
+            result["git_revision"] = revision
+        return [result]
     ensure_dir(out_dir)
     cmd = ["git", "clone"]
     if branch and not revision:
