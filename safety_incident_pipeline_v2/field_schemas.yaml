@@ -1,5 +1,5 @@
 # Field schemas for safety engineering & incident analysis
-schema_version: "0.1"
+schema_version: "0.9"
 schemas:
   incident_report_chunk_v1.0.0:
     description: Chunked text extracted from an incident report (PDF/HTML/etc.) with

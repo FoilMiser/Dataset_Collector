@@ -8,7 +8,7 @@
 #
 # The pipeline stores evidence snapshots so you can audit every decision.
 
-schema_version: "0.2"
+schema_version: "0.9"
 updated_utc: "2025-12-13"
 
 spdx:

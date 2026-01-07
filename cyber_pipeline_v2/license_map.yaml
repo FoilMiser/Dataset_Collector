@@ -11,7 +11,7 @@
 # - Explicit normalization for CVE Program Terms of Use (LicenseRef-CVE-TOU) -> conditional.
 # - Treat Sigma custom license and GPL telemetry datasets as conditional by default.
 
-schema_version: "0.3"
+schema_version: "0.9"
 updated_utc: "2025-12-30"
 
 spdx:
