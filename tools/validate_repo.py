@@ -336,6 +336,13 @@ def get_download_requirement_errors(download: dict[str, Any], strategy: str) -> 
     return get_strategy_requirement_errors(download, strategy)
 
 
+def _is_placeholder_strategy(strategy: str) -> bool:
+    normalized = " ".join((strategy or "").strip().lower().split())
+    if normalized in {"todo", "not implemented"}:
+        return True
+    return normalized in {"not_implemented", "not-implemented", "none"}
+
+
 def validate_targets_file(path: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     errors: list[dict[str, Any]] = []
     warnings: list[dict[str, Any]] = []
@@ -395,7 +402,31 @@ def validate_targets_file(path: Path) -> tuple[list[dict[str, Any]], list[dict[s
                 "message": "download.strategy is required for enabled targets",
             })
             continue
-        if get_strategy_spec(strategy) is None:
+        if _is_placeholder_strategy(strategy):
+            errors.append({
+                "type": "todo_download_strategy",
+                "targets_path": str(path),
+                "target_id": tid,
+                "strategy": strategy,
+                "message": f"Enabled target {tid} uses TODO/not implemented strategy '{strategy}'.",
+            })
+            continue
+        strategy_spec = get_strategy_spec(strategy)
+        if strategy_spec is not None:
+            status = str(strategy_spec.get("status", "supported") or "supported").strip().lower()
+            if status in {"todo", "not implemented", "not_implemented", "not-implemented", "placeholder"}:
+                errors.append({
+                    "type": "todo_download_strategy",
+                    "targets_path": str(path),
+                    "target_id": tid,
+                    "strategy": strategy,
+                    "message": (
+                        f"Enabled target {tid} uses TODO/not implemented strategy '{strategy}' "
+                        f"(status: {status})."
+                    ),
+                })
+                continue
+        if strategy_spec is None:
             errors.append({
                 "type": "unknown_download_strategy",
                 "targets_path": str(path),
