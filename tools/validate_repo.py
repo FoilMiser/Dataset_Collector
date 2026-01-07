@@ -254,18 +254,38 @@ def validate_versioned_modules(root: Path) -> list[dict[str, Any]]:
     return errors
 
 
+def resolve_companion_paths(targets_path: Path, value: Any, default: str) -> list[Path]:
+    raw = value if value not in (None, "") else default
+    if isinstance(raw, (list, tuple)):
+        entries = raw
+    else:
+        entries = [raw]
+    paths: list[Path] = []
+    for entry in entries:
+        if entry in (None, ""):
+            continue
+        path = Path(str(entry))
+        if not path.is_absolute():
+            path = targets_path.parent / path
+        paths.append(path)
+    return paths
+
+
 def load_profiles(
-    license_map_path: Path,
+    license_map_paths: list[Path],
     errors: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    if not license_map_path.exists():
-        return {}
-    try:
-        data = read_yaml(license_map_path, schema_name="license_map")
-    except READ_YAML_EXCEPTIONS as exc:
-        _append_read_error(errors, license_map_path, exc)
-        return {}
-    return data.get("profiles", {}) or data.get("license_profiles", {}) or {}
+    profiles: dict[str, Any] = {}
+    for license_map_path in license_map_paths:
+        if not license_map_path.exists():
+            continue
+        try:
+            data = read_yaml(license_map_path, schema_name="license_map")
+        except READ_YAML_EXCEPTIONS as exc:
+            _append_read_error(errors, license_map_path, exc)
+            continue
+        profiles.update(data.get("profiles", {}) or data.get("license_profiles", {}) or {})
+    return profiles
 
 
 def _parse_updated_utc(value: str) -> datetime | None:
@@ -336,24 +356,21 @@ def validate_targets_file(path: Path) -> tuple[list[dict[str, Any]], list[dict[s
         })
 
     companion = cfg.get("companion_files", {}) or {}
-    license_map_path = Path(companion.get("license_map", "license_map.yaml"))
-    if not license_map_path.is_absolute():
-        license_map_path = path.parent / license_map_path
-    if license_map_path.exists():
-        warnings.extend(_collect_updated_utc_warnings(license_map_path, "license_map", errors))
-    profiles = load_profiles(license_map_path, errors)
+    license_map_paths = resolve_companion_paths(path, companion.get("license_map"), "license_map.yaml")
+    for license_map_path in license_map_paths:
+        if license_map_path.exists():
+            warnings.extend(_collect_updated_utc_warnings(license_map_path, "license_map", errors))
+    profiles = load_profiles(license_map_paths, errors)
 
-    field_schemas_path = Path(companion.get("field_schemas", "field_schemas.yaml"))
-    if not field_schemas_path.is_absolute():
-        field_schemas_path = path.parent / field_schemas_path
-    if field_schemas_path.exists():
-        warnings.extend(_collect_updated_utc_warnings(field_schemas_path, "field_schemas", errors))
+    field_schemas_paths = resolve_companion_paths(path, companion.get("field_schemas"), "field_schemas.yaml")
+    for field_schemas_path in field_schemas_paths:
+        if field_schemas_path.exists():
+            warnings.extend(_collect_updated_utc_warnings(field_schemas_path, "field_schemas", errors))
 
-    denylist_path = Path(companion.get("denylist", "denylist.yaml"))
-    if not denylist_path.is_absolute():
-        denylist_path = path.parent / denylist_path
-    if denylist_path.exists():
-        warnings.extend(_collect_updated_utc_warnings(denylist_path, "denylist", errors))
+    denylist_paths = resolve_companion_paths(path, companion.get("denylist"), "denylist.yaml")
+    for denylist_path in denylist_paths:
+        if denylist_path.exists():
+            warnings.extend(_collect_updated_utc_warnings(denylist_path, "denylist", errors))
 
     for target in cfg.get("targets", []) or []:
         if not target.get("enabled", True):

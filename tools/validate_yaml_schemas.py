@@ -22,18 +22,43 @@ def iter_targets_files(root: Path) -> Iterable[Path]:
         yield from sorted(pipeline_dir.glob("targets_*.yaml"))
 
 
-def iter_companion_files(root: Path) -> Iterable[tuple[Path, str]]:
-    for pipeline_dir in sorted(root.glob("*_pipeline_v2")):
-        if not pipeline_dir.is_dir():
+def _resolve_companion_paths(targets_path: Path, value: object, default: str) -> list[Path]:
+    raw = value if value not in (None, "") else default
+    if isinstance(raw, (list, tuple)):
+        entries = raw
+    else:
+        entries = [raw]
+    paths: list[Path] = []
+    for entry in entries:
+        if entry in (None, ""):
             continue
-        for name, schema in (
-            ("license_map.yaml", "license_map"),
-            ("field_schemas.yaml", "field_schemas"),
-            ("denylist.yaml", "denylist"),
+        path = Path(str(entry))
+        if not path.is_absolute():
+            path = targets_path.parent / path
+        paths.append(path)
+    return paths
+
+
+def iter_companion_files(root: Path) -> Iterable[tuple[Path, str]]:
+    seen: set[tuple[Path, str]] = set()
+    for targets_path in iter_targets_files(root):
+        try:
+            cfg = read_yaml(targets_path, schema_name="targets") or {}
+        except (ConfigValidationError, YamlParseError, FileNotFoundError):
+            continue
+        companion = cfg.get("companion_files", {}) or {}
+        for name, schema, default in (
+            ("license_map", "license_map", "license_map.yaml"),
+            ("field_schemas", "field_schemas", "field_schemas.yaml"),
+            ("denylist", "denylist", "denylist.yaml"),
         ):
-            path = pipeline_dir / name
-            if path.exists():
-                yield path, schema
+            for path in _resolve_companion_paths(targets_path, companion.get(name), default):
+                key = (path, schema)
+                if key in seen:
+                    continue
+                seen.add(key)
+                if path.exists():
+                    yield path, schema
 
 
 def iter_pipeline_maps(root: Path) -> Iterable[Path]:

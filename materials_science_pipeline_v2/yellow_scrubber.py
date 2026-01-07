@@ -49,6 +49,7 @@ try:
 except ImportError:
     requests = None
 
+from collector_core.companion_files import read_field_schemas, read_license_maps, resolve_companion_paths
 from collector_core.config_validator import read_yaml as read_yaml_config
 
 
@@ -132,15 +133,11 @@ class FieldSpec:
     nullable: bool = True
     validation: dict[str, Any] = dataclasses.field(default_factory=dict)
 
-def load_field_schemas(path: Path) -> dict[str, dict[str, FieldSpec]]:
+def load_field_schemas(paths: list[Path]) -> dict[str, dict[str, FieldSpec]]:
     """Load field schemas from field_schemas.yaml."""
-    if not path.exists():
-        return {}
-    
-    cfg = read_yaml(path)
     schemas = {}
-    
-    for schema_name, schema_def in cfg.get("schemas", {}).items():
+
+    for schema_name, schema_def in read_field_schemas(paths).items():
         fields = {}
         for field_name, field_def in schema_def.get("fields", {}).items():
             fields[field_name] = FieldSpec(
@@ -382,8 +379,8 @@ def extract_pubchem_computed_only(
 # License Map helpers
 # --------------------------
 
-def load_license_map(path: Path) -> dict[str, Any]:
-    return read_yaml(path)
+def load_license_map(paths: list[Path]) -> dict[str, Any]:
+    return read_license_maps(paths)
 
 def normalize_spdx_from_text(license_map: dict[str, Any], blob: str, spdx_hint: str = "") -> str:
     hint = normalize_whitespace(safe_text(spdx_hint))
@@ -643,11 +640,13 @@ def main() -> None:
     targets_cfg = read_yaml(targets_path)
     companion = targets_cfg.get("companion_files", {})
     
-    license_map_path = Path(args.license_map or companion.get("license_map", "./license_map.yaml")).expanduser().resolve()
-    license_map = load_license_map(license_map_path)
-    
-    field_schemas_path = Path(args.field_schemas or companion.get("field_schemas", "./field_schemas.yaml")).expanduser().resolve()
-    field_schemas = load_field_schemas(field_schemas_path) if field_schemas_path.exists() else {}
+    license_map_value = args.license_map if args.license_map else companion.get("license_map")
+    license_map_paths = resolve_companion_paths(targets_path, license_map_value, "./license_map.yaml")
+    license_map = load_license_map(license_map_paths)
+
+    field_schemas_value = args.field_schemas if args.field_schemas else companion.get("field_schemas")
+    field_schemas_paths = resolve_companion_paths(targets_path, field_schemas_value, "./field_schemas.yaml")
+    field_schemas = load_field_schemas(field_schemas_paths) if field_schemas_paths else {}
 
     pools = pools_from_targets_yaml(targets_path, Path(args.pools_root).expanduser().resolve())
     target_defs = {t["id"]: t for t in targets_cfg.get("targets", []) if isinstance(t, dict) and t.get("id")}

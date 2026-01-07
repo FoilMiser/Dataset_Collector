@@ -15,6 +15,7 @@ from typing import Any
 import requests
 
 from collector_core.__version__ import __version__ as VERSION
+from collector_core.companion_files import read_denylist_raw, read_license_maps, resolve_companion_paths
 from collector_core.config_validator import read_yaml
 from collector_core.dependencies import _try_import
 from collector_core.exceptions import ConfigValidationError
@@ -141,7 +142,7 @@ class DriverConfig:
     headers: dict[str, str]
     targets_path: Path
     targets_cfg: dict[str, Any]
-    license_map_path: Path
+    license_map_path: list[Path]
     license_map: LicenseMap
     denylist: dict[str, Any]
     manifests_root: Path
@@ -188,13 +189,14 @@ class ClassificationResult:
     warnings: list[dict[str, Any]]
 
 
-def load_license_map(path: Path) -> LicenseMap:
-    m = read_yaml(path, schema_name="license_map")
+def load_license_map(paths: Path | list[Path]) -> LicenseMap:
+    path_list = paths if isinstance(paths, list) else [paths]
+    m = read_license_maps(path_list)
     spdx = m.get("spdx", {}) or {}
     normalization = m.get("normalization", {}) or {}
     restriction_scan = m.get("restriction_scan", {}) or {}
     gating = m.get("gating", {}) or {}
-    profiles = m.get("profiles", {}) or m.get("license_profiles", {}) or {}
+    profiles = m.get("profiles", {}) or {}
 
     return LicenseMap(
         allow=spdx.get("allow", []),
@@ -285,10 +287,11 @@ def load_driver_config(args: argparse.Namespace) -> DriverConfig:
     globals_cfg = targets_cfg.get("globals", {}) or {}
     retry_max, retry_backoff = resolve_retry_config(args, globals_cfg)
     companion = targets_cfg.get("companion_files", {}) or {}
-    license_map_path = Path(args.license_map or companion.get("license_map", "./license_map.yaml")).resolve()
-    license_map = load_license_map(license_map_path)
-    denylist_path = Path(companion.get("denylist", "./denylist.yaml")).resolve()
-    denylist = load_denylist(denylist_path)
+    license_map_value = args.license_map if args.license_map is not None else companion.get("license_map")
+    license_map_paths = resolve_companion_paths(targets_path, license_map_value, "./license_map.yaml")
+    license_map = load_license_map(license_map_paths)
+    denylist_paths = resolve_companion_paths(targets_path, companion.get("denylist"), "./denylist.yaml")
+    denylist = load_denylist(denylist_paths)
     manifests_root, queues_root = resolve_output_roots(args, globals_cfg)
     ensure_dir(manifests_root)
     ensure_dir(queues_root)
@@ -299,7 +302,7 @@ def load_driver_config(args: argparse.Namespace) -> DriverConfig:
         headers=headers,
         targets_path=targets_path,
         targets_cfg=targets_cfg,
-        license_map_path=license_map_path,
+        license_map_path=license_map_paths,
         license_map=license_map,
         denylist=denylist,
         manifests_root=manifests_root,
@@ -493,81 +496,81 @@ def extract_domain(url: str) -> str:
         return ""
 
 
-def load_denylist(path: Path) -> dict[str, Any]:
+def _normalize_denylist(data: dict[str, Any]) -> dict[str, Any]:
+    patterns = data.get("patterns", []) or []
+    domain_patterns = data.get("domain_patterns", []) or []
+    publisher_patterns = data.get("publisher_patterns", []) or []
+
+    # Normalize main patterns (v0.9: with severity and provenance)
+    norm = []
+    for p in patterns:
+        if not isinstance(p, dict):
+            continue
+        kind = str(p.get("type", "substring")).lower()
+        value = str(p.get("value", "") or "")
+        if not value:
+            continue
+        fields = p.get("fields", None)
+        if fields is None:
+            fields = ["id", "name", "license_evidence_url", "download_blob"]
+        norm.append(
+            {
+                "type": kind,
+                "value": value,
+                "fields": [str(f) for f in (fields or [])],
+                "severity": str(p.get("severity", "hard_red")).lower(),  # v0.9: hard_red | force_yellow
+                "reason": str(p.get("reason", p.get("rationale", "")) or ""),
+                "link": str(p.get("link", "") or ""),  # v0.9: provenance
+                "rationale": str(p.get("rationale", "") or ""),  # v0.9: provenance
+            }
+        )
+
+    # v0.9: Normalize domain patterns
+    norm_domain = []
+    for p in domain_patterns:
+        if not isinstance(p, dict):
+            continue
+        domain = str(p.get("domain", "") or "").lower()
+        if not domain:
+            continue
+        norm_domain.append(
+            {
+                "domain": domain,
+                "severity": str(p.get("severity", "hard_red")).lower(),
+                "link": str(p.get("link", "") or ""),
+                "rationale": str(p.get("rationale", "") or ""),
+            }
+        )
+
+    # v0.9: Normalize publisher patterns
+    norm_publisher = []
+    for p in publisher_patterns:
+        if not isinstance(p, dict):
+            continue
+        publisher = str(p.get("publisher", "") or "")
+        if not publisher:
+            continue
+        norm_publisher.append(
+            {
+                "publisher": publisher,
+                "severity": str(p.get("severity", "hard_red")).lower(),
+                "link": str(p.get("link", "") or ""),
+                "rationale": str(p.get("rationale", "") or ""),
+            }
+        )
+
+    return {
+        "patterns": norm,
+        "domain_patterns": norm_domain,
+        "publisher_patterns": norm_publisher,
+    }
+
+
+def load_denylist(paths: Path | list[Path]) -> dict[str, Any]:
     """Load denylist.yaml if present. Returns dict with keys: patterns, domain_patterns, publisher_patterns."""
-    if not path or not path.exists():
-        return {"patterns": [], "domain_patterns": [], "publisher_patterns": []}
-    try:
-        d = read_yaml(path, schema_name="denylist") or {}
-        patterns = d.get("patterns", []) or []
-        domain_patterns = d.get("domain_patterns", []) or []
-        publisher_patterns = d.get("publisher_patterns", []) or []
-
-        # Normalize main patterns (v0.9: with severity and provenance)
-        norm = []
-        for p in patterns:
-            if not isinstance(p, dict):
-                continue
-            kind = str(p.get("type", "substring")).lower()
-            value = str(p.get("value", "") or "")
-            if not value:
-                continue
-            fields = p.get("fields", None)
-            if fields is None:
-                fields = ["id", "name", "license_evidence_url", "download_blob"]
-            norm.append(
-                {
-                    "type": kind,
-                    "value": value,
-                    "fields": [str(f) for f in (fields or [])],
-                    "severity": str(p.get("severity", "hard_red")).lower(),  # v0.9: hard_red | force_yellow
-                    "reason": str(p.get("reason", p.get("rationale", "")) or ""),
-                    "link": str(p.get("link", "") or ""),  # v0.9: provenance
-                    "rationale": str(p.get("rationale", "") or ""),  # v0.9: provenance
-                }
-            )
-
-        # v0.9: Normalize domain patterns
-        norm_domain = []
-        for p in domain_patterns:
-            if not isinstance(p, dict):
-                continue
-            domain = str(p.get("domain", "") or "").lower()
-            if not domain:
-                continue
-            norm_domain.append(
-                {
-                    "domain": domain,
-                    "severity": str(p.get("severity", "hard_red")).lower(),
-                    "link": str(p.get("link", "") or ""),
-                    "rationale": str(p.get("rationale", "") or ""),
-                }
-            )
-
-        # v0.9: Normalize publisher patterns
-        norm_publisher = []
-        for p in publisher_patterns:
-            if not isinstance(p, dict):
-                continue
-            publisher = str(p.get("publisher", "") or "")
-            if not publisher:
-                continue
-            norm_publisher.append(
-                {
-                    "publisher": publisher,
-                    "severity": str(p.get("severity", "hard_red")).lower(),
-                    "link": str(p.get("link", "") or ""),
-                    "rationale": str(p.get("rationale", "") or ""),
-                }
-            )
-
-        return {
-            "patterns": norm,
-            "domain_patterns": norm_domain,
-            "publisher_patterns": norm_publisher,
-        }
-    except Exception:
-        return {"patterns": [], "domain_patterns": [], "publisher_patterns": []}
+    path_list = paths if isinstance(paths, list) else [paths]
+    raw = read_denylist_raw(path_list)
+    return _normalize_denylist(raw)
 
 
 def denylist_hits(denylist: dict[str, Any], hay: dict[str, str]) -> list[dict[str, Any]]:
@@ -1648,7 +1651,7 @@ class BasePipelineDriver:
             "queued_yellow": len(results.yellow_rows),
             "queued_red": len(results.red_rows),
             "targets_path": str(cfg.targets_path),
-            "license_map_path": str(cfg.license_map_path),
+            "license_map_path": [str(p) for p in cfg.license_map_path],
             "manifests_root": str(cfg.manifests_root),
             "queues_root": str(cfg.queues_root),
             "warnings": results.warnings,
