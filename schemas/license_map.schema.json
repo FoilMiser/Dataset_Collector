@@ -39,6 +39,14 @@
       },
       "additionalProperties": true
     },
+    "evidence_change_policy": {
+      "type": "string",
+      "enum": ["raw", "normalized", "either"]
+    },
+    "cosmetic_change_policy": {
+      "type": "string",
+      "enum": ["warn_only", "treat_as_changed"]
+    },
     "gating": { "type": "object" },
     "profiles": { "type": "object" },
     "license_profiles": { "type": "object" }

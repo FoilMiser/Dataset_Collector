@@ -32,6 +32,8 @@ SUPPORTED_GATES = {
     "restriction_phrase_scan",
     "snapshot_terms",
 }
+EVIDENCE_CHANGE_POLICIES = {"raw", "normalized", "either"}
+COSMETIC_CHANGE_POLICIES = {"warn_only", "treat_as_changed"}
 
 def utc_now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
@@ -123,6 +125,38 @@ def coerce_int(val: Any, default: int | None = None) -> int | None:
         return default
 
 
+def normalize_evidence_change_policy(value: Any) -> str:
+    policy = str(value or "").strip().lower()
+    if policy in EVIDENCE_CHANGE_POLICIES:
+        return policy
+    return "normalized"
+
+
+def normalize_cosmetic_change_policy(value: Any) -> str:
+    policy = str(value or "").strip().lower()
+    if policy in COSMETIC_CHANGE_POLICIES:
+        return policy
+    return "warn_only"
+
+
+def resolve_evidence_change(
+    raw_changed: bool,
+    normalized_changed: bool,
+    cosmetic_change: bool,
+    evidence_policy: str,
+    cosmetic_policy: str,
+) -> bool:
+    if evidence_policy == "raw":
+        changed = raw_changed
+    elif evidence_policy == "either":
+        changed = raw_changed or normalized_changed
+    else:
+        changed = normalized_changed
+    if cosmetic_change and cosmetic_policy == "treat_as_changed":
+        return True
+    return changed
+
+
 @dataclasses.dataclass
 class LicenseMap:
     allow: list[str]
@@ -132,6 +166,8 @@ class LicenseMap:
     restriction_phrases: list[str]
     gating: dict[str, str]
     profiles: dict[str, dict[str, Any]]
+    evidence_change_policy: str
+    cosmetic_change_policy: str
 
 
 @dataclasses.dataclass(frozen=True)
@@ -197,6 +233,8 @@ def load_license_map(paths: Path | list[Path]) -> LicenseMap:
     restriction_scan = m.get("restriction_scan", {}) or {}
     gating = m.get("gating", {}) or {}
     profiles = m.get("profiles", {}) or {}
+    evidence_change_policy = normalize_evidence_change_policy(m.get("evidence_change_policy"))
+    cosmetic_change_policy = normalize_cosmetic_change_policy(m.get("cosmetic_change_policy"))
 
     return LicenseMap(
         allow=spdx.get("allow", []),
@@ -206,6 +244,8 @@ def load_license_map(paths: Path | list[Path]) -> LicenseMap:
         restriction_phrases=restriction_scan.get("phrases", []),
         gating=gating,
         profiles=profiles,
+        evidence_change_policy=evidence_change_policy,
+        cosmetic_change_policy=cosmetic_change_policy,
     )
 
 
@@ -1152,6 +1192,9 @@ class BasePipelineDriver:
         self,
         manifest_dir: Path,
         url: str,
+        *,
+        evidence_change_policy: str = "normalized",
+        cosmetic_change_policy: str = "warn_only",
         max_retries: int = 3,
         backoff_base: float = 2.0,
         headers: dict[str, str] | None = None,
@@ -1274,13 +1317,20 @@ class BasePipelineDriver:
             and normalized_digest
             and previous_normalized_digest
         )
+        changed_from_previous = resolve_evidence_change(
+            raw_changed_from_previous,
+            normalized_changed_from_previous,
+            cosmetic_change,
+            evidence_change_policy,
+            cosmetic_change_policy,
+        )
         result.update(
             {
                 "sha256_normalized_text": normalized_digest,
                 "raw_changed_from_previous": raw_changed_from_previous,
                 "normalized_changed_from_previous": normalized_changed_from_previous,
                 "cosmetic_change": cosmetic_change,
-                "changed_from_previous": bool(raw_changed_from_previous or normalized_changed_from_previous),
+                "changed_from_previous": changed_from_previous,
             }
         )
         if previous_renamed_path:
@@ -1372,7 +1422,20 @@ class BasePipelineDriver:
         normalized_mismatch = bool(
             signoff_normalized_sha and evidence_normalized_sha and signoff_normalized_sha != evidence_normalized_sha
         )
-        if raw_mismatch or normalized_mismatch:
+        cosmetic_change = bool(
+            raw_mismatch
+            and not normalized_mismatch
+            and signoff_normalized_sha
+            and evidence_normalized_sha
+        )
+        change_requires_review = resolve_evidence_change(
+            raw_mismatch,
+            normalized_mismatch,
+            cosmetic_change,
+            cfg.license_map.evidence_change_policy,
+            cfg.license_map.cosmetic_change_policy,
+        )
+        if change_requires_review:
             review_status = "pending"
             promote_to = ""
             review_required = True
@@ -1415,6 +1478,7 @@ class BasePipelineDriver:
         )
         row = self.build_row(
             ctx,
+            cfg.license_map,
             evidence,
             restriction_hits,
             resolved,
@@ -1434,12 +1498,14 @@ class BasePipelineDriver:
             evidence_snapshot = self.snapshot_evidence(
                 ctx.target_manifest_dir,
                 ctx.evidence_url,
+                evidence_change_policy=cfg.license_map.evidence_change_policy,
+                cosmetic_change_policy=cfg.license_map.cosmetic_change_policy,
                 max_retries=cfg.retry_max,
                 backoff_base=cfg.retry_backoff,
                 headers=cfg.headers,
             )
             evidence_text = extract_text_for_scanning(evidence_snapshot)
-            license_change_detected = bool(evidence_snapshot.get("normalized_changed_from_previous"))
+            license_change_detected = bool(evidence_snapshot.get("changed_from_previous"))
         elif "snapshot_terms" in ctx.gates and cfg.args.no_fetch:
             existing_evidence_path = find_existing_evidence(ctx.target_manifest_dir)
             if existing_evidence_path:
@@ -1505,7 +1571,13 @@ class BasePipelineDriver:
             and signoff_evidence_sha256_normalized
             and current_evidence_sha256_normalized
         )
-        signoff_is_stale = bool(normalized_mismatch)
+        signoff_is_stale = resolve_evidence_change(
+            raw_mismatch,
+            normalized_mismatch,
+            cosmetic_change,
+            cfg.license_map.evidence_change_policy,
+            cfg.license_map.cosmetic_change_policy,
+        )
         evaluation = {
             "id": ctx.tid,
             "name": ctx.name,
@@ -1557,6 +1629,7 @@ class BasePipelineDriver:
     def build_row(
         self,
         ctx: TargetContext,
+        license_map: LicenseMap,
         evidence: EvidenceResult,
         restriction_hits: list[str],
         resolved: str,
@@ -1587,7 +1660,13 @@ class BasePipelineDriver:
             and signoff_evidence_sha256_normalized
             and current_evidence_sha256_normalized
         )
-        signoff_is_stale = bool(normalized_mismatch)
+        signoff_is_stale = resolve_evidence_change(
+            raw_mismatch,
+            normalized_mismatch,
+            cosmetic_change,
+            license_map.evidence_change_policy,
+            license_map.cosmetic_change_policy,
+        )
         row = {
             "id": ctx.tid,
             "name": ctx.name,

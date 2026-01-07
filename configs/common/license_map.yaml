@@ -168,6 +168,9 @@ restriction_scan:
     - "robots.txt noai"
     - "noai meta tag"
 
+evidence_change_policy: "normalized"  # raw | normalized | either
+cosmetic_change_policy: "warn_only"  # warn_only | treat_as_changed
+
 gating:
   # SPDX -> bucket mapping behavior
   conditional_spdx_bucket: "YELLOW"

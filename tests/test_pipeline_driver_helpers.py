@@ -92,6 +92,8 @@ def test_resolve_effective_bucket_applies_no_fetch_guard() -> None:
         restriction_phrases=[],
         gating={"low_confidence_bucket": "YELLOW"},
         profiles={"permissive": {"default_bucket": "GREEN"}},
+        evidence_change_policy="normalized",
+        cosmetic_change_policy="warn_only",
     )
     evidence = EvidenceResult(
         snapshot={"status": "ok"},
@@ -124,6 +126,8 @@ def test_resolve_effective_bucket_denies_hard_red() -> None:
         restriction_phrases=[],
         gating={"low_confidence_bucket": "YELLOW"},
         profiles={"permissive": {"default_bucket": "GREEN"}},
+        evidence_change_policy="normalized",
+        cosmetic_change_policy="warn_only",
     )
     evidence = EvidenceResult(
         snapshot={"status": "ok"},
@@ -156,6 +160,8 @@ def test_build_target_identity_warns_on_unknown_profile() -> None:
         restriction_phrases=[],
         gating={},
         profiles={"permissive": {"default_bucket": "GREEN"}},
+        evidence_change_policy="normalized",
+        cosmetic_change_policy="warn_only",
     )
     tid, name, profile, enabled, warnings = build_target_identity(
         {"id": "t1", "name": "Target", "license_profile": "unknown"},

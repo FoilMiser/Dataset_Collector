@@ -39,6 +39,8 @@ def read_license_maps(paths: Sequence[Path]) -> dict[str, Any]:
         "restriction_scan": {"phrases": []},
         "gating": {},
         "profiles": {},
+        "evidence_change_policy": None,
+        "cosmetic_change_policy": None,
     }
     for path in paths:
         data = read_yaml(path, schema_name="license_map") or {}
@@ -58,6 +60,11 @@ def read_license_maps(paths: Sequence[Path]) -> dict[str, Any]:
 
         profiles = data.get("profiles", {}) or data.get("license_profiles", {}) or {}
         merged["profiles"].update(profiles)
+
+        if data.get("evidence_change_policy") is not None:
+            merged["evidence_change_policy"] = data.get("evidence_change_policy")
+        if data.get("cosmetic_change_policy") is not None:
+            merged["cosmetic_change_policy"] = data.get("cosmetic_change_policy")
     return merged
 
 
