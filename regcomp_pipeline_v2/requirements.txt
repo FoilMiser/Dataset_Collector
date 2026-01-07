@@ -1,4 +1,4 @@
-# Regulation & Compliance Corpus Pipeline v2.0.0 - Requirements (adapted from chemistry)
+# Regulation & Compliance Corpus Pipeline v2 - Requirements (adapted from chemistry)
 -r ../requirements.constraints.txt
 
 # Optional: for accurate token counting in catalog_builder

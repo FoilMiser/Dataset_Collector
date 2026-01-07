@@ -1,4 +1,4 @@
-# Chemistry Corpus Pipeline v2.0.0 - Requirements
+# Chemistry Corpus Pipeline v2 - Requirements
 -r ../requirements.constraints.txt
 
 # Optional: for accurate token counting in catalog_builder

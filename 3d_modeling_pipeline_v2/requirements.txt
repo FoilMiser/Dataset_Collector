@@ -1,4 +1,4 @@
-# 3D Modeling Corpus Pipeline v2.0.0 - Requirements
+# 3D Modeling Corpus Pipeline v2 - Requirements
 -r ../requirements.constraints.txt
 
 # Optional: public S3 support (s3_public strategy)
