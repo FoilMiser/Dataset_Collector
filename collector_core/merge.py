@@ -82,6 +82,11 @@ class MergeState:
     execute: bool
     progress: bool
     progress_interval: int
+    inflight_records: dict[str, dict[str, Any]]
+    shard_index: dict[str, str]
+    pending_updates: dict[str, dict[str, Any]]
+    max_source_urls: int
+    max_duplicates: int
 
 
 @dataclasses.dataclass
@@ -106,21 +111,22 @@ class Sharder:
         suffix = "jsonl.gz" if self.cfg.compression == "gzip" else "jsonl"
         return self.base_dir / f"{self.cfg.prefix}_{self.shard_idx:05d}.{suffix}"
 
-    def add(self, row: dict[str, Any]) -> Path | None:
+    def add(self, row: dict[str, Any]) -> tuple[Path | None, list[dict[str, Any]]]:
         self.current.append(row)
         if len(self.current) >= self.cfg.max_records_per_shard:
-            path = self.flush()
+            path, flushed = self.flush()
             self.shard_idx += 1
-            return path
-        return None
+            return path, flushed
+        return None, []
 
-    def flush(self) -> Path | None:
+    def flush(self) -> tuple[Path | None, list[dict[str, Any]]]:
         if not self.current:
-            return None
+            return None, []
         path = self._path()
-        append_jsonl(path, self.current)
+        records = self.current
+        append_jsonl(path, records)
         self.current = []
-        return path
+        return path, records
 
 
 class DedupeIndex:
@@ -207,6 +213,10 @@ def sha256_text(text: str) -> str:
     return hashlib.sha256(norm.encode("utf-8")).hexdigest()
 
 
+DEFAULT_MAX_SOURCE_URLS = 10
+DEFAULT_MAX_DUPLICATES = 20
+
+
 def read_jsonl(path: Path) -> Iterator[dict[str, Any]]:
     opener = gzip.open if path.suffix == ".gz" else open
     with opener(path, "rt", encoding="utf-8", errors="ignore") as f:
@@ -236,6 +246,95 @@ def append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
 def write_json(path: Path, obj: dict[str, Any]) -> None:
     ensure_dir(path.parent)
     path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def merge_distinct_urls(
+    existing: Iterable[str],
+    incoming: Iterable[str],
+    limit: int,
+) -> list[str]:
+    merged: list[str] = []
+    seen: set[str] = set()
+    for url in list(existing) + list(incoming):
+        if not url:
+            continue
+        if url in seen:
+            continue
+        merged.append(url)
+        seen.add(url)
+        if len(merged) >= limit:
+            break
+    return merged
+
+
+def build_dedupe_update(
+    record: dict[str, Any],
+    *,
+    source_kind: str,
+    source_path: Path | None,
+) -> dict[str, Any]:
+    entry: dict[str, Any] = {
+        "content_sha256": record.get("content_sha256"),
+        "source_urls": record.get("source_urls", []),
+        "source": record.get("source", {}),
+        "source_kind": source_kind,
+        "seen_at_utc": utc_now(),
+    }
+    if source_path is not None:
+        entry["source_path"] = str(source_path)
+    return {
+        "source_urls": record.get("source_urls", []),
+        "duplicates": [entry],
+    }
+
+
+def merge_update_payload(
+    base: dict[str, Any],
+    update: dict[str, Any],
+    *,
+    max_source_urls: int,
+    max_duplicates: int,
+) -> dict[str, Any]:
+    merged_urls = merge_distinct_urls(
+        base.get("source_urls", []),
+        update.get("source_urls", []),
+        max_source_urls,
+    )
+    duplicates = list(base.get("duplicates", []))
+    for entry in update.get("duplicates", []):
+        if entry not in duplicates:
+            duplicates.append(entry)
+    if len(duplicates) > max_duplicates:
+        duplicates = duplicates[-max_duplicates:]
+    return {
+        "source_urls": merged_urls,
+        "duplicates": duplicates,
+    }
+
+
+def merge_provenance_update(
+    record: dict[str, Any],
+    update: dict[str, Any],
+    *,
+    max_source_urls: int,
+    max_duplicates: int,
+) -> None:
+    record["source_urls"] = merge_distinct_urls(
+        record.get("source_urls", []),
+        update.get("source_urls", []),
+        max_source_urls,
+    )
+    provenance = record.get("provenance") or {}
+    duplicates = list(provenance.get("duplicates", []))
+    for entry in update.get("duplicates", []):
+        if entry not in duplicates:
+            duplicates.append(entry)
+    if len(duplicates) > max_duplicates:
+        duplicates = duplicates[-max_duplicates:]
+    if duplicates:
+        provenance["duplicates"] = duplicates
+        record["provenance"] = provenance
+    record["timestamp_updated"] = utc_now()
 
 
 def resolve_dataset_root(explicit: str | None = None) -> Path | None:
@@ -532,6 +631,51 @@ def record_skip(
     append_jsonl(roots.ledger_root / "combined_skipped.jsonl", [row])
 
 
+def record_dedupe_event(
+    roots: Roots,
+    *,
+    content_hash: str,
+    source_kind: str,
+    source_path: Path | None,
+    target_id: str,
+    pool: str,
+    record: dict[str, Any],
+    retained_shard: str | None,
+) -> None:
+    row: dict[str, Any] = {
+        "stage": "merge",
+        "content_sha256": content_hash,
+        "target_id": target_id,
+        "license_pool": pool,
+        "source_kind": source_kind,
+        "seen_at_utc": utc_now(),
+        "source_urls": record.get("source_urls", []),
+        "source": record.get("source", {}),
+    }
+    if source_path is not None:
+        row["source_path"] = str(source_path)
+    if retained_shard:
+        row["retained_shard"] = retained_shard
+    append_jsonl(roots.ledger_root / "combined_deduped.jsonl", [row])
+
+
+def register_flushed_records(
+    state: MergeState,
+    *,
+    shard_path: Path | None,
+    records: list[dict[str, Any]],
+) -> None:
+    if not shard_path:
+        return
+    shard_str = str(shard_path)
+    for rec in records:
+        content_hash = rec.get("content_sha256")
+        if not content_hash:
+            continue
+        state.shard_index[content_hash] = shard_str
+        state.inflight_records.pop(content_hash, None)
+
+
 def build_target_meta(cfg: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return {
         str(target.get("id")): {
@@ -608,15 +752,49 @@ def handle_record(
     content_hash = record["content_sha256"]
     if not state.dedupe.add_if_new(content_hash):
         state.summary["deduped"] += 1
+        update = build_dedupe_update(record, source_kind=source_kind, source_path=source_path)
+        retained_shard = state.shard_index.get(content_hash)
+        if state.execute:
+            record_dedupe_event(
+                roots,
+                content_hash=content_hash,
+                source_kind=source_kind,
+                source_path=source_path,
+                target_id=resolved_target,
+                pool=pool_value,
+                record=record,
+                retained_shard=retained_shard,
+            )
+        retained = state.inflight_records.get(content_hash)
+        if retained:
+            merge_provenance_update(
+                retained,
+                update,
+                max_source_urls=state.max_source_urls,
+                max_duplicates=state.max_duplicates,
+            )
+        else:
+            pending = state.pending_updates.get(content_hash)
+            if pending:
+                state.pending_updates[content_hash] = merge_update_payload(
+                    pending,
+                    update,
+                    max_source_urls=state.max_source_urls,
+                    max_duplicates=state.max_duplicates,
+                )
+            else:
+                state.pending_updates[content_hash] = update
         return
     pool = record.get("pool") or pool_value
     sharder = get_sharder(pool, roots, state)
     shard_path = str(sharder._path())
     if state.execute:
-        path = sharder.add(record)
+        state.inflight_records[content_hash] = record
+        path, flushed_records = sharder.add(record)
         if path:
             shard_path = str(path)
             state.summary["shards"].append(shard_path)
+            register_flushed_records(state, shard_path=path, records=flushed_records)
         append_jsonl(
             roots.ledger_root / "combined_index.jsonl",
             [
@@ -698,9 +876,50 @@ def finalize_shards(state: MergeState) -> None:
     if not state.execute:
         return
     for sharder in state.pool_sharders.values():
-        flushed = sharder.flush()
-        if flushed:
-            state.summary["shards"].append(str(flushed))
+        flushed_path, flushed_records = sharder.flush()
+        if flushed_path:
+            state.summary["shards"].append(str(flushed_path))
+            register_flushed_records(state, shard_path=flushed_path, records=flushed_records)
+
+
+def apply_pending_updates(roots: Roots, state: MergeState) -> None:
+    if not state.execute or not state.pending_updates:
+        return
+    updates_by_shard: dict[str, dict[str, dict[str, Any]]] = {}
+    for content_hash, update in state.pending_updates.items():
+        shard = state.shard_index.get(content_hash)
+        if not shard:
+            continue
+        updates_by_shard.setdefault(shard, {})[content_hash] = update
+    for shard_path, updates in updates_by_shard.items():
+        path = Path(shard_path)
+        temp_path = path.with_suffix(path.suffix + ".tmp")
+        opener = gzip.open if path.suffix == ".gz" else open
+        with opener(path, "rt", encoding="utf-8", errors="ignore") as src, opener(
+            temp_path,
+            "wt",
+            encoding="utf-8",
+        ) as dst:
+            for line in src:
+                raw = line.strip()
+                if not raw:
+                    continue
+                try:
+                    record = json.loads(raw)
+                except json.JSONDecodeError:
+                    dst.write(line)
+                    continue
+                content_hash = record.get("content_sha256")
+                update = updates.get(content_hash) if content_hash else None
+                if update:
+                    merge_provenance_update(
+                        record,
+                        update,
+                        max_source_urls=state.max_source_urls,
+                        max_duplicates=state.max_duplicates,
+                    )
+                dst.write(json.dumps(record, ensure_ascii=False) + "\n")
+        temp_path.replace(path)
 
 
 def build_dedupe_index(roots: Roots, partitions: int) -> DedupeIndex | PartitionedDedupeIndex:
@@ -745,6 +964,11 @@ def merge_records(
         execute=execute,
         progress=runtime.progress,
         progress_interval=runtime.progress_interval,
+        inflight_records={},
+        shard_index={},
+        pending_updates={},
+        max_source_urls=DEFAULT_MAX_SOURCE_URLS,
+        max_duplicates=DEFAULT_MAX_DUPLICATES,
     )
     summary["dedupe_partitions"] = runtime.dedupe_partitions
     profiler: cProfile.Profile | None = None
@@ -757,6 +981,7 @@ def merge_records(
         process_green_records(roots, state, target_canon, default_canon)
         process_screened_yellow(roots, state)
         finalize_shards(state)
+        apply_pending_updates(roots, state)
     finally:
         dedupe.close()
         if runtime.trace_memory:
