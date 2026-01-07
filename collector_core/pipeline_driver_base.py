@@ -509,18 +509,64 @@ def extract_evidence_fields(target: dict[str, Any]) -> tuple[str, str]:
     return spdx_hint, evidence_url
 
 
+def _merge_download_config(download: dict[str, Any]) -> dict[str, Any]:
+    download_cfg = dict(download or {})
+    cfg = download_cfg.get("config")
+    if isinstance(cfg, dict):
+        merged = dict(cfg)
+        merged.update({k: v for k, v in download_cfg.items() if k != "config"})
+        return merged
+    return download_cfg
+
+
+def _is_probable_url(value: str) -> bool:
+    if not value:
+        return False
+    try:
+        from urllib.parse import urlparse
+
+        parsed = urlparse(value)
+        return parsed.scheme.lower() in {"http", "https"} and bool(parsed.netloc)
+    except Exception:
+        return False
+
+
+def _collect_urls(value: Any, urls: list[str], seen: set[str]) -> None:
+    if isinstance(value, str):
+        if _is_probable_url(value) and value not in seen:
+            seen.add(value)
+            urls.append(value)
+        return
+    if isinstance(value, dict):
+        for item in value.values():
+            _collect_urls(item, urls, seen)
+        return
+    if isinstance(value, (list, tuple, set)):
+        for item in value:
+            _collect_urls(item, urls, seen)
+
+
+def extract_download_urls(target: dict[str, Any]) -> list[str]:
+    download_cfg = _merge_download_config(target.get("download", {}) or {})
+    urls: list[str] = []
+    _collect_urls(download_cfg, urls, set())
+    return urls
+
+
 def build_denylist_haystack(
     tid: str,
     name: str,
     evidence_url: str,
-    download_blob: str,
+    download_urls: list[str],
     target: dict[str, Any],
-) -> dict[str, str]:
+) -> dict[str, Any]:
+    download_blob = " ".join(download_urls)
     return {
         "id": tid,
         "name": name,
         "license_evidence_url": evidence_url,
         "download_blob": download_blob,
+        "download_urls": download_urls,
         "publisher": str(target.get("publisher", "") or ""),
     }
 
@@ -552,7 +598,7 @@ def _normalize_denylist(data: dict[str, Any]) -> dict[str, Any]:
             continue
         fields = p.get("fields", None)
         if fields is None:
-            fields = ["id", "name", "license_evidence_url", "download_blob"]
+            fields = ["id", "name", "license_evidence_url", "download_urls", "download_blob"]
         norm.append(
             {
                 "type": kind,
@@ -613,7 +659,15 @@ def load_denylist(paths: Path | list[Path]) -> dict[str, Any]:
     return _normalize_denylist(raw)
 
 
-def denylist_hits(denylist: dict[str, Any], hay: dict[str, str]) -> list[dict[str, Any]]:
+def _iter_hay_values(value: Any) -> list[str]:
+    if isinstance(value, (list, tuple, set)):
+        return [str(item) for item in value if item]
+    if value:
+        return [str(value)]
+    return []
+
+
+def denylist_hits(denylist: dict[str, Any], hay: dict[str, Any]) -> list[dict[str, Any]]:
     """Return list of matched denylist patterns with field, reason, severity (v0.9)."""
     hits: list[dict[str, Any]] = []
 
@@ -626,65 +680,66 @@ def denylist_hits(denylist: dict[str, Any], hay: dict[str, str]) -> list[dict[st
         severity = p.get("severity", "hard_red")
 
         for f in fields:
-            src = str(hay.get(f, "") or "")
-            if not src:
-                continue
-
-            matched = False
-            if kind == "regex":
-                try:
-                    if re.search(val, src, flags=re.IGNORECASE):
+            for src in _iter_hay_values(hay.get(f, "")):
+                matched = False
+                if kind == "regex":
+                    try:
+                        if re.search(val, src, flags=re.IGNORECASE):
+                            matched = True
+                    except re.error:
+                        continue
+                elif kind == "domain":
+                    # v0.9: Domain extraction matching
+                    src_domain = extract_domain(src)
+                    if src_domain and val.lower() in src_domain:
                         matched = True
-                except re.error:
-                    continue
-            elif kind == "domain":
-                # v0.9: Domain extraction matching
-                src_domain = extract_domain(src)
-                if src_domain and val.lower() in src_domain:
-                    matched = True
-            else:  # substring
-                if val.lower() in src.lower():
-                    matched = True
+                else:  # substring
+                    if val.lower() in src.lower():
+                        matched = True
 
-            if matched:
-                hits.append(
-                    {
-                        "field": f,
-                        "pattern": val,
-                        "type": kind,
-                        "severity": severity,
-                        "reason": p.get("reason", ""),
-                        "link": p.get("link", ""),
-                        "rationale": p.get("rationale", ""),
-                    }
-                )
-                break
+                if matched:
+                    hits.append(
+                        {
+                            "field": f,
+                            "pattern": val,
+                            "type": kind,
+                            "severity": severity,
+                            "reason": p.get("reason", ""),
+                            "link": p.get("link", ""),
+                            "rationale": p.get("rationale", ""),
+                        }
+                    )
+                    break
+            else:
+                continue
+            break
 
     # v0.9: Process domain patterns (against URLs in hay)
     domain_pats = (denylist or {}).get("domain_patterns", []) or []
-    url_fields = ["license_evidence_url", "download_blob"]
+    url_fields = ["license_evidence_url", "download_urls"]
     for dp in domain_pats:
         target_domain = dp.get("domain", "").lower()
         if not target_domain:
             continue
         for f in url_fields:
-            src = str(hay.get(f, "") or "")
-            if not src:
+            for src in _iter_hay_values(hay.get(f, "")):
+                src_domain = extract_domain(src)
+                if src_domain and target_domain in src_domain:
+                    hits.append(
+                        {
+                            "field": f,
+                            "pattern": target_domain,
+                            "type": "domain",
+                            "severity": dp.get("severity", "hard_red"),
+                            "reason": dp.get("rationale", ""),
+                            "link": dp.get("link", ""),
+                            "rationale": dp.get("rationale", ""),
+                        }
+                    )
+                    break
+            else:
                 continue
-            src_domain = extract_domain(src)
-            if src_domain and target_domain in src_domain:
-                hits.append(
-                    {
-                        "field": f,
-                        "pattern": target_domain,
-                        "type": "domain",
-                        "severity": dp.get("severity", "hard_red"),
-                        "reason": dp.get("rationale", ""),
-                        "link": dp.get("link", ""),
-                        "rationale": dp.get("rationale", ""),
-                    }
-                )
-                break
+            break
 
     # v0.9: Process publisher patterns (if publisher metadata available)
     publisher_pats = (denylist or {}).get("publisher_patterns", []) or []
@@ -1376,6 +1431,7 @@ class BasePipelineDriver:
         spdx_hint, evidence_url = extract_evidence_fields(target)
         download_cfg = target.get("download", {}) or {}
         download_blob = json.dumps(download_cfg, ensure_ascii=False)
+        download_urls = extract_download_urls(target)
         review_required = bool(target.get("review_required", False))
         merged_gates = merge_gates(cfg.default_gates, target.get("gates_override", {}) or {})
         warnings.extend(validate_target_gates(merged_gates, tid, strict=cfg.args.strict))
@@ -1385,7 +1441,7 @@ class BasePipelineDriver:
         signoff = read_review_signoff(target_manifest_dir)
         review_status = str(signoff.get("status", "") or "").lower()
         promote_to = str(signoff.get("promote_to", "") or "").upper()
-        dl_hits = denylist_hits(cfg.denylist, build_denylist_haystack(tid, name, evidence_url, download_blob, target))
+        dl_hits = denylist_hits(cfg.denylist, build_denylist_haystack(tid, name, evidence_url, download_urls, target))
         routing = self.resolve_routing_fields(target)
         split_group_id = str(target.get("split_group_id", "") or tid)
         ctx = TargetContext(
