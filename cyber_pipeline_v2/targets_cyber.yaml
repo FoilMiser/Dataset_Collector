@@ -1,5 +1,5 @@
 # Cybersecurity + Industrial Threat Modeling dataset targets (ethically + legally cleared)
-# Companion files: ./license_map.yaml, ./field_schemas.yaml, ./denylist.yaml, ./difficulties_cyber.yaml
+# Companion files: ../configs/common/license_map.yaml, ../configs/common/field_schemas.yaml, ../configs/common/denylist.yaml, ./difficulties_cyber.yaml
 #
 # Notes:
 # - Strategies align to acquire_worker.py: http|ftp|git|zenodo|dataverse|huggingface_datasets|none
@@ -12,13 +12,10 @@ updated_utc: "2025-12-30"
 companion_files:
   license_map:
     - "../configs/common/license_map.yaml"
-    - "./license_map.yaml"
   field_schemas:
     - "../configs/common/field_schemas.yaml"
-    - "./field_schemas.yaml"
   denylist:
     - "../configs/common/denylist.yaml"
-    - "./denylist.yaml"
 
 globals:
   raw_root: "/data/cyber/raw"
