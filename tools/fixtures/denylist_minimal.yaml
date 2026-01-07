@@ -1,0 +1,10 @@
+schema_version: "0.9"
+patterns:
+  - type: "substring"
+    value: "denylist_target"
+    fields:
+      - "id"
+    severity: "hard_red"
+    rationale: "Fixture denylist entry"
+domain_patterns: []
+publisher_patterns: []

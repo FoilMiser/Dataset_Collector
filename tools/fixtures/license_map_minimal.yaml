@@ -1,0 +1,20 @@
+schema_version: "0.9"
+spdx:
+  allow:
+    - MIT
+  conditional:
+    - LGPL-2.1-only
+  deny_prefixes:
+    - GPL-3
+normalization:
+  rules: []
+restriction_scan:
+  phrases: []
+gating:
+  unknown_spdx_bucket: YELLOW
+  conditional_spdx_bucket: YELLOW
+  deny_spdx_bucket: RED
+  low_confidence_bucket: YELLOW
+profiles:
+  permissive:
+    default_bucket: GREEN
