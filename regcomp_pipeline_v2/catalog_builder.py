@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
-"""Pipeline entry point for catalog builder."""
+"""Deprecated pipeline entry point for catalog builder."""
 
 from pathlib import Path
 
-from collector_core.catalog_builder import main as catalog_main
+from collector_core.pipeline_cli import run_deprecated_entrypoint
 
 if __name__ == "__main__":
-    catalog_main(pipeline_id=Path(__file__).resolve().parent.name)
+    raise SystemExit(
+        run_deprecated_entrypoint(
+            "catalog-builder",
+            pipeline_id=Path(__file__).resolve().parent.name,
+        )
+    )
