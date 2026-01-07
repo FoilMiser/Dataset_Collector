@@ -876,8 +876,12 @@ def run_acquire_worker(
     ap.add_argument("--overwrite", action="store_true", help="Overwrite existing outputs")
     ap.add_argument("--verify-sha256", action="store_true", help="Compute sha256 for http downloads")
     ap.add_argument("--verify-zenodo-md5", action="store_true", help="Verify Zenodo md5")
-    ap.add_argument("--enable-resume", action="store_true", default=True)
-    ap.add_argument("--no-resume", action="store_true")
+    ap.add_argument(
+        "--resume",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Resume partial downloads (default: resume).",
+    )
     ap.add_argument("--limit-targets", type=int, default=None)
     ap.add_argument("--limit-files", type=int, default=None)
     ap.add_argument("--max-bytes-per-target", type=int, default=None)
@@ -903,7 +907,7 @@ def run_acquire_worker(
             args.overwrite,
             args.verify_sha256,
             args.verify_zenodo_md5,
-            args.enable_resume and not args.no_resume,
+            args.resume,
             max(1, args.workers),
         ),
         retry=RetryConfig(args.retry_max, args.retry_backoff),

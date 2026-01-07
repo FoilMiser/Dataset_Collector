@@ -92,6 +92,7 @@ Optional (standardized):
 - `--raw-root PATH`
 - `--manifests-root PATH`
 - `--logs-root PATH`
+- `--resume / --no-resume` (default: resume)
 - `--retry-max INT` (default: `3`)
 - `--retry-backoff FLOAT` (default: `2.0`)
 
