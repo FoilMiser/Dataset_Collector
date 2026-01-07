@@ -1,4 +1,4 @@
-# Agri Circular Pipeline v2.0.0 - Requirements
+# Agri Circular Pipeline v2 - Requirements
 -r ../requirements.constraints.txt
 
 # Optional: for accurate token counting in catalog_builder
