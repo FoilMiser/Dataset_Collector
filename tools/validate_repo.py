@@ -26,6 +26,7 @@ if __package__ in (None, ""):
         sys.path.insert(0, str(repo_root))
 
 from collector_core.config_validator import read_yaml
+from collector_core.exceptions import ConfigValidationError, YamlParseError
 from tools.strategy_registry import (
     get_strategy_requirement_errors,
     get_strategy_spec,
@@ -96,11 +97,36 @@ def iter_collector_core_versioned_modules(root: Path) -> Iterable[Path]:
         yield pipeline_version
 
 
-def _load_pipeline_map(root: Path) -> tuple[Path, dict[str, Any]] | None:
+READ_YAML_EXCEPTIONS = (
+    ConfigValidationError,
+    YamlParseError,
+    FileNotFoundError,
+    OSError,
+    ValueError,
+)
+
+
+def _append_read_error(errors: list[dict[str, Any]], path: Path, exc: Exception) -> None:
+    errors.append({
+        "type": "read_yaml_error",
+        "path": str(path),
+        "exception": exc.__class__.__name__,
+        "message": str(exc),
+    })
+
+
+def _load_pipeline_map(
+    root: Path,
+    errors: list[dict[str, Any]],
+) -> tuple[Path, dict[str, Any]] | None:
     pipeline_map_path = root / "tools" / "pipeline_map.yaml"
     if not pipeline_map_path.exists():
         return None
-    pipeline_map = read_yaml(pipeline_map_path, schema_name="pipeline_map") or {}
+    try:
+        pipeline_map = read_yaml(pipeline_map_path, schema_name="pipeline_map") or {}
+    except READ_YAML_EXCEPTIONS as exc:
+        _append_read_error(errors, pipeline_map_path, exc)
+        return None
     return pipeline_map_path, pipeline_map
 
 
@@ -108,7 +134,7 @@ def validate_pipeline_layout(root: Path) -> tuple[list[dict[str, Any]], list[Pat
     errors: list[dict[str, Any]] = []
     pipeline_dirs: list[Path] = []
 
-    pipeline_map_entry = _load_pipeline_map(root)
+    pipeline_map_entry = _load_pipeline_map(root, errors)
     if pipeline_map_entry is not None:
         pipeline_map_path, pipeline_map = pipeline_map_entry
         pipelines_cfg = pipeline_map.get("pipelines", {}) or {}
@@ -228,10 +254,17 @@ def validate_versioned_modules(root: Path) -> list[dict[str, Any]]:
     return errors
 
 
-def load_profiles(license_map_path: Path) -> dict[str, Any]:
+def load_profiles(
+    license_map_path: Path,
+    errors: list[dict[str, Any]],
+) -> dict[str, Any]:
     if not license_map_path.exists():
         return {}
-    data = read_yaml(license_map_path, schema_name="license_map")
+    try:
+        data = read_yaml(license_map_path, schema_name="license_map")
+    except READ_YAML_EXCEPTIONS as exc:
+        _append_read_error(errors, license_map_path, exc)
+        return {}
     return data.get("profiles", {}) or data.get("license_profiles", {}) or {}
 
 
@@ -242,9 +275,17 @@ def _parse_updated_utc(value: str) -> datetime | None:
         return None
 
 
-def _collect_updated_utc_warnings(path: Path, schema_name: str) -> list[dict[str, Any]]:
+def _collect_updated_utc_warnings(
+    path: Path,
+    schema_name: str,
+    errors: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
     warnings: list[dict[str, Any]] = []
-    cfg = read_yaml(path, schema_name=schema_name) or {}
+    try:
+        cfg = read_yaml(path, schema_name=schema_name) or {}
+    except READ_YAML_EXCEPTIONS as exc:
+        _append_read_error(errors, path, exc)
+        return warnings
     updated = str(cfg.get("updated_utc", "")).strip()
     if not updated:
         return warnings
@@ -279,8 +320,12 @@ def validate_targets_file(path: Path) -> tuple[list[dict[str, Any]], list[dict[s
     errors: list[dict[str, Any]] = []
     warnings: list[dict[str, Any]] = []
 
-    cfg = read_yaml(path, schema_name="targets") or {}
-    warnings.extend(_collect_updated_utc_warnings(path, "targets"))
+    try:
+        cfg = read_yaml(path, schema_name="targets") or {}
+    except READ_YAML_EXCEPTIONS as exc:
+        _append_read_error(errors, path, exc)
+        return errors, warnings
+    warnings.extend(_collect_updated_utc_warnings(path, "targets", errors))
     schema_version = str(cfg.get("schema_version", ""))
     if schema_version and schema_version != EXPECTED_TARGETS_SCHEMA:
         errors.append({
@@ -295,20 +340,20 @@ def validate_targets_file(path: Path) -> tuple[list[dict[str, Any]], list[dict[s
     if not license_map_path.is_absolute():
         license_map_path = path.parent / license_map_path
     if license_map_path.exists():
-        warnings.extend(_collect_updated_utc_warnings(license_map_path, "license_map"))
-    profiles = load_profiles(license_map_path)
+        warnings.extend(_collect_updated_utc_warnings(license_map_path, "license_map", errors))
+    profiles = load_profiles(license_map_path, errors)
 
     field_schemas_path = Path(companion.get("field_schemas", "field_schemas.yaml"))
     if not field_schemas_path.is_absolute():
         field_schemas_path = path.parent / field_schemas_path
     if field_schemas_path.exists():
-        warnings.extend(_collect_updated_utc_warnings(field_schemas_path, "field_schemas"))
+        warnings.extend(_collect_updated_utc_warnings(field_schemas_path, "field_schemas", errors))
 
     denylist_path = Path(companion.get("denylist", "denylist.yaml"))
     if not denylist_path.is_absolute():
         denylist_path = path.parent / denylist_path
     if denylist_path.exists():
-        warnings.extend(_collect_updated_utc_warnings(denylist_path, "denylist"))
+        warnings.extend(_collect_updated_utc_warnings(denylist_path, "denylist", errors))
 
     for target in cfg.get("targets", []) or []:
         if not target.get("enabled", True):
