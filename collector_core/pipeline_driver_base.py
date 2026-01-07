@@ -12,6 +12,7 @@ import re
 import socket
 import time
 import urllib.parse
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -1883,6 +1884,23 @@ class BasePipelineDriver:
         write_jsonl(queues_root / "red_rejected.jsonl", results.red_rows)
 
     def emit_summary(self, cfg: DriverConfig, results: ClassificationResult) -> None:
+        failed_targets = [
+            {
+                "id": warning.get("target_id", "unknown"),
+                "error": warning.get("message") or warning.get("type") or "warning",
+            }
+            for warning in results.warnings
+        ]
+        counts = Counter(
+            {
+                "targets_total": len(cfg.targets),
+                "queued_green": len(results.green_rows),
+                "queued_yellow": len(results.yellow_rows),
+                "queued_red": len(results.red_rows),
+                "warnings": len(results.warnings),
+                "failed": len(failed_targets),
+            }
+        )
         summary = {
             "run_at_utc": utc_now(),
             "pipeline_version": VERSION,
@@ -1895,6 +1913,8 @@ class BasePipelineDriver:
             "manifests_root": str(cfg.manifests_root),
             "queues_root": str(cfg.queues_root),
             "warnings": results.warnings,
+            "counts": dict(counts),
+            "failed_targets": failed_targets,
         }
         write_json(cfg.queues_root / "run_summary.json", summary)
 

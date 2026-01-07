@@ -999,6 +999,12 @@ def merge_records(
                 )
                 summary["profile_path"] = str(profile_path)
                 summary["profile_text_path"] = str(text_path)
+    summary["counts"] = {
+        "written": summary["written"],
+        "deduped": summary["deduped"],
+        "skipped": summary["skipped"],
+    }
+    summary["failed_targets"] = []
     summary["finished_at_utc"] = utc_now()
     return summary
 
