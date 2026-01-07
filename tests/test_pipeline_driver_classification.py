@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from collector_core.secrets import REDACTED
 
 @dataclasses.dataclass(frozen=True)
 class PipelineTestConfig:
@@ -180,6 +181,38 @@ def test_offline_snapshot_terms_forces_yellow(tmp_path: Path, minimal_config: Pi
         (minimal_config.manifests_root / "offline_target" / "evaluation.json").read_text(encoding="utf-8")
     )
     assert evaluation["no_fetch_missing_evidence"] is True
+
+
+def test_evaluation_manifest_redacts_headers(tmp_path: Path, minimal_config: PipelineTestConfig) -> None:
+    secret = "supersecret"
+    targets = [
+        {
+            "id": "redact_target",
+            "name": "Redact Headers Dataset",
+            "license_profile": "permissive",
+            "license_evidence": {"spdx_hint": "MIT", "url": "https://example.test/terms"},
+        }
+    ]
+    targets_path = minimal_config.write_targets(tmp_path, targets)
+
+    run_driver(
+        targets_path,
+        minimal_config.license_map_path,
+        extra_args=[
+            "--evidence-header",
+            f"Authorization=Bearer {secret}",
+            "--evidence-header",
+            f"X-Api-Key={secret}",
+        ],
+    )
+
+    evaluation_path = minimal_config.manifests_root / "redact_target" / "evaluation.json"
+    evaluation_text = evaluation_path.read_text(encoding="utf-8")
+    assert secret not in evaluation_text
+    assert REDACTED in evaluation_text
+    evaluation = json.loads(evaluation_text)
+    assert evaluation["evidence_headers_used"]["Authorization"] == REDACTED
+    assert evaluation["evidence_headers_used"]["X-Api-Key"] == REDACTED
 
 
 def test_denylist_overrides_bucket(tmp_path: Path, minimal_config: PipelineTestConfig) -> None:

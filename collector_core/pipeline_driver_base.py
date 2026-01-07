@@ -19,6 +19,7 @@ from collector_core.config_validator import read_yaml
 from collector_core.dependencies import _try_import
 from collector_core.exceptions import ConfigValidationError
 from collector_core.logging_config import add_logging_args, configure_logging
+from collector_core.secrets import REDACTED, SecretStr, redact_headers
 
 logger = logging.getLogger(__name__)
 PdfReader = _try_import("pypdf", "PdfReader")
@@ -238,6 +239,24 @@ def build_evidence_headers(raw_headers: list[str]) -> dict[str, str]:
         if key.strip():
             headers[key.strip()] = value.strip()
     return headers
+
+
+def _scrub_secret_values(value: Any) -> Any:
+    if isinstance(value, SecretStr):
+        return REDACTED
+    if isinstance(value, dict):
+        return {key: _scrub_secret_values(val) for key, val in value.items()}
+    if isinstance(value, list):
+        return [_scrub_secret_values(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_scrub_secret_values(item) for item in value)
+    return value
+
+
+def redact_headers_for_manifest(headers: dict[str, str] | None) -> dict[str, Any]:
+    if not headers:
+        return {}
+    return _scrub_secret_values(redact_headers(headers))
 
 
 def resolve_output_roots(args: argparse.Namespace, globals_cfg: dict[str, Any]) -> tuple[Path, Path]:
@@ -1106,7 +1125,7 @@ class BasePipelineDriver:
             "url": url,
             "fetched_at_utc": utc_now(),
             "status": "skipped",
-            "headers_used": headers or {},
+            "headers_used": redact_headers_for_manifest(headers),
         }
         if not url:
             result["status"] = "no_url"
@@ -1473,7 +1492,7 @@ class BasePipelineDriver:
             "queue_bucket": eff_bucket,
             "license_evidence_url": ctx.evidence_url,
             "evidence_snapshot": evidence.snapshot,
-            "evidence_headers_used": cfg.headers,
+            "evidence_headers_used": redact_headers_for_manifest(cfg.headers),
             "license_change_detected": evidence.license_change_detected,
             "signoff_evidence_sha256": signoff_evidence_sha256,
             "signoff_evidence_sha256_raw_bytes": signoff_evidence_sha256_raw,
