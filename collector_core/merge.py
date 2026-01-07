@@ -21,7 +21,7 @@ from datasets import DatasetDict, load_from_disk
 
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.config_validator import read_yaml
-from tools.output_contract import normalize_output_record, validate_output_contract
+from collector_core.output_contract import normalize_output_record, validate_output_contract
 
 if importlib.util.find_spec("tqdm"):
     from tqdm import tqdm as tqdm_progress
