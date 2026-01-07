@@ -27,6 +27,7 @@ from typing import Any
 from datasets import DatasetDict, load_from_disk
 
 from collector_core.__version__ import __version__ as VERSION
+from collector_core.companion_files import read_field_schemas, resolve_companion_paths
 from collector_core.config_validator import read_yaml
 from collector_core.yellow_screen_common import (
     PitchConfig,
@@ -215,15 +216,8 @@ def sharding_cfg(cfg: dict[str, Any], prefix: str) -> ShardingConfig:
 
 def load_field_schemas(cfg: dict[str, Any], targets_path: Path) -> dict[str, dict[str, Any]]:
     comp = (cfg.get("companion_files", {}) or {})
-    schema_path = comp.get("field_schemas")
-    if not schema_path:
-        return {}
-    path = Path(schema_path)
-    if not path.is_absolute():
-        path = targets_path.parent / path
-    if not path.exists():
-        return {}
-    return read_yaml(path, schema_name="field_schemas") or {}
+    schema_paths = resolve_companion_paths(targets_path, comp.get("field_schemas"), "./field_schemas.yaml")
+    return read_field_schemas(schema_paths)
 
 
 def find_text(row: dict[str, Any], candidates: list[str]) -> str | None:

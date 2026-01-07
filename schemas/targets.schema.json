@@ -9,9 +9,24 @@
     "companion_files": {
       "type": "object",
       "properties": {
-        "license_map": { "type": "string" },
-        "field_schemas": { "type": "string" },
-        "denylist": { "type": "string" }
+        "license_map": {
+          "anyOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" } }
+          ]
+        },
+        "field_schemas": {
+          "anyOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" } }
+          ]
+        },
+        "denylist": {
+          "anyOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" } }
+          ]
+        }
       },
       "additionalProperties": true
     },

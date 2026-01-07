@@ -27,6 +27,7 @@ from typing import Any
 from datasets import DatasetDict, load_from_disk
 
 from collector_core.__version__ import __version__ as VERSION
+from collector_core.companion_files import read_field_schemas, resolve_companion_paths
 from collector_core.config_validator import read_yaml
 from collector_core.yellow_screen_common import (
     PitchConfig,
@@ -103,12 +104,9 @@ class FieldSpec:
     validation: dict[str, Any] = dataclasses.field(default_factory=dict)
 
 
-def load_field_schemas(path: Path) -> dict[str, dict[str, FieldSpec]]:
-    if not path.exists():
-        return {}
-    cfg = load_yaml(path, schema_name="field_schemas")
+def load_field_schemas(paths: list[Path]) -> dict[str, dict[str, FieldSpec]]:
     schemas: dict[str, dict[str, FieldSpec]] = {}
-    for schema_name, schema_def in (cfg.get("schemas") or {}).items():
+    for schema_name, schema_def in read_field_schemas(paths).items():
         fields: dict[str, FieldSpec] = {}
         for fname, fdef in (schema_def.get("fields") or {}).items():
             fields[fname] = FieldSpec(
@@ -809,13 +807,10 @@ def main() -> None:
     ensure_dir(roots.pitches_root)
 
     companion = (cfg.get("companion_files") or {})
-    field_schemas_path = companion.get("field_schemas")
+    field_schemas_paths = resolve_companion_paths(targets_path, companion.get("field_schemas"), "./field_schemas.yaml")
     schemas: dict[str, dict[str, FieldSpec]] = {}
-    if field_schemas_path:
-        fs_path = Path(field_schemas_path)
-        if not fs_path.is_absolute():
-            fs_path = targets_path.parent / fs_path
-        schemas = load_field_schemas(fs_path)
+    if field_schemas_paths:
+        schemas = load_field_schemas(field_schemas_paths)
 
     queue_rows = read_jsonl(Path(args.queue))
     queue_rows = [r for r in queue_rows if r.get("enabled", True) and r.get("id")]

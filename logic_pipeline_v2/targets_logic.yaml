@@ -2,9 +2,15 @@ schema_version: "0.9"
 updated_utc: "2025-12-30"
 
 companion_files:
-  license_map: "./license_map.yaml"
-  field_schemas: "./field_schemas.yaml"
-  denylist: "./denylist.yaml"
+  license_map:
+    - "../configs/common/license_map.yaml"
+    - "./license_map.yaml"
+  field_schemas:
+    - "../configs/common/field_schemas.yaml"
+    - "./field_schemas.yaml"
+  denylist:
+    - "../configs/common/denylist.yaml"
+    - "./denylist.yaml"
 
 globals:
   raw_root: /data/logic/raw

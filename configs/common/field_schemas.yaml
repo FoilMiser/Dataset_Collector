@@ -1,0 +1,7 @@
+# field_schemas.yaml
+# v0.2 — shared schema registry (pipeline-specific schemas live in overrides)
+
+schema_version: "0.9"
+updated_utc: "2025-12-30"
+
+schemas: {}
