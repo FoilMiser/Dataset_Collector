@@ -90,6 +90,37 @@ def test_snapshot_evidence_write_mismatch_marks_error(tmp_path: Path, monkeypatc
     assert "verification" in result.get("error", "").lower()
 
 
+def test_snapshot_evidence_removes_stale_siblings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    driver = BasePipelineDriver()
+
+    def fake_fetch(
+        url: str,
+        timeout_s: float | tuple[float, float] = (15.0, 60.0),
+        max_retries: int = 3,
+        backoff_base: float = 2.0,
+        headers: dict[str, str] | None = None,
+        max_bytes: int | None = None,
+    ) -> tuple[bytes | None, str | None, dict[str, object]]:
+        return b"%PDF-1.4\nbody", "application/pdf", {"retries": 0, "errors": [], "final_url": url}
+
+    monkeypatch.setattr(driver, "fetch_url_with_retry", fake_fetch)
+
+    manifest_dir = tmp_path / "manifest"
+    manifest_dir.mkdir()
+    (manifest_dir / "license_evidence.html").write_text("<html>old</html>", encoding="utf-8")
+    (manifest_dir / "license_evidence.txt").write_text("stale", encoding="utf-8")
+
+    driver.snapshot_evidence(manifest_dir, "https://example.test/terms")
+
+    current_files = sorted(
+        path.name
+        for path in manifest_dir.glob("license_evidence.*")
+        if not path.name.startswith("license_evidence.prev_")
+    )
+    assert current_files == ["license_evidence.pdf"]
+    assert any(path.suffix == ".html" for path in manifest_dir.glob("license_evidence.prev_*"))
+
+
 def test_resolve_retry_config_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     args = SimpleNamespace(retry_max=None, retry_backoff=None, max_retries=None)
     monkeypatch.setenv("PIPELINE_RETRY_MAX", "5")

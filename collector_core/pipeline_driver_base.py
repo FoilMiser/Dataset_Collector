@@ -34,6 +34,7 @@ SUPPORTED_GATES = {
 }
 EVIDENCE_CHANGE_POLICIES = {"raw", "normalized", "either"}
 COSMETIC_CHANGE_POLICIES = {"warn_only", "treat_as_changed"}
+EVIDENCE_EXTENSIONS = [".html", ".pdf", ".txt", ".json"]
 
 def utc_now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
@@ -354,11 +355,27 @@ def load_driver_config(args: argparse.Namespace) -> DriverConfig:
 
 
 def find_existing_evidence(manifest_dir: Path) -> Path | None:
-    for ext in [".html", ".pdf", ".txt", ".json"]:
+    for ext in EVIDENCE_EXTENSIONS:
         candidate = manifest_dir / f"license_evidence{ext}"
         if candidate.exists():
             return candidate
     return None
+
+
+def cleanup_stale_evidence(manifest_dir: Path, keep: Path | None = None) -> list[Path]:
+    removed: list[Path] = []
+    keep_resolved = keep.resolve() if keep else None
+    for path in manifest_dir.glob("license_evidence*"):
+        if path.name == "license_evidence_meta.json":
+            continue
+        if path.name.startswith("license_evidence.prev_"):
+            continue
+        if keep_resolved and path.resolve() == keep_resolved:
+            continue
+        if path.is_file():
+            path.unlink()
+            removed.append(path)
+    return removed
 
 
 def apply_denylist_bucket(dl_hits: list[dict[str, Any]], eff_bucket: str) -> str:
@@ -1276,12 +1293,9 @@ class BasePipelineDriver:
         previous_normalized_digest = None
         existing_path = None
         existing_meta: dict[str, Any] = {}
-        for ext in [".html", ".pdf", ".txt", ".json"]:
-            candidate = manifest_dir / f"license_evidence{ext}"
-            if candidate.exists():
-                existing_path = candidate
-                previous_digest = sha256_file(candidate)
-                break
+        existing_path = find_existing_evidence(manifest_dir)
+        if existing_path:
+            previous_digest = sha256_file(existing_path)
         meta_path = manifest_dir / "license_evidence_meta.json"
         if meta_path.exists():
             try:
@@ -1339,6 +1353,7 @@ class BasePipelineDriver:
         ensure_dir(manifest_dir)
         out_path = manifest_dir / f"license_evidence{ext}"
         temp_path = manifest_dir / f"license_evidence{ext}.part"
+        cleanup_stale_evidence(manifest_dir, keep=existing_path)
         raw_changed_from_previous = bool(previous_digest and previous_digest != digest)
         history: list[dict[str, Any]] = []
         if isinstance(existing_meta.get("history"), list):
