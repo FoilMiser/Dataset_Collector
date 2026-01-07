@@ -1,6 +1,6 @@
 # targets_agri_circular.yaml
 # v0.1 — agriculture + waste streams + circular bioeconomy dataset inventory
-# Companion files: ./license_map.yaml, ./field_schemas.yaml, ./denylist.yaml, ./difficulties_agri_circular.yaml
+# Companion files: ../configs/common/license_map.yaml, ../configs/common/field_schemas.yaml, ../configs/common/denylist.yaml, ./difficulties_agri_circular.yaml
 #
 # Notes:
 #   - GREEN: permissive/public-domain sources (auto-ingest)
@@ -12,13 +12,10 @@ updated_utc: "2025-12-30"
 companion_files:
   license_map:
     - "../configs/common/license_map.yaml"
-    - "./license_map.yaml"
   field_schemas:
     - "../configs/common/field_schemas.yaml"
-    - "./field_schemas.yaml"
   denylist:
     - "../configs/common/denylist.yaml"
-    - "./denylist.yaml"
 
 globals:
   raw_root: "/data/agri_circular/raw"
