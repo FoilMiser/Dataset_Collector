@@ -77,6 +77,7 @@ Optional (standardized):
 - `--queues-root PATH` (alias: `--out-queues`)
 - `--retry-max INT` (alias: `--max-retries`, default: `3`)
 - `--retry-backoff FLOAT` (default: `2.0`)
+- `--allow-private-evidence-hosts` (allow evidence URLs that resolve to private, loopback, or link-local IPs)
 
 ### `acquire_worker.py`
 

@@ -4,11 +4,14 @@ import argparse
 import dataclasses
 import hashlib
 import html
+import ipaddress
 import json
 import logging
 import os
 import re
+import socket
 import time
+import urllib.parse
 from pathlib import Path
 from typing import Any
 
@@ -80,6 +83,49 @@ def normalize_whitespace(text: str) -> str:
 
 def lower(text: str) -> str:
     return (text or "").lower()
+
+
+def _is_blocked_ip(ip_value: str) -> bool:
+    ip = ipaddress.ip_address(ip_value)
+    return ip.is_private or ip.is_loopback or ip.is_link_local
+
+
+def _resolve_host_ips(hostname: str) -> list[str]:
+    ips: set[str] = set()
+    try:
+        addrinfo = socket.getaddrinfo(hostname, None)
+    except socket.gaierror:
+        return []
+    for item in addrinfo:
+        sockaddr = item[4]
+        if sockaddr:
+            ips.add(sockaddr[0])
+    return sorted(ips)
+
+
+def validate_evidence_url(url: str, allow_private_hosts: bool) -> tuple[bool, str | None]:
+    parsed = urllib.parse.urlparse(url)
+    scheme = (parsed.scheme or "").lower()
+    if scheme not in {"http", "https"}:
+        return False, f"unsupported_scheme:{scheme or 'missing'}"
+    if not parsed.hostname:
+        return False, "missing_hostname"
+    if allow_private_hosts:
+        return True, None
+    hostname = parsed.hostname
+    try:
+        ip_value = ipaddress.ip_address(hostname)
+    except ValueError:
+        ips = _resolve_host_ips(hostname)
+        if not ips:
+            return False, "unresolvable_hostname"
+        for ip_value in ips:
+            if _is_blocked_ip(ip_value):
+                return False, f"blocked_ip:{ip_value}"
+        return True, None
+    if _is_blocked_ip(str(ip_value)):
+        return False, f"blocked_ip:{ip_value}"
+    return True, None
 
 
 _HTML_SCRIPT_STYLE_RE = re.compile(r"(?is)<(script|style)[^>]*>.*?</\1>")
@@ -1194,9 +1240,15 @@ class BasePipelineDriver:
         backoff_base: float = 2.0,
         headers: dict[str, str] | None = None,
         max_bytes: int | None = None,
+        allow_private_hosts: bool = False,
     ) -> tuple[bytes | None, str | None, dict[str, Any]]:
         """Fetch URL with retry and exponential backoff."""
         meta: dict[str, Any] = {"retries": 0, "errors": [], "timeout": timeout_s, "max_bytes": max_bytes}
+        allowed, reason = validate_evidence_url(url, allow_private_hosts)
+        if not allowed:
+            meta["blocked_url"] = url
+            meta["blocked_reason"] = reason
+            return None, "blocked_url", meta
 
         for attempt in range(max_retries):
             try:
@@ -1212,6 +1264,25 @@ class BasePipelineDriver:
                     meta["final_status"] = r.status_code
                     meta["final_url"] = final_url
                     meta["content_type"] = ctype
+                    redirect_urls: list[str] = []
+                    for resp in r.history:
+                        location = resp.headers.get("Location")
+                        if not location:
+                            continue
+                        redirect_urls.append(urllib.parse.urljoin(resp.url, location))
+                    redirect_urls.append(final_url)
+                    for redirect_url in redirect_urls:
+                        allowed, reason = validate_evidence_url(redirect_url, allow_private_hosts)
+                        if not allowed:
+                            meta["blocked_url"] = redirect_url
+                            meta["blocked_reason"] = reason
+                            logger.warning(
+                                "Evidence fetch blocked: url=%s blocked_url=%s reason=%s",
+                                url,
+                                redirect_url,
+                                reason,
+                            )
+                            return None, "blocked_url", meta
                     content_length = r.headers.get("Content-Length")
                     if max_bytes and content_length:
                         try:
@@ -1278,6 +1349,7 @@ class BasePipelineDriver:
         max_retries: int = 3,
         backoff_base: float = 2.0,
         headers: dict[str, str] | None = None,
+        allow_private_hosts: bool = False,
     ) -> dict[str, Any]:
         result: dict[str, Any] = {
             "url": url,
@@ -1312,6 +1384,7 @@ class BasePipelineDriver:
             backoff_base=backoff_base,
             headers=headers,
             max_bytes=self.EVIDENCE_MAX_BYTES,
+            allow_private_hosts=allow_private_hosts,
         )
         result["fetch_meta"] = meta
 
@@ -1590,6 +1663,7 @@ class BasePipelineDriver:
                 max_retries=cfg.retry_max,
                 backoff_base=cfg.retry_backoff,
                 headers=cfg.headers,
+                allow_private_hosts=cfg.args.allow_private_evidence_hosts,
             )
             evidence_text = extract_text_for_scanning(evidence_snapshot)
             license_change_detected = bool(evidence_snapshot.get("changed_from_previous"))
@@ -1873,6 +1947,11 @@ class BasePipelineDriver:
             action="append",
             default=[],
             help="Custom header for evidence fetcher (KEY=VALUE). Useful for license-gated pages",
+        )
+        ap.add_argument(
+            "--allow-private-evidence-hosts",
+            action="store_true",
+            help="Allow evidence URLs that resolve to private, loopback, or link-local IPs (unsafe).",
         )
         ap.add_argument(
             "--strict",
