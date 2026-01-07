@@ -56,7 +56,7 @@ class PipelineTestConfig:
 def minimal_license_map(tmp_path: Path) -> Path:
     license_map_path = tmp_path / "license_map.yaml"
     license_map = {
-        "schema_version": "0.3",
+        "schema_version": "0.9",
         "spdx": {
             "allow": ["MIT"],
             "conditional": ["LGPL-2.1-only"],
@@ -82,7 +82,7 @@ def minimal_config(tmp_path: Path, minimal_license_map: Path) -> PipelineTestCon
     denylist_path.write_text(
         yaml.safe_dump(
             {
-                "schema_version": "0.2",
+                "schema_version": "0.9",
                 "patterns": [],
                 "domain_patterns": [],
                 "publisher_patterns": [],
@@ -215,12 +215,62 @@ def test_evaluation_manifest_redacts_headers(tmp_path: Path, minimal_config: Pip
     assert evaluation["evidence_headers_used"]["X-Api-Key"] == REDACTED
 
 
+def _collect_strings(value: object) -> list[str]:
+    if isinstance(value, dict):
+        strings: list[str] = []
+        for key, item in value.items():
+            strings.extend(_collect_strings(key))
+            strings.extend(_collect_strings(item))
+        return strings
+    if isinstance(value, list):
+        strings = []
+        for item in value:
+            strings.extend(_collect_strings(item))
+        return strings
+    if isinstance(value, str):
+        return [value]
+    return []
+
+
+def test_manifests_omit_or_redact_secret_headers(tmp_path: Path, minimal_config: PipelineTestConfig) -> None:
+    secret = "supersecret"
+    targets = [
+        {
+            "id": "manifest_scan_target",
+            "name": "Manifest Scan Dataset",
+            "license_profile": "permissive",
+            "license_evidence": {"spdx_hint": "MIT", "url": "https://example.test/terms"},
+        }
+    ]
+    targets_path = minimal_config.write_targets(tmp_path, targets)
+
+    run_driver(
+        targets_path,
+        minimal_config.license_map_path,
+        extra_args=["--evidence-header", f"Authorization=Bearer {secret}"],
+    )
+
+    manifest_dir = minimal_config.manifests_root / "manifest_scan_target"
+    manifest_paths = list(manifest_dir.rglob("*.json"))
+    assert manifest_paths
+
+    forbidden_markers = ("Authorization: Bearer", "Authorization=Bearer", secret)
+    for path in manifest_paths:
+        manifest_text = path.read_text(encoding="utf-8")
+        assert not any(marker in manifest_text for marker in forbidden_markers)
+        manifest_payload = json.loads(manifest_text)
+        strings = _collect_strings(manifest_payload)
+        assert not any("Bearer " in value for value in strings)
+        if "Authorization" in strings:
+            assert REDACTED in strings
+
+
 def test_denylist_overrides_bucket(tmp_path: Path, minimal_config: PipelineTestConfig) -> None:
     denylist_path = tmp_path / "denylist.yaml"
     denylist_path.write_text(
         yaml.safe_dump(
             {
-                "schema_version": "0.2",
+                "schema_version": "0.9",
                 "patterns": [
                     {
                         "type": "substring",
