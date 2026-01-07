@@ -12,6 +12,17 @@ reproducibility.
 - Track work in GitHub Issues (or `docs/pipeline_backlog.md` if working offline).
 - Do not add `todo.txt` files; migrate any ad-hoc notes into the tracker instead.
 
+## Pre-commit setup (recommended)
+
+We use pre-commit hooks to enforce formatting and linting consistent with the
+repository style (Ruff + yamllint + whitespace/EOF fixes).
+
+```bash
+pip install pre-commit
+pre-commit install
+pre-commit run --all-files
+```
+
 ## CI matrix expectations
 
 CI runs validation across multiple operating systems and Python versions with two
