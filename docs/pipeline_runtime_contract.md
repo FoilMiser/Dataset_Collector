@@ -135,6 +135,15 @@ See `docs/output_contract.md` for the full layout; key stage outputs are:
 | `yellow_screen_worker.py` | `screened_yellow/<pool>/shards/*`, `_ledger/yellow_passed.jsonl`, `_ledger/yellow_pitched.jsonl` |
 | `merge_worker.py` | `combined/<pool>/shards/*`, `_ledger/combined_index.jsonl`, `_ledger/merge_summary.json` |
 
+## Summary payload fields
+
+Each stage summary JSON now includes:
+
+- `counts`: status breakdown for the stage (including `total` and per-status counts where applicable).
+- `failed_targets`: list of `{id, error}` entries for targets that failed or were skipped in that stage.
+
+Stage-specific fields (like `queued_green` or `written`) remain unchanged; the new fields are additive.
+
 ## Retry/backoff behavior
 
 All stages that perform network I/O use **exponential backoff** with:

@@ -23,6 +23,7 @@ import json
 import re
 import time
 import zipfile
+from collections import Counter
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
@@ -787,6 +788,14 @@ def main() -> None:
     for row in queue_rows:
         res = process_target(cfg, roots, row, args.execute, pitch_cfg)
         summary["results"].append(res)
+
+    status_counts = Counter(result.get("status") or "unknown" for result in summary["results"])
+    summary["counts"] = {"total": len(summary["results"]), **dict(status_counts)}
+    summary["failed_targets"] = [
+        {"id": result.get("target_id", "unknown"), "error": result.get("reason", "unknown")}
+        for result in summary["results"]
+        if result.get("status") != "ok"
+    ]
 
     write_json(roots.ledger_root / "yellow_screen_summary.json", summary)
 

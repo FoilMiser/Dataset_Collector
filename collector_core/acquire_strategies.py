@@ -8,6 +8,7 @@ import os
 import subprocess
 import sys
 import time
+from collections import Counter
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -940,6 +941,14 @@ def run_acquire_worker(
         for row in rows:
             res = run_target(ctx, args.bucket, row, strategy_handlers, postprocess)
             summary["results"].append(res)
+
+    status_counts = Counter(result.get("status") or "unknown" for result in summary["results"])
+    summary["counts"] = {"total": len(summary["results"]), **dict(status_counts)}
+    summary["failed_targets"] = [
+        {"id": result.get("id", "unknown"), "error": result.get("error", "unknown")}
+        for result in summary["results"]
+        if result.get("status") == "error"
+    ]
 
     write_json(roots.logs_root / f"acquire_summary_{args.bucket}.json", summary)
     if ctx.mode.execute and args.strict and any(r.get("status") == "error" for r in summary["results"]):
