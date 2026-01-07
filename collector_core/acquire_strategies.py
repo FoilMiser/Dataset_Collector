@@ -153,18 +153,56 @@ def _http_download_with_resume(ctx: AcquireContext, url: str, out_path: Path, ex
     if missing:
         raise RuntimeError(missing)
     ensure_dir(out_path.parent)
-    headers = {}
+    temp_path = out_path.with_name(f"{out_path.name}.part")
+    headers: dict[str, str] = {}
     mode = "wb"
-    existing = out_path.stat().st_size if out_path.exists() else 0
+    existing = 0
+    if temp_path.exists() and ctx.mode.enable_resume:
+        existing = temp_path.stat().st_size
     if existing and ctx.mode.enable_resume:
         headers["Range"] = f"bytes={existing}-"
         mode = "ab"
-    with requests.get(url, stream=True, headers=headers, timeout=(15, 300)) as r:
-        r.raise_for_status()
-        with out_path.open(mode) as f:
-            for chunk in r.iter_content(chunk_size=1024 * 1024):
+
+    def _stream_response(response: requests.Response, write_mode: str) -> None:
+        with temp_path.open(write_mode) as f:
+            for chunk in response.iter_content(chunk_size=1024 * 1024):
                 if chunk:
                     f.write(chunk)
+
+    def _valid_content_range(header: str | None, start_offset: int) -> bool:
+        if not header:
+            return False
+        if not header.startswith("bytes "):
+            return False
+        try:
+            range_part = header.split(" ", 1)[1]
+            span, _total = range_part.split("/", 1)
+            start_str, _end_str = span.split("-", 1)
+            return int(start_str) == start_offset
+        except ValueError:
+            return False
+
+    with requests.get(url, stream=True, headers=headers, timeout=(15, 300)) as r:
+        r.raise_for_status()
+        if existing and ctx.mode.enable_resume:
+            content_range = r.headers.get("Content-Range")
+            valid_range = _valid_content_range(content_range, existing)
+            if r.status_code == 206:
+                if content_range and not valid_range:
+                    raise RuntimeError("Invalid Content-Range for resumed download.")
+                _stream_response(r, mode)
+            elif valid_range:
+                _stream_response(r, mode)
+            else:
+                if r.status_code == 200:
+                    with requests.get(url, stream=True, timeout=(15, 300)) as fresh:
+                        fresh.raise_for_status()
+                        _stream_response(fresh, "wb")
+                else:
+                    raise RuntimeError("Expected 206 Partial Content or a valid Content-Range for resumed download.")
+        else:
+            _stream_response(r, mode)
+    temp_path.replace(out_path)
     result: dict[str, Any] = {"status": "ok", "path": str(out_path)}
     if ctx.mode.verify_sha256 and expected_size and out_path.stat().st_size != expected_size:
         result = {"status": "error", "error": "size_mismatch"}
