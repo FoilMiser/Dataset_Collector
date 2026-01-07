@@ -688,11 +688,43 @@ def resolve_spdx_with_confidence(
     blob = normalize_whitespace(f"{hint} {evidence_text}")
     blob_l = lower(blob)
 
+    def _find_rule_match(needle: str) -> tuple[int, int] | None:
+        if not needle:
+            return None
+        if len(needle) <= 4 and re.fullmatch(r"[A-Za-z0-9]+", needle):
+            pattern = re.compile(rf"\b{re.escape(needle)}\b", re.IGNORECASE)
+            match = pattern.search(blob)
+            if match:
+                return match.start(), match.end()
+            return None
+        idx = blob_l.find(lower(needle))
+        if idx == -1:
+            return None
+        return idx, idx + len(needle)
+
+    def _excerpt(start: int, end: int, context: int = 40) -> str:
+        before = max(0, start - context)
+        after = min(len(blob), end + context)
+        return blob[before:after].strip()
+
     for rule in license_map.normalization_rules:
-        needles = [lower(x) for x in (rule.get("match_any") or []) if x]
-        if needles and any(n in blob_l for n in needles):
+        needles = [x for x in (rule.get("match_any") or []) if x]
+        matched_needle = None
+        match_span = None
+        for needle in needles:
+            match_span = _find_rule_match(str(needle))
+            if match_span:
+                matched_needle = str(needle)
+                break
+        if matched_needle and match_span:
             confidence = min(0.9, 0.6 + 0.05 * len(needles))
-            return str(rule.get("spdx", "UNKNOWN")) or "UNKNOWN", confidence, "normalized via rule match"
+            spdx = str(rule.get("spdx", "UNKNOWN")) or "UNKNOWN"
+            snippet = _excerpt(*match_span)
+            reason = (
+                "normalized via rule match: "
+                f"spdx={spdx} needle='{matched_needle}' excerpt='{snippet}'"
+            )
+            return spdx, confidence, reason
 
     if hint.upper() == "DERIVED":
         return "Derived", 0.6, "derived content flag"
