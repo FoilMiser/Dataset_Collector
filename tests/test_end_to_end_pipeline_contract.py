@@ -7,8 +7,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 import yaml
-from datasets import Dataset
+
+datasets = pytest.importorskip("datasets")
+Dataset = datasets.Dataset
 
 OUTPUT_CONTRACT_PATH = Path(__file__).resolve().parents[1] / "collector_core" / "output_contract.py"
 OUTPUT_CONTRACT_SPEC = importlib.util.spec_from_file_location("output_contract", OUTPUT_CONTRACT_PATH)

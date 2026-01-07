@@ -6,8 +6,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 import yaml
-from datasets import Dataset
+
+datasets = pytest.importorskip("datasets")
+Dataset = datasets.Dataset
 
 
 def test_yellow_screen_hf_dataset(tmp_path: Path) -> None:
