@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+import socket
 from types import SimpleNamespace
 
 import pytest
 
+import collector_core.pipeline_driver_base as pipeline_driver_base
 from collector_core.pipeline_driver_base import (
     BasePipelineDriver,
     EvidenceResult,
@@ -49,6 +51,7 @@ def test_snapshot_evidence_manifest_redacts_headers(tmp_path: Path, monkeypatch:
         backoff_base: float = 2.0,
         headers: dict[str, str] | None = None,
         max_bytes: int | None = None,
+        allow_private_hosts: bool = False,
     ) -> tuple[bytes | None, str | None, dict[str, object]]:
         return b"ok", "text/plain", {"retries": 0, "errors": [], "final_url": url}
 
@@ -71,6 +74,7 @@ def test_snapshot_evidence_write_mismatch_marks_error(tmp_path: Path, monkeypatc
         backoff_base: float = 2.0,
         headers: dict[str, str] | None = None,
         max_bytes: int | None = None,
+        allow_private_hosts: bool = False,
     ) -> tuple[bytes | None, str | None, dict[str, object]]:
         return b"ok", "text/plain", {"retries": 0, "errors": [], "final_url": url}
 
@@ -100,6 +104,7 @@ def test_snapshot_evidence_removes_stale_siblings(tmp_path: Path, monkeypatch: p
         backoff_base: float = 2.0,
         headers: dict[str, str] | None = None,
         max_bytes: int | None = None,
+        allow_private_hosts: bool = False,
     ) -> tuple[bytes | None, str | None, dict[str, object]]:
         return b"%PDF-1.4\nbody", "application/pdf", {"retries": 0, "errors": [], "final_url": url}
 
@@ -119,6 +124,65 @@ def test_snapshot_evidence_removes_stale_siblings(tmp_path: Path, monkeypatch: p
     )
     assert current_files == ["license_evidence.pdf"]
     assert any(path.suffix == ".html" for path in manifest_dir.glob("license_evidence.prev_*"))
+
+
+def test_fetch_url_with_retry_blocks_loopback(monkeypatch: pytest.MonkeyPatch) -> None:
+    driver = BasePipelineDriver()
+
+    def unexpected_get(*args: object, **kwargs: object) -> None:
+        raise AssertionError("requests.get should not be called for blocked URLs")
+
+    monkeypatch.setattr(pipeline_driver_base.requests, "get", unexpected_get)
+
+    content, info, meta = driver.fetch_url_with_retry("http://127.0.0.1/terms")
+    assert content is None
+    assert info == "blocked_url"
+    assert meta["blocked_url"] == "http://127.0.0.1/terms"
+    assert "blocked_ip" in meta["blocked_reason"]
+
+
+def test_fetch_url_with_retry_blocks_private_redirect(monkeypatch: pytest.MonkeyPatch) -> None:
+    driver = BasePipelineDriver()
+
+    class RedirectResponse:
+        def __init__(self, url: str, location: str) -> None:
+            self.url = url
+            self.headers = {"Location": location}
+
+    class DummyResponse:
+        def __init__(self, url: str, history: list[RedirectResponse]) -> None:
+            self.url = url
+            self.headers = {"Content-Type": "text/plain"}
+            self.status_code = 200
+            self.history = history
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def iter_content(self, chunk_size: int = 1024) -> list[bytes]:
+            return [b"ok"]
+
+        def __enter__(self) -> "DummyResponse":
+            return self
+
+        def __exit__(self, exc_type: object, exc: object, tb: object) -> bool:
+            return False
+
+    redirect = RedirectResponse("https://example.test/start", "http://127.0.0.1/private")
+    response = DummyResponse("http://127.0.0.1/private", [redirect])
+
+    def fake_getaddrinfo(host: str, *args: object, **kwargs: object) -> list[tuple[object, ...]]:
+        if host == "example.test":
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))]
+        return []
+
+    monkeypatch.setattr(pipeline_driver_base.socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr(pipeline_driver_base.requests, "get", lambda *args, **kwargs: response)
+
+    content, info, meta = driver.fetch_url_with_retry("https://example.test/start")
+    assert content is None
+    assert info == "blocked_url"
+    assert meta["blocked_url"] == "http://127.0.0.1/private"
 
 
 def test_resolve_retry_config_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
