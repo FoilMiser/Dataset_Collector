@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import subprocess
+import sys
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -883,6 +884,7 @@ def run_acquire_worker(
     ap.add_argument("--workers", type=int, default=1)
     ap.add_argument("--retry-max", type=int, default=3)
     ap.add_argument("--retry-backoff", type=float, default=2.0)
+    ap.add_argument("--strict", "--fail-on-error", dest="strict", action="store_true")
     args = ap.parse_args()
 
     queue_path = Path(args.queue).expanduser().resolve()
@@ -936,3 +938,5 @@ def run_acquire_worker(
             summary["results"].append(res)
 
     write_json(roots.logs_root / f"acquire_summary_{args.bucket}.json", summary)
+    if ctx.mode.execute and args.strict and any(r.get("status") == "error" for r in summary["results"]):
+        sys.exit(1)
