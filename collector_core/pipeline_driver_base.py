@@ -577,9 +577,17 @@ def extract_domain(url: str) -> str:
         from urllib.parse import urlparse
 
         parsed = urlparse(url)
-        return parsed.netloc.lower()
+        return parsed.hostname or ""
     except Exception:
         return ""
+
+
+def _domain_matches(host: str, target: str) -> bool:
+    if not host or not target:
+        return False
+    host_l = host.lower()
+    target_l = target.lower()
+    return host_l == target_l or host_l.endswith(f".{target_l}")
 
 
 def _normalize_denylist(data: dict[str, Any]) -> dict[str, Any]:
@@ -691,7 +699,7 @@ def denylist_hits(denylist: dict[str, Any], hay: dict[str, Any]) -> list[dict[st
                 elif kind == "domain":
                     # v0.9: Domain extraction matching
                     src_domain = extract_domain(src)
-                    if src_domain and val.lower() in src_domain:
+                    if _domain_matches(src_domain, val):
                         matched = True
                 else:  # substring
                     if val.lower() in src.lower():
@@ -724,7 +732,7 @@ def denylist_hits(denylist: dict[str, Any], hay: dict[str, Any]) -> list[dict[st
         for f in url_fields:
             for src in _iter_hay_values(hay.get(f, "")):
                 src_domain = extract_domain(src)
-                if src_domain and target_domain in src_domain:
+                if _domain_matches(src_domain, target_domain):
                     hits.append(
                         {
                             "field": f,

@@ -203,6 +203,27 @@ def test_denylist_hits_match_download_url() -> None:
     assert hits and hits[0]["type"] == "domain"
 
 
+def test_denylist_domain_matches_subdomains_only() -> None:
+    target = {"download": {"url": "https://notgov.com/file"}}
+    denylist = {
+        "domain_patterns": [
+            {"domain": "example.com", "severity": "hard_red"},
+            {"domain": "gov", "severity": "hard_red"},
+        ]
+    }
+    download_urls = extract_download_urls(target)
+    haystack = build_denylist_haystack(
+        "t1",
+        "Target",
+        "https://sub.example.com",
+        download_urls,
+        target,
+    )
+    hits = denylist_hits(denylist, haystack)
+    patterns = {hit["pattern"] for hit in hits if hit["type"] == "domain"}
+    assert patterns == {"example.com"}
+
+
 def test_apply_yellow_signoff_requirement_flags_review() -> None:
     review_required = apply_yellow_signoff_requirement(
         "YELLOW",
