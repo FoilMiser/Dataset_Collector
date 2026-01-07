@@ -44,7 +44,20 @@ def test_resolve_spdx_with_confidence_matches_rules(license_map):
     )
     assert spdx == "CC-BY-4.0"
     assert confidence >= 0.6
-    assert reason == "normalized via rule match"
+    assert "normalized via rule match" in reason
+    assert "spdx=CC-BY-4.0" in reason
+    assert "excerpt=" in reason
+
+
+def test_resolve_spdx_with_confidence_avoids_embedded_short_tokens(license_map):
+    spdx, confidence, reason = resolve_spdx_with_confidence(
+        license_map,
+        evidence_text="Users may permit access to the dataset.",
+        spdx_hint="UNKNOWN",
+    )
+    assert spdx == "UNKNOWN"
+    assert confidence == 0.2
+    assert reason == "no confident match"
 
 
 def test_spdx_bucket_respects_allow_and_denies(license_map):
