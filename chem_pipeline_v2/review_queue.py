@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
-"""Pipeline entry point for manual YELLOW review queue helper."""
+"""Deprecated pipeline entry point for manual YELLOW review queue helper."""
 
 from pathlib import Path
 
-from collector_core.review_queue import main as review_main
+from collector_core.pipeline_cli import run_deprecated_entrypoint
 
 if __name__ == "__main__":
-    review_main(pipeline_id=Path(__file__).resolve().parent.name)
+    raise SystemExit(
+        run_deprecated_entrypoint(
+            "review-queue",
+            pipeline_id=Path(__file__).resolve().parent.name,
+        )
+    )

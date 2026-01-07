@@ -53,6 +53,7 @@ dev = [
 [project.scripts]
 dc-review = "collector_core.review_queue:main"
 dc-catalog = "collector_core.catalog_builder:main"
+dc-pipeline = "collector_core.pipeline_cli:main"
 
 [tool.setuptools.dynamic]
 version = { attr = "collector_core.__version__.__version__" }

@@ -13,7 +13,7 @@ All manual YELLOW reviews MUST land in one of these states:
 | `PITCH` | Not approved for inclusion. | `status: "rejected"`, include `reason` |
 
 > Notes:
-> - The `review_queue.py` helpers write `review_signoff.json` files and accept `constraints`, `reason`, and optional `evidence_links_checked` and `notes` fields.
+> - The `review-queue` helper writes `review_signoff.json` files and accepts `constraints`, `reason`, and optional `evidence_links_checked` and `notes` fields.
 > - The `promote_to` field is optional and should be used only if your pipeline explicitly supports promotion logic.
 
 ## Required evidence artifacts
@@ -24,7 +24,7 @@ Each YELLOW target MUST have a manifest directory and review signoff artifacts. 
    - Emitted by `pipeline_driver.py` during `classify`.
    - Includes `id`, `name`, `license_profile`, `license_evidence_url`, and `manifest_dir`.
 2. **`review_signoff.json` in the manifest directory**
-   - Written by `review_queue.py` when a reviewer approves or rejects a target.
+   - Written by the `review-queue` helper when a reviewer approves or rejects a target.
    - Required fields for consistent workflow:
      - `target_id`
      - `status` (`approved` or `rejected`)
@@ -57,21 +57,29 @@ Each pipeline writes queue files to a per-pipeline queues root, configured via `
 
 If `globals.queues_root` is not set, each pipeline falls back to a default `/data/<pipeline>/_queues` path (see each pipeline's `run_pipeline.sh` for defaults).
 
-### Per-pipeline review queue scripts
+### Unified review queue helper
 
-Each pipeline has its own review helper script, named `review_queue.py`, for listing and signing off on YELLOW targets. The script path follows this pattern:
+Use the unified CLI to list and sign off on YELLOW targets:
+
+```
+dc-pipeline review-queue --pipeline-id <pipeline> [args]
+```
+
+Examples:
+- `dc-pipeline review-queue --pipeline-id biology_pipeline_v2 list --limit 50`
+- `dc-pipeline review-queue --pipeline-id chem_pipeline_v2 approve --target <target_id> ...`
+
+If you run from inside a pipeline directory, you can omit `--pipeline-id` and the CLI will infer it.
+
+### Deprecated per-pipeline scripts
+
+Per-pipeline helper scripts are deprecated and will be removed in a future release. The old script path pattern was:
 
 ```
 <pipeline>_pipeline_v2/review_queue.py
 ```
 
-Examples:
-- `biology_pipeline_v2/review_queue.py`
-- `chem_pipeline_v2/review_queue.py`
-- `engineering_pipeline_v2/review_queue.py`
-- `nlp_pipeline_v2/review_queue.py`
-
-These scripts use the queue JSONL and write `review_signoff.json` in the target manifest directory.
+These deprecated scripts still work but emit a warning. Prefer the unified CLI above.
 
 ## Standard workflow (single source of truth)
 
@@ -81,7 +89,7 @@ The workflow is consistent across all pipelines:
    - Emits `green_download.jsonl` and `yellow_pipeline.jsonl` in the queues root.
 2. **Acquire YELLOW (`acquire_worker.py`)**
    - Downloads YELLOW data into the raw YELLOW bucket.
-3. **Manual review (`review_queue.py`)**
+3. **Manual review (`review-queue`)**
    - `list` to see pending entries.
    - `approve` for `ALLOW` or `ALLOW_WITH_RESTRICTIONS`.
    - `reject` for `PITCH`.
@@ -94,7 +102,7 @@ The workflow is consistent across all pipelines:
 5. **Merge (`merge_worker.py`)**
    - Combines GREEN records with `screened_yellow` shards only.
    - Pitched YELLOW records never enter combined output.
-6. **Catalog (`catalog_builder.py`)**
+6. **Catalog (`catalog-builder`)**
    - Summarizes raw, screened YELLOW, combined shards, and ledgers.
 
 ## Decision flow into `screen_yellow` / `merge` / `catalog`
@@ -107,22 +115,22 @@ The workflow is consistent across all pipelines:
 
 ```bash
 # List pending YELLOW targets
-python <pipeline>_pipeline_v2/review_queue.py --queue <queues_root>/yellow_pipeline.jsonl list --limit 50
+dc-pipeline review-queue --pipeline-id <pipeline> --queue <queues_root>/yellow_pipeline.jsonl list --limit 50
 
 # Approve (ALLOW)
-python <pipeline>_pipeline_v2/review_queue.py --queue <queues_root>/yellow_pipeline.jsonl \
+dc-pipeline review-queue --pipeline-id <pipeline> --queue <queues_root>/yellow_pipeline.jsonl \
   approve --target <target_id> --manifest-dir <manifests_root>/<target_id> \
   --reviewer "Name" --reason "Evidence supports inclusion"
 
 # Approve with restrictions (ALLOW_WITH_RESTRICTIONS)
-python <pipeline>_pipeline_v2/review_queue.py --queue <queues_root>/yellow_pipeline.jsonl \
+dc-pipeline review-queue --pipeline-id <pipeline> --queue <queues_root>/yellow_pipeline.jsonl \
   approve --target <target_id> --manifest-dir <manifests_root>/<target_id> \
   --reviewer "Name" --reason "Allowed with attribution" \
   --constraints "Must include attribution text from source" \
   --evidence-links "https://example.com/license,https://example.com/terms"
 
 # Reject (PITCH)
-python <pipeline>_pipeline_v2/review_queue.py --queue <queues_root>/yellow_pipeline.jsonl \
+dc-pipeline review-queue --pipeline-id <pipeline> --queue <queues_root>/yellow_pipeline.jsonl \
   reject --target <target_id> --manifest-dir <manifests_root>/<target_id> \
   --reviewer "Name" --reason "License is incompatible"
 ```
