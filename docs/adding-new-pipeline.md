@@ -2,21 +2,32 @@
 
 This cookbook outlines the minimal steps to add a new `*_pipeline_v2` directory and wire it into the orchestration tools.
 
-## 1. Create the pipeline directory
+## 1. Generate a scaffold
 
-Create a new directory following the naming pattern `your_domain_pipeline_v2/` and include the standard files:
+Use the generator to scaffold a new pipeline directory with standard entry points,
+README, and targets config:
+
+```bash
+python tools/generate_pipeline.py --domain your_domain
+```
+
+The scaffolded directory includes:
 
 ```
 your_domain_pipeline_v2/
+  README.md
   run_pipeline.sh
   pipeline_driver.py
   acquire_worker.py
+  yellow_screen_worker.py
+  merge_worker.py
+  catalog_builder.py
+  review_queue.py
   targets_your_domain.yaml
-  license_map.yaml
   requirements.txt
 ```
 
-Use an existing pipeline as a template to keep the stage contract consistent.
+Use existing pipelines as references for domain-specific customization.
 
 ## 2. Implement the CLI entrypoint
 
@@ -44,7 +55,8 @@ Define targets in `targets_your_domain.yaml`, including:
 
 ## 5. Configure licensing
 
-Populate `license_map.yaml` with any required license metadata so merge stages can enforce allow/deny rules.
+Update the shared license map in `configs/common/license_map.yaml` (or add a pipeline-specific file
+and reference it from `targets_your_domain.yaml`) so merge stages can enforce allow/deny rules.
 
 ## 6. Register the pipeline
 
