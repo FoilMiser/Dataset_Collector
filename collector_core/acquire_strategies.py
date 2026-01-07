@@ -148,7 +148,28 @@ def run_cmd(cmd: list[str], cwd: Path | None = None) -> str:
     return p.stdout.decode("utf-8", errors="ignore")
 
 
-def _http_download_with_resume(ctx: AcquireContext, url: str, out_path: Path, expected_size: int | None = None) -> dict[str, Any]:
+def _parse_content_length(response: requests.Response, existing: int) -> int | None:
+    content_range = response.headers.get("Content-Range")
+    if content_range and "/" in content_range:
+        total = content_range.split("/", 1)[1]
+        if total.isdigit():
+            return int(total)
+    content_length = response.headers.get("Content-Length")
+    if content_length and content_length.isdigit():
+        length = int(content_length)
+        if response.status_code == 206 and existing:
+            return existing + length
+        return length
+    return None
+
+
+def _http_download_with_resume(
+    ctx: AcquireContext,
+    url: str,
+    out_path: Path,
+    expected_size: int | None = None,
+    expected_sha256: str | None = None,
+) -> dict[str, Any]:
     missing = requires("requests", requests, install="pip install requests")
     if missing:
         raise RuntimeError(missing)
@@ -163,7 +184,13 @@ def _http_download_with_resume(ctx: AcquireContext, url: str, out_path: Path, ex
         headers["Range"] = f"bytes={existing}-"
         mode = "ab"
 
-    def _stream_response(response: requests.Response, write_mode: str) -> None:
+    content_length: int | None = None
+    resolved_url: str | None = None
+
+    def _stream_response(response: requests.Response, write_mode: str, existing_offset: int) -> None:
+        nonlocal content_length, resolved_url
+        resolved_url = response.url
+        content_length = _parse_content_length(response, existing_offset)
         with temp_path.open(write_mode) as f:
             for chunk in response.iter_content(chunk_size=1024 * 1024):
                 if chunk:
@@ -190,29 +217,51 @@ def _http_download_with_resume(ctx: AcquireContext, url: str, out_path: Path, ex
             if r.status_code == 206:
                 if content_range and not valid_range:
                     raise RuntimeError("Invalid Content-Range for resumed download.")
-                _stream_response(r, mode)
+                _stream_response(r, mode, existing)
             elif valid_range:
-                _stream_response(r, mode)
+                _stream_response(r, mode, existing)
             else:
                 if r.status_code == 200:
                     with requests.get(url, stream=True, timeout=(15, 300)) as fresh:
                         fresh.raise_for_status()
-                        _stream_response(fresh, "wb")
+                        _stream_response(fresh, "wb", 0)
                 else:
                     raise RuntimeError("Expected 206 Partial Content or a valid Content-Range for resumed download.")
         else:
-            _stream_response(r, mode)
+            _stream_response(r, mode, existing)
+    actual_size = temp_path.stat().st_size
+    if content_length is None:
+        content_length = actual_size
+    if expected_size is not None and actual_size != expected_size:
+        temp_path.unlink(missing_ok=True)
+        return {
+            "status": "error",
+            "error": "size_mismatch",
+            "message": f"Expected size {expected_size} bytes but downloaded {actual_size} bytes.",
+            "resolved_url": resolved_url,
+            "content_length": content_length,
+        }
+    sha256 = sha256_file(temp_path)
+    if expected_sha256 and sha256.lower() != expected_sha256.lower():
+        temp_path.unlink(missing_ok=True)
+        return {
+            "status": "error",
+            "error": "sha256_mismatch",
+            "message": "Expected sha256 did not match downloaded content.",
+            "expected_sha256": expected_sha256,
+            "sha256": sha256,
+            "resolved_url": resolved_url,
+            "content_length": content_length,
+        }
     temp_path.replace(out_path)
-    result: dict[str, Any] = {"status": "ok", "path": str(out_path)}
-    if expected_size is not None:
-        actual_size = out_path.stat().st_size
-        if actual_size != expected_size:
-            return {
-                "status": "error",
-                "error": "size_mismatch",
-                "message": f"Expected size {expected_size} bytes but downloaded {actual_size} bytes.",
-            }
-    if ctx.mode.verify_sha256:
+    result: dict[str, Any] = {
+        "status": "ok",
+        "path": str(out_path),
+        "resolved_url": resolved_url,
+        "content_length": content_length,
+        "sha256": sha256,
+    }
+    if ctx.mode.verify_sha256 and "sha256" not in result:
         result["sha256"] = sha256_file(out_path)
     return result
 
@@ -231,6 +280,13 @@ def handle_http_multi(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -
         return [{"status": "error", "error": "missing url"}]
     results: list[dict[str, Any]] = []
     filenames: list[str] = download.get("filenames") or []
+    expected_sha256 = download.get("expected_sha256") or download.get("sha256")
+    expected_sha256s: list[str | None] | None = None
+    expected_sha256_map: dict[str, str] | None = None
+    if isinstance(expected_sha256, list):
+        expected_sha256s = expected_sha256
+    elif isinstance(expected_sha256, dict):
+        expected_sha256_map = expected_sha256
     for idx, url in enumerate(urls):
         if ctx.limits.limit_files and idx >= ctx.limits.limit_files:
             break
@@ -247,7 +303,12 @@ def handle_http_multi(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -
         if not ctx.mode.execute:
             results.append({"status": "noop", "path": str(out_path)})
             continue
-        results.append(_http_download_with_resume(ctx, url, out_path, download.get("expected_size")))
+        expected = expected_sha256
+        if expected_sha256s is not None:
+            expected = expected_sha256s[idx] if idx < len(expected_sha256s) else None
+        elif expected_sha256_map is not None:
+            expected = expected_sha256_map.get(filename) or expected_sha256_map.get(url)
+        results.append(_http_download_with_resume(ctx, url, out_path, download.get("expected_size"), expected))
     return results
 
 
@@ -264,7 +325,9 @@ def handle_http_single(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) 
         return [{"status": "ok", "path": str(out_path), "cached": True}]
     if not ctx.mode.execute:
         return [{"status": "noop", "path": str(out_path)}]
-    return [_http_download_with_resume(ctx, url, out_path, download.get("expected_size"))]
+    return [
+        _http_download_with_resume(ctx, url, out_path, download.get("expected_size"), download.get("expected_sha256"))
+    ]
 
 
 def handle_ftp(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
@@ -288,9 +351,22 @@ def handle_ftp(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
             for fname in files[: ctx.limits.limit_files or len(files)]:
                 local = out_dir / fname
                 ensure_dir(local.parent)
-                with local.open("wb") as f:
+                temp_path = local.with_name(f"{local.name}.part")
+                with temp_path.open("wb") as f:
                     ftp.retrbinary(f"RETR {fname}", f.write)
-                results.append({"status": "ok", "path": str(local)})
+                content_length = temp_path.stat().st_size
+                sha256 = sha256_file(temp_path)
+                temp_path.replace(local)
+                resolved_url = f"{base.rstrip('/')}/{fname}" if base else fname
+                results.append(
+                    {
+                        "status": "ok",
+                        "path": str(local),
+                        "resolved_url": resolved_url,
+                        "content_length": content_length,
+                        "sha256": sha256,
+                    }
+                )
     return results
 
 
@@ -394,9 +470,35 @@ def handle_dataverse(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) ->
     filename = safe_name(urlparse(resp.url).path.split("/")[-1] or pid)
     out_path = out_dir / filename
     ensure_dir(out_path.parent)
-    with out_path.open("wb") as f:
+    temp_path = out_path.with_name(f"{out_path.name}.part")
+    with temp_path.open("wb") as f:
         f.write(resp.content)
-    return [{"status": "ok", "path": str(out_path)}]
+    content_length = temp_path.stat().st_size
+    sha256 = sha256_file(temp_path)
+    expected_sha256 = download.get("expected_sha256")
+    if expected_sha256 and sha256.lower() != expected_sha256.lower():
+        temp_path.unlink(missing_ok=True)
+        return [
+            {
+                "status": "error",
+                "error": "sha256_mismatch",
+                "message": "Expected sha256 did not match downloaded content.",
+                "expected_sha256": expected_sha256,
+                "sha256": sha256,
+                "resolved_url": resp.url,
+                "content_length": content_length,
+            }
+        ]
+    temp_path.replace(out_path)
+    return [
+        {
+            "status": "ok",
+            "path": str(out_path),
+            "resolved_url": resp.url,
+            "content_length": content_length,
+            "sha256": sha256,
+        }
+    ]
 
 
 def handle_figshare_article(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
@@ -587,11 +689,35 @@ def handle_aws_requester_pays(ctx: AcquireContext, row: dict[str, Any], out_dir:
         return [{"status": "noop", "path": str(out_path)}]
     ensure_dir(out_path.parent)
     payer = download.get("request_payer", "requester")
-    cmd = ["aws", "s3api", "get-object", "--bucket", bucket, "--key", key, str(out_path), "--request-payer", payer]
+    temp_path = out_path.with_name(f"{out_path.name}.part")
+    cmd = ["aws", "s3api", "get-object", "--bucket", bucket, "--key", key, str(temp_path), "--request-payer", payer]
     log = run_cmd(cmd)
-    result = {"status": "ok", "path": str(out_path), "log": log}
-    if ctx.mode.verify_sha256 and download.get("sha256"):
-        result["sha256"] = sha256_file(out_path)
+    content_length = temp_path.stat().st_size
+    sha256 = sha256_file(temp_path)
+    expected_sha256 = download.get("expected_sha256")
+    if expected_sha256 and sha256.lower() != expected_sha256.lower():
+        temp_path.unlink(missing_ok=True)
+        return [
+            {
+                "status": "error",
+                "error": "sha256_mismatch",
+                "message": "Expected sha256 did not match downloaded content.",
+                "expected_sha256": expected_sha256,
+                "sha256": sha256,
+                "resolved_url": f"s3://{bucket}/{key}",
+                "content_length": content_length,
+                "log": log,
+            }
+        ]
+    temp_path.replace(out_path)
+    result = {
+        "status": "ok",
+        "path": str(out_path),
+        "log": log,
+        "resolved_url": f"s3://{bucket}/{key}",
+        "content_length": content_length,
+        "sha256": sha256,
+    }
     return [result]
 
 
