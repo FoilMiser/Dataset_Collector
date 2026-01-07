@@ -83,3 +83,23 @@ jobs:
       - name: Check for Python cache artifacts
         run: |
           python -c "from pathlib import Path; import sys; root=Path('.'); bad=[p for p in root.rglob('__pycache__') if p.is_dir()]; bad += [p for p in root.rglob('.pytest_cache') if p.is_dir()]; bad += [p for p in root.rglob('*.pyc') if p.is_file()]; print('Found cache artifacts:') if bad else print('No cache artifacts found.'); [print(f' - {p}') for p in bad]; sys.exit(1 if bad else 0)"
+
+  minimal-dry-run:
+    name: minimal dry run (classify/acquire/merge/catalog)
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Upgrade pip
+        run: |
+          python -m pip install --upgrade pip
+      - name: Install deps
+        run: |
+          python -m pip install -r requirements.in
+      - name: Run minimal dry run fixture
+        run: |
+          bash tools/run_minimal_dry_run.sh

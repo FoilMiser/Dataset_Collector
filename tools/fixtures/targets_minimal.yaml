@@ -1,0 +1,29 @@
+schema_version: "0.9"
+companion_files:
+  license_map: "license_map_minimal.yaml"
+  denylist: "denylist_minimal.yaml"
+targets:
+  - id: "green_target"
+    name: "Minimal green target"
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "MIT"
+      url: "https://example.test/terms"
+    download:
+      strategy: "none"
+  - id: "yellow_target"
+    name: "Minimal yellow target"
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "LGPL-2.1-only"
+      url: "https://example.test/terms"
+    download:
+      strategy: "none"
+  - id: "denylist_target"
+    name: "Denylist target"
+    license_profile: "permissive"
+    license_evidence:
+      spdx_hint: "MIT"
+      url: "https://example.test/terms"
+    download:
+      strategy: "none"
