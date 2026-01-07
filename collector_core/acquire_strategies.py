@@ -298,19 +298,39 @@ def handle_git(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
     download = normalize_download(row.get("download", {}) or {})
     repo = download.get("repo") or download.get("repo_url") or download.get("url") or download.get("url")
     branch = download.get("branch")
+    commit = download.get("commit")
+    tag = download.get("tag")
+    revision = commit or tag
     if not repo:
         return [{"status": "error", "error": "missing repo"}]
-    if out_dir.exists() and any(out_dir.iterdir()) and not ctx.mode.overwrite:
-        return [{"status": "ok", "path": str(out_dir), "cached": True}]
     if not ctx.mode.execute:
         return [{"status": "noop", "path": str(out_dir)}]
+    if out_dir.exists() and any(out_dir.iterdir()) and not ctx.mode.overwrite:
+        if revision:
+            git_dir = out_dir / ".git"
+            if not git_dir.exists():
+                return [{"status": "error", "error": "missing_git_repo", "path": str(out_dir)}]
+            if tag:
+                run_cmd(["git", "-C", str(out_dir), "fetch", "--tags", "--force"])
+            run_cmd(["git", "-C", str(out_dir), "checkout", revision])
+            resolved = run_cmd(["git", "-C", str(out_dir), "rev-parse", "HEAD"]).strip()
+            return [
+                {"status": "ok", "path": str(out_dir), "cached": True, "git_revision": revision, "git_commit": resolved}
+            ]
+        return [{"status": "ok", "path": str(out_dir), "cached": True}]
     ensure_dir(out_dir)
     cmd = ["git", "clone"]
-    if branch:
+    if branch and not revision:
         cmd += ["-b", branch]
     cmd += [repo, str(out_dir)]
     log = run_cmd(cmd)
-    return [{"status": "ok", "path": str(out_dir), "log": log}]
+    if revision:
+        run_cmd(["git", "-C", str(out_dir), "checkout", revision])
+    resolved = run_cmd(["git", "-C", str(out_dir), "rev-parse", "HEAD"]).strip()
+    result = {"status": "ok", "path": str(out_dir), "log": log, "git_commit": resolved}
+    if revision:
+        result["git_revision"] = revision
+    return [result]
 
 
 def handle_zenodo(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
@@ -614,12 +634,20 @@ def resolve_output_dir(ctx: AcquireContext, bucket: str, pool: str, target_id: s
     return out
 
 
-def write_done_marker(ctx: AcquireContext, target_id: str, bucket: str, status: str) -> None:
+def write_done_marker(
+    ctx: AcquireContext, target_id: str, bucket: str, status: str, extra: dict[str, Any] | None = None
+) -> None:
     marker = ctx.roots.manifests_root / safe_name(target_id) / "acquire_done.json"
-    write_json(
-        marker,
-        {"target_id": target_id, "bucket": bucket, "status": status, "written_at_utc": utc_now(), "version": VERSION},
-    )
+    payload = {
+        "target_id": target_id,
+        "bucket": bucket,
+        "status": status,
+        "written_at_utc": utc_now(),
+        "version": VERSION,
+    }
+    if extra:
+        payload.update(extra)
+    write_json(marker, payload)
 
 
 def run_target(
@@ -661,6 +689,15 @@ def run_target(
             manifest["post_processors"] = post_processors
 
     manifest["finished_at_utc"] = utc_now()
+    git_info: dict[str, Any] | None = None
+    for result in manifest["results"]:
+        if result.get("git_commit"):
+            git_info = {"git_commit": result["git_commit"]}
+            if result.get("git_revision"):
+                git_info["git_revision"] = result["git_revision"]
+            break
+    if git_info:
+        manifest.update(git_info)
     write_json(out_dir / "download_manifest.json", manifest)
 
     status = "ok" if any(r.get("status") == "ok" for r in manifest["results"]) else manifest["results"][0].get("status", "error")
@@ -669,7 +706,7 @@ def run_target(
             if isinstance(proc, dict) and proc.get("status") not in {"ok", "noop"}:
                 status = proc.get("status", status)
     if ctx.mode.execute:
-        write_done_marker(ctx, tid, bucket, status)
+        write_done_marker(ctx, tid, bucket, status, git_info)
     return {"id": tid, "status": status, "bucket": bucket, "license_pool": pool, "strategy": strat}
 
 
