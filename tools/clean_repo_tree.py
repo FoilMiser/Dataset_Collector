@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import sys
+
+sys.dont_write_bytecode = True
+
 import argparse
 import shutil
 from collections.abc import Iterable
@@ -16,6 +20,12 @@ OUTPUT_DIR_NAMES = {
     "_catalogs",
     "_pitches",
 }
+
+
+def _remove_runtime_artifacts(repo_root: Path) -> None:
+    runtime_cache = repo_root / "tools" / "__pycache__"
+    if runtime_cache.exists():
+        shutil.rmtree(runtime_cache, ignore_errors=True)
 
 
 def _iter_candidates(repo_root: Path) -> Iterable[Path]:
@@ -70,6 +80,7 @@ def main() -> int:
     args = ap.parse_args()
 
     repo_root = Path(args.repo_root).expanduser().resolve()
+    _remove_runtime_artifacts(repo_root)
     candidates = _dedupe(_iter_candidates(repo_root))
     _print_plan(candidates, repo_root)
 
