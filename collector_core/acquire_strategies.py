@@ -204,9 +204,15 @@ def _http_download_with_resume(ctx: AcquireContext, url: str, out_path: Path, ex
             _stream_response(r, mode)
     temp_path.replace(out_path)
     result: dict[str, Any] = {"status": "ok", "path": str(out_path)}
-    if ctx.mode.verify_sha256 and expected_size and out_path.stat().st_size != expected_size:
-        result = {"status": "error", "error": "size_mismatch"}
-    elif ctx.mode.verify_sha256:
+    if expected_size is not None:
+        actual_size = out_path.stat().st_size
+        if actual_size != expected_size:
+            return {
+                "status": "error",
+                "error": "size_mismatch",
+                "message": f"Expected size {expected_size} bytes but downloaded {actual_size} bytes.",
+            }
+    if ctx.mode.verify_sha256:
         result["sha256"] = sha256_file(out_path)
     return result
 
