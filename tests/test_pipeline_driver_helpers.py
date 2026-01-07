@@ -14,6 +14,8 @@ from collector_core.pipeline_driver_base import (
     build_denylist_haystack,
     build_evidence_headers,
     build_target_identity,
+    denylist_hits,
+    extract_download_urls,
     redact_headers_for_manifest,
     resolve_effective_bucket,
     resolve_retry_config,
@@ -179,10 +181,26 @@ def test_build_denylist_haystack_includes_publisher() -> None:
         "t1",
         "Target",
         "https://example.test/terms",
-        "{}",
+        [],
         {"publisher": "Example Pub"},
     )
     assert haystack["publisher"] == "Example Pub"
+
+
+def test_denylist_hits_match_download_url() -> None:
+    target = {"download": {"url": "https://blocked.example.com/file"}}
+    denylist = {
+        "domain_patterns": [
+            {
+                "domain": "blocked.example.com",
+                "severity": "hard_red",
+            }
+        ]
+    }
+    download_urls = extract_download_urls(target)
+    haystack = build_denylist_haystack("t1", "Target", "", download_urls, target)
+    hits = denylist_hits(denylist, haystack)
+    assert hits and hits[0]["type"] == "domain"
 
 
 def test_apply_yellow_signoff_requirement_flags_review() -> None:
