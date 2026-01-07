@@ -61,6 +61,35 @@ def test_snapshot_evidence_manifest_redacts_headers(tmp_path: Path, monkeypatch:
     assert REDACTED in meta_text
 
 
+def test_snapshot_evidence_write_mismatch_marks_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    driver = BasePipelineDriver()
+
+    def fake_fetch(
+        url: str,
+        timeout_s: float | tuple[float, float] = (15.0, 60.0),
+        max_retries: int = 3,
+        backoff_base: float = 2.0,
+        headers: dict[str, str] | None = None,
+        max_bytes: int | None = None,
+    ) -> tuple[bytes | None, str | None, dict[str, object]]:
+        return b"ok", "text/plain", {"retries": 0, "errors": [], "final_url": url}
+
+    original_write_bytes = Path.write_bytes
+
+    def partial_write(self: Path, data: bytes) -> int:
+        if self.name.endswith(".part"):
+            return original_write_bytes(self, data[:1])
+        return original_write_bytes(self, data)
+
+    monkeypatch.setattr(driver, "fetch_url_with_retry", fake_fetch)
+    monkeypatch.setattr(Path, "write_bytes", partial_write)
+
+    manifest_dir = tmp_path / "manifest"
+    result = driver.snapshot_evidence(manifest_dir, "https://example.test/terms")
+    assert result["status"] == "error"
+    assert "verification" in result.get("error", "").lower()
+
+
 def test_resolve_retry_config_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     args = SimpleNamespace(retry_max=None, retry_backoff=None, max_retries=None)
     monkeypatch.setenv("PIPELINE_RETRY_MAX", "5")

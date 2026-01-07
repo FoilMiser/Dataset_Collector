@@ -1338,6 +1338,7 @@ class BasePipelineDriver:
 
         ensure_dir(manifest_dir)
         out_path = manifest_dir / f"license_evidence{ext}"
+        temp_path = manifest_dir / f"license_evidence{ext}.part"
         raw_changed_from_previous = bool(previous_digest and previous_digest != digest)
         history: list[dict[str, Any]] = []
         if isinstance(existing_meta.get("history"), list):
@@ -1362,8 +1363,13 @@ class BasePipelineDriver:
                 "fetched_at_utc": existing_meta.get("fetched_at_utc"),
             }
             history.append(previous_entry)
-        out_path.write_bytes(content)
+        temp_path.write_bytes(content)
+        temp_path.replace(out_path)
+        saved_digest = sha256_file(out_path)
         result["saved_path"] = str(out_path)
+        if not saved_digest or saved_digest != digest:
+            result["status"] = "error"
+            result["error"] = "Evidence file write verification failed."
         normalized_text = extract_text_for_scanning(result)
         normalized_digest = compute_normalized_text_hash(
             normalized_text,
@@ -1401,7 +1407,9 @@ class BasePipelineDriver:
         result["history"] = history
         if result["changed_from_previous"]:
             result["evidence_files_verified"] = bool(
-                (previous_renamed_path and previous_renamed_path.exists()) and out_path.exists()
+                (previous_renamed_path and previous_renamed_path.exists())
+                and out_path.exists()
+                and saved_digest == digest
             )
             if not result["evidence_files_verified"]:
                 result["status"] = "error"
