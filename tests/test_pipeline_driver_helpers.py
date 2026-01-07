@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from collector_core.pipeline_driver_base import (
+    BasePipelineDriver,
     EvidenceResult,
     LicenseMap,
     apply_denylist_bucket,
@@ -12,15 +14,49 @@ from collector_core.pipeline_driver_base import (
     build_denylist_haystack,
     build_evidence_headers,
     build_target_identity,
+    redact_headers_for_manifest,
     resolve_effective_bucket,
     resolve_retry_config,
     sort_queue_rows,
 )
+from collector_core.secrets import REDACTED
 
 
 def test_build_evidence_headers_filters_invalid() -> None:
     headers = build_evidence_headers(["Authorization=token", "X-Test=1", "invalid"])
     assert headers == {"Authorization": "token", "X-Test": "1"}
+
+
+def test_redact_headers_for_manifest_scrubs_sensitive_values() -> None:
+    headers = {"Authorization": "Bearer secret", "X-Api-Key": "abc123", "User-Agent": "demo"}
+    redacted = redact_headers_for_manifest(headers)
+    assert redacted["Authorization"] == REDACTED
+    assert redacted["X-Api-Key"] == REDACTED
+    assert redacted["User-Agent"] == "demo"
+
+
+def test_snapshot_evidence_manifest_redacts_headers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    driver = BasePipelineDriver()
+    secret = "supersecret"
+    headers = {"Authorization": f"Bearer {secret}", "X-Api-Key": secret}
+
+    def fake_fetch(
+        url: str,
+        timeout_s: float | tuple[float, float] = (15.0, 60.0),
+        max_retries: int = 3,
+        backoff_base: float = 2.0,
+        headers: dict[str, str] | None = None,
+        max_bytes: int | None = None,
+    ) -> tuple[bytes | None, str | None, dict[str, object]]:
+        return b"ok", "text/plain", {"retries": 0, "errors": [], "final_url": url}
+
+    monkeypatch.setattr(driver, "fetch_url_with_retry", fake_fetch)
+
+    manifest_dir = tmp_path / "manifest"
+    driver.snapshot_evidence(manifest_dir, "https://example.test/terms", headers=headers)
+    meta_text = (manifest_dir / "license_evidence_meta.json").read_text(encoding="utf-8")
+    assert secret not in meta_text
+    assert REDACTED in meta_text
 
 
 def test_resolve_retry_config_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
