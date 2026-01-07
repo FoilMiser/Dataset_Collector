@@ -1,7 +1,7 @@
 # field_schemas.yaml
 # v2.0 — Canonical record schema for econ/stats/decision pipeline (v2 layout)
 
-schema_version: "2.0"
+schema_version: "0.9"
 updated_utc: "2025-12-30"
 
 schemas:

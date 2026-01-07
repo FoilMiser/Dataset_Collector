@@ -10,7 +10,7 @@
 #
 # All patterns now require 'link' and 'rationale' fields for auditability.
 
-schema_version: "0.2"
+schema_version: "0.9"
 updated_utc: "2025-12-30"
 
 # v0.9: Domain extraction patterns (match against extracted domain from URLs)
