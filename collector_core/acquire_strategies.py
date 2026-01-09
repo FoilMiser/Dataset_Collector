@@ -177,14 +177,7 @@ def _http_download_with_resume(
         raise RuntimeError(missing)
     ensure_dir(out_path.parent)
     temp_path = out_path.with_name(f"{out_path.name}.part")
-    headers: dict[str, str] = {}
-    mode = "wb"
-    existing = 0
-    if temp_path.exists() and ctx.mode.enable_resume:
-        existing = temp_path.stat().st_size
-    if existing and ctx.mode.enable_resume:
-        headers["Range"] = f"bytes={existing}-"
-        mode = "ab"
+    max_attempts = max(1, ctx.retry.max_attempts)
 
     content_length: int | None = None
     resolved_url: str | None = None
@@ -211,26 +204,62 @@ def _http_download_with_resume(
         except ValueError:
             return False
 
-    with requests.get(url, stream=True, headers=headers, timeout=(15, 300)) as r:
-        r.raise_for_status()
+    def _is_transient_error(exc: Exception) -> bool:
+        if isinstance(exc, requests.exceptions.HTTPError):
+            status_code = exc.response.status_code if exc.response is not None else None
+            return status_code is not None and status_code >= 500
+        return isinstance(
+            exc,
+            (
+                requests.exceptions.ConnectionError,
+                requests.exceptions.Timeout,
+                requests.exceptions.ChunkedEncodingError,
+                requests.exceptions.ContentDecodingError,
+                requests.exceptions.TooManyRedirects,
+            ),
+        )
+
+    for attempt in range(max_attempts):
+        headers: dict[str, str] = {}
+        mode = "wb"
+        existing = 0
+        if temp_path.exists() and ctx.mode.enable_resume:
+            existing = temp_path.stat().st_size
         if existing and ctx.mode.enable_resume:
-            content_range = r.headers.get("Content-Range")
-            valid_range = _valid_content_range(content_range, existing)
-            if r.status_code == 206:
-                if content_range and not valid_range:
-                    raise RuntimeError("Invalid Content-Range for resumed download.")
-                _stream_response(r, mode, existing)
-            elif valid_range:
-                _stream_response(r, mode, existing)
-            else:
-                if r.status_code == 200:
-                    with requests.get(url, stream=True, timeout=(15, 300)) as fresh:
-                        fresh.raise_for_status()
-                        _stream_response(fresh, "wb", 0)
+            headers["Range"] = f"bytes={existing}-"
+            mode = "ab"
+        content_length = None
+        resolved_url = None
+        try:
+            with requests.get(url, stream=True, headers=headers, timeout=(15, 300)) as r:
+                r.raise_for_status()
+                if existing and ctx.mode.enable_resume:
+                    content_range = r.headers.get("Content-Range")
+                    valid_range = _valid_content_range(content_range, existing)
+                    if r.status_code == 206:
+                        if content_range and not valid_range:
+                            raise RuntimeError("Invalid Content-Range for resumed download.")
+                        _stream_response(r, mode, existing)
+                    elif valid_range:
+                        _stream_response(r, mode, existing)
+                    else:
+                        if r.status_code == 200:
+                            with requests.get(url, stream=True, timeout=(15, 300)) as fresh:
+                                fresh.raise_for_status()
+                                _stream_response(fresh, "wb", 0)
+                        else:
+                            raise RuntimeError(
+                                "Expected 206 Partial Content or a valid Content-Range for resumed download."
+                            )
                 else:
-                    raise RuntimeError("Expected 206 Partial Content or a valid Content-Range for resumed download.")
-        else:
-            _stream_response(r, mode, existing)
+                    _stream_response(r, mode, existing)
+        except Exception as exc:
+            if not _is_transient_error(exc) or attempt >= max_attempts - 1:
+                raise
+            sleep_time = min(ctx.retry.backoff_base**attempt, ctx.retry.backoff_max)
+            time.sleep(sleep_time)
+            continue
+        break
     actual_size = temp_path.stat().st_size
     if content_length is None:
         content_length = actual_size
