@@ -132,7 +132,7 @@ def render_pipeline_driver(spec: PipelineSpec) -> str:
 
 def render_acquire_worker(spec: PipelineSpec) -> str:
     return textwrap.dedent(
-        f"""
+        f'''
         #!/usr/bin/env python3
         """
         acquire_worker.py (v2.0)
@@ -179,13 +179,13 @@ def render_acquire_worker(spec: PipelineSpec) -> str:
 
         if __name__ == "__main__":
             main()
-        """
+        '''
     ).strip() + "\n"
 
 
 def render_yellow_screen_worker(spec: PipelineSpec) -> str:
     return textwrap.dedent(
-        f"""
+        f'''
         #!/usr/bin/env python3
         """
         yellow_screen_worker.py (v2.0)
@@ -216,13 +216,13 @@ def render_yellow_screen_worker(spec: PipelineSpec) -> str:
 
         if __name__ == "__main__":
             main()
-        """
+        '''
     ).strip() + "\n"
 
 
 def render_merge_worker(spec: PipelineSpec) -> str:
     return textwrap.dedent(
-        f"""
+        f'''
         #!/usr/bin/env python3
         """
         merge_worker.py (v2.0)
@@ -260,13 +260,13 @@ def render_merge_worker(spec: PipelineSpec) -> str:
 
         if __name__ == "__main__":
             main()
-        """
+        '''
     ).strip() + "\n"
 
 
 def render_catalog_builder() -> str:
     return textwrap.dedent(
-        """
+        f'''
         #!/usr/bin/env python3
         """Deprecated pipeline entry point for catalog builder."""
 
@@ -281,13 +281,13 @@ def render_catalog_builder() -> str:
                     pipeline_id=Path(__file__).resolve().parent.name,
                 )
             )
-        """
+        '''
     ).strip() + "\n"
 
 
 def render_review_queue() -> str:
     return textwrap.dedent(
-        """
+        f'''
         #!/usr/bin/env python3
         """Deprecated pipeline entry point for manual YELLOW review queue helper."""
 
@@ -302,7 +302,7 @@ def render_review_queue() -> str:
                     pipeline_id=Path(__file__).resolve().parent.name,
                 )
             )
-        """
+        '''
     ).strip() + "\n"
 
 
