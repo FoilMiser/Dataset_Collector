@@ -24,6 +24,7 @@ from collector_core.config_validator import read_yaml
 from collector_core.dependencies import _try_import
 from collector_core.exceptions import ConfigValidationError
 from collector_core.logging_config import add_logging_args, configure_logging
+from collector_core.network_utils import _with_retries
 from collector_core.secrets import REDACTED, SecretStr, redact_headers
 
 logger = logging.getLogger(__name__)
@@ -1251,94 +1252,108 @@ class BasePipelineDriver:
             meta["blocked_reason"] = reason
             return None, "blocked_url", meta
 
-        for attempt in range(max_retries):
-            try:
-                with requests.get(
-                    url,
-                    timeout=timeout_s,
-                    headers={"User-Agent": f"{self.USER_AGENT}/{VERSION}", **(headers or {})},
-                    stream=True,
-                ) as r:
-                    r.raise_for_status()
-                    ctype = r.headers.get("Content-Type", "")
-                    final_url = r.url
-                    meta["final_status"] = r.status_code
-                    meta["final_url"] = final_url
-                    meta["content_type"] = ctype
-                    redirect_urls: list[str] = []
-                    for resp in r.history:
-                        location = resp.headers.get("Location")
-                        if not location:
-                            continue
-                        redirect_urls.append(urllib.parse.urljoin(resp.url, location))
-                    redirect_urls.append(final_url)
-                    for redirect_url in redirect_urls:
-                        allowed, reason = validate_evidence_url(redirect_url, allow_private_hosts)
-                        if not allowed:
-                            meta["blocked_url"] = redirect_url
-                            meta["blocked_reason"] = reason
-                            logger.warning(
-                                "Evidence fetch blocked: url=%s blocked_url=%s reason=%s",
-                                url,
-                                redirect_url,
-                                reason,
-                            )
-                            return None, "blocked_url", meta
-                    content_length = r.headers.get("Content-Length")
-                    if max_bytes and content_length:
-                        try:
-                            if int(content_length) > max_bytes:
-                                meta["size_exceeded"] = True
-                                meta["bytes"] = int(content_length)
-                                logger.warning(
-                                    "Evidence fetch aborted: url=%s final_url=%s content_type=%s bytes=%s limit=%s",
-                                    url,
-                                    final_url,
-                                    ctype,
-                                    content_length,
-                                    max_bytes,
-                                )
-                                return None, "response_too_large", meta
-                        except ValueError:
-                            pass
+        def _record_retry(attempt: int, exc: Exception) -> None:
+            meta["retries"] = attempt
+            meta["errors"].append({"attempt": attempt, "error": repr(exc)})
 
-                    chunks: list[bytes] = []
-                    total = 0
-                    for chunk in r.iter_content(chunk_size=1024 * 1024):
-                        if not chunk:
-                            continue
-                        total += len(chunk)
-                        if max_bytes and total > max_bytes:
+        def _fetch_once() -> tuple[bytes, str]:
+            with requests.get(
+                url,
+                timeout=timeout_s,
+                headers={"User-Agent": f"{self.USER_AGENT}/{VERSION}", **(headers or {})},
+                stream=True,
+            ) as r:
+                r.raise_for_status()
+                ctype = r.headers.get("Content-Type", "")
+                final_url = r.url
+                meta["final_status"] = r.status_code
+                meta["final_url"] = final_url
+                meta["content_type"] = ctype
+                redirect_urls: list[str] = []
+                for resp in r.history:
+                    location = resp.headers.get("Location")
+                    if not location:
+                        continue
+                    redirect_urls.append(urllib.parse.urljoin(resp.url, location))
+                redirect_urls.append(final_url)
+                for redirect_url in redirect_urls:
+                    allowed, reason = validate_evidence_url(redirect_url, allow_private_hosts)
+                    if not allowed:
+                        meta["blocked_url"] = redirect_url
+                        meta["blocked_reason"] = reason
+                        logger.warning(
+                            "Evidence fetch blocked: url=%s blocked_url=%s reason=%s",
+                            url,
+                            redirect_url,
+                            reason,
+                        )
+                        raise RuntimeError("blocked_url")
+                content_length = r.headers.get("Content-Length")
+                if max_bytes and content_length:
+                    try:
+                        if int(content_length) > max_bytes:
                             meta["size_exceeded"] = True
-                            meta["bytes"] = total
+                            meta["bytes"] = int(content_length)
                             logger.warning(
                                 "Evidence fetch aborted: url=%s final_url=%s content_type=%s bytes=%s limit=%s",
                                 url,
                                 final_url,
                                 ctype,
-                                total,
+                                content_length,
                                 max_bytes,
                             )
-                            return None, "response_too_large", meta
-                        chunks.append(chunk)
-                    content = b"".join(chunks)
-                    meta["bytes"] = total
-                    logger.info(
-                        "Evidence fetched: url=%s final_url=%s content_type=%s bytes=%s",
-                        url,
-                        final_url,
-                        ctype,
-                        total,
-                    )
-                    return content, ctype, meta
-            except Exception as e:
-                meta["retries"] = attempt + 1
-                meta["errors"].append({"attempt": attempt + 1, "error": repr(e)})
-                if attempt < max_retries - 1:
-                    sleep_time = min(backoff_base**attempt, 60)
-                    time.sleep(sleep_time)
+                            raise RuntimeError("response_too_large")
+                    except ValueError:
+                        pass
 
-        return None, f"Failed after {max_retries} attempts", meta
+                chunks: list[bytes] = []
+                total = 0
+                for chunk in r.iter_content(chunk_size=1024 * 1024):
+                    if not chunk:
+                        continue
+                    total += len(chunk)
+                    if max_bytes and total > max_bytes:
+                        meta["size_exceeded"] = True
+                        meta["bytes"] = total
+                        logger.warning(
+                            "Evidence fetch aborted: url=%s final_url=%s content_type=%s bytes=%s limit=%s",
+                            url,
+                            final_url,
+                            ctype,
+                            total,
+                            max_bytes,
+                        )
+                        raise RuntimeError("response_too_large")
+                    chunks.append(chunk)
+                content = b"".join(chunks)
+                meta["bytes"] = total
+                logger.info(
+                    "Evidence fetched: url=%s final_url=%s content_type=%s bytes=%s",
+                    url,
+                    final_url,
+                    ctype,
+                    total,
+                )
+                return content, ctype
+
+        try:
+            content, ctype = _with_retries(
+                _fetch_once,
+                max_attempts=max_retries,
+                backoff_base=backoff_base,
+                backoff_max=60.0,
+                on_retry=_record_retry,
+            )
+            return content, ctype, meta
+        except Exception as e:
+            meta["errors"].append({"attempt": meta["retries"] + 1, "error": repr(e)})
+            meta["retries"] = max(meta["retries"], 1)
+            if str(e) == "blocked_url":
+                return None, "blocked_url", meta
+            if str(e) == "response_too_large":
+                return None, "response_too_large", meta
+
+        return None, f"Failed after {meta['retries']} attempts", meta
 
     def snapshot_evidence(
         self,
