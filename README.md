@@ -34,6 +34,18 @@ Dataset Collector v2 uses three safety buckets to control merges:
 
 YELLOW items must be reviewed and approved before they are eligible for the combined corpus.
 
+## License profiles
+
+Targets and catalog entries may specify a `license_profile` value. Supported values are:
+
+- `permissive`
+- `public_domain`
+- `copyleft`
+- `record_level`
+- `unknown`
+- `quarantine`
+- `deny`
+
 ## Known Limitations
 
 - **Yellow-screen boundaries**: The `acquire_yellow` and `screen_yellow` stages only apply to targets explicitly marked as YELLOW in pipeline target YAMLs. Anything not labeled YELLOW is outside the yellow-screen workflow, and no automatic promotion to GREEN occurs without human review.
