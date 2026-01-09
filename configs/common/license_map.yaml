@@ -189,6 +189,10 @@ profiles:
   record_level:
     # requires per-record license metadata / allowlist extraction
     default_bucket: "YELLOW"
+  public_domain:
+    default_bucket: "GREEN"
+  quarantine:
+    default_bucket: "YELLOW"
   unknown:
     default_bucket: "YELLOW"
   deny:
