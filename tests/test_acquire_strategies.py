@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -12,13 +11,8 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
-WORKER_PATH = REPO_ROOT / "kg_nav_pipeline_v2" / "acquire_worker.py"
-SPEC = importlib.util.spec_from_file_location("kg_nav_acquire_worker", WORKER_PATH)
-if SPEC is None or SPEC.loader is None:
-    raise RuntimeError("Unable to load kg_nav acquire worker module for tests.")
-aw = importlib.util.module_from_spec(SPEC)
-sys.modules["kg_nav_acquire_worker"] = aw
-SPEC.loader.exec_module(aw)
+
+import collector_core.acquire_strategies as aw
 
 
 class StreamResponse:
