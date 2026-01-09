@@ -18,6 +18,7 @@ from urllib.parse import urlparse
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.config_validator import read_yaml
 from collector_core.dependencies import _try_import, requires
+from collector_core.network_utils import _with_retries
 
 requests = _try_import("requests")
 FTP = _try_import("ftplib", "FTP")
@@ -462,8 +463,17 @@ def handle_zenodo(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> li
         return [{"status": "error", "error": missing}]
     if not ctx.mode.execute:
         return [{"status": "noop", "path": str(out_dir)}]
-    resp = requests.get(api_url, timeout=60)
-    resp.raise_for_status()
+    def _fetch() -> requests.Response:
+        resp = requests.get(api_url, timeout=60)
+        resp.raise_for_status()
+        return resp
+
+    resp = _with_retries(
+        _fetch,
+        max_attempts=ctx.retry.max_attempts,
+        backoff_base=ctx.retry.backoff_base,
+        backoff_max=ctx.retry.backoff_max,
+    )
     data = resp.json()
     hits = data.get("hits", {}).get("hits", [])
     if hits and not data.get("files"):
@@ -551,8 +561,17 @@ def handle_figshare_article(ctx: AcquireContext, row: dict[str, Any], out_dir: P
     endpoint = f"{api_base}/articles/{article_id}"
     if not ctx.mode.execute:
         return [{"status": "noop", "article_id": article_id, "path": str(out_dir)}]
-    resp = requests.get(endpoint, timeout=60)
-    resp.raise_for_status()
+    def _fetch() -> requests.Response:
+        resp = requests.get(endpoint, timeout=60)
+        resp.raise_for_status()
+        return resp
+
+    resp = _with_retries(
+        _fetch,
+        max_attempts=ctx.retry.max_attempts,
+        backoff_base=ctx.retry.backoff_base,
+        backoff_max=ctx.retry.backoff_max,
+    )
     meta = resp.json()
     files = meta.get("files", []) or []
     results: list[dict[str, Any]] = []
@@ -581,8 +600,17 @@ def handle_figshare_files(ctx: AcquireContext, row: dict[str, Any], out_dir: Pat
         return [{"status": "error", "error": missing}]
     if not ctx.mode.execute:
         return [{"status": "noop", "path": str(out_dir)}]
-    resp = requests.get(api, timeout=120)
-    resp.raise_for_status()
+    def _fetch() -> requests.Response:
+        resp = requests.get(api, timeout=120)
+        resp.raise_for_status()
+        return resp
+
+    resp = _with_retries(
+        _fetch,
+        max_attempts=ctx.retry.max_attempts,
+        backoff_base=ctx.retry.backoff_base,
+        backoff_max=ctx.retry.backoff_max,
+    )
     files = resp.json() or []
     ensure_dir(out_dir)
     results: list[dict[str, Any]] = []
