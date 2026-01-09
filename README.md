@@ -49,6 +49,28 @@ YELLOW items must be reviewed and approved before they are eligible for the comb
 - [Adding a new pipeline](docs/adding-new-pipeline.md)
 - [Run instructions](docs/run_instructions.md)
 
+## Reproducible installs (recommended)
+
+Use the base + extras flow: install the shared base constraints once, then layer in the
+pipeline-specific extras you need.
+
+```bash
+pip install -r requirements.constraints.txt
+pip install -r requirements-dev.constraints.txt
+pip install -r math_pipeline_v2/requirements.txt
+# repeat for other pipeline extras as needed
+```
+
+### Regenerate the constraints files
+
+These constraints are version-pinned but do not use hash checking, and they are not a
+full lockfile that pins every transitive dependency.
+
+```bash
+uv pip compile requirements.in -o requirements.constraints.txt
+uv pip compile requirements-dev.in -o requirements-dev.constraints.txt
+```
+
 ## Run all pipelines via JupyterLab
 
 1. Launch JupyterLab from the repository root (Windows, macOS, or Linux; `bash` is optional unless you plan to run shell-based cells).
@@ -125,15 +147,11 @@ python run_all.py --dest-root "E:/AI-Research/datasets/Natural" --execute
 
 ### Windows-first Jupyter (Natural corpus)
 
-If you prefer to run a smaller subset of stages from Jupyter on Windows, you can
-call the Windows-native orchestrator directly from a notebook cell:
+If you prefer to run a smaller subset of stages from Jupyter on Windows, first
+set up dependencies using [Reproducible installs](#reproducible-installs-recommended),
+then call the Windows-native orchestrator directly from a notebook cell:
 
 ```powershell
-py -3.11 -m venv .venv
-.venv\Scripts\activate
-pip install -r math_pipeline_v2\requirements.txt
-# repeat for other pipeline requirements as needed
-
 python tools\build_natural_corpus.py --dest-root "E:\AI-Research\datasets\Natural" --pipelines all --stages classify,acquire_green,acquire_yellow --execute
 ```
 
@@ -153,11 +171,6 @@ Use the Windows-first orchestrator to run all pipelines sequentially and emit th
 Natural corpus layout under a single destination root. This is an optional alternative to the JupyterLab notebook flow.
 
 ```powershell
-py -3.11 -m venv .venv
-.venv\Scripts\activate
-pip install -r math_pipeline_v2\requirements.txt
-# repeat for other pipeline requirements as needed
-
 python tools\build_natural_corpus.py --dest-root "E:\AI-Research\datasets\Natural" --pipelines all --execute
 ```
 
@@ -198,32 +211,10 @@ Update these in the pipeline’s configuration files (for example `targets_*.yam
 
 - **Python**: Each pipeline depends on Python; version and additional tools may vary by pipeline.
   Tested on Python 3.10 and 3.11.
-- **Requirements**: Install base dependencies once from `requirements.constraints.txt`, then layer pipeline-specific extras from each pipeline’s `requirements.txt`.
-- **Notebook dependencies**: `jupyterlab` and `ipykernel` are tracked in `requirements-dev.in` and installed from `requirements-dev.constraints.txt`.
+- **Requirements**: Follow [Reproducible installs](#reproducible-installs-recommended) for the shared base and pipeline-specific extras.
+- **Notebook dependencies**: `jupyterlab` and `ipykernel` are tracked in `requirements-dev.in` and installed via the reproducible constraints flow.
 - **External tools**: `git` is required when a target uses `download.strategy: git`. The AWS CLI is required for `s3_sync` or `aws_requester_pays` download modes. `aria2c` is required for `download.strategy: torrent`.
 - **Dry-run vs execute**: dry-run is the default when `--execute` is absent. Use `--execute` only when you intend to modify data or produce outputs.
-
-## Reproducible installs (recommended)
-
-Use the base + extras flow: install the shared base constraints once, then layer in the
-pipeline-specific extras you need.
-
-```bash
-pip install -r requirements.constraints.txt
-pip install -r requirements-dev.constraints.txt
-pip install -r math_pipeline_v2/requirements.txt
-# repeat for other pipeline extras as needed
-```
-
-### Regenerate the constraints files
-
-These constraints are version-pinned but do not use hash checking, and they are not a
-full lockfile that pins every transitive dependency.
-
-```bash
-uv pip compile requirements.in -o requirements.constraints.txt
-uv pip compile requirements-dev.in -o requirements-dev.constraints.txt
-```
 
 ## Preflight validation
 
