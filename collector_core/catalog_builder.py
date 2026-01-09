@@ -12,9 +12,12 @@ from __future__ import annotations
 import argparse
 import gzip
 import json
+import sys
 import time
 from pathlib import Path
 from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from collector_core.config_validator import read_yaml
 

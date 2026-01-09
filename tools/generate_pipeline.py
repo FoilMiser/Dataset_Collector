@@ -108,6 +108,11 @@ def render_pipeline_driver(spec: PipelineSpec) -> str:
         #!/usr/bin/env python3
         from __future__ import annotations
 
+        import sys
+        from pathlib import Path
+
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
         from collector_core.__version__ import __version__ as VERSION
         from collector_core.pipeline_driver_base import BasePipelineDriver, RoutingBlockSpec
 
@@ -141,6 +146,11 @@ def render_acquire_worker(spec: PipelineSpec) -> str:
         """
 
         from __future__ import annotations
+
+        import sys
+        from pathlib import Path
+
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
         from collector_core.acquire_strategies import (
             RootsDefaults,
@@ -270,7 +280,12 @@ def render_catalog_builder() -> str:
         #!/usr/bin/env python3
         """Deprecated pipeline entry point for catalog builder."""
 
+        from __future__ import annotations
+
+        import sys
         from pathlib import Path
+
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
         from collector_core.pipeline_cli import run_deprecated_entrypoint
 
@@ -291,7 +306,12 @@ def render_review_queue() -> str:
         #!/usr/bin/env python3
         """Deprecated pipeline entry point for manual YELLOW review queue helper."""
 
+        from __future__ import annotations
+
+        import sys
         from pathlib import Path
+
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
         from collector_core.pipeline_cli import run_deprecated_entrypoint
 
