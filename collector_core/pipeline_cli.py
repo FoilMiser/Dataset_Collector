@@ -136,6 +136,8 @@ def main() -> int:
     )
 
     passthrough = list(args.args)
+    if passthrough[:1] == ["--"]:
+        passthrough = passthrough[1:]
     default_targets = _pick_default_targets(pipeline_dir)
 
     if args.command == COMMAND_CATALOG_BUILDER:

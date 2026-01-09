@@ -57,6 +57,5 @@ python regcomp_pipeline_v2/merge_worker.py \
 python -m collector_core.pipeline_cli \
   --pipeline-id regcomp \
   catalog-builder \
-  -- \
   --targets "${TEMP_FIXTURES}/targets_minimal_patched.yaml" \
   --output "${DATASET_ROOT}/_catalogs/catalog.json"
