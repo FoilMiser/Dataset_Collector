@@ -51,10 +51,10 @@ globals:
       - "no tdm"
       - "no machine learning"
 
-  default_gates:
-    - snapshot_terms
-    - restriction_phrase_scan
-
+  default_license_gates:
+    - "snapshot_terms"
+    - "restriction_phrase_scan"
+  default_content_checks: []
 queues:
   emit:
     - id: "green_download"
@@ -213,7 +213,7 @@ targets:
       strategy: "git"
       repo: "https://github.com/OpenLogicProject/OpenLogic.git"
       checkout: "master"
-    gates_override:
+    content_checks:
       add: ["extract_text_chunks"]
     output:
       pool: "permissive"
@@ -262,7 +262,7 @@ targets:
       strategy: "git"
       repo: "https://github.com/SMT-LIB/benchmarks.git"
       checkout: "master"
-    gates_override:
+    content_checks:
       add: ["record_level_filter"]
     output:
       pool: "quarantine"
@@ -384,8 +384,10 @@ targets:
       dataset_id: ""
     canonicalize:
       text_field_candidates: ["text", "story", "context", "question", "answer"]
-    gates_override:
-      add: ["manual_legal_review", "segregate_copyleft_pool"]
+    license_gates:
+      add: ["manual_legal_review"]
+    content_checks:
+      add: ["segregate_copyleft_pool"]
     output:
       pool: "copyleft"
       formats: ["hf_dataset"]
@@ -424,7 +426,7 @@ targets:
         exclude_terms:
           - "astrology"
           - "tarot"
-    gates_override:
+    content_checks:
       add: ["record_level_filter", "extract_text_chunks"]
     output:
       pool: "quarantine"
@@ -449,8 +451,10 @@ targets:
       strategy: "http"
       urls:
         - "https://dumps.wikimedia.org/enwiki/latest/enwiki-latest-pages-articles.xml.bz2"
-    gates_override:
-      add: ["manual_legal_review", "segregate_copyleft_pool", "extract_text_chunks"]
+    license_gates:
+      add: ["manual_legal_review"]
+    content_checks:
+      add: ["segregate_copyleft_pool", "extract_text_chunks"]
     output:
       pool: "copyleft"
       formats: ["bz2", "jsonl.gz"]
@@ -473,8 +477,10 @@ targets:
     download:
       strategy: "http"
       urls: []
-    gates_override:
-      add: ["manual_legal_review", "segregate_copyleft_pool", "extract_text_chunks"]
+    license_gates:
+      add: ["manual_legal_review"]
+    content_checks:
+      add: ["segregate_copyleft_pool", "extract_text_chunks"]
     output:
       pool: "copyleft"
       formats: ["7z", "xml", "jsonl.gz"]

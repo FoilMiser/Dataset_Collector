@@ -43,10 +43,10 @@ globals:
     require_record_license: true
     allow_spdx: [CC0-1.0, CC-BY-4.0, MIT, Apache-2.0, BSD-3-Clause, CC-BY-SA-4.0]
     deny_phrases: [noai, "no tdm", "no machine learning", "noncommercial", "no derivatives", "nd", "nc"]
-  default_gates:
+  default_license_gates:
     - "snapshot_terms"
     - "restriction_phrase_scan"
-
+  default_content_checks: []
 queues:
   emit:
     - id: "green_download"
@@ -154,7 +154,7 @@ targets:
         - "steps"
         - "expected_artifacts"   # e.g., stl path, gcode, screenshots, params
         - "verification"         # render hash, param checks, etc.
-    gates_override:
+    content_checks:
       add: ["emit_training_manifest"]
     three_d_routing:
       domain: cad_parametric
@@ -186,7 +186,7 @@ targets:
         - "**/*.obj"
         - "**/*.stl"
       emit_index: true
-    gates_override:
+    content_checks:
       add: ["mesh_validate", "mesh_sanitize", "mesh_extract_metadata", "mesh_render_thumbnails"]
     output:
       pool: "permissive"
@@ -213,7 +213,7 @@ targets:
     download:
       strategy: "git"
       repo_url: "https://github.com/blender/education"
-    gates_override:
+    content_checks:
       add: ["extract_text_chunks"]
     output:
       pool: "permissive"
@@ -245,9 +245,11 @@ targets:
       integrity:
         verify_size: true
         compute_sha256: true
-    gates_override:
+    license_gates:
       add:
         - "manual_legal_review"
+    content_checks:
+      add:
         - "record_level_filter"
         - "mesh_validate"
         - "mesh_sanitize"
@@ -287,7 +289,7 @@ targets:
       sharding:
         method: "hash_prefix"
         prefix_chars: 2
-    gates_override:
+    content_checks:
       add: ["mesh_geometry_dedupe", "collect_statistics"]
     output:
       pool: "permissive"
@@ -315,8 +317,10 @@ targets:
       strategy: "api"
       base_url: "https://3dprint.nih.gov"
       note: "Site availability can be intermittent; mirror metadata + license fields first."
-    gates_override:
-      add: ["manual_legal_review", "record_level_filter", "mesh_validate", "mesh_sanitize", "weapon_trademark_filter"]
+    license_gates:
+      add: ["manual_legal_review"]
+    content_checks:
+      add: ["record_level_filter", "mesh_validate", "mesh_sanitize", "weapon_trademark_filter"]
     output:
       pool: "quarantine"
       formats: ["stl", "obj", "jsonl"]
@@ -343,7 +347,7 @@ targets:
     download:
       strategy: "git"
       repo_url: "https://github.com/blender/blender-manual"
-    gates_override:
+    content_checks:
       add: ["extract_text_chunks", "segregate_copyleft_pool"]
     output:
       pool: "copyleft"
@@ -370,7 +374,7 @@ targets:
     download:
       strategy: "git"
       repo_url: "https://github.com/Ultimaker/CuraEngine"
-    gates_override:
+    content_checks:
       add: ["segregate_copyleft_pool"]
     output:
       pool: "copyleft"
@@ -426,8 +430,10 @@ targets:
       split: "train"
     canonicalize:
       text_field_candidates: ["text", "description", "caption", "title"]
-    gates_override:
-      add: ["manual_legal_review", "record_level_filter", "mesh_validate", "mesh_sanitize", "weapon_trademark_filter"]
+    license_gates:
+      add: ["manual_legal_review"]
+    content_checks:
+      add: ["record_level_filter", "mesh_validate", "mesh_sanitize", "weapon_trademark_filter"]
     record_level_policy:
       allow_spdx: ["CC0-1.0", "CC-BY-4.0", "CC-BY-3.0"]
       deny_if_contains_phrases: ["NonCommercial", "NoDerivatives", "NoAI"]
@@ -485,8 +491,10 @@ targets:
       seed_urls:
         - "https://research.google/blog/scanned-objects-by-google-research-a-dataset-of-3d-scanned-common-household-items/"
       emit_index: true
-    gates_override:
-      add: ["manual_legal_review", "mesh_validate", "mesh_sanitize", "mesh_extract_metadata"]
+    license_gates:
+      add: ["manual_legal_review"]
+    content_checks:
+      add: ["mesh_validate", "mesh_sanitize", "mesh_extract_metadata"]
     output:
       pool: "permissive"
       formats: ["obj", "png", "jsonl"]

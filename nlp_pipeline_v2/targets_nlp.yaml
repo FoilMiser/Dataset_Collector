@@ -56,10 +56,10 @@ globals:
     normalize_whitespace: true
     force_language: "en"
 
-  default_gates:
+  default_license_gates:
     - "snapshot_terms"
     - "restriction_phrase_scan"
-
+  default_content_checks: []
 queues:
   emit:
     - id: "green_download"
@@ -153,7 +153,7 @@ targets:
     output:
       pool: "permissive"
       formats: ["hf_disk"]
-    gates_override:
+    license_gates:
       add: ["manual_legal_review"]
     routing:
       subject: "nlp"
@@ -259,7 +259,7 @@ targets:
     output:
       pool: "permissive"
       formats: ["hf_disk"]
-    gates_override:
+    license_gates:
       add: ["manual_legal_review"]
     routing:
       subject: "nlp"
@@ -287,8 +287,10 @@ targets:
     output:
       pool: "permissive"
       formats: ["hf_disk"]
-    gates_override:
-      add: ["record_level_filter", "manual_legal_review"]
+    license_gates:
+      add: ["manual_legal_review"]
+    content_checks:
+      add: ["record_level_filter"]
     routing:
       subject: "nlp"
       domain: "education"
@@ -315,8 +317,10 @@ targets:
     output:
       pool: "permissive"
       formats: ["hf_disk"]
-    gates_override:
-      add: ["record_level_filter", "manual_legal_review"]
+    license_gates:
+      add: ["manual_legal_review"]
+    content_checks:
+      add: ["record_level_filter"]
     routing:
       subject: "nlp"
       domain: "scientific"
@@ -452,7 +456,7 @@ targets:
     output:
       pool: "permissive"
       formats: ["html", "jsonl.gz"]
-    gates_override:
+    license_gates:
       add: ["manual_legal_review"]
     routing:
       subject: "nlp"
@@ -481,7 +485,7 @@ targets:
     output:
       pool: "permissive"
       formats: ["pdf", "html", "jsonl.gz"]
-    gates_override:
+    license_gates:
       add: ["manual_legal_review"]
     routing:
       subject: "nlp"
@@ -510,7 +514,7 @@ targets:
     output:
       pool: "permissive"
       formats: ["pdf", "html", "jsonl.gz"]
-    gates_override:
+    content_checks:
       add: ["record_level_filter"]
     routing:
       subject: "nlp"
@@ -539,8 +543,10 @@ targets:
     output:
       pool: "permissive"
       formats: ["pdf", "html", "jsonl.gz"]
-    gates_override:
-      add: ["record_level_filter", "manual_legal_review"]
+    license_gates:
+      add: ["manual_legal_review"]
+    content_checks:
+      add: ["record_level_filter"]
     routing:
       subject: "nlp"
       domain: "gov"
@@ -566,8 +572,10 @@ targets:
     output:
       pool: "permissive"
       formats: ["html", "jsonl.gz"]
-    gates_override:
-      add: ["record_level_filter", "manual_legal_review"]
+    license_gates:
+      add: ["manual_legal_review"]
+    content_checks:
+      add: ["record_level_filter"]
     routing:
       subject: "nlp"
       domain: "gov"
@@ -598,8 +606,10 @@ targets:
     output:
       pool: "copyleft"
       formats: ["hf_disk"]
-    gates_override:
-      add: ["segregate_copyleft_pool", "manual_legal_review"]
+    license_gates:
+      add: ["manual_legal_review"]
+    content_checks:
+      add: ["segregate_copyleft_pool"]
     routing:
       subject: "nlp"
       domain: "misc"
@@ -626,8 +636,10 @@ targets:
     output:
       pool: "copyleft"
       formats: ["hf_disk"]
-    gates_override:
-      add: ["segregate_copyleft_pool", "manual_legal_review"]
+    license_gates:
+      add: ["manual_legal_review"]
+    content_checks:
+      add: ["segregate_copyleft_pool"]
     routing:
       subject: "nlp"
       domain: "misc"

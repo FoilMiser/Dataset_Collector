@@ -563,9 +563,10 @@ def render_targets_yaml(spec: PipelineSpec) -> str:
               - "no tdm"
               - "no machine learning"
 
-          default_gates:
+          default_license_gates:
             - snapshot_terms
             - restriction_phrase_scan
+          default_content_checks: []
 
         queues:
           emit:

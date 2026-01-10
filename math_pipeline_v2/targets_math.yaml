@@ -43,9 +43,10 @@ globals:
     - noai
     - "no tdm"
     - "no machine learning"
-  default_gates:
-  - snapshot_terms
-  - restriction_phrase_scan
+  default_license_gates:
+    - "snapshot_terms"
+    - "restriction_phrase_scan"
+  default_content_checks: []
 queues:
   emit:
   - id: green_download
@@ -163,9 +164,9 @@ targets:
     category: glossary
     level: 6
     granularity: target
-  gates_override:
+  content_checks:
     add:
-    - emit_training_manifest
+      - "emit_training_manifest"
   routing:
     domain: math_reference
     category: glossary
@@ -325,10 +326,10 @@ targets:
     category: encyclopedia
     level: 7
     granularity: target
-  gates_override:
+  content_checks:
     add:
-    - record_level_filter
-    - domain_filter_math_stackexchange
+      - "record_level_filter"
+      - "domain_filter_math_stackexchange"
   review_required: false
   routing:
     domain: math_reference
@@ -367,11 +368,11 @@ targets:
     category: research_papers
     level: 9
     granularity: target
-  gates_override:
+  content_checks:
     add:
-    - record_level_filter
-    - domain_filter_arxiv_math
-    - extract_latex_aware_chunks
+      - "record_level_filter"
+      - "domain_filter_arxiv_math"
+      - "extract_latex_aware_chunks"
   review_required: true
   review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
   routing:
@@ -410,11 +411,11 @@ targets:
     category: encyclopedia
     level: 6
     granularity: target
-  gates_override:
+  content_checks:
     add:
-    - record_level_filter
-    - domain_filter_math_textbooks
-    - emit_attribution_bundle
+      - "record_level_filter"
+      - "domain_filter_math_textbooks"
+      - "emit_attribution_bundle"
   review_required: true
   review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
   routing:
@@ -453,11 +454,11 @@ targets:
     category: encyclopedia
     level: 6
     granularity: target
-  gates_override:
+  content_checks:
     add:
-    - record_level_filter
-    - domain_filter_math_textbooks
-    - emit_attribution_bundle
+      - "record_level_filter"
+      - "domain_filter_math_textbooks"
+      - "emit_attribution_bundle"
   review_required: true
   review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
   routing:
@@ -496,11 +497,11 @@ targets:
     category: encyclopedia
     level: 6
     granularity: target
-  gates_override:
+  content_checks:
     add:
-    - record_level_filter
-    - domain_filter_math_textbooks
-    - emit_attribution_bundle
+      - "record_level_filter"
+      - "domain_filter_math_textbooks"
+      - "emit_attribution_bundle"
   review_required: true
   review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
   routing:
@@ -539,11 +540,11 @@ targets:
     category: encyclopedia
     level: 6
     granularity: target
-  gates_override:
+  content_checks:
     add:
-    - record_level_filter
-    - domain_filter_math_textbooks
-    - emit_attribution_bundle
+      - "record_level_filter"
+      - "domain_filter_math_textbooks"
+      - "emit_attribution_bundle"
   review_required: true
   review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
   routing:
@@ -582,11 +583,11 @@ targets:
     category: encyclopedia
     level: 6
     granularity: target
-  gates_override:
+  content_checks:
     add:
-    - record_level_filter
-    - domain_filter_math_textbooks
-    - emit_attribution_bundle
+      - "record_level_filter"
+      - "domain_filter_math_textbooks"
+      - "emit_attribution_bundle"
   review_required: true
   review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
   routing:
@@ -620,9 +621,9 @@ targets:
     category: metamath
     level: 7
     granularity: target
-  gates_override:
+  content_checks:
     add:
-    - formal_chunk_by_theorem
+      - "formal_chunk_by_theorem"
   routing:
     domain: formal_systems
     category: metamath
@@ -655,9 +656,9 @@ targets:
     category: lean_mathlib
     level: 8
     granularity: target
-  gates_override:
+  content_checks:
     add:
-    - formal_chunk_by_lemma
+      - "formal_chunk_by_lemma"
   routing:
     domain: formal_systems
     category: lean_mathlib
@@ -690,10 +691,10 @@ targets:
     category: lean_mathlib
     level: 8
     granularity: target
-  gates_override:
+  content_checks:
     add:
-    - formal_chunk_by_lemma
-    - emit_training_manifest
+      - "formal_chunk_by_lemma"
+      - "emit_training_manifest"
   routing:
     domain: formal_systems
     category: lean_mathlib
@@ -726,9 +727,9 @@ targets:
     category: coq_mathcomp
     level: 8
     granularity: target
-  gates_override:
+  content_checks:
     add:
-    - formal_chunk_by_theorem
+      - "formal_chunk_by_theorem"
   routing:
     domain: formal_systems
     category: coq_mathcomp
@@ -760,9 +761,9 @@ targets:
     category: lean_mathlib
     level: 8
     granularity: target
-  gates_override:
+  content_checks:
     add:
-    - formal_chunk_by_module
+      - "formal_chunk_by_module"
   routing:
     domain: formal_systems
     category: lean_mathlib
@@ -794,9 +795,9 @@ targets:
     category: coq_mathcomp
     level: 8
     granularity: target
-  gates_override:
+  content_checks:
     add:
-    - formal_chunk_by_lemma
+      - "formal_chunk_by_lemma"
   routing:
     domain: formal_systems
     category: coq_mathcomp
@@ -828,9 +829,9 @@ targets:
     category: lean_mathlib
     level: 8
     granularity: target
-  gates_override:
+  content_checks:
     add:
-    - formal_chunk_by_theorem
+      - "formal_chunk_by_theorem"
   routing:
     domain: formal_systems
     category: lean_mathlib
@@ -863,9 +864,9 @@ targets:
     category: glossary
     level: 6
     granularity: target
-  gates_override:
+  content_checks:
     add:
-    - code_and_docs_chunking
+      - "code_and_docs_chunking"
   routing:
     domain: math_reference
     category: glossary
@@ -897,10 +898,10 @@ targets:
     category: isabelle_afp
     level: 8
     granularity: target
-  gates_override:
+  content_checks:
     add:
-    - record_level_filter
-    - formal_chunk_by_entry
+      - "record_level_filter"
+      - "formal_chunk_by_entry"
   review_required: true
   review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
   routing:
@@ -934,10 +935,10 @@ targets:
     category: functions_graphs
     level: 5
     granularity: target
-  gates_override:
+  content_checks:
     add:
-    - extract_text_chunks
-    - extract_latex_aware_chunks
+      - "extract_text_chunks"
+      - "extract_latex_aware_chunks"
   routing:
     domain: algebra
     category: functions_graphs
@@ -969,10 +970,10 @@ targets:
     category: calc_single_variable_1
     level: 6
     granularity: target
-  gates_override:
+  content_checks:
     add:
-    - extract_text_chunks
-    - extract_latex_aware_chunks
+      - "extract_text_chunks"
+      - "extract_latex_aware_chunks"
   routing:
     domain: calculus
     category: calc_single_variable_1
@@ -1003,9 +1004,9 @@ targets:
     category: encyclopedia
     level: 7
     granularity: target
-  gates_override:
+  license_gates:
     add:
-    - manual_legal_review
+      - "manual_legal_review"
   review_required: true
   review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
   routing:
@@ -1037,9 +1038,9 @@ targets:
     category: encyclopedia
     level: 7
     granularity: target
-  gates_override:
+  license_gates:
     add:
-    - manual_legal_review
+      - "manual_legal_review"
   review_required: true
   review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
   routing:

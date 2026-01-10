@@ -41,10 +41,10 @@ globals:
       - "no tdm"
       - "no machine learning"
 
-  default_gates:
+  default_license_gates:
     - "snapshot_terms"
     - "restriction_phrase_scan"
-
+  default_content_checks: []
 companion_files:
   license_map:
     - "../configs/common/license_map.yaml"
@@ -169,9 +169,8 @@ targets:
         - "answer_key"
         - "grading_fn"
         - "units_schema"
-    gates_override:
+    content_checks:
       add: ["emit_training_manifest"]
-
   # A) Ontologies / IDs
   - id: "chebi_core"
     name: "ChEBI — ontology + structures"
@@ -224,7 +223,7 @@ targets:
       integrity:
         verify_size: true
         compute_sha256: true
-    gates_override:
+    content_checks:
       add: ["computed_only_extract", "validate_schema", "collect_statistics"]
     output:
       pool: "quarantine"
@@ -289,8 +288,10 @@ targets:
     download:
       strategy: "http"
       urls: ["https://chembl.gitbook.io/chembl-interface-documentation/downloads"]
-    gates_override:
-      add: ["manual_legal_review", "segregate_copyleft_pool"]
+    license_gates:
+      add: ["manual_legal_review"]
+    content_checks:
+      add: ["segregate_copyleft_pool"]
     output:
       pool: "copyleft"
       formats: ["sqlite", "tsv", "jsonl"]
@@ -344,7 +345,7 @@ targets:
         enabled: true
         cache_dir: "quarantine/pmc_oa_fulltext/_cache"
         max_cache_size_gb: 100
-    gates_override:
+    content_checks:
       add: ["record_level_filter", "extract_text_chunks", "collect_statistics"]
     # v0.6: enhanced text processing for PMC
     text_processing:
@@ -366,8 +367,10 @@ targets:
     download:
       strategy: "http"
       urls: ["https://dumps.wikimedia.org/enwiki/latest/"]
-    gates_override:
-      add: ["manual_legal_review", "segregate_copyleft_pool", "extract_text_chunks"]
+    license_gates:
+      add: ["manual_legal_review"]
+    content_checks:
+      add: ["segregate_copyleft_pool", "extract_text_chunks"]
     output:
       pool: "copyleft"
       formats: ["bz2", "jsonl.gz"]
@@ -388,7 +391,7 @@ targets:
       integrity:
         verify_size: true
         compute_sha256: true
-    gates_override:
+    content_checks:
       add: ["record_level_filter", "validate_schema", "collect_statistics"]
     # v0.9: split_group_id for related spectra
     split_group_id: "mona_spectra_group"
@@ -412,7 +415,7 @@ targets:
       integrity:
         verify_size: true
         compute_sha256: true
-    gates_override:
+    content_checks:
       add: ["record_level_filter", "validate_schema", "collect_statistics"]
     # v0.9: split_group_id for related natural product clusters
     split_group_id: "gnps_cluster_group"
@@ -436,8 +439,10 @@ targets:
       strategy: "api"
       base_url: "https://api.rsc.org/compounds/v1"
       api_key_env: "CHEMSPIDER_API_KEY"
-    gates_override:
-      add: ["manual_legal_review", "record_level_filter"]
+    license_gates:
+      add: ["manual_legal_review"]
+    content_checks:
+      add: ["record_level_filter"]
     output:
       pool: "quarantine"
       formats: ["json", "jsonl.gz"]

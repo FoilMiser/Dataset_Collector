@@ -66,10 +66,10 @@ globals:
     include_figure_captions: true
     include_table_captions: true
 
-  default_gates:
-    - snapshot_terms
-    - restriction_phrase_scan
-
+  default_license_gates:
+    - "snapshot_terms"
+    - "restriction_phrase_scan"
+  default_content_checks: []
 queues:
   emit:
     - id: green_download
@@ -145,9 +145,8 @@ targets:
       subject: metrology
       domain: si_units
       category: si_brochure
-    gates_override:
+    content_checks:
       add: ["extract_text_chunks", "emit_training_manifest", "emit_attribution_bundle"]
-
   - id: "nist_sp_330_si_brochure_us"
     name: "NIST SP 330-2019: The International System of Units (SI), 2019 Edition (US adaptation)"
     enabled: true
@@ -169,9 +168,8 @@ targets:
       subject: metrology
       domain: si_units
       category: si_brochure
-    gates_override:
+    content_checks:
       add: ["extract_text_chunks", "emit_training_manifest", "emit_attribution_bundle"]
-
   - id: "nist_rdaf_sp_1500_18r2_html"
     name: "NIST Research Data Framework (SP 1500-18r2) — HTML landing (for 'how NIST writes guidance')"
     enabled: true
@@ -193,9 +191,8 @@ targets:
       subject: metrology
       domain: standards_regulatory
       category: terminology_definitions
-    gates_override:
+    content_checks:
       add: ["extract_text_chunks", "emit_training_manifest", "emit_attribution_bundle"]
-
   - id: "nist_technical_series_publication_metadata"
     name: "NIST Technical Series Publication Metadata (Crossref exports) — monthly updated"
     enabled: true
@@ -219,9 +216,8 @@ targets:
       subject: metrology
       domain: standards_regulatory
       category: reporting_templates
-    gates_override:
+    content_checks:
       add: ["emit_training_manifest", "emit_attribution_bundle"]
-
   - id: "nist_nvlpubs_fulltext_harvest"
     name: "NIST NVL PubS full-text harvest (SP/TN/NISTIR/HB/etc) — TODO implement"
     enabled: false
@@ -242,8 +238,10 @@ targets:
       subject: metrology
       domain: calibration_traceability
       category: traceability_chain
-    gates_override:
-      add: ["manual_legal_review", "record_level_filter", "extract_text_chunks", "near_duplicate_detection"]
+    license_gates:
+      add: ["manual_legal_review"]
+    content_checks:
+      add: ["record_level_filter", "extract_text_chunks", "near_duplicate_detection"]
     output:
       pool: "quarantine"
       formats: ["jsonl.gz", "parquet"]
@@ -270,8 +268,10 @@ targets:
       subject: metrology
       domain: instrumentation
       category: sensors_basic
-    gates_override:
-      add: ["manual_legal_review", "distribution_statement_scan", "record_level_filter", "extract_text_chunks", "near_duplicate_detection"]
+    license_gates:
+      add: ["manual_legal_review"]
+    content_checks:
+      add: ["distribution_statement_scan", "record_level_filter", "extract_text_chunks", "near_duplicate_detection"]
     output:
       pool: "quarantine"
       formats: ["jsonl.gz", "parquet"]
@@ -297,8 +297,10 @@ targets:
       subject: metrology
       domain: instrumentation
       category: sensors_basic
-    gates_override:
-      add: ["manual_legal_review", "record_level_filter", "extract_text_chunks", "near_duplicate_detection"]
+    license_gates:
+      add: ["manual_legal_review"]
+    content_checks:
+      add: ["record_level_filter", "extract_text_chunks", "near_duplicate_detection"]
     output:
       pool: "quarantine"
       formats: ["jsonl.gz", "parquet"]
@@ -322,8 +324,10 @@ targets:
       subject: metrology
       domain: standards_regulatory
       category: reporting_templates
-    gates_override:
-      add: ["manual_legal_review", "record_level_filter", "extract_text_chunks", "near_duplicate_detection"]
+    license_gates:
+      add: ["manual_legal_review"]
+    content_checks:
+      add: ["record_level_filter", "extract_text_chunks", "near_duplicate_detection"]
     output:
       pool: "quarantine"
       formats: ["jsonl.gz", "parquet"]
@@ -349,9 +353,8 @@ targets:
       subject: metrology
       domain: standards_regulatory
       category: reporting_templates
-    gates_override:
+    content_checks:
       add: ["extract_text_chunks", "emit_training_manifest", "emit_attribution_bundle"]
-
   - id: "ntsb_aviation_accident_data_census"
     name: "NTSB Aviation Accident Data Census (ZIP) + coding manuals (data engineering + rigor)"
     enabled: false
@@ -377,9 +380,8 @@ targets:
       subject: metrology
       domain: instrumentation
       category: sensors_basic
-    gates_override:
+    content_checks:
       add: ["extract_text_chunks", "emit_training_manifest", "emit_attribution_bundle"]
-
   - id: "faa_advisory_circulars_harvest"
     name: "FAA Advisory Circulars (AC) — TODO implement crawler (many PDFs)"
     enabled: false
@@ -399,8 +401,10 @@ targets:
       subject: metrology
       domain: standards_regulatory
       category: reporting_templates
-    gates_override:
-      add: ["manual_legal_review", "record_level_filter", "extract_text_chunks", "near_duplicate_detection"]
+    license_gates:
+      add: ["manual_legal_review"]
+    content_checks:
+      add: ["record_level_filter", "extract_text_chunks", "near_duplicate_detection"]
     output:
       pool: "quarantine"
       formats: ["jsonl.gz", "parquet"]
@@ -430,9 +434,10 @@ targets:
       subject: metrology
       domain: misc
       category: misc
-    gates_override:
-      add: ["manual_legal_review", "record_level_filter", "near_duplicate_detection"]
-
+    license_gates:
+      add: ["manual_legal_review"]
+    content_checks:
+      add: ["record_level_filter", "near_duplicate_detection"]
   - id: "common_pile_doab"
     name: "Common Pile v0.1 — DOAB (open access books; useful but broad)"
     enabled: false
@@ -458,9 +463,10 @@ targets:
       subject: metrology
       domain: misc
       category: misc
-    gates_override:
-      add: ["manual_legal_review", "record_level_filter", "near_duplicate_detection"]
-
+    license_gates:
+      add: ["manual_legal_review"]
+    content_checks:
+      add: ["record_level_filter", "near_duplicate_detection"]
   - id: "iso_standards_paywalled"
     name: "ISO/IEC standards text (paywalled / restrictive) — DO NOT INGEST"
     enabled: false

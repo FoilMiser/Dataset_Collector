@@ -18,6 +18,82 @@
         "exponential_backoff": { "type": "boolean" }
       },
       "additionalProperties": false
+    },
+    "license_gate": {
+      "type": "string",
+      "enum": [
+        "manual_legal_review",
+        "manual_review",
+        "no_restrictions",
+        "restriction_phrase_scan",
+        "snapshot_terms"
+      ]
+    },
+    "content_check": {
+      "type": "string",
+      "enum": [
+        "code_and_docs_chunking",
+        "collect_statistics",
+        "computed_only_extract",
+        "distribution_statement_scan",
+        "domain_filter_arxiv_math",
+        "domain_filter_math_stackexchange",
+        "domain_filter_math_textbooks",
+        "dual_use_instruction_scan",
+        "dual_use_scan",
+        "emit_attribution_bundle",
+        "emit_training_manifest",
+        "extract_latex_aware_chunks",
+        "extract_text_chunks",
+        "formal_chunk_by_entry",
+        "formal_chunk_by_lemma",
+        "formal_chunk_by_module",
+        "formal_chunk_by_theorem",
+        "exploit_code_scan",
+        "html_crawl",
+        "license_metadata_validate",
+        "mesh_extract_metadata",
+        "mesh_geometry_dedupe",
+        "mesh_render_thumbnails",
+        "mesh_sanitize",
+        "mesh_validate",
+        "near_duplicate_detection",
+        "pdf_extract",
+        "pii_phi_scan",
+        "pii_scan",
+        "pii_scan_and_redact",
+        "pii_scan_and_redact_strict",
+        "record_level_filter",
+        "secret_scan",
+        "segregate_copyleft_pool",
+        "strip_third_party_media",
+        "validate_schema",
+        "weapon_trademark_filter"
+      ]
+    },
+    "license_gate_list": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/license_gate" }
+    },
+    "content_check_list": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/content_check" }
+    },
+    "license_gate_override": {
+      "type": "object",
+      "properties": {
+        "add": { "$ref": "#/definitions/license_gate_list" },
+        "remove": { "$ref": "#/definitions/license_gate_list" }
+      },
+      "additionalProperties": false
+    },
+    "content_check_override": {
+      "type": "object",
+      "properties": {
+        "add": { "$ref": "#/definitions/content_check_list" },
+        "remove": { "$ref": "#/definitions/content_check_list" }
+      },
+      "additionalProperties": false
     }
   },
   "properties": {
@@ -73,7 +149,9 @@
             "compression": { "type": "string" }
           },
           "additionalProperties": true
-        }
+        },
+        "default_license_gates": { "$ref": "#/definitions/license_gate_list" },
+        "default_content_checks": { "$ref": "#/definitions/content_check_list" }
       },
       "additionalProperties": true
     },
@@ -142,7 +220,9 @@
               }
             },
             "additionalProperties": true
-          }
+          },
+          "license_gates": { "$ref": "#/definitions/license_gate_override" },
+          "content_checks": { "$ref": "#/definitions/content_check_override" }
         },
         "additionalProperties": true
       }

@@ -178,8 +178,8 @@ targets:
   output:
     pool: permissive
     formats: [jsonl.gz, parquet]
-  gates_override:
-    add: [manual_legal_review]
+  license_gates:
+    add: ["manual_legal_review"]
   routing:
     subject: materials_science
     domain: materials_ml
