@@ -1005,13 +1005,19 @@ def run_acquire_worker(
 
     if ctx.mode.workers > 1 and ctx.mode.execute:
         with ThreadPoolExecutor(max_workers=ctx.mode.workers) as ex:
-            futures = {ex.submit(run_target, ctx, args.bucket, row, strategy_handlers, postprocess): row for row in rows}
+            results_by_index = [None] * len(rows)
+            futures = {
+                ex.submit(run_target, ctx, args.bucket, row, strategy_handlers, postprocess): (idx, row)
+                for idx, row in enumerate(rows)
+            }
             for fut in as_completed(futures):
+                idx, row = futures[fut]
                 try:
                     res = fut.result()
                 except Exception as e:
-                    res = {"id": futures[fut].get("id"), "status": "error", "error": repr(e)}
-                summary["results"].append(res)
+                    res = {"id": row.get("id"), "status": "error", "error": repr(e)}
+                results_by_index[idx] = res
+            summary["results"] = [result for result in results_by_index if result is not None]
     else:
         for row in rows:
             res = run_target(ctx, args.bucket, row, strategy_handlers, postprocess)
