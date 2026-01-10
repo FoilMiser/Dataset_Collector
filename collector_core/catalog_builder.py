@@ -20,8 +20,8 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from collector_core.config_validator import read_yaml
-
-VERSION = "2.0"
+from collector_core.__version__ import __schema_version__ as SCHEMA_VERSION
+from collector_core.__version__ import __version__ as PIPELINE_VERSION
 
 
 def utc_now() -> str:
@@ -117,9 +117,13 @@ def build_catalog(cfg: dict[str, Any], pipeline_slug: str | None = None) -> dict
     combined_root = Path(g.get("combined_root", default_root(pipeline_slug, "combined")))
     ledger_root = Path(g.get("ledger_root", default_root(pipeline_slug, "_ledger")))
 
+    generated_at = utc_now()
     catalog = {
-        "generated_at_utc": utc_now(),
-        "version": VERSION,
+        "generated_at_utc": generated_at,
+        "written_at_utc": generated_at,
+        "pipeline_version": PIPELINE_VERSION,
+        "schema_version": SCHEMA_VERSION,
+        "version": PIPELINE_VERSION,
         "raw": collect_raw_stats(raw_root),
         "screened_yellow": collect_shard_stage(screened_root),
         "combined": collect_shard_stage(combined_root),
@@ -134,7 +138,7 @@ def build_catalog(cfg: dict[str, Any], pipeline_slug: str | None = None) -> dict
 
 
 def main(*, pipeline_id: str | None = None) -> None:
-    ap = argparse.ArgumentParser(description=f"Catalog Builder v{VERSION}")
+    ap = argparse.ArgumentParser(description=f"Catalog Builder v{PIPELINE_VERSION}")
     ap.add_argument("--targets", required=True, help="targets YAML")
     ap.add_argument("--output", required=True, help="Output JSON path")
     args = ap.parse_args()
