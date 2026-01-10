@@ -37,13 +37,13 @@ def _is_windows_style(path_str: str) -> bool:
     return ":" in path_str or "\\" in path_str
 
 
-def _normalize_stages(stages: Sequence[str]) -> list[str]:
+def _normalize_list_arg(values: Sequence[str]) -> list[str]:
     normalized: list[str] = []
-    for stage in stages:
-        if "," in stage:
-            normalized.extend([part for part in stage.split(",") if part])
+    for value in values:
+        if "," in value:
+            normalized.extend([part for part in value.split(",") if part])
         else:
-            normalized.append(stage)
+            normalized.append(value)
     return normalized
 
 
@@ -195,7 +195,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     _validate_pipeline_map_destination(dest_root, pipeline_map_path)
 
     pipelines_cfg = pipeline_map.get("pipelines", {}) or {}
-    selected_pipelines = _normalize_stages(args.pipelines)
+    selected_pipelines = _normalize_list_arg(args.pipelines)
     if "all" in selected_pipelines:
         pipeline_names = list(pipelines_cfg.keys())
     else:
@@ -204,7 +204,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     if args.mode != "full":
         stages = MODE_STAGES[args.mode]
     else:
-        stages = _normalize_stages(args.stages)
+        stages = _normalize_list_arg(args.stages)
 
     for pipeline_name in pipeline_names:
         pipeline_entry = pipelines_cfg.get(pipeline_name)
