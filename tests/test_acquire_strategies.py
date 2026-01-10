@@ -87,13 +87,14 @@ def make_ctx(
     verify_sha256: bool = False,
     verify_zenodo_md5: bool = False,
     max_attempts: int = 1,
+    max_bytes_per_target: int | None = None,
 ) -> aw.AcquireContext:
     roots = aw.Roots(
         raw_root=tmp_path / "raw",
         manifests_root=tmp_path / "_manifests",
         logs_root=tmp_path / "_logs",
     )
-    limits = aw.Limits(limit_targets=None, limit_files=None, max_bytes_per_target=None)
+    limits = aw.Limits(limit_targets=None, limit_files=None, max_bytes_per_target=max_bytes_per_target)
     mode = aw.RunMode(
         execute=execute,
         overwrite=True,
@@ -273,6 +274,84 @@ def test_s3_sync_mock(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     assert calls[0][:4] == ["aws", "s3", "sync", "s3://bucket/data"]
     assert "--no-sign-request" in calls[0]
     assert "--request-payer" in calls[0]
+
+
+def test_http_multi_respects_max_bytes_per_target(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_download(ctx: aw.AcquireContext, url: str, out_path: Path, expected_size: int | None = None, expected_sha256=None):
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_bytes(b"x" * 10)
+        return {"status": "ok", "path": str(out_path), "content_length": 10}
+
+    monkeypatch.setattr(aw, "_http_download_with_resume", fake_download)
+
+    ctx = make_ctx(tmp_path, max_bytes_per_target=5)
+    row = {
+        "id": "http-multi",
+        "download": {
+            "strategy": "http",
+            "urls": ["https://example.com/a", "https://example.com/b"],
+            "filenames": ["a.bin", "b.bin"],
+        },
+    }
+    out_dir = tmp_path / "http"
+    results = aw.handle_http_multi(ctx, row, out_dir)
+
+    assert results[0]["status"] == "error"
+    assert results[0]["error"] == "limit_exceeded"
+    assert results[0]["limit_type"] == "bytes_per_target"
+    assert results[0]["limit"] == 5
+    assert results[0]["observed"] == 10
+    assert not (out_dir / "a.bin").exists()
+    assert results[1]["status"] == "error"
+    assert results[1]["error"] == "limit_exceeded"
+    assert results[1]["limit_type"] == "bytes_per_target"
+
+
+def test_git_clone_post_check_respects_max_bytes_per_target(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_run_cmd(cmd: list[str], cwd: Path | None = None) -> str:
+        if cmd[:2] == ["git", "clone"]:
+            dest = Path(cmd[-1])
+            dest.mkdir(parents=True, exist_ok=True)
+            (dest / "big.bin").write_bytes(b"x" * 10)
+            return "cloned"
+        if "rev-parse" in cmd:
+            return "deadbeef"
+        return ""
+
+    monkeypatch.setattr(aw, "run_cmd", fake_run_cmd)
+
+    ctx = make_ctx(tmp_path, max_bytes_per_target=5)
+    row = {"id": "git", "download": {"strategy": "git", "repo": "https://example.com/repo.git"}}
+    out_dir = tmp_path / "repo"
+    results = aw.handle_git(ctx, row, out_dir)
+
+    assert results[0]["status"] == "error"
+    assert results[0]["error"] == "limit_exceeded"
+    assert results[0]["limit_type"] == "bytes_per_target"
+    assert results[0]["limit"] == 5
+    assert results[0]["observed"] == 10
+    assert not out_dir.exists()
+
+
+def test_s3_sync_post_check_respects_max_bytes_per_target(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_run_cmd(cmd: list[str], cwd: Path | None = None) -> str:
+        out_dir = Path(cmd[-1])
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "payload.bin").write_bytes(b"x" * 10)
+        return "synced"
+
+    monkeypatch.setattr(aw, "run_cmd", fake_run_cmd)
+
+    ctx = make_ctx(tmp_path, max_bytes_per_target=5)
+    row = {"id": "s3", "download": {"strategy": "s3_sync", "urls": ["s3://bucket/data"]}}
+    out_dir = tmp_path / "s3"
+    results = aw.handle_s3_sync(ctx, row, out_dir)
+
+    assert results[0]["status"] == "error"
+    assert results[0]["error"] == "limit_exceeded"
+    assert results[0]["limit_type"] == "bytes_per_target"
+    assert results[0]["limit"] == 5
+    assert results[0]["observed"] == 10
 
 
 @pytest.mark.parametrize(
