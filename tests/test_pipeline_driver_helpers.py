@@ -16,9 +16,12 @@ from collector_core.pipeline_driver_base import (
     build_denylist_haystack,
     build_evidence_headers,
     build_target_identity,
+    compute_file_hashes,
+    compute_signoff_mismatches,
     denylist_hits,
     extract_download_urls,
     redact_headers_for_manifest,
+    resolve_evidence_change,
     resolve_effective_bucket,
     resolve_retry_config,
     sort_queue_rows,
@@ -356,3 +359,60 @@ def test_apply_yellow_signoff_requirement_flags_review() -> None:
         True,
     )
     assert review_required is True
+
+
+def test_text_extraction_failure_fallback_and_evidence_change_policies(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pdf_path = tmp_path / "evidence.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4\nexample")
+    monkeypatch.setattr(pipeline_driver_base, "PdfReader", None)
+
+    evidence: dict[str, object] = {}
+    raw_hash, normalized_hash = compute_file_hashes(pdf_path, evidence)
+
+    assert raw_hash
+    assert raw_hash == normalized_hash
+    assert evidence["normalized_hash_fallback"] == "raw_bytes"
+    assert evidence["text_extraction_failed"] is True
+
+    raw_mismatch, normalized_mismatch, cosmetic_change = compute_signoff_mismatches(
+        signoff_raw_sha="deadbeef",
+        signoff_normalized_sha="beadfeed",
+        current_raw_sha=raw_hash,
+        current_normalized_sha=normalized_hash,
+        text_extraction_failed=True,
+    )
+    assert raw_mismatch is True
+    assert normalized_mismatch is True
+    assert (
+        resolve_evidence_change(
+            raw_mismatch,
+            normalized_mismatch,
+            cosmetic_change,
+            evidence_policy="normalized",
+            cosmetic_policy="warn_only",
+        )
+        is True
+    )
+
+    assert (
+        resolve_evidence_change(
+            raw_changed=True,
+            normalized_changed=False,
+            cosmetic_change=False,
+            evidence_policy="normalized",
+            cosmetic_policy="warn_only",
+        )
+        is False
+    )
+    assert (
+        resolve_evidence_change(
+            raw_changed=True,
+            normalized_changed=False,
+            cosmetic_change=False,
+            evidence_policy="either",
+            cosmetic_policy="warn_only",
+        )
+        is True
+    )
