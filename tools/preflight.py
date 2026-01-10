@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
 import shutil
 import sys
+import traceback
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
@@ -47,10 +49,11 @@ def run_preflight(
     strict: bool = False,
     pipelines: list[str] | None = None,
     warn_disabled: bool = False,
+    verbose: bool = False,
 ) -> int:
     pipeline_map = _load_yaml(pipeline_map_path, "pipeline_map")
     pipelines_cfg = pipeline_map.get("pipelines", {}) or {}
-    errors: list[str] = []
+    errors: list[str | dict[str, str]] = []
     warnings: list[str] = []
     strategies_in_use_enabled: set[str] = set()
     strategies_in_use_disabled: set[str] = set()
@@ -94,8 +97,17 @@ def run_preflight(
 
         try:
             handler_keys = _load_strategy_handlers(acquire_worker_path)
-        except RuntimeError as exc:
-            errors.append(str(exc))
+        except Exception as exc:
+            errors.append(
+                {
+                    "pipeline": pipeline_name,
+                    "path": str(acquire_worker_path),
+                    "exception_type": type(exc).__name__,
+                    "message": str(exc),
+                }
+            )
+            if verbose:
+                traceback.print_exc()
             continue
 
         targets_cfg = _load_yaml(targets_path, "targets")
@@ -222,7 +234,10 @@ def run_preflight(
     if errors:
         print("Preflight errors:")
         for error in errors:
-            print(f"  - {error}")
+            if isinstance(error, dict):
+                print(f"  - {json.dumps(error, sort_keys=True)}")
+            else:
+                print(f"  - {error}")
         return 1
 
     print("Preflight checks passed.")
@@ -244,6 +259,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         help="Specific pipelines to check (default: all)",
     )
     ap.add_argument("--strict", action="store_true", help="Treat warnings as failures")
+    ap.add_argument("--verbose", action="store_true", help="Enable verbose logging")
     warn_group = ap.add_mutually_exclusive_group()
     warn_group.add_argument(
         "--warn-disabled",
@@ -269,6 +285,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         strict=args.strict,
         pipelines=args.pipelines,
         warn_disabled=args.warn_disabled,
+        verbose=args.verbose,
     )
 
 
