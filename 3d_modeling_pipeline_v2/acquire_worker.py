@@ -15,12 +15,16 @@ from __future__ import annotations
 
 import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+if __package__ in (None, ""):
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+else:
+    from pathlib import Path
 
 import fnmatch
 import json
 import time
-from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin, urlparse
 from urllib.robotparser import RobotFileParser

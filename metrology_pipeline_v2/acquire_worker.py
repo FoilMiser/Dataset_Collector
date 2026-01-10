@@ -15,14 +15,18 @@ from __future__ import annotations
 
 import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+if __package__ in (None, ""):
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+else:
+    from pathlib import Path
 
 import dataclasses
 import gzip
 import hashlib
 import json
 from collections.abc import Callable
-from pathlib import Path
 from typing import Any
 
 from collector_core.__version__ import __version__ as VERSION
