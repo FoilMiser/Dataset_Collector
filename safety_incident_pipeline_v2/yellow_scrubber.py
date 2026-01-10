@@ -15,7 +15,7 @@ if __package__ in (None, ""):
 from collector_core.pipeline_spec import get_pipeline_spec  # noqa: E402
 from collector_core.yellow_review_helpers import make_main  # noqa: E402
 
-DOMAIN = "logic"
+DOMAIN = "safety_incident"
 
 if __name__ == "__main__":
     spec = get_pipeline_spec(DOMAIN)

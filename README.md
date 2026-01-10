@@ -199,6 +199,62 @@ Some targets depend on external tools. Install them as needed:
 - **AWS CLI v2** (required for `s3_sync` or `aws_requester_pays`): https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
 - **huggingface-cli** (optional; if you add Hugging Face auth flows later): https://huggingface.co/docs/huggingface_hub/quick-start#login
 
+## Architecture: Spec-driven pipelines
+
+All 18 domain pipelines are now configured via `collector_core/pipeline_specs_registry.py`.
+Each `PipelineSpec` defines:
+
+- **domain**: The unique domain identifier (e.g., `physics`, `chem`, `math`)
+- **name**: Human-readable pipeline name
+- **domain_prefix**: Short prefix for path construction (defaults to domain)
+- **targets_yaml**: The targets YAML file name
+- **routing_keys/routing_confidence_keys**: Routing configuration
+- **default_routing**: Default routing values
+- **yellow_screen_module**: Domain-specific yellow screen module (if any)
+- **custom_workers**: Domain-specific worker modules (if any)
+
+### Thin wrappers
+
+Per-pipeline worker files are now thin wrappers that delegate to `collector_core`:
+
+```python
+# pipeline_driver.py
+from collector_core.pipeline_factory import get_pipeline_driver
+DOMAIN = "physics"
+if __name__ == "__main__":
+    get_pipeline_driver(DOMAIN).main()
+```
+
+```python
+# acquire_worker.py
+from collector_core.generic_workers import main_acquire
+DOMAIN = "physics"
+if __name__ == "__main__":
+    main_acquire(DOMAIN)
+```
+
+```python
+# yellow_screen_worker.py
+from collector_core.yellow_screen_dispatch import main_yellow_screen
+DOMAIN = "physics"
+if __name__ == "__main__":
+    main_yellow_screen(DOMAIN)
+```
+
+### Syncing wrappers
+
+To regenerate all thin wrappers from the registry:
+
+```bash
+python tools/sync_pipeline_wrappers.py
+```
+
+To check wrappers are up-to-date (CI mode):
+
+```bash
+python tools/sync_pipeline_wrappers.py --check
+```
+
 ## Expected directory structure & configurable paths
 
 Within each `*_pipeline_v2` directory, you should expect:

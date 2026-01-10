@@ -9,12 +9,15 @@ from __future__ import annotations
 import gzip
 import hashlib
 import json
+import logging
 import re
 import time
 import unicodedata
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 def utc_now() -> str:
@@ -47,6 +50,7 @@ def sha256_file(path: Path) -> str | None:
                 h.update(chunk)
         return h.hexdigest()
     except Exception:
+        logger.warning("Failed to compute SHA-256 hash for %s", path, exc_info=True)
         return None
 
 
@@ -187,4 +191,5 @@ def coerce_int(val: Any, default: int | None = None) -> int | None:
     try:
         return int(val)
     except Exception:
+        logger.debug("Failed to coerce value %r to int, using default %r", val, default)
         return default

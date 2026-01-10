@@ -2,15 +2,8 @@
 """
 acquire_worker.py (v2.0)
 
-Replaces download_worker.py with the v2 raw layout:
-  raw/{green|yellow}/{license_pool}/{target_id}/...
-
-Reads queue rows emitted by pipeline_driver.py and downloads payloads using the
-configured strategy. Dry-run by default; pass --execute to write files. After a
-successful run it writes a per-target `acquire_done.json` under the manifests
-root.
+Thin wrapper that delegates to the spec-driven generic acquire worker.
 """
-
 from __future__ import annotations
 
 import sys
@@ -19,31 +12,9 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from collector_core.__version__ import __version__ as VERSION
-from collector_core.acquire_strategies import (
-    DEFAULT_STRATEGY_HANDLERS,
-    RootsDefaults,
-    run_acquire_worker,
-)
+from collector_core.generic_workers import main_acquire  # noqa: E402
 
-__all__ = ["main", "VERSION"]
-
-STRATEGY_HANDLERS = DEFAULT_STRATEGY_HANDLERS
-
-DEFAULTS = RootsDefaults(
-    raw_root="/data/cyber/raw",
-    manifests_root="/data/cyber/_manifests",
-    logs_root="/data/cyber/_logs",
-)
-
-
-def main() -> None:
-    run_acquire_worker(
-        defaults=DEFAULTS,
-        targets_yaml_label="targets_cyber.yaml",
-        strategy_handlers=STRATEGY_HANDLERS,
-    )
-
+DOMAIN = "cyber"
 
 if __name__ == "__main__":
-    main()
+    main_acquire(DOMAIN)
