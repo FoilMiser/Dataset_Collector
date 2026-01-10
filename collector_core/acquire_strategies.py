@@ -880,6 +880,10 @@ def run_target(
     else:
         try:
             manifest["results"] = handler(ctx, row, out_dir)
+            if not manifest["results"]:
+                manifest["results"] = [
+                    {"status": "failed", "reason": "handler_returned_no_results"}
+                ]
         except Exception as e:
             manifest["results"] = [{"status": "error", "error": repr(e)}]
 
