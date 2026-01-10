@@ -32,6 +32,16 @@ single domain folder must include the following structure:
   repo; optional fields like `difficulty_level` may appear in queue rows for downstream use.
   Downstream workflows should consume `combined/<pool>/shards/` plus manifests/ledgers as needed.
 
+## Catalog summary fields
+
+The catalog output includes aggregated rollups for acquisition and classification:
+
+- `raw.buckets.<bucket>.pools.<pool>.{targets,bytes}`: per-license-pool counts and bytes for raw GREEN/YELLOW downloads.
+- `license_pools.<bucket>.<pool>.{targets,bytes}`: per-license-pool totals across GREEN/YELLOW raw plus RED queue counts (bytes are `0` for RED).
+- `strategy_counts`: counts of targets per `download.strategy` in the targets config.
+- `top_targets_by_bytes`: top N raw targets by size with `{target_id,bucket,pool,bytes,files}`.
+- `top_licenses`: top N most frequent licenses observed in queue rows, reported as `{license,count}`.
+
 ## Merge deduplication strategy
 
 The merge worker uses a SQLite-backed index (`_ledger/combined_dedupe.sqlite`) keyed by
