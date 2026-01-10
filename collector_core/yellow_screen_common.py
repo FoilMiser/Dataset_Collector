@@ -1,18 +1,22 @@
 from __future__ import annotations
 
 import dataclasses
-import gzip
-import hashlib
-import json
 import os
-import re
-import time
-from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.config_validator import read_yaml
+from collector_core.utils import (
+    utc_now,
+    ensure_dir,
+    sha256_text,
+    read_json,
+    read_jsonl,
+    write_json,
+    write_jsonl,
+    append_jsonl,
+)
 
 __all__ = ["VERSION"]
 
@@ -101,63 +105,6 @@ def default_yellow_roots(prefix: str) -> YellowRootDefaults:
         ledger_root=f"/data/{prefix}/_ledger",
         pitches_root=f"/data/{prefix}/_pitches",
     )
-
-
-def utc_now() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-
-
-def ensure_dir(path: Path) -> None:
-    path.mkdir(parents=True, exist_ok=True)
-
-
-def sha256_text(text: str) -> str:
-    norm = re.sub(r"\s+", " ", (text or "").strip())
-    return hashlib.sha256(norm.encode("utf-8")).hexdigest()
-
-
-def read_json(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def read_jsonl(path: Path) -> Iterator[dict[str, Any]]:
-    opener = gzip.open if path.suffix == ".gz" else open
-    with opener(path, "rt", encoding="utf-8", errors="ignore") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                try:
-                    yield json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-
-
-def write_json(path: Path, obj: dict[str, Any]) -> None:
-    ensure_dir(path.parent)
-    tmp_path = Path(f"{path}.tmp")
-    tmp_path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    tmp_path.replace(path)
-
-
-def write_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
-    ensure_dir(path.parent)
-    opener = gzip.open if path.suffix == ".gz" else open
-    with opener(path, "wt", encoding="utf-8") as f:
-        for row in rows:
-            f.write(json.dumps(row, ensure_ascii=False) + "\n")
-
-
-def append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
-    ensure_dir(path.parent)
-    mode = "at" if path.suffix != ".gz" else "ab"
-    if path.suffix == ".gz":
-        with gzip.open(path, mode) as f:  # type: ignore
-            for row in rows:
-                f.write((json.dumps(row, ensure_ascii=False) + "\n").encode("utf-8"))
-    else:
-        with open(path, mode, encoding="utf-8") as f:
-            for row in rows:
-                f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
 def load_targets_cfg(path: Path) -> dict[str, Any]:

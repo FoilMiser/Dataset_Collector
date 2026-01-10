@@ -10,7 +10,6 @@ import logging
 import os
 import re
 import socket
-import time
 import urllib.parse
 from collections import Counter
 from pathlib import Path
@@ -19,6 +18,18 @@ from typing import Any
 import requests
 
 from collector_core.__version__ import __version__ as VERSION
+from collector_core.utils import (
+    utc_now,
+    ensure_dir,
+    sha256_bytes,
+    sha256_file,
+    normalize_whitespace,
+    lower,
+    write_json,
+    write_jsonl,
+    contains_any,
+    coerce_int,
+)
 from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.companion_files import read_denylist_raw, read_license_maps, resolve_companion_paths
 from collector_core.config_validator import read_yaml
@@ -42,52 +53,12 @@ EVIDENCE_CHANGE_POLICIES = {"raw", "normalized", "either"}
 COSMETIC_CHANGE_POLICIES = {"warn_only", "treat_as_changed"}
 EVIDENCE_EXTENSIONS = [".html", ".pdf", ".txt", ".json"]
 
-def utc_now() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-
-
-def ensure_dir(p: Path) -> None:
-    p.mkdir(parents=True, exist_ok=True)
-
-
-def sha256_bytes(b: bytes) -> str:
-    return hashlib.sha256(b).hexdigest()
-
-
-def sha256_file(path: Path) -> str | None:
-    try:
-        return sha256_bytes(path.read_bytes())
-    except Exception:
-        return None
-
 
 def resolve_dataset_root(explicit: str | None) -> Path | None:
     value = explicit or os.getenv("DATASET_ROOT") or os.getenv("DATASET_COLLECTOR_ROOT")
     if not value:
         return None
     return Path(value).expanduser().resolve()
-
-
-def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
-    ensure_dir(path.parent)
-    with path.open("w", encoding="utf-8") as f:
-        for row in rows:
-            f.write(json.dumps(row, ensure_ascii=False) + "\n")
-
-
-def write_json(path: Path, obj: dict[str, Any]) -> None:
-    ensure_dir(path.parent)
-    tmp_path = Path(f"{path}.tmp")
-    tmp_path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    tmp_path.replace(path)
-
-
-def normalize_whitespace(text: str) -> str:
-    return re.sub(r"\s+", " ", (text or "")).strip()
-
-
-def lower(text: str) -> str:
-    return (text or "").lower()
 
 
 def _is_blocked_ip(ip_value: str) -> bool:
@@ -159,22 +130,6 @@ def normalize_evidence_text(text: str) -> str:
     for pattern in _TIMESTAMP_PATTERNS:
         cleaned = pattern.sub(" ", cleaned)
     return normalize_whitespace(cleaned)
-
-
-def contains_any(haystack: str, needles: list[str]) -> list[str]:
-    hits = []
-    h = lower(haystack)
-    for n in needles:
-        if n and lower(n) in h:
-            hits.append(n)
-    return hits
-
-
-def coerce_int(val: Any, default: int | None = None) -> int | None:
-    try:
-        return int(val)
-    except Exception:
-        return default
 
 
 def normalize_evidence_change_policy(value: Any) -> str:

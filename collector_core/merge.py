@@ -4,14 +4,11 @@ import argparse
 import cProfile
 import dataclasses
 import gzip
-import hashlib
 import importlib.util
 import json
 import os
 import pstats
-import re
 import sqlite3
-import time
 import tracemalloc
 from collections.abc import Iterable, Iterator
 from pathlib import Path
@@ -23,6 +20,14 @@ from collector_core.__version__ import __version__ as VERSION
 from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.config_validator import read_yaml
 from collector_core.output_contract import normalize_output_record, validate_output_contract
+from collector_core.utils import (
+    utc_now,
+    ensure_dir,
+    sha256_text,
+    read_jsonl,
+    append_jsonl,
+    write_json,
+)
 
 if importlib.util.find_spec("tqdm"):
     from tqdm import tqdm as tqdm_progress
@@ -201,54 +206,8 @@ def default_merge_roots(prefix: str) -> RootDefaults:
     )
 
 
-def utc_now() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-
-
-def ensure_dir(path: Path) -> None:
-    path.mkdir(parents=True, exist_ok=True)
-
-
-def sha256_text(text: str) -> str:
-    norm = re.sub(r"\s+", " ", (text or "").strip())
-    return hashlib.sha256(norm.encode("utf-8")).hexdigest()
-
-
 DEFAULT_MAX_SOURCE_URLS = 10
 DEFAULT_MAX_DUPLICATES = 20
-
-
-def read_jsonl(path: Path) -> Iterator[dict[str, Any]]:
-    opener = gzip.open if path.suffix == ".gz" else open
-    with opener(path, "rt", encoding="utf-8", errors="ignore") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                try:
-                    yield json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-
-
-def append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
-    ensure_dir(path.parent)
-    opener = gzip.open if path.suffix == ".gz" else open
-    mode = "ab" if path.suffix == ".gz" else "at"
-    if path.suffix == ".gz":
-        with opener(path, mode) as f:  # type: ignore
-            for row in rows:
-                f.write((json.dumps(row, ensure_ascii=False) + "\n").encode("utf-8"))
-    else:
-        with opener(path, mode, encoding="utf-8") as f:  # type: ignore
-            for row in rows:
-                f.write(json.dumps(row, ensure_ascii=False) + "\n")
-
-
-def write_json(path: Path, obj: dict[str, Any]) -> None:
-    ensure_dir(path.parent)
-    tmp_path = Path(f"{path}.tmp")
-    tmp_path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    tmp_path.replace(path)
 
 
 def merge_distinct_urls(
