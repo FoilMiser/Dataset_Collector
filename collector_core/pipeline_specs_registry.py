@@ -32,7 +32,7 @@ register_pipeline(PipelineSpec(
     name="Biology Pipeline",
     domain_prefix="bio",
     targets_yaml="targets_biology.yaml",
-    routing_keys=["bio_routing"],
+    routing_keys=["bio_routing", "math_routing"],
     routing_confidence_keys=["bio_routing"],
     default_routing={
         "subject": "biology",
@@ -77,10 +77,10 @@ register_pipeline(PipelineSpec(
     domain="earth",
     name="Earth Science Pipeline",
     targets_yaml="targets_earth.yaml",
-    routing_keys=["earth_routing"],
+    routing_keys=["earth_routing", "math_routing"],
     routing_confidence_keys=["earth_routing"],
     default_routing={
-        "subject": "earth_science",
+        "subject": "earth",
         "domain": "misc",
         "category": "misc",
         "level": 5,
@@ -93,7 +93,7 @@ register_pipeline(PipelineSpec(
     name="Materials Science Pipeline",
     domain_prefix="matsci",
     targets_yaml="targets_materials.yaml",
-    routing_keys=["materials_routing", "chem_routing"],
+    routing_keys=["materials_routing", "math_routing"],
     routing_confidence_keys=["materials_routing"],
     default_routing={
         "subject": "materials_science",
@@ -126,11 +126,11 @@ register_pipeline(PipelineSpec(
     domain="code",
     name="Code Pipeline",
     targets_yaml="targets_code.yaml",
-    routing_keys=["code_routing"],
-    routing_confidence_keys=["code_routing"],
+    routing_keys=["code_routing", "math_routing"],
+    routing_confidence_keys=["code_routing", "math_routing"],
     default_routing={
         "subject": "code",
-        "domain": "misc",
+        "domain": "multi",
         "category": "misc",
         "level": 5,
         "granularity": "target"
@@ -142,10 +142,10 @@ register_pipeline(PipelineSpec(
     domain="cyber",
     name="Cybersecurity Pipeline",
     targets_yaml="targets_cyber.yaml",
-    routing_keys=["cyber_routing"],
+    routing_keys=["cyber_routing", "math_routing"],
     routing_confidence_keys=["cyber_routing"],
     default_routing={
-        "subject": "cybersecurity",
+        "subject": "cyber",
         "domain": "misc",
         "category": "misc",
         "level": 5,
@@ -163,10 +163,10 @@ register_pipeline(PipelineSpec(
     name="3D Modeling Pipeline",
     domain_prefix="3d",
     targets_yaml="targets_3d.yaml",
-    routing_keys=["3d_routing"],
-    routing_confidence_keys=["3d_routing"],
+    routing_keys=["three_d_routing"],
+    routing_confidence_keys=["three_d_routing"],
     default_routing={
-        "subject": "3d_modeling",
+        "subject": "3d",
         "domain": "misc",
         "category": "misc",
         "level": 5,
@@ -179,7 +179,7 @@ register_pipeline(PipelineSpec(
     domain="metrology",
     name="Metrology Pipeline",
     targets_yaml="targets_metrology.yaml",
-    routing_keys=["metrology_routing"],
+    routing_keys=["metrology_routing", "math_routing"],
     routing_confidence_keys=["metrology_routing"],
     default_routing={
         "subject": "metrology",
@@ -188,6 +188,7 @@ register_pipeline(PipelineSpec(
         "level": 5,
         "granularity": "target"
     },
+    include_routing_dict_in_row=True,
 ))
 
 
@@ -213,7 +214,7 @@ register_pipeline(PipelineSpec(
     domain="logic",
     name="Logic Pipeline",
     targets_yaml="targets_logic.yaml",
-    routing_keys=["logic_routing", "math_routing"],
+    routing_keys=["logic_routing"],
     routing_confidence_keys=["logic_routing"],
     default_routing={
         "subject": "logic",
@@ -228,10 +229,10 @@ register_pipeline(PipelineSpec(
     domain="kg_nav",
     name="Knowledge Graph & Navigation Pipeline",
     targets_yaml="targets_kg_nav.yaml",
-    routing_keys=["kg_nav_routing"],
-    routing_confidence_keys=["kg_nav_routing"],
+    routing_keys=["kg_routing", "math_routing"],
+    routing_confidence_keys=["kg_routing"],
     default_routing={
-        "subject": "knowledge_graph",
+        "subject": "kg_nav",
         "domain": "misc",
         "category": "misc",
         "level": 5,
@@ -248,16 +249,17 @@ register_pipeline(PipelineSpec(
     name="Economics, Statistics, Decision & Adaptation Pipeline",
     domain_prefix="econ",
     targets_yaml="targets_econ_stats_decision_v2.yaml",
-    routing_keys=["econ_routing"],
+    routing_keys=["econ_routing", "math_routing"],
     routing_confidence_keys=["econ_routing"],
     default_routing={
-        "subject": "economics",
+        "subject": "econ",
         "domain": "misc",
         "category": "misc",
         "level": 5,
         "granularity": "target"
     },
     yellow_screen_module="yellow_screen_econ",
+    include_routing_dict_in_row=True,
 ))
 
 register_pipeline(PipelineSpec(
@@ -267,7 +269,7 @@ register_pipeline(PipelineSpec(
     routing_keys=["regcomp_routing"],
     routing_confidence_keys=["regcomp_routing"],
     default_routing={
-        "subject": "regulatory",
+        "subject": "regcomp",
         "domain": "misc",
         "category": "misc",
         "level": 5,
@@ -286,7 +288,7 @@ register_pipeline(PipelineSpec(
     routing_keys=["safety_routing"],
     routing_confidence_keys=["safety_routing"],
     default_routing={
-        "subject": "safety",
+        "subject": "safety_incident",
         "domain": "misc",
         "category": "misc",
         "level": 5,
@@ -299,10 +301,10 @@ register_pipeline(PipelineSpec(
     domain="agri_circular",
     name="Agriculture & Circular Economy Pipeline",
     targets_yaml="targets_agri_circular.yaml",
-    routing_keys=["agri_routing"],
+    routing_keys=["agri_routing", "math_routing"],
     routing_confidence_keys=["agri_routing"],
     default_routing={
-        "subject": "agriculture",
+        "subject": "agri_circular",
         "domain": "misc",
         "category": "misc",
         "level": 5,

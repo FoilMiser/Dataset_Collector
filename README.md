@@ -52,6 +52,7 @@ Targets and catalog entries may specify a `license_profile` value. Supported val
 - **Excluded sources**: RED-labeled sources are excluded by design and are not collected or merged. Some targets may be disabled in `targets_*.yaml` or omitted from `tools/pipeline_map.sample.yaml`, which means they are intentionally not part of the run.
 - **Non-goals**: This repository does not perform data cleaning, deduplication across domains, or final dataset curation beyond the per-pipeline merge step. It also does not guarantee license compatibility checks outside the configured `license_map.yaml` entries.
 - **Corpus constraints**: Outputs are constrained to the `combined/` stage described in `docs/output_contract.md`; there is no final, unified post-processing stage here. Downstream consumers should expect per-pipeline catalogs and manifests with varying completeness based on enabled targets and available credentials.
+- **Rate limiting configuration**: Some `targets_*.yaml` files include `resolvers: ... rate_limit: ...` blocks (e.g., for GitHub API), but this configuration is not currently consumed by the codebase. The schema does not validate these blocks. Until rate limiting is implemented, these serve as documentation of intended behavior only.
 
 ## Documentation
 
@@ -198,6 +199,62 @@ Some targets depend on external tools. Install them as needed:
 - **7zip/unzip** (optional; for large archive extraction): https://www.7-zip.org/
 - **AWS CLI v2** (required for `s3_sync` or `aws_requester_pays`): https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
 - **huggingface-cli** (optional; if you add Hugging Face auth flows later): https://huggingface.co/docs/huggingface_hub/quick-start#login
+
+## Architecture: Spec-driven pipelines
+
+All 18 domain pipelines are now configured via `collector_core/pipeline_specs_registry.py`.
+Each `PipelineSpec` defines:
+
+- **domain**: The unique domain identifier (e.g., `physics`, `chem`, `math`)
+- **name**: Human-readable pipeline name
+- **domain_prefix**: Short prefix for path construction (defaults to domain)
+- **targets_yaml**: The targets YAML file name
+- **routing_keys/routing_confidence_keys**: Routing configuration
+- **default_routing**: Default routing values
+- **yellow_screen_module**: Domain-specific yellow screen module (if any)
+- **custom_workers**: Domain-specific worker modules (if any)
+
+### Thin wrappers
+
+Per-pipeline worker files are now thin wrappers that delegate to `collector_core`:
+
+```python
+# pipeline_driver.py
+from collector_core.pipeline_factory import get_pipeline_driver
+DOMAIN = "physics"
+if __name__ == "__main__":
+    get_pipeline_driver(DOMAIN).main()
+```
+
+```python
+# acquire_worker.py
+from collector_core.generic_workers import main_acquire
+DOMAIN = "physics"
+if __name__ == "__main__":
+    main_acquire(DOMAIN)
+```
+
+```python
+# yellow_screen_worker.py
+from collector_core.yellow_screen_dispatch import main_yellow_screen
+DOMAIN = "physics"
+if __name__ == "__main__":
+    main_yellow_screen(DOMAIN)
+```
+
+### Syncing wrappers
+
+To regenerate all thin wrappers from the registry:
+
+```bash
+python tools/sync_pipeline_wrappers.py
+```
+
+To check wrappers are up-to-date (CI mode):
+
+```bash
+python tools/sync_pipeline_wrappers.py --check
+```
 
 ## Expected directory structure & configurable paths
 

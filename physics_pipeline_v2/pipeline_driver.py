@@ -1,33 +1,29 @@
 #!/usr/bin/env python3
+"""
+pipeline_driver.py (v2.0)
+
+Thin wrapper that delegates to the spec-driven pipeline factory.
+Includes custom build_row_extras for physics-specific output fields.
+"""
 from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Any
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from typing import Any
+from collector_core.pipeline_driver_base import coerce_int  # noqa: E402
+from collector_core.pipeline_factory import get_pipeline_driver  # noqa: E402
 
-from collector_core.__version__ import __version__ as VERSION
-from collector_core.pipeline_driver_base import (
-    BasePipelineDriver,
-    RoutingBlockSpec,
-    coerce_int,
-)
+DOMAIN = "physics"
+
+_DriverBase = get_pipeline_driver(DOMAIN)
 
 
-class PhysicsPipelineDriver(BasePipelineDriver):
-    DOMAIN = 'physics'
-    PIPELINE_VERSION = VERSION
-    TARGETS_LABEL = 'targets_physics.yaml'
-    USER_AGENT = 'physics-corpus-pipeline'
-    ROUTING_KEYS = ['physics_routing', 'math_routing']
-    DEFAULT_ROUTING = {'subject': 'physics', 'granularity': 'target'}
-    ROUTING_BLOCKS = [
-        RoutingBlockSpec(name='math_routing', sources=['math_routing'], mode='subset'),
-        RoutingBlockSpec(name='physics_routing', sources=['physics_routing'], mode='subset'),
-    ]
+class PhysicsPipelineDriver(_DriverBase):  # type: ignore[valid-type,misc]
+    """Physics pipeline driver with custom row extras."""
 
     def build_row_extras(self, target: dict[str, Any], routing: dict[str, Any]) -> dict[str, Any]:
         mr = target.get("math_routing", {}) or {}

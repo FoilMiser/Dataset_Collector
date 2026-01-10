@@ -1,32 +1,28 @@
 #!/usr/bin/env python3
+"""
+pipeline_driver.py (v2.0)
+
+Thin wrapper that delegates to the spec-driven pipeline factory.
+Includes custom build_row_extras for metrology-specific output fields.
+"""
 from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Any
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from typing import Any
+from collector_core.pipeline_factory import get_pipeline_driver  # noqa: E402
 
-from collector_core.__version__ import __version__ as VERSION
-from collector_core.pipeline_driver_base import (
-    BasePipelineDriver,
-    RoutingBlockSpec,
-)
+DOMAIN = "metrology"
+
+_DriverBase = get_pipeline_driver(DOMAIN)
 
 
-class MetrologyPipelineDriver(BasePipelineDriver):
-    DOMAIN = 'metrology'
-    PIPELINE_VERSION = VERSION
-    TARGETS_LABEL = 'targets_metrology.yaml'
-    USER_AGENT = 'metrology-corpus-pipeline'
-    ROUTING_KEYS = ['metrology_routing', 'math_routing']
-    DEFAULT_ROUTING = {'subject': 'metrology', 'granularity': 'target'}
-    ROUTING_BLOCKS = [
-        RoutingBlockSpec(name='math_routing', sources=['math_routing'], mode='subset'),
-    ]
-    INCLUDE_ROUTING_DICT_IN_ROW = True
+class MetrologyPipelineDriver(_DriverBase):  # type: ignore[valid-type,misc]
+    """Metrology pipeline driver with custom row extras."""
 
     def build_row_extras(self, target: dict[str, Any], routing: dict[str, Any]) -> dict[str, Any]:
         mr = target.get("math_routing", {}) or {}

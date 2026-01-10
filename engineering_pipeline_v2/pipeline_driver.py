@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""
+pipeline_driver.py (v2.0)
+
+Thin wrapper that delegates to the spec-driven pipeline factory.
+"""
 from __future__ import annotations
 
 import sys
@@ -7,23 +12,9 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from collector_core.__version__ import __version__ as VERSION
-from collector_core.pipeline_driver_base import (
-    BasePipelineDriver,
-    RoutingBlockSpec,
-)
+from collector_core.pipeline_factory import get_pipeline_driver  # noqa: E402
 
-
-class EngineeringPipelineDriver(BasePipelineDriver):
-    DOMAIN = 'engineering'
-    PIPELINE_VERSION = VERSION
-    TARGETS_LABEL = 'targets_engineering.yaml'
-    USER_AGENT = 'engineering-corpus-pipeline'
-    ROUTING_KEYS = ['engineering_routing']
-    DEFAULT_ROUTING = {'subject': 'engineering', 'granularity': 'target'}
-    ROUTING_BLOCKS = [
-        RoutingBlockSpec(name='engineering_routing', sources=['engineering_routing'], mode='subset'),
-    ]
+DOMAIN = "engineering"
 
 if __name__ == "__main__":
-    EngineeringPipelineDriver.main()
+    get_pipeline_driver(DOMAIN).main()

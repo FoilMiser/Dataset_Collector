@@ -2,9 +2,8 @@
 """
 yellow_screen_worker.py (v2.0)
 
-Thin adapter for collector_core.yellow_screen_econ.
+Thin wrapper that delegates to the spec-driven yellow screen dispatch.
 """
-
 from __future__ import annotations
 
 import sys
@@ -13,7 +12,9 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from collector_core.yellow_screen_econ import main
+from collector_core.yellow_screen_dispatch import main_yellow_screen  # noqa: E402
+
+DOMAIN = "econ_stats_decision_adaptation"
 
 if __name__ == "__main__":
-    main()
+    main_yellow_screen(DOMAIN)

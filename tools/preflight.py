@@ -16,7 +16,11 @@ if __package__ in (None, ""):
         sys.path.insert(0, str(repo_root))
 
 from collector_core.config_validator import read_yaml
-from tools.strategy_registry import get_external_tools, get_strategy_spec
+from tools.strategy_registry import (
+    get_external_tools,
+    get_strategy_requirement_errors,
+    get_strategy_spec,
+)
 
 TOOL_INSTALL_HINTS = {
     "git": "Install Git for Windows: https://git-scm.com/download/win",
@@ -255,6 +259,14 @@ def run_preflight(
                             f"{pipeline_name}:{target_id} disabled uses {status} strategy '{strategy}'"
                         )
                     continue
+            # Validate required download config fields for this strategy
+            requirement_errors = get_strategy_requirement_errors(download, strategy)
+            if requirement_errors:
+                for req_error in requirement_errors:
+                    if enabled:
+                        errors.append(f"{pipeline_name}:{target_id} {req_error}")
+                    elif warn_disabled:
+                        warnings.append(f"{pipeline_name}:{target_id} (disabled) {req_error}")
             if enabled:
                 strategies_in_use_enabled.add(strategy)
                 strategy_targets_enabled.setdefault(strategy, []).append(

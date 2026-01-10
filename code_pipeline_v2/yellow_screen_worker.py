@@ -2,9 +2,8 @@
 """
 yellow_screen_worker.py (v2.0)
 
-Thin adapter for collector_core.yellow_screen_standard.
+Thin wrapper that delegates to the spec-driven yellow screen dispatch.
 """
-
 from __future__ import annotations
 
 import sys
@@ -13,19 +12,9 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from collector_core import yellow_screen_standard as core_yellow
-from collector_core.yellow_screen_common import default_yellow_roots
+from collector_core.yellow_screen_dispatch import main_yellow_screen  # noqa: E402
 
-DEFAULT_ROOTS = default_yellow_roots("code")
-
-
-def resolve_roots(cfg: dict):
-    return core_yellow.resolve_roots(cfg, DEFAULT_ROOTS)
-
-
-def main() -> None:
-    core_yellow.main(defaults=DEFAULT_ROOTS)
-
+DOMAIN = "code"
 
 if __name__ == "__main__":
-    main()
+    main_yellow_screen(DOMAIN)
