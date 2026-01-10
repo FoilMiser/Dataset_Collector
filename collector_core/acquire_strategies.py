@@ -18,6 +18,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from collector_core.__version__ import __version__ as VERSION
+from collector_core.acquire_limits import build_target_limit_enforcer, cleanup_path, resolve_result_bytes
 from collector_core.config_validator import read_yaml
 from collector_core.dependencies import _try_import, requires
 from collector_core.network_utils import _with_retries
@@ -406,6 +407,12 @@ def _http_download_with_resume(
 
 def handle_http_multi(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     download = normalize_download(row.get("download", {}) or {})
+    enforcer = build_target_limit_enforcer(
+        target_id=str(row.get("id", "unknown")),
+        limit_files=ctx.limits.limit_files,
+        max_bytes_per_target=ctx.limits.max_bytes_per_target,
+        download=download,
+    )
     urls: list[str] = []
     if download.get("url"):
         urls.append(download["url"])
@@ -421,47 +428,110 @@ def handle_http_multi(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -
         expected_sha256s = expected_sha256
     elif isinstance(expected_sha256, dict):
         expected_sha256_map = expected_sha256
+    expected_size = download.get("expected_size")
+    expected_sizes: list[int | None] | None = None
+    expected_size_map: dict[str, int] | None = None
+    if isinstance(expected_size, list):
+        expected_sizes = [int(s) if s is not None else None for s in expected_size]
+    elif isinstance(expected_size, dict):
+        expected_size_map = {str(k): int(v) for k, v in expected_size.items() if v is not None}
     for idx, url in enumerate(urls):
-        if ctx.limits.limit_files and idx >= ctx.limits.limit_files:
-            break
         filename = (
             (filenames[idx] if idx < len(filenames) else None)
             or download.get("filename")
             or safe_name(urlparse(url).path.split("/")[-1])
             or f"payload_{idx}.bin"
         )
+        limit_error = enforcer.start_file(filename)
+        if limit_error:
+            results.append(limit_error)
+            break
+        limit_error = enforcer.check_remaining_bytes(filename)
+        if limit_error:
+            results.append(limit_error)
+            break
         out_path = out_dir / filename
         if out_path.exists() and not ctx.mode.overwrite:
-            results.append({"status": "ok", "path": str(out_path), "cached": True})
+            result = {"status": "ok", "path": str(out_path), "cached": True}
+            size_bytes = resolve_result_bytes(result, out_path)
+            limit_error = enforcer.record_bytes(size_bytes, filename)
+            if limit_error:
+                results.append(limit_error)
+            else:
+                results.append(result)
             continue
         if not ctx.mode.execute:
-            results.append({"status": "noop", "path": str(out_path)})
+            result = {"status": "noop", "path": str(out_path)}
+            results.append(result)
             continue
         expected = expected_sha256
         if expected_sha256s is not None:
             expected = expected_sha256s[idx] if idx < len(expected_sha256s) else None
         elif expected_sha256_map is not None:
             expected = expected_sha256_map.get(filename) or expected_sha256_map.get(url)
-        results.append(_http_download_with_resume(ctx, url, out_path, download.get("expected_size"), expected))
+        size_hint = None
+        if expected_sizes is not None:
+            size_hint = expected_sizes[idx] if idx < len(expected_sizes) else None
+        elif expected_size_map is not None:
+            size_hint = expected_size_map.get(filename) or expected_size_map.get(url)
+        else:
+            size_hint = int(expected_size) if expected_size is not None else None
+        limit_error = enforcer.check_size_hint(size_hint, filename)
+        if limit_error:
+            results.append(limit_error)
+            continue
+        result = _http_download_with_resume(ctx, url, out_path, size_hint, expected)
+        size_bytes = resolve_result_bytes(result, out_path)
+        limit_error = enforcer.record_bytes(size_bytes, filename)
+        if limit_error:
+            if result.get("status") == "ok" and not result.get("cached"):
+                cleanup_path(out_path)
+            results.append(limit_error)
+        else:
+            results.append(result)
     return results
 
 
 def handle_http_single(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     download = normalize_download(row.get("download", {}) or {})
+    enforcer = build_target_limit_enforcer(
+        target_id=str(row.get("id", "unknown")),
+        limit_files=ctx.limits.limit_files,
+        max_bytes_per_target=ctx.limits.max_bytes_per_target,
+        download=download,
+    )
     url = download.get("url") or download.get("urls", [None])[0]
     if not url:
         return [{"status": "error", "error": "missing url"}]
     filename = download.get("filename") or safe_name(urlparse(url).path.split("/")[-1])
     if not filename:
         filename = "payload.bin"
+    limit_error = enforcer.start_file(filename)
+    if limit_error:
+        return [limit_error]
+    limit_error = enforcer.check_remaining_bytes(filename)
+    if limit_error:
+        return [limit_error]
+    size_hint = download.get("expected_size")
+    limit_error = enforcer.check_size_hint(int(size_hint) if size_hint is not None else None, filename)
+    if limit_error:
+        return [limit_error]
     out_path = out_dir / filename
     if out_path.exists() and not ctx.mode.overwrite:
-        return [{"status": "ok", "path": str(out_path), "cached": True}]
+        result = {"status": "ok", "path": str(out_path), "cached": True}
+        size_bytes = resolve_result_bytes(result, out_path)
+        limit_error = enforcer.record_bytes(size_bytes, filename)
+        return [limit_error] if limit_error else [result]
     if not ctx.mode.execute:
         return [{"status": "noop", "path": str(out_path)}]
-    return [
-        _http_download_with_resume(ctx, url, out_path, download.get("expected_size"), download.get("expected_sha256"))
-    ]
+    result = _http_download_with_resume(ctx, url, out_path, size_hint, download.get("expected_sha256"))
+    size_bytes = resolve_result_bytes(result, out_path)
+    limit_error = enforcer.record_bytes(size_bytes, filename)
+    if limit_error:
+        if result.get("status") == "ok" and not result.get("cached"):
+            cleanup_path(out_path)
+        return [limit_error]
+    return [result]
 
 
 def handle_http(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
@@ -477,6 +547,12 @@ def handle_http(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list
 
 def handle_ftp(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     download = normalize_download(row.get("download", {}) or {})
+    enforcer = build_target_limit_enforcer(
+        target_id=str(row.get("id", "unknown")),
+        limit_files=ctx.limits.limit_files,
+        max_bytes_per_target=ctx.limits.max_bytes_per_target,
+        download=download,
+    )
     base = download.get("base_url")
     globs = download.get("globs", ["*"])
     missing = requires("ftplib", FTP, install="use a standard Python build that includes ftplib")
@@ -493,14 +569,32 @@ def handle_ftp(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
         ftp.cwd(url.path)
         for g in globs:
             files = ftp.nlst(g)
-            for fname in files[: ctx.limits.limit_files or len(files)]:
+            for fname in files:
+                limit_error = enforcer.start_file(fname)
+                if limit_error:
+                    results.append(limit_error)
+                    return results
+                limit_error = enforcer.check_remaining_bytes(fname)
+                if limit_error:
+                    results.append(limit_error)
+                    return results
                 local = out_dir / fname
                 ensure_dir(local.parent)
                 temp_path = local.with_name(f"{local.name}.part")
                 with temp_path.open("wb") as f:
                     ftp.retrbinary(f"RETR {fname}", f.write)
                 content_length = temp_path.stat().st_size
+                limit_error = enforcer.check_size_hint(content_length, fname)
+                if limit_error:
+                    temp_path.unlink(missing_ok=True)
+                    results.append(limit_error)
+                    continue
                 sha256 = sha256_file(temp_path)
+                limit_error = enforcer.record_bytes(content_length, fname)
+                if limit_error:
+                    temp_path.unlink(missing_ok=True)
+                    results.append(limit_error)
+                    continue
                 temp_path.replace(local)
                 resolved_url = f"{base.rstrip('/')}/{fname}" if base else fname
                 results.append(
@@ -517,6 +611,12 @@ def handle_ftp(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
 
 def handle_git(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     download = normalize_download(row.get("download", {}) or {})
+    enforcer = build_target_limit_enforcer(
+        target_id=str(row.get("id", "unknown")),
+        limit_files=ctx.limits.limit_files,
+        max_bytes_per_target=ctx.limits.max_bytes_per_target,
+        download=download,
+    )
     repo = download.get("repo") or download.get("repo_url") or download.get("url") or download.get("url")
     branch = download.get("branch")
     commit = download.get("commit")
@@ -524,6 +624,12 @@ def handle_git(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
     revision = commit or tag
     if not repo:
         return [{"status": "error", "error": "missing repo"}]
+    limit_error = enforcer.start_file(repo)
+    if limit_error:
+        return [limit_error]
+    limit_error = enforcer.check_remaining_bytes(repo)
+    if limit_error:
+        return [limit_error]
     if not ctx.mode.execute:
         return [{"status": "noop", "path": str(out_dir)}]
     if out_dir.exists() and any(out_dir.iterdir()) and not ctx.mode.overwrite:
@@ -540,7 +646,9 @@ def handle_git(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
         result = {"status": "ok", "path": str(out_dir), "cached": True, "git_commit": resolved}
         if revision:
             result["git_revision"] = revision
-        return [result]
+        size_bytes = resolve_result_bytes(result, out_dir)
+        limit_error = enforcer.record_bytes(size_bytes, repo)
+        return [limit_error] if limit_error else [result]
     ensure_dir(out_dir)
     cmd = ["git", "clone"]
     if branch and not revision:
@@ -553,11 +661,22 @@ def handle_git(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
     result = {"status": "ok", "path": str(out_dir), "log": log, "git_commit": resolved}
     if revision:
         result["git_revision"] = revision
+    size_bytes = resolve_result_bytes(result, out_dir)
+    limit_error = enforcer.record_bytes(size_bytes, repo)
+    if limit_error:
+        cleanup_path(out_dir)
+        return [limit_error]
     return [result]
 
 
 def handle_zenodo(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     download = normalize_download(row.get("download", {}) or {})
+    enforcer = build_target_limit_enforcer(
+        target_id=str(row.get("id", "unknown")),
+        limit_files=ctx.limits.limit_files,
+        max_bytes_per_target=ctx.limits.max_bytes_per_target,
+        download=download,
+    )
     api_url = download.get("api") or download.get("record_url")
     record_id = download.get("record_id")
     doi = download.get("doi")
@@ -593,11 +712,24 @@ def handle_zenodo(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> li
         data = hits[0]
     results: list[dict[str, Any]] = []
     files = data.get("files", []) or data.get("hits", {}).get("hits", [{}])[0].get("files", [])
-    for f in files[: ctx.limits.limit_files or len(files)]:
+    for f in files:
         link = f.get("links", {}).get("self") or f.get("link")
         if not link:
             continue
         filename = f.get("key") or f.get("name") or safe_name(link)
+        limit_error = enforcer.start_file(filename)
+        if limit_error:
+            results.append(limit_error)
+            break
+        limit_error = enforcer.check_remaining_bytes(filename)
+        if limit_error:
+            results.append(limit_error)
+            break
+        size_hint = f.get("size")
+        limit_error = enforcer.check_size_hint(int(size_hint) if size_hint is not None else None, filename)
+        if limit_error:
+            results.append(limit_error)
+            continue
         out_path = out_dir / filename
         ensure_dir(out_path.parent)
         r = _http_download_with_resume(ctx, link, out_path)
@@ -605,12 +737,25 @@ def handle_zenodo(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> li
             expected_md5 = f["checksum"].split(":", 1)[1]
             if md5_file(out_path) != expected_md5:
                 r = {"status": "error", "error": "md5_mismatch"}
-        results.append(r)
+        size_bytes = resolve_result_bytes(r, out_path)
+        limit_error = enforcer.record_bytes(size_bytes, filename)
+        if limit_error:
+            if r.get("status") == "ok" and not r.get("cached"):
+                cleanup_path(out_path)
+            results.append(limit_error)
+        else:
+            results.append(r)
     return results or [{"status": "noop", "reason": "no files"}]
 
 
 def handle_dataverse(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     download = normalize_download(row.get("download", {}) or {})
+    enforcer = build_target_limit_enforcer(
+        target_id=str(row.get("id", "unknown")),
+        limit_files=ctx.limits.limit_files,
+        max_bytes_per_target=ctx.limits.max_bytes_per_target,
+        download=download,
+    )
     pid = download.get("persistent_id") or download.get("pid")
     instance = download.get("instance") or "https://dataverse.harvard.edu"
     if not pid:
@@ -618,11 +763,21 @@ def handle_dataverse(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) ->
     missing = requires("requests", requests, install="pip install requests")
     if missing:
         return [{"status": "error", "error": missing}]
+    limit_error = enforcer.start_file(pid)
+    if limit_error:
+        return [limit_error]
+    limit_error = enforcer.check_remaining_bytes(pid)
+    if limit_error:
+        return [limit_error]
     if not ctx.mode.execute:
         return [{"status": "noop", "path": str(out_dir)}]
     url = f"{instance}/api/access/dvobject/{pid}"
     resp = requests.get(url, allow_redirects=True, timeout=60)
     resp.raise_for_status()
+    size_hint = resp.headers.get("Content-Length")
+    limit_error = enforcer.check_size_hint(int(size_hint) if size_hint else None, pid)
+    if limit_error:
+        return [limit_error]
     filename = safe_name(urlparse(resp.url).path.split("/")[-1] or pid)
     out_path = out_dir / filename
     ensure_dir(out_path.parent)
@@ -645,6 +800,10 @@ def handle_dataverse(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) ->
                 "content_length": content_length,
             }
         ]
+    limit_error = enforcer.record_bytes(content_length, filename)
+    if limit_error:
+        temp_path.unlink(missing_ok=True)
+        return [limit_error]
     temp_path.replace(out_path)
     return [
         {
@@ -662,6 +821,12 @@ def handle_figshare_article(ctx: AcquireContext, row: dict[str, Any], out_dir: P
     if missing:
         return [{"status": "error", "error": missing}]
     download = normalize_download(row.get("download", {}) or {})
+    enforcer = build_target_limit_enforcer(
+        target_id=str(row.get("id", "unknown")),
+        limit_files=ctx.limits.limit_files,
+        max_bytes_per_target=ctx.limits.max_bytes_per_target,
+        download=download,
+    )
     article_id = download.get("article_id")
     if not article_id and download.get("article_url"):
         try:
@@ -689,15 +854,34 @@ def handle_figshare_article(ctx: AcquireContext, row: dict[str, Any], out_dir: P
     files = meta.get("files", []) or []
     results: list[dict[str, Any]] = []
     for idx, fmeta in enumerate(files):
-        if ctx.limits.limit_files and idx >= ctx.limits.limit_files:
-            break
         download_url = fmeta.get("download_url") or (fmeta.get("links") or {}).get("download")
         if not download_url:
             results.append({"status": "error", "error": "missing_download_url", "file": fmeta.get("name")})
             continue
         fname = safe_name(fmeta.get("name") or fmeta.get("id") or f"figshare_file_{idx}")
+        limit_error = enforcer.start_file(fname)
+        if limit_error:
+            results.append(limit_error)
+            break
+        limit_error = enforcer.check_remaining_bytes(fname)
+        if limit_error:
+            results.append(limit_error)
+            break
         expected_size = fmeta.get("size")
-        results.append(_http_download_with_resume(ctx, download_url, out_dir / fname, expected_size))
+        limit_error = enforcer.check_size_hint(int(expected_size) if expected_size is not None else None, fname)
+        if limit_error:
+            results.append(limit_error)
+            continue
+        out_path = out_dir / fname
+        result = _http_download_with_resume(ctx, download_url, out_path, expected_size)
+        size_bytes = resolve_result_bytes(result, out_path)
+        limit_error = enforcer.record_bytes(size_bytes, fname)
+        if limit_error:
+            if result.get("status") == "ok" and not result.get("cached"):
+                cleanup_path(out_path)
+            results.append(limit_error)
+        else:
+            results.append(result)
     write_json(out_dir / "figshare_article.json", meta)
     return results
 
@@ -707,6 +891,12 @@ handle_figshare = handle_figshare_article
 
 def handle_figshare_files(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     download = normalize_download(row.get("download", {}) or {})
+    enforcer = build_target_limit_enforcer(
+        target_id=str(row.get("id", "unknown")),
+        limit_files=ctx.limits.limit_files,
+        max_bytes_per_target=ctx.limits.max_bytes_per_target,
+        download=download,
+    )
     article_id = download.get("article_id") or download.get("id")
     api = download.get("api") or (f"https://api.figshare.com/v2/articles/{article_id}/files" if article_id else None)
     if not article_id or not api:
@@ -730,15 +920,34 @@ def handle_figshare_files(ctx: AcquireContext, row: dict[str, Any], out_dir: Pat
     files = resp.json() or []
     ensure_dir(out_dir)
     results: list[dict[str, Any]] = []
-    limit = ctx.limits.limit_files or len(files)
-    for f in files[:limit]:
+    for f in files:
         link = f.get("download_url") or (f.get("links") or {}).get("download")
         if not link:
             continue
         filename = safe_name(f.get("name") or f.get("id") or str(article_id))
         out_path = out_dir / filename
-
-        results.append(_http_download_with_resume(ctx, link, out_path))
+        limit_error = enforcer.start_file(filename)
+        if limit_error:
+            results.append(limit_error)
+            break
+        limit_error = enforcer.check_remaining_bytes(filename)
+        if limit_error:
+            results.append(limit_error)
+            break
+        size_hint = f.get("size")
+        limit_error = enforcer.check_size_hint(int(size_hint) if size_hint is not None else None, filename)
+        if limit_error:
+            results.append(limit_error)
+            continue
+        result = _http_download_with_resume(ctx, link, out_path)
+        size_bytes = resolve_result_bytes(result, out_path)
+        limit_error = enforcer.record_bytes(size_bytes, filename)
+        if limit_error:
+            if result.get("status") == "ok" and not result.get("cached"):
+                cleanup_path(out_path)
+            results.append(limit_error)
+        else:
+            results.append(result)
     return results or [{"status": "noop", "reason": "no files"}]
 
 
@@ -748,6 +957,12 @@ def make_github_release_handler(user_agent: str) -> StrategyHandler:
         if missing:
             return [{"status": "error", "error": missing}]
         download = normalize_download(row.get("download", {}) or {})
+        enforcer = build_target_limit_enforcer(
+            target_id=str(row.get("id", "unknown")),
+            limit_files=ctx.limits.limit_files,
+            max_bytes_per_target=ctx.limits.max_bytes_per_target,
+            download=download,
+        )
         owner = download.get("owner")
         repo = download.get("repo") or download.get("repository")
         if repo and "/" in repo and not owner:
@@ -781,14 +996,34 @@ def make_github_release_handler(user_agent: str) -> StrategyHandler:
         assets = meta.get("assets", []) or []
         results: list[dict[str, Any]] = []
         for idx, asset in enumerate(assets):
-            if ctx.limits.limit_files and idx >= ctx.limits.limit_files:
-                break
             download_url = asset.get("browser_download_url") or asset.get("url")
             if not download_url:
                 results.append({"status": "error", "error": "missing_download_url", "asset": asset.get("name")})
                 continue
             fname = safe_name(asset.get("name") or f"{repo}_asset_{idx}")
-            results.append(_http_download_with_resume(ctx, download_url, out_dir / fname, asset.get("size")))
+            limit_error = enforcer.start_file(fname)
+            if limit_error:
+                results.append(limit_error)
+                break
+            limit_error = enforcer.check_remaining_bytes(fname)
+            if limit_error:
+                results.append(limit_error)
+                break
+            size_hint = asset.get("size")
+            limit_error = enforcer.check_size_hint(int(size_hint) if size_hint is not None else None, fname)
+            if limit_error:
+                results.append(limit_error)
+                continue
+            out_path = out_dir / fname
+            result = _http_download_with_resume(ctx, download_url, out_path, size_hint)
+            size_bytes = resolve_result_bytes(result, out_path)
+            limit_error = enforcer.record_bytes(size_bytes, fname)
+            if limit_error:
+                if result.get("status") == "ok" and not result.get("cached"):
+                    cleanup_path(out_path)
+                results.append(limit_error)
+            else:
+                results.append(result)
         write_json(out_dir / "github_release.json", meta)
         return results
 
@@ -797,6 +1032,12 @@ def make_github_release_handler(user_agent: str) -> StrategyHandler:
 
 def handle_hf_datasets(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     download = normalize_download(row.get("download", {}) or {})
+    enforcer = build_target_limit_enforcer(
+        target_id=str(row.get("id", "unknown")),
+        limit_files=ctx.limits.limit_files,
+        max_bytes_per_target=ctx.limits.max_bytes_per_target,
+        download=download,
+    )
     dataset_id = download.get("dataset_id")
     if not dataset_id:
         return [{"status": "error", "error": "missing dataset_id"}]
@@ -819,19 +1060,55 @@ def handle_hf_datasets(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) 
     ensure_dir(out_dir)
     if splits:
         for sp in splits:
+            file_label = f"{dataset_id}:{sp}"
+            limit_error = enforcer.start_file(file_label)
+            if limit_error:
+                results.append(limit_error)
+                break
+            limit_error = enforcer.check_remaining_bytes(file_label)
+            if limit_error:
+                results.append(limit_error)
+                break
             ds = load_dataset(dataset_id, split=sp, **load_kwargs)
             sp_dir = out_dir / f"split_{safe_name(sp)}"
             ds.save_to_disk(str(sp_dir))
-            results.append({"status": "ok", "dataset_id": dataset_id, "split": sp})
+            result = {"status": "ok", "dataset_id": dataset_id, "split": sp, "path": str(sp_dir)}
+            size_bytes = resolve_result_bytes(result, sp_dir)
+            limit_error = enforcer.record_bytes(size_bytes, file_label)
+            if limit_error:
+                cleanup_path(sp_dir)
+                results.append(limit_error)
+            else:
+                results.append(result)
     else:
+        file_label = dataset_id
+        limit_error = enforcer.start_file(file_label)
+        if limit_error:
+            return [limit_error]
+        limit_error = enforcer.check_remaining_bytes(file_label)
+        if limit_error:
+            return [limit_error]
         ds = load_dataset(dataset_id, **load_kwargs)
-        ds.save_to_disk(str(out_dir / "hf_dataset"))
-        results.append({"status": "ok", "dataset_id": dataset_id})
+        ds_path = out_dir / "hf_dataset"
+        ds.save_to_disk(str(ds_path))
+        result = {"status": "ok", "dataset_id": dataset_id, "path": str(ds_path)}
+        size_bytes = resolve_result_bytes(result, ds_path)
+        limit_error = enforcer.record_bytes(size_bytes, file_label)
+        if limit_error:
+            cleanup_path(ds_path)
+            return [limit_error]
+        results.append(result)
     return results
 
 
 def handle_s3_sync(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     download = normalize_download(row.get("download", {}) or {})
+    enforcer = build_target_limit_enforcer(
+        target_id=str(row.get("id", "unknown")),
+        limit_files=ctx.limits.limit_files,
+        max_bytes_per_target=ctx.limits.max_bytes_per_target,
+        download=download,
+    )
     urls = download.get("urls") or []
     if not urls:
         return [{"status": "error", "error": "missing urls"}]
@@ -841,6 +1118,15 @@ def handle_s3_sync(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> l
     results: list[dict[str, Any]] = []
     extra_args = download.get("extra_args", []) or []
     for url in urls:
+        limit_error = enforcer.start_file(url)
+        if limit_error:
+            results.append(limit_error)
+            break
+        limit_error = enforcer.check_remaining_bytes(url)
+        if limit_error:
+            results.append(limit_error)
+            break
+        before_bytes = resolve_result_bytes({}, out_dir) or 0
         cmd = ["aws", "s3", "sync", url, str(out_dir)]
         if download.get("no_sign_request"):
             cmd.append("--no-sign-request")
@@ -848,20 +1134,42 @@ def handle_s3_sync(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> l
             cmd += ["--request-payer", str(download.get("request_payer"))]
         cmd += [str(a) for a in extra_args]
         log = run_cmd(cmd)
-        results.append({"status": "ok", "path": str(out_dir), "log": log})
+        after_bytes = resolve_result_bytes({}, out_dir) or before_bytes
+        delta_bytes = max(0, after_bytes - before_bytes)
+        limit_error = enforcer.record_bytes(delta_bytes, url)
+        result = {"status": "ok", "path": str(out_dir), "log": log}
+        if limit_error:
+            results.append(limit_error)
+        else:
+            results.append(result)
     return results
 
 
 def handle_aws_requester_pays(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     download = normalize_download(row.get("download", {}) or {})
+    enforcer = build_target_limit_enforcer(
+        target_id=str(row.get("id", "unknown")),
+        limit_files=ctx.limits.limit_files,
+        max_bytes_per_target=ctx.limits.max_bytes_per_target,
+        download=download,
+    )
     bucket = download.get("bucket")
     key = download.get("key")
     if not bucket or not key:
         return [{"status": "error", "error": "missing bucket/key"}]
     dest_filename = download.get("dest_filename") or safe_name(Path(key).name)
+    limit_error = enforcer.start_file(dest_filename)
+    if limit_error:
+        return [limit_error]
+    limit_error = enforcer.check_remaining_bytes(dest_filename)
+    if limit_error:
+        return [limit_error]
     out_path = out_dir / dest_filename
     if out_path.exists() and not ctx.mode.overwrite:
-        return [{"status": "ok", "path": str(out_path), "cached": True}]
+        result = {"status": "ok", "path": str(out_path), "cached": True}
+        size_bytes = resolve_result_bytes(result, out_path)
+        limit_error = enforcer.record_bytes(size_bytes, dest_filename)
+        return [limit_error] if limit_error else [result]
     if not ctx.mode.execute:
         return [{"status": "noop", "path": str(out_path)}]
     ensure_dir(out_path.parent)
@@ -886,6 +1194,10 @@ def handle_aws_requester_pays(ctx: AcquireContext, row: dict[str, Any], out_dir:
                 "log": log,
             }
         ]
+    limit_error = enforcer.record_bytes(content_length, dest_filename)
+    if limit_error:
+        temp_path.unlink(missing_ok=True)
+        return [limit_error]
     temp_path.replace(out_path)
     result = {
         "status": "ok",
@@ -900,15 +1212,33 @@ def handle_aws_requester_pays(ctx: AcquireContext, row: dict[str, Any], out_dir:
 
 def handle_torrent(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     download = normalize_download(row.get("download", {}) or {})
+    enforcer = build_target_limit_enforcer(
+        target_id=str(row.get("id", "unknown")),
+        limit_files=ctx.limits.limit_files,
+        max_bytes_per_target=ctx.limits.max_bytes_per_target,
+        download=download,
+    )
     magnet = download.get("magnet") or download.get("torrent")
     if not magnet:
         return [{"status": "error", "error": "missing magnet/torrent"}]
+    limit_error = enforcer.start_file(magnet)
+    if limit_error:
+        return [limit_error]
+    limit_error = enforcer.check_remaining_bytes(magnet)
+    if limit_error:
+        return [limit_error]
     if not ctx.mode.execute:
         return [{"status": "noop", "path": str(out_dir)}]
     ensure_dir(out_dir)
     try:
         log = run_cmd(["aria2c", "--seed-time=0", "-d", str(out_dir), magnet])
-        return [{"status": "ok", "path": str(out_dir), "log": log}]
+        result = {"status": "ok", "path": str(out_dir), "log": log}
+        size_bytes = resolve_result_bytes(result, out_dir)
+        limit_error = enforcer.record_bytes(size_bytes, magnet)
+        if limit_error:
+            cleanup_path(out_dir)
+            return [limit_error]
+        return [result]
     except Exception as e:
         return [{"status": "error", "error": repr(e)}]
 
