@@ -50,6 +50,7 @@ def run_preflight(
     pipelines: list[str] | None = None,
     warn_disabled: bool = False,
     verbose: bool = False,
+    quiet: bool = False,
 ) -> int:
     pipeline_map = _load_yaml(pipeline_map_path, "pipeline_map")
     pipelines_cfg = pipeline_map.get("pipelines", {}) or {}
@@ -224,11 +225,15 @@ def run_preflight(
         )
 
     if warnings:
-        print("Preflight warnings:")
-        for warning in warnings:
-            print(f"  - {warning}")
+        if not quiet:
+            print("Preflight warnings:")
+            for warning in warnings:
+                print(f"  - {warning}")
         if strict and not errors:
-            print("Preflight warnings treated as errors (--strict enabled).")
+            if quiet:
+                print("Preflight checks failed (warnings treated as errors).")
+            else:
+                print("Preflight warnings treated as errors (--strict enabled).")
             return 1
 
     if errors:
@@ -238,6 +243,8 @@ def run_preflight(
                 print(f"  - {json.dumps(error, sort_keys=True)}")
             else:
                 print(f"  - {error}")
+        if quiet:
+            print("Preflight checks failed.")
         return 1
 
     print("Preflight checks passed.")
@@ -266,10 +273,10 @@ def main(argv: Iterable[str] | None = None) -> int:
         action="store_true",
         help="Emit warnings for disabled targets",
     )
-    warn_group.add_argument(
+    ap.add_argument(
         "--quiet",
         action="store_true",
-        help="Deprecated alias for suppressing warnings for disabled targets",
+        help="Suppress warnings and info output (still prints errors and summary)",
     )
     args = ap.parse_args(argv)
 
@@ -286,6 +293,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         pipelines=args.pipelines,
         warn_disabled=args.warn_disabled,
         verbose=args.verbose,
+        quiet=args.quiet,
     )
 
 
