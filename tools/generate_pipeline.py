@@ -170,6 +170,7 @@ def render_acquire_worker(spec: PipelineSpec) -> str:
         DEFAULTS = RootsDefaults(
             raw_root="/data/{spec.domain}/raw",
             manifests_root="/data/{spec.domain}/_manifests",
+            ledger_root="/data/{spec.domain}/_ledger",
             logs_root="/data/{spec.domain}/_logs",
         )
 

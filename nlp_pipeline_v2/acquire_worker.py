@@ -41,6 +41,7 @@ STRATEGY_HANDLERS = {
 DEFAULTS = RootsDefaults(
     raw_root="/data/nlp/raw",
     manifests_root="/data/nlp/_manifests",
+    ledger_root="/data/nlp/_ledger",
     logs_root="/data/nlp/_logs",
 )
 

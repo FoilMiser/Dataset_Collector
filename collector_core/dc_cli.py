@@ -86,6 +86,7 @@ def _run_acquire(slug: str, targets_path: Path | None, args: list[str], ctx) -> 
     defaults = RootsDefaults(
         raw_root=f"/data/{slug}/raw",
         manifests_root=f"/data/{slug}/_manifests",
+        ledger_root=f"/data/{slug}/_ledger",
         logs_root=f"/data/{slug}/_logs",
     )
     handlers, postprocess = resolve_acquire_hooks(ctx)

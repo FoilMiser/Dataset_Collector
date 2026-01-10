@@ -43,6 +43,7 @@ STRATEGY_HANDLERS = {
 DEFAULTS = RootsDefaults(
     raw_root="/data/kg_nav/raw",
     manifests_root="/data/kg_nav/_manifests",
+    ledger_root="/data/kg_nav/_ledger",
     logs_root="/data/kg_nav/_logs",
 )
 

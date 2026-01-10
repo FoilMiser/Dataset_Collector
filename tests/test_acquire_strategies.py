@@ -444,6 +444,7 @@ def test_run_acquire_worker_strict_exits_on_error(
             defaults=aw.RootsDefaults(
                 raw_root=str(raw_root),
                 manifests_root=str(manifests_root),
+                ledger_root=str(tmp_path / "_ledger"),
                 logs_root=str(logs_root),
             ),
             targets_yaml_label="targets_kg_nav.yaml",

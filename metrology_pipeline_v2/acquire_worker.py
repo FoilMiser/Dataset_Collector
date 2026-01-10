@@ -57,6 +57,7 @@ STRATEGY_HANDLERS = {
 DEFAULTS = RootsDefaults(
     raw_root="/data/metrology/raw",
     manifests_root="/data/metrology/_manifests",
+    ledger_root="/data/metrology/_ledger",
     logs_root="/data/metrology/_logs",
 )
 

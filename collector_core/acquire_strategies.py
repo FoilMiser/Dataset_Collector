@@ -24,6 +24,7 @@ from collector_core.acquire_limits import (
     resolve_result_bytes,
 )
 from collector_core.artifact_metadata import build_artifact_metadata
+from collector_core.checks.runner import generate_run_id, run_checks_for_target
 from collector_core.config_validator import read_yaml
 from collector_core.dependencies import _try_import, requires
 from collector_core.network_utils import _with_retries
@@ -52,6 +53,7 @@ PostProcessor = Callable[
 class RootsDefaults:
     raw_root: str
     manifests_root: str
+    ledger_root: str
     logs_root: str
 
 
@@ -59,6 +61,7 @@ class RootsDefaults:
 class Roots:
     raw_root: Path
     manifests_root: Path
+    ledger_root: Path
     logs_root: Path
 
 
@@ -94,6 +97,7 @@ class AcquireContext:
     retry: RetryConfig
     allow_non_global_download_hosts: bool = False
     cfg: dict[str, Any] | None = None
+    checks_run_id: str = ""
 
 
 def _read_jsonl_list(path: Path) -> list[dict[str, Any]]:
@@ -1399,6 +1403,9 @@ def run_target(
 ) -> dict[str, Any]:
     tid = row["id"]
     pool = resolve_license_pool(row)
+    content_checks = row.get("content_checks") or []
+    if not isinstance(content_checks, list):
+        content_checks = [str(content_checks)]
     strat = (row.get("download", {}) or {}).get("strategy", "none")
     out_dir = resolve_output_dir(ctx, bucket, pool, tid)
     manifest = {
@@ -1460,6 +1467,15 @@ def run_target(
                 status = proc.get("status", status)
     if ctx.mode.execute:
         write_done_marker(ctx, tid, bucket, status, git_info)
+    run_checks_for_target(
+        content_checks=content_checks,
+        ledger_root=ctx.roots.ledger_root,
+        run_id=ctx.checks_run_id,
+        target_id=tid,
+        stage="acquire",
+        row=row,
+        extra={"bucket": bucket, "status": status},
+    )
     return {"id": tid, "status": status, "bucket": bucket, "license_pool": pool, "strategy": strat}
 
 
@@ -1478,10 +1494,12 @@ def load_roots(
     manifests_root = Path(
         overrides.manifests_root or g.get("manifests_root", defaults.manifests_root)
     )
+    ledger_root = Path(overrides.ledger_root or g.get("ledger_root", defaults.ledger_root))
     logs_root = Path(overrides.logs_root or g.get("logs_root", defaults.logs_root))
     return Roots(
         raw_root=raw_root.expanduser().resolve(),
         manifests_root=manifests_root.expanduser().resolve(),
+        ledger_root=ledger_root.expanduser().resolve(),
         logs_root=logs_root.expanduser().resolve(),
     )
 
@@ -1501,6 +1519,7 @@ def run_acquire_worker(
     )
     ap.add_argument("--raw-root", default=None, help="Override raw root")
     ap.add_argument("--manifests-root", default=None, help="Override manifests root")
+    ap.add_argument("--ledger-root", default=None, help="Override ledger root")
     ap.add_argument("--logs-root", default=None, help="Override logs root")
     ap.add_argument("--execute", action="store_true", help="Perform downloads")
     ap.add_argument("--overwrite", action="store_true", help="Overwrite existing outputs")
@@ -1535,6 +1554,7 @@ def run_acquire_worker(
     cfg = load_config(targets_path)
     roots = load_roots(cfg, args, defaults)
     ensure_dir(roots.logs_root)
+    ensure_dir(roots.ledger_root)
 
     ctx = AcquireContext(
         roots=roots,
@@ -1550,6 +1570,7 @@ def run_acquire_worker(
         retry=RetryConfig(args.retry_max, args.retry_backoff),
         allow_non_global_download_hosts=args.allow_non_global_download_hosts,
         cfg=cfg,
+        checks_run_id=generate_run_id("acquire"),
     )
 
     if ctx.limits.limit_targets:
@@ -1557,6 +1578,7 @@ def run_acquire_worker(
     rows = [r for r in rows if r.get("enabled", True) and r.get("id")]
 
     summary = {
+        "checks_run_id": ctx.checks_run_id,
         "run_at_utc": utc_now(),
         "queue": str(queue_path),
         "bucket": args.bucket,

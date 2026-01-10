@@ -27,6 +27,7 @@ def run_acquire_for_pipeline(spec: PipelineSpec) -> None:
     defaults = RootsDefaults(
         raw_root=roots["raw_root"],
         manifests_root=roots["manifests_root"],
+        ledger_root=roots["ledger_root"],
         logs_root=roots["logs_root"],
     )
     run_acquire_worker(

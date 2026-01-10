@@ -41,6 +41,7 @@ STRATEGY_HANDLERS = {
 DEFAULTS = RootsDefaults(
     raw_root="/data/chem/raw",
     manifests_root="/data/chem/_manifests",
+    ledger_root="/data/chem/_ledger",
     logs_root="/data/chem/_logs",
 )
 
