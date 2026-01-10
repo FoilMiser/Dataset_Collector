@@ -362,6 +362,17 @@ def handle_http_single(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) 
     ]
 
 
+def handle_http(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
+    download = normalize_download(row.get("download", {}) or {})
+    urls: list[str] = []
+    if download.get("url"):
+        urls.append(download["url"])
+    urls.extend([u for u in download.get("urls") or [] if u])
+    if len(urls) > 1:
+        return handle_http_multi(ctx, row, out_dir)
+    return handle_http_single(ctx, row, out_dir)
+
+
 def handle_ftp(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     download = normalize_download(row.get("download", {}) or {})
     base = download.get("base_url")
@@ -587,6 +598,9 @@ def handle_figshare_article(ctx: AcquireContext, row: dict[str, Any], out_dir: P
         results.append(_http_download_with_resume(ctx, download_url, out_dir / fname, expected_size))
     write_json(out_dir / "figshare_article.json", meta)
     return results
+
+
+handle_figshare = handle_figshare_article
 
 
 def handle_figshare_files(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
