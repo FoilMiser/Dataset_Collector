@@ -53,6 +53,27 @@ Define targets in `targets_your_domain.yaml`, including:
 - `safety_bucket` values (GREEN/YELLOW/RED).
 - Any pipeline-specific metadata.
 
+### Companion files and shared configs
+
+Targets files declare companion files that the runtime loads alongside the target
+definitions. The shared defaults live in `configs/common/` and are referenced with
+relative paths, for example:
+
+```yaml
+companion_files:
+  license_map:
+    - "../configs/common/license_map.yaml"
+  field_schemas:
+    - "../configs/common/field_schemas.yaml"
+  denylist:
+    - "../configs/common/denylist.yaml"
+```
+
+Use the shared files as-is when you want to inherit the repo defaults. When you
+need pipeline-specific overrides, add a local YAML (for example
+`your_domain_pipeline_v2/license_map.yaml`) and reference it under
+`companion_files` so only that pipeline changes.
+
 ## 5. Configure licensing
 
 Update the shared license map in `configs/common/license_map.yaml` (or add a pipeline-specific file

@@ -209,13 +209,41 @@ Within each `*_pipeline_v2` directory, you should expect:
   pipeline_driver.py
   acquire_worker.py
   targets_*.yaml
-  license_map.yaml
+```
+
+Shared configuration files live in `configs/common/` and are referenced from each
+pipeline’s targets YAML:
+
+```
+configs/
+  common/
+    license_map.yaml
+    field_schemas.yaml
+    denylist.yaml
+```
+
+Targets YAMLs point at companion files using relative paths, for example in
+`math_pipeline_v2/targets_math.yaml`:
+
+```yaml
+companion_files:
+  license_map:
+    - "../configs/common/license_map.yaml"
+  field_schemas:
+    - "../configs/common/field_schemas.yaml"
+  denylist:
+    - "../configs/common/denylist.yaml"
 ```
 
 Two global configuration entries determine where queues and catalogs are stored:
 
 - `globals.queues_root`: root path for pipeline queues (intermediate work items).
 - `globals.catalogs_root`: root path for pipeline catalogs.
+
+Modify the shared files in `configs/common/` only when you want the change to apply
+across pipelines. For pipeline-specific tweaks, add a local YAML alongside your
+targets file and point to it in `companion_files` so you inherit the defaults and
+override only what you need.
 
 Update these in the pipeline’s configuration files (for example `targets_*.yaml` in each pipeline directory) to control where outputs are written.
 
