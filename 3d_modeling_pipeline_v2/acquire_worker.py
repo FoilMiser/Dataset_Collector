@@ -485,6 +485,7 @@ STRATEGY_HANDLERS = {
 DEFAULTS = RootsDefaults(
     raw_root="/data/3d/raw",
     manifests_root="/data/3d/_manifests",
+    ledger_root="/data/3d/_ledger",
     logs_root="/data/3d/_logs",
 )
 

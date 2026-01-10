@@ -18,6 +18,7 @@ import requests
 
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.artifact_metadata import build_artifact_metadata
+from collector_core.checks.runner import generate_run_id, run_checks_for_target
 from collector_core.companion_files import read_license_maps, resolve_companion_paths
 from collector_core.config_validator import read_yaml
 
@@ -235,10 +236,12 @@ class DriverConfig:
     denylist: dict[str, Any]
     manifests_root: Path
     queues_root: Path
+    ledger_root: Path
     default_license_gates: list[str]
     default_content_checks: list[str]
     targets: list[dict[str, Any]]
     require_yellow_signoff: bool
+    checks_run_id: str
 
 
 @dataclasses.dataclass(frozen=True)
@@ -359,10 +362,11 @@ def redact_headers_for_manifest(headers: dict[str, str] | None) -> dict[str, Any
 
 def resolve_output_roots(
     args: argparse.Namespace, globals_cfg: dict[str, Any]
-) -> tuple[Path, Path]:
+) -> tuple[Path, Path, Path]:
     dataset_root = resolve_dataset_root(args.dataset_root)
     manifests_override = args.manifests_root or args.out_manifests
     queues_override = args.queues_root or args.out_queues
+    ledger_override = args.ledger_root
     if manifests_override:
         manifests_root = Path(manifests_override).expanduser().resolve()
     elif dataset_root:
@@ -377,7 +381,13 @@ def resolve_output_roots(
         queues_root = (dataset_root / "_queues").resolve()
     else:
         queues_root = Path(globals_cfg.get("queues_root", "./queues")).expanduser().resolve()
-    return manifests_root, queues_root
+    if ledger_override:
+        ledger_root = Path(ledger_override).expanduser().resolve()
+    elif dataset_root:
+        ledger_root = (dataset_root / "_ledger").resolve()
+    else:
+        ledger_root = Path(globals_cfg.get("ledger_root", "./_ledger")).expanduser().resolve()
+    return manifests_root, queues_root, ledger_root
 
 
 def load_driver_config(args: argparse.Namespace) -> DriverConfig:
@@ -398,9 +408,10 @@ def load_driver_config(args: argparse.Namespace) -> DriverConfig:
         targets_path, companion.get("denylist"), "./denylist.yaml"
     )
     denylist = load_denylist(denylist_paths)
-    manifests_root, queues_root = resolve_output_roots(args, globals_cfg)
+    manifests_root, queues_root, ledger_root = resolve_output_roots(args, globals_cfg)
     ensure_dir(manifests_root)
     ensure_dir(queues_root)
+    ensure_dir(ledger_root)
     return DriverConfig(
         args=args,
         retry_max=retry_max,
@@ -413,10 +424,12 @@ def load_driver_config(args: argparse.Namespace) -> DriverConfig:
         denylist=denylist,
         manifests_root=manifests_root,
         queues_root=queues_root,
+        ledger_root=ledger_root,
         default_license_gates=globals_cfg.get("default_license_gates", []) or [],
         default_content_checks=globals_cfg.get("default_content_checks", []) or [],
         targets=targets_cfg.get("targets", []) or [],
         require_yellow_signoff=bool(globals_cfg.get("require_yellow_signoff", False)),
+        checks_run_id=generate_run_id("classification"),
     )
 
 
@@ -1622,6 +1635,15 @@ class BasePipelineDriver:
             review_required,
             out_pool,
         )
+        run_checks_for_target(
+            content_checks=ctx.content_checks,
+            ledger_root=cfg.ledger_root,
+            run_id=cfg.checks_run_id,
+            target_id=ctx.tid,
+            stage="classification",
+            target=ctx.target,
+            row=row,
+        )
         return evaluation, row
 
     def fetch_evidence(self, ctx: TargetContext, cfg: DriverConfig) -> EvidenceResult:
@@ -1819,6 +1841,7 @@ class BasePipelineDriver:
             "priority": ctx.target.get("priority", None),
             "enabled": ctx.enabled,
             "statistics": ctx.target.get("statistics", {}),
+            "content_checks": ctx.content_checks,
             "split_group_id": ctx.split_group_id,
             "denylist_hits": ctx.dl_hits,
             "review_required": review_required,
@@ -1931,6 +1954,7 @@ class BasePipelineDriver:
         ap.add_argument(
             "--queues-root", default=None, help="Override queues_root (alias: --out-queues)"
         )
+        ap.add_argument("--ledger-root", default=None, help="Override ledger_root")
         ap.add_argument("--out-manifests", default=None, help=argparse.SUPPRESS)
         ap.add_argument("--out-queues", default=None, help=argparse.SUPPRESS)
         ap.add_argument(
