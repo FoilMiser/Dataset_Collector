@@ -4,6 +4,7 @@ yellow_screen_worker.py (v2.0)
 
 Thin wrapper that delegates to the spec-driven yellow screen dispatch.
 """
+
 from __future__ import annotations
 
 import sys

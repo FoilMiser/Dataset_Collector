@@ -11,6 +11,7 @@ This module does **not** perform domain-specific transforms. Instead it:
 
 Not legal advice.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -24,7 +25,7 @@ from typing import Any
 from collector_core.__version__ import __schema_version__ as SCHEMA_VERSION
 from collector_core.__version__ import __version__ as TOOL_VERSION
 from collector_core.config_validator import read_yaml as read_yaml_config
-from collector_core.utils import ensure_dir, utc_now
+from collector_core.utils import ensure_dir, read_jsonl_list, utc_now
 
 
 @dataclass
@@ -64,17 +65,6 @@ class QueueEntry:
 def read_targets_yaml(path: Path) -> dict[str, Any]:
     """Read and validate a targets YAML file."""
     return read_yaml_config(path, schema_name="targets") or {}
-
-
-def read_jsonl_list(path: Path) -> list[dict[str, Any]]:
-    """Read JSONL file and return as list."""
-    rows: list[dict[str, Any]] = []
-    with path.open("r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                rows.append(json.loads(line))
-    return rows
 
 
 def load_queue(queue_path: Path, limit: int | None = None) -> list[QueueEntry]:
@@ -130,10 +120,7 @@ def write_plan(
         "entries": [asdict(e) for e in entries],
     }
     tmp_path = Path(f"{output_path}.tmp")
-    tmp_path.write_text(
-        json.dumps(plan, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8"
-    )
+    tmp_path.write_text(json.dumps(plan, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     tmp_path.replace(output_path)
 
 

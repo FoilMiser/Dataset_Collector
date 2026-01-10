@@ -21,7 +21,6 @@ import hashlib
 import io
 import json
 import re
-import time
 import zipfile
 from collections import Counter
 from collections.abc import Iterable, Iterator
@@ -33,6 +32,7 @@ from datasets import DatasetDict, load_from_disk
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.config_validator import read_yaml
+from collector_core.utils import ensure_dir, read_jsonl, utc_now, write_json, write_jsonl
 from collector_core.yellow_screen_common import (
     PitchConfig,
     resolve_dataset_root,
@@ -40,44 +40,9 @@ from collector_core.yellow_screen_common import (
 )
 
 
-def utc_now() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-
-
-def ensure_dir(path: Path) -> None:
-    path.mkdir(parents=True, exist_ok=True)
-
-
 def sha256_text(text: str) -> str:
     norm = re.sub(r"\s+", " ", (text or "").strip())
     return hashlib.sha256(norm.encode("utf-8")).hexdigest()
-
-
-def read_jsonl(path: Path) -> Iterator[dict[str, Any]]:
-    opener = gzip.open if path.suffix == ".gz" else open
-    with opener(path, "rt", encoding="utf-8", errors="ignore") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                try:
-                    yield json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-
-
-def write_json(path: Path, obj: dict[str, Any]) -> None:
-    ensure_dir(path.parent)
-    tmp_path = Path(f"{path}.tmp")
-    tmp_path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    tmp_path.replace(path)
-
-
-def write_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
-    ensure_dir(path.parent)
-    opener = gzip.open if path.suffix == ".gz" else open
-    with opener(path, "wt", encoding="utf-8") as f:
-        for row in rows:
-            f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
 def append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
@@ -171,11 +136,15 @@ def load_signoff(manifest_dir: Path) -> dict[str, Any] | None:
 def resolve_roots(cfg: dict[str, Any], dataset_root: Path | None = None) -> Roots:
     dataset_root = dataset_root or resolve_dataset_root()
     default_raw = dataset_root / "raw" if dataset_root else Path("/data/econ/raw")
-    default_screened = dataset_root / "screened_yellow" if dataset_root else Path("/data/econ/screened_yellow")
-    default_manifests = dataset_root / "_manifests" if dataset_root else Path("/data/econ/_manifests")
+    default_screened = (
+        dataset_root / "screened_yellow" if dataset_root else Path("/data/econ/screened_yellow")
+    )
+    default_manifests = (
+        dataset_root / "_manifests" if dataset_root else Path("/data/econ/_manifests")
+    )
     default_ledger = dataset_root / "_ledger" if dataset_root else Path("/data/econ/_ledger")
     default_pitches = dataset_root / "_pitches" if dataset_root else Path("/data/econ/_pitches")
-    g = (cfg.get("globals", {}) or {})
+    g = cfg.get("globals", {}) or {}
     return Roots(
         raw_root=Path(g.get("raw_root", default_raw)).expanduser().resolve(),
         screened_root=Path(g.get("screened_yellow_root", default_screened)).expanduser().resolve(),
@@ -186,11 +155,11 @@ def resolve_roots(cfg: dict[str, Any], dataset_root: Path | None = None) -> Root
 
 
 def merge_screening_config(cfg: dict[str, Any], target: dict[str, Any]) -> ScreeningConfig:
-    g = (cfg.get("globals", {}) or {})
-    g_screen = (g.get("screening", {}) or {})
-    g_canon = (g.get("canonicalize", {}) or {})
-    t_screen = (target.get("yellow_screen", {}) or {})
-    t_canon = (target.get("canonicalize", {}) or {})
+    g = cfg.get("globals", {}) or {}
+    g_screen = g.get("screening", {}) or {}
+    g_canon = g.get("canonicalize", {}) or {}
+    t_screen = target.get("yellow_screen", {}) or {}
+    t_canon = target.get("canonicalize", {}) or {}
     adapter = str(t_screen.get("adapter") or g_screen.get("adapter") or "auto")
     inner_adapter = t_screen.get("inner_adapter")
     return ScreeningConfig(
@@ -201,12 +170,27 @@ def merge_screening_config(cfg: dict[str, Any], target: dict[str, Any]) -> Scree
             or g_screen.get("text_field_candidates")
             or ["text"]
         ),
-        license_fields=list(t_screen.get("record_license_field_candidates") or g_screen.get("record_license_field_candidates") or ["license", "license_spdx"]),
+        license_fields=list(
+            t_screen.get("record_license_field_candidates")
+            or g_screen.get("record_license_field_candidates")
+            or ["license", "license_spdx"]
+        ),
         allow_spdx=list(t_screen.get("allow_spdx") or g_screen.get("allow_spdx") or []),
-        deny_phrases=[p.lower() for p in (t_screen.get("deny_phrases") or g_screen.get("deny_phrases") or [])],
-        require_record_license=bool(t_screen.get("require_record_license", g_screen.get("require_record_license", False))),
+        deny_phrases=[
+            p.lower() for p in (t_screen.get("deny_phrases") or g_screen.get("deny_phrases") or [])
+        ],
+        require_record_license=bool(
+            t_screen.get("require_record_license", g_screen.get("require_record_license", False))
+        ),
         min_chars=int(t_screen.get("min_chars", g_screen.get("min_chars", 200))),
-        max_chars=int(t_canon.get("max_chars", t_screen.get("max_chars", g_canon.get("max_chars", g_screen.get("max_chars", 12000))))),
+        max_chars=int(
+            t_canon.get(
+                "max_chars",
+                t_screen.get(
+                    "max_chars", g_canon.get("max_chars", g_screen.get("max_chars", 12000))
+                ),
+            )
+        ),
         adapter=adapter,
         inner_adapter=str(inner_adapter) if inner_adapter else None,
         chunk_rows=int(t_screen.get("chunk_rows", g_screen.get("chunk_rows", 1000))),
@@ -214,7 +198,7 @@ def merge_screening_config(cfg: dict[str, Any], target: dict[str, Any]) -> Scree
 
 
 def sharding_cfg(cfg: dict[str, Any], prefix: str) -> ShardingConfig:
-    g = (cfg.get("globals", {}).get("sharding", {}) or {})
+    g = cfg.get("globals", {}).get("sharding", {}) or {}
     return ShardingConfig(
         max_records_per_shard=int(g.get("max_records_per_shard", 50000)),
         compression=str(g.get("compression", "gzip")),
@@ -230,6 +214,7 @@ def find_text(row: dict[str, Any], candidates: list[str]) -> str | None:
                 val = "\n".join(map(str, val))
             return str(val)
     return None
+
 
 def extract_text(row: dict[str, Any], candidates: list[str]) -> str | None:
     if row.get("text"):
@@ -248,8 +233,6 @@ def extract_text(row: dict[str, Any], candidates: list[str]) -> str | None:
         return json.dumps(row, ensure_ascii=False)
     except Exception:
         return str(row)
-
-
 
 
 def find_license(row: dict[str, Any], candidates: list[str]) -> str | None:
@@ -297,14 +280,16 @@ def record_pitch(
         if source_url:
             sample["source_url"] = source_url
     if text:
-        sample["text"] = text[:pitch_cfg.text_limit]
+        sample["text"] = text[: pitch_cfg.text_limit]
     if sample_extra:
         sample.update(sample_extra)
     append_jsonl(roots.pitches_root / "yellow_pitch.jsonl", [sample])
     pitch_counts[key] = pitch_counts.get(key, 0) + 1
 
 
-def canonical_record(raw: dict[str, Any], text: str, target_id: str, license_profile: str, license_spdx: str | None) -> dict[str, Any]:
+def canonical_record(
+    raw: dict[str, Any], text: str, target_id: str, license_profile: str, license_spdx: str | None
+) -> dict[str, Any]:
     record_id = str(raw.get("record_id") or raw.get("id") or sha256_text(f"{target_id}:{text}"))
     content_hash = sha256_text(text)
     source = raw.get("source", {}) or {}
@@ -346,14 +331,18 @@ def iter_hf_dataset_dirs(raw_dir: Path) -> Iterator[Path]:
         yield path
 
 
-
 def routing_from_queue(queue_row: dict[str, Any]) -> dict[str, Any]:
     return {
-        "subject": queue_row.get("routing_subject") or queue_row.get("routing", {}).get("subject") or "econ",
+        "subject": queue_row.get("routing_subject")
+        or queue_row.get("routing", {}).get("subject")
+        or "econ",
         "domain": queue_row.get("routing_domain") or queue_row.get("routing", {}).get("domain"),
-        "category": queue_row.get("routing_category") or queue_row.get("routing", {}).get("category"),
+        "category": queue_row.get("routing_category")
+        or queue_row.get("routing", {}).get("category"),
         "level": queue_row.get("routing_level") or queue_row.get("routing", {}).get("level"),
-        "granularity": queue_row.get("routing_granularity") or queue_row.get("routing", {}).get("granularity") or "target",
+        "granularity": queue_row.get("routing_granularity")
+        or queue_row.get("routing", {}).get("granularity")
+        or "target",
     }
 
 
@@ -412,14 +401,18 @@ def process_target(
     target_cfg = next((t for t in cfg.get("targets", []) if t.get("id") == target_id), {})
     screen_cfg = merge_screening_config(cfg, target_cfg)
     shard_cfg = sharding_cfg(cfg, "yellow_shard")
-    g = (cfg.get("globals", {}) or {})
+    g = cfg.get("globals", {}) or {}
     require_signoff = bool(g.get("require_yellow_signoff", False))
-    allow_without_signoff = bool((target_cfg.get("yellow_screen", {}) or {}).get("allow_without_signoff", False))
+    allow_without_signoff = bool(
+        (target_cfg.get("yellow_screen", {}) or {}).get("allow_without_signoff", False)
+    )
     manifest_dir = Path(queue_row.get("manifest_dir") or roots.manifests_root / target_id)
     signoff = load_signoff(manifest_dir) or {}
     status = str(signoff.get("status", "") or "").lower()
     pool_dir_base = roots.raw_root / "yellow"
-    license_pools = [p.name for p in pool_dir_base.iterdir() if p.is_dir()] if pool_dir_base.exists() else []
+    license_pools = (
+        [p.name for p in pool_dir_base.iterdir() if p.is_dir()] if pool_dir_base.exists() else []
+    )
     pools = license_pools or [queue_row.get("license_profile", "quarantine")]
     base_routing = routing_from_queue(queue_row)
     primary_url = primary_source_url(queue_row)
@@ -498,7 +491,9 @@ def process_target(
             src.setdefault("artifact_path", artifact_path)
             record["source"] = src
             record.setdefault("routing", base_routing)
-            record.setdefault("license_profile", queue_row.get("license_profile") or pool or "quarantine")
+            record.setdefault(
+                "license_profile", queue_row.get("license_profile") or pool or "quarantine"
+            )
             record.setdefault("artifact_path", artifact_path)
             return record
 
@@ -530,20 +525,35 @@ def process_target(
                 pitch("no_text", sample_id=raw_record.get("id") or raw_record.get("record_id"))
                 return
             if len(text) < screen_cfg.min_chars or len(text) > screen_cfg.max_chars:
-                pitch("length_bounds", sample_id=raw_record.get("id") or raw_record.get("record_id"))
+                pitch(
+                    "length_bounds", sample_id=raw_record.get("id") or raw_record.get("record_id")
+                )
                 return
             lic = find_license(raw_record, screen_cfg.license_fields)
             if screen_cfg.require_record_license and not lic:
-                pitch("missing_record_license", sample_id=raw_record.get("id") or raw_record.get("record_id"))
+                pitch(
+                    "missing_record_license",
+                    sample_id=raw_record.get("id") or raw_record.get("record_id"),
+                )
                 return
             if lic and screen_cfg.allow_spdx and lic not in screen_cfg.allow_spdx:
-                pitch("license_not_allowlisted", sample_id=raw_record.get("id") or raw_record.get("record_id"))
+                pitch(
+                    "license_not_allowlisted",
+                    sample_id=raw_record.get("id") or raw_record.get("record_id"),
+                )
                 return
             if contains_deny(text, screen_cfg.deny_phrases):
                 pitch("deny_phrase", sample_id=raw_record.get("id") or raw_record.get("record_id"))
                 return
-            license_profile = str(raw_record.get("license_profile") or queue_row.get("license_profile") or pool or "quarantine")
-            record = canonical_record(raw_record, text, target_id, license_profile, lic or license_spdx_hint)
+            license_profile = str(
+                raw_record.get("license_profile")
+                or queue_row.get("license_profile")
+                or pool
+                or "quarantine"
+            )
+            record = canonical_record(
+                raw_record, text, target_id, license_profile, lic or license_spdx_hint
+            )
             passed += 1
             if execute:
                 current_shard = str(sharder._next_path())
@@ -575,7 +585,9 @@ def process_target(
                     lines.append(", ".join([str(v) for v in row]))
             return "\n".join(lines)
 
-        def emit_tabular(reader: Iterable[Any], header: list[str], file_label: str, artifact_path: str) -> None:
+        def emit_tabular(
+            reader: Iterable[Any], header: list[str], file_label: str, artifact_path: str
+        ) -> None:
             nonlocal tabular_chunk_idx
             if header and is_potential_microdata(header):
                 pitch("possible_microdata", sample=header)
@@ -586,7 +598,10 @@ def process_target(
                 rows.append(row)
                 if len(rows) >= screen_cfg.chunk_rows:
                     text = tabular_text(header, rows, file_label)
-                    raw = prepare_record({"record_id": f"{target_id}:{file_label}:chunk{tabular_chunk_idx:04d}"}, artifact_path)
+                    raw = prepare_record(
+                        {"record_id": f"{target_id}:{file_label}:chunk{tabular_chunk_idx:04d}"},
+                        artifact_path,
+                    )
                     tabular_chunk_idx += 1
                     validate_and_add(raw, text)
                     rows = []
@@ -594,7 +609,10 @@ def process_target(
                     break
             if rows:
                 text = tabular_text(header, rows, file_label)
-                raw = prepare_record({"record_id": f"{target_id}:{file_label}:chunk{tabular_chunk_idx:04d}"}, artifact_path)
+                raw = prepare_record(
+                    {"record_id": f"{target_id}:{file_label}:chunk{tabular_chunk_idx:04d}"},
+                    artifact_path,
+                )
                 tabular_chunk_idx += 1
                 validate_and_add(raw, text)
 
@@ -606,11 +624,15 @@ def process_target(
                         break
                     raw = item if isinstance(item, dict) else {"text": str(item)}
                     prepared = prepare_record(raw, artifact_path)
-                    text = extract_text(prepared, screen_cfg.text_fields) or json.dumps(item, ensure_ascii=False)
+                    text = extract_text(prepared, screen_cfg.text_fields) or json.dumps(
+                        item, ensure_ascii=False
+                    )
                     validate_and_add(prepared, text)
             elif isinstance(data, dict):
                 prepared = prepare_record(data, artifact_path)
-                text = extract_text(prepared, screen_cfg.text_fields) or json.dumps(data, ensure_ascii=False)
+                text = extract_text(prepared, screen_cfg.text_fields) or json.dumps(
+                    data, ensure_ascii=False
+                )
                 validate_and_add(prepared, text)
             else:
                 prepared = prepare_record({"text": str(data)}, artifact_path)
@@ -639,7 +661,9 @@ def process_target(
             elif handler_suffix == ".txt":
                 text = safe_read_text(file_path)
                 if text:
-                    prepared = prepare_record({"record_id": f"{target_id}:{file_path.name}"}, str(file_path))
+                    prepared = prepare_record(
+                        {"record_id": f"{target_id}:{file_path.name}"}, str(file_path)
+                    )
                     validate_and_add(prepared, text)
                 else:
                     pitch("no_text", sample_id=file_path.name)
@@ -647,7 +671,9 @@ def process_target(
                 delimiter = "," if handler_suffix == ".csv" else "\t"
                 try:
                     opener = gzip.open if suffix == ".gz" else open
-                    with opener(file_path, "rt", encoding="utf-8", errors="ignore", newline="") as f:
+                    with opener(
+                        file_path, "rt", encoding="utf-8", errors="ignore", newline=""
+                    ) as f:
                         f.seek(0)
                         reader = csv.DictReader(f, delimiter=delimiter)
                         header = reader.fieldnames or []
@@ -657,7 +683,9 @@ def process_target(
                             f.seek(0)
                             raw_reader = csv.reader(f, delimiter=delimiter)
                             header_row = next(raw_reader, [])
-                            header_list = header_row if isinstance(header_row, list) else [header_row]
+                            header_list = (
+                                header_row if isinstance(header_row, list) else [header_row]
+                            )
                             emit_tabular(raw_reader, header_list, file_path.name, str(file_path))
                 except Exception:
                     pitch("tabular_parse_error", sample_id=file_path.name)
@@ -674,9 +702,14 @@ def process_target(
                             inner_suffixes = Path(info.filename).suffixes
                             inner_suffix = inner_suffixes[-1].lower() if inner_suffixes else ""
                             with zf.open(info) as f:
-                                if inner_suffix in {".csv", ".tsv"} or screen_cfg.inner_adapter == "csv_chunked":
+                                if (
+                                    inner_suffix in {".csv", ".tsv"}
+                                    or screen_cfg.inner_adapter == "csv_chunked"
+                                ):
                                     delimiter = "," if inner_suffix != ".tsv" else "\t"
-                                    text_stream = io.TextIOWrapper(f, encoding="utf-8", errors="ignore", newline="")
+                                    text_stream = io.TextIOWrapper(
+                                        f, encoding="utf-8", errors="ignore", newline=""
+                                    )
                                     reader = csv.DictReader(text_stream, delimiter=delimiter)
                                     header = reader.fieldnames or []
                                     if header:
@@ -685,10 +718,18 @@ def process_target(
                                         text_stream.seek(0)
                                         raw_reader = csv.reader(text_stream, delimiter=delimiter)
                                         header_row = next(raw_reader, [])
-                                        header_list = header_row if isinstance(header_row, list) else [header_row]
-                                        emit_tabular(raw_reader, header_list, artifact_label, artifact_label)
+                                        header_list = (
+                                            header_row
+                                            if isinstance(header_row, list)
+                                            else [header_row]
+                                        )
+                                        emit_tabular(
+                                            raw_reader, header_list, artifact_label, artifact_label
+                                        )
                                 elif inner_suffix == ".jsonl":
-                                    text_stream = io.TextIOWrapper(f, encoding="utf-8", errors="ignore")
+                                    text_stream = io.TextIOWrapper(
+                                        f, encoding="utf-8", errors="ignore"
+                                    )
                                     for line in text_stream:
                                         line = line.strip()
                                         if not line:
@@ -697,10 +738,17 @@ def process_target(
                                             raw = json.loads(line)
                                         except json.JSONDecodeError:
                                             continue
-                                        prepared = prepare_record(raw if isinstance(raw, dict) else {"text": str(raw)}, artifact_label)
-                                        validate_and_add(prepared, extract_text(prepared, screen_cfg.text_fields))
+                                        prepared = prepare_record(
+                                            raw if isinstance(raw, dict) else {"text": str(raw)},
+                                            artifact_label,
+                                        )
+                                        validate_and_add(
+                                            prepared, extract_text(prepared, screen_cfg.text_fields)
+                                        )
                                 elif inner_suffix == ".json":
-                                    text_stream = io.TextIOWrapper(f, encoding="utf-8", errors="ignore")
+                                    text_stream = io.TextIOWrapper(
+                                        f, encoding="utf-8", errors="ignore"
+                                    )
                                     try:
                                         data = json.load(text_stream)
                                     except Exception:
@@ -708,9 +756,14 @@ def process_target(
                                         continue
                                     handle_json_payload(data, artifact_label)
                                 elif inner_suffix == ".txt":
-                                    text_stream = io.TextIOWrapper(f, encoding="utf-8", errors="ignore")
+                                    text_stream = io.TextIOWrapper(
+                                        f, encoding="utf-8", errors="ignore"
+                                    )
                                     text = text_stream.read()
-                                    prepared = prepare_record({"record_id": f"{target_id}:{artifact_label}"}, artifact_label)
+                                    prepared = prepare_record(
+                                        {"record_id": f"{target_id}:{artifact_label}"},
+                                        artifact_label,
+                                    )
                                     validate_and_add(prepared, text)
                                 else:
                                     pitch("unsupported_inner_file", sample_id=artifact_label)
@@ -734,13 +787,16 @@ def process_target(
                         sample_extra={"path": str(ds_path)},
                     )
                 continue
-            datasets = list(dataset_obj.values()) if isinstance(dataset_obj, DatasetDict) else [dataset_obj]
+            datasets = (
+                list(dataset_obj.values())
+                if isinstance(dataset_obj, DatasetDict)
+                else [dataset_obj]
+            )
             for dataset in datasets:
                 for raw in dataset:
                     record = raw if isinstance(raw, dict) else {"text": str(raw)}
                     prepared = prepare_record(record, str(ds_path))
                     validate_and_add(prepared, extract_text(prepared, screen_cfg.text_fields))
-
 
         if execute:
             flushed = sharder.flush()
@@ -767,9 +823,23 @@ def main() -> None:
     ap.add_argument("--targets", required=True, help="Path to targets_econ_stats_decision_v2.yaml")
     ap.add_argument("--queue", required=True, help="YELLOW queue JSONL")
     ap.add_argument("--execute", action="store_true", help="Write outputs (default: dry-run)")
-    ap.add_argument("--dataset-root", default=None, help="Override dataset root (raw/screened/_ledger/_pitches/_manifests)")
-    ap.add_argument("--pitch-sample-limit", type=int, default=None, help="Max pitch samples per reason (override)")
-    ap.add_argument("--pitch-text-limit", type=int, default=None, help="Max chars stored in pitch samples (override)")
+    ap.add_argument(
+        "--dataset-root",
+        default=None,
+        help="Override dataset root (raw/screened/_ledger/_pitches/_manifests)",
+    )
+    ap.add_argument(
+        "--pitch-sample-limit",
+        type=int,
+        default=None,
+        help="Max pitch samples per reason (override)",
+    )
+    ap.add_argument(
+        "--pitch-text-limit",
+        type=int,
+        default=None,
+        help="Max chars stored in pitch samples (override)",
+    )
     args = ap.parse_args()
 
     targets_path = Path(args.targets).expanduser().resolve()

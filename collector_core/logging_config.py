@@ -11,14 +11,15 @@ from collector_core.secrets import redact_string, redact_structure
 _CONFIGURED = False
 
 # Context variables for structured logging
-_log_context: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar(
-    "log_context", default={}
+_log_context: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar(
+    "log_context", default=None
 )
 
 
 def get_log_context() -> dict[str, Any]:
     """Get the current logging context."""
-    return _log_context.get().copy()
+    ctx = _log_context.get()
+    return ctx.copy() if ctx else {}
 
 
 def set_log_context(**kwargs: Any) -> None:
@@ -28,7 +29,8 @@ def set_log_context(**kwargs: Any) -> None:
 
 def update_log_context(**kwargs: Any) -> None:
     """Update the current logging context (merges with existing)."""
-    current = _log_context.get().copy()
+    ctx = _log_context.get()
+    current = ctx.copy() if ctx else {}
     current.update(kwargs)
     _log_context.set(current)
 
@@ -45,7 +47,7 @@ class LogContext:
         self.kwargs = kwargs
         self.token: contextvars.Token | None = None
 
-    def __enter__(self) -> "LogContext":
+    def __enter__(self) -> LogContext:
         current = _log_context.get().copy()
         current.update(self.kwargs)
         self.token = _log_context.set(current)

@@ -22,7 +22,9 @@ def write_screened_records(
     deduped = 0
     with shard_path.open("w", encoding="utf-8") as handle:
         for idx in range(total_records):
-            base_idx = idx - 1 if duplicate_every and idx % duplicate_every == 0 and idx > 0 else idx
+            base_idx = (
+                idx - 1 if duplicate_every and idx % duplicate_every == 0 and idx > 0 else idx
+            )
             text = f"record {base_idx}"
             content_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
             if content_hash in seen:

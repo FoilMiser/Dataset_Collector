@@ -4,6 +4,7 @@ collector_core/pipeline_factory.py
 Factory for creating pipeline driver instances from specifications.
 Eliminates the need for per-pipeline pipeline_driver.py files.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -28,9 +29,7 @@ def create_pipeline_driver(spec: PipelineSpec) -> type[BasePipelineDriver]:
     # Build routing blocks from routing keys
     routing_blocks = []
     for key in spec.routing_keys:
-        routing_blocks.append(
-            RoutingBlockSpec(name=key, sources=[key], mode="subset")
-        )
+        routing_blocks.append(RoutingBlockSpec(name=key, sources=[key], mode="subset"))
 
     # Create the dynamic class
     class_attrs = {

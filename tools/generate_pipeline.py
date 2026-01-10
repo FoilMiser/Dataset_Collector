@@ -2,11 +2,11 @@
 from __future__ import annotations
 
 import argparse
+import re
+import textwrap
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-import re
-import textwrap
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
@@ -58,8 +58,9 @@ def build_spec(pipeline_id: str | None, domain: str | None, title: str | None) -
 
 
 def render_readme(spec: PipelineSpec) -> str:
-    return textwrap.dedent(
-        f"""
+    return (
+        textwrap.dedent(
+            f"""
         # {spec.title} Corpus Pipeline (v2)
 
         This pipeline follows the shared v2 stage flow described in
@@ -99,12 +100,15 @@ def render_readme(spec: PipelineSpec) -> str:
 
         Pipeline code is provided as-is for research and development use.
         """
-    ).strip() + "\n"
+        ).strip()
+        + "\n"
+    )
 
 
 def render_pipeline_driver(spec: PipelineSpec) -> str:
-    return textwrap.dedent(
-        f"""
+    return (
+        textwrap.dedent(
+            f"""
         #!/usr/bin/env python3
         from __future__ import annotations
 
@@ -132,12 +136,15 @@ def render_pipeline_driver(spec: PipelineSpec) -> str:
         if __name__ == "__main__":
             {spec.class_name}PipelineDriver.main()
         """
-    ).strip() + "\n"
+        ).strip()
+        + "\n"
+    )
 
 
 def render_acquire_worker(spec: PipelineSpec) -> str:
-    return textwrap.dedent(
-        f'''
+    return (
+        textwrap.dedent(
+            f'''
         #!/usr/bin/env python3
         """
         acquire_worker.py (v2.0)
@@ -178,12 +185,15 @@ def render_acquire_worker(spec: PipelineSpec) -> str:
         if __name__ == "__main__":
             main()
         '''
-    ).strip() + "\n"
+        ).strip()
+        + "\n"
+    )
 
 
 def render_yellow_screen_worker(spec: PipelineSpec) -> str:
-    return textwrap.dedent(
-        f'''
+    return (
+        textwrap.dedent(
+            f'''
         #!/usr/bin/env python3
         """
         yellow_screen_worker.py (v2.0)
@@ -215,12 +225,15 @@ def render_yellow_screen_worker(spec: PipelineSpec) -> str:
         if __name__ == "__main__":
             main()
         '''
-    ).strip() + "\n"
+        ).strip()
+        + "\n"
+    )
 
 
 def render_merge_worker(spec: PipelineSpec) -> str:
-    return textwrap.dedent(
-        f'''
+    return (
+        textwrap.dedent(
+            f'''
         #!/usr/bin/env python3
         """
         merge_worker.py (v2.0)
@@ -259,12 +272,15 @@ def render_merge_worker(spec: PipelineSpec) -> str:
         if __name__ == "__main__":
             main()
         '''
-    ).strip() + "\n"
+        ).strip()
+        + "\n"
+    )
 
 
 def render_catalog_builder() -> str:
-    return textwrap.dedent(
-        f'''
+    return (
+        textwrap.dedent(
+            '''
         #!/usr/bin/env python3
         """Deprecated pipeline entry point for catalog builder."""
 
@@ -285,12 +301,15 @@ def render_catalog_builder() -> str:
                 )
             )
         '''
-    ).strip() + "\n"
+        ).strip()
+        + "\n"
+    )
 
 
 def render_review_queue() -> str:
-    return textwrap.dedent(
-        f'''
+    return (
+        textwrap.dedent(
+            '''
         #!/usr/bin/env python3
         """Deprecated pipeline entry point for manual YELLOW review queue helper."""
 
@@ -311,12 +330,15 @@ def render_review_queue() -> str:
                 )
             )
         '''
-    ).strip() + "\n"
+        ).strip()
+        + "\n"
+    )
 
 
 def render_run_pipeline(spec: PipelineSpec) -> str:
-    return textwrap.dedent(
-        f"""
+    return (
+        textwrap.dedent(
+            f"""
         #!/usr/bin/env bash
         #
         # run_pipeline.sh (v2.0)
@@ -480,13 +502,16 @@ def render_run_pipeline(spec: PipelineSpec) -> str:
           *) echo -e "${{RED}}Unknown stage: $STAGE${{NC}}"; usage; exit 1 ;;
         esac
         """
-    ).strip() + "\n"
+        ).strip()
+        + "\n"
+    )
 
 
 def render_targets_yaml(spec: PipelineSpec) -> str:
     updated = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    return textwrap.dedent(
-        f"""
+    return (
+        textwrap.dedent(
+            f"""
         schema_version: "0.9"
         updated_utc: "{updated}"
 
@@ -619,7 +644,9 @@ def render_targets_yaml(spec: PipelineSpec) -> str:
               subject: {spec.domain}
               granularity: target
         """
-    ).strip() + "\n"
+        ).strip()
+        + "\n"
+    )
 
 
 def render_requirements() -> str:
@@ -653,7 +680,9 @@ def generate_pipeline(spec: PipelineSpec, repo_root: Path, force: bool) -> Path:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Scaffold a new v2 pipeline wrapper.")
     parser.add_argument("--pipeline-id", help="Pipeline directory name, e.g., math_pipeline_v2")
-    parser.add_argument("--domain", help="Domain slug (defaults to pipeline-id without _pipeline_v2)")
+    parser.add_argument(
+        "--domain", help="Domain slug (defaults to pipeline-id without _pipeline_v2)"
+    )
     parser.add_argument("--title", help="Human-friendly pipeline title")
     parser.add_argument(
         "--dest",

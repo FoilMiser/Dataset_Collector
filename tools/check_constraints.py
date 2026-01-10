@@ -75,9 +75,7 @@ def main() -> int:
             missing.append(f"{DEV_CONSTRAINTS}: missing pin for {requirement}")
 
     if not _has_include_line(DEV_CONSTRAINTS, "-r requirements.constraints.txt"):
-        missing.append(
-            f"{DEV_CONSTRAINTS}: missing '-r requirements.constraints.txt' include"
-        )
+        missing.append(f"{DEV_CONSTRAINTS}: missing '-r requirements.constraints.txt' include")
 
     if missing:
         print("Constraints validation failed:")

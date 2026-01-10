@@ -4,13 +4,12 @@ collector_core/generic_workers.py
 Generic worker implementations that can be parameterized by pipeline spec.
 Replaces per-pipeline acquire_worker.py, merge_worker.py, etc.
 """
+
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 from typing import TYPE_CHECKING
 
-from collector_core.__version__ import __version__ as VERSION
 from collector_core.acquire_strategies import (
     DEFAULT_STRATEGY_HANDLERS,
     RootsDefaults,

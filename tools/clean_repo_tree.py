@@ -4,10 +4,10 @@ import sys
 
 sys.dont_write_bytecode = True
 
-import argparse
-import shutil
-from collections.abc import Iterable
-from pathlib import Path
+import argparse  # noqa: E402
+import shutil  # noqa: E402
+from collections.abc import Iterable  # noqa: E402
+from pathlib import Path  # noqa: E402
 
 OUTPUT_DIR_NAMES = {
     "raw",

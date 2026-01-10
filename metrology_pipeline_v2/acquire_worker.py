@@ -31,8 +31,8 @@ from typing import Any
 
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.acquire_strategies import (
-    AcquireContext,
     DEFAULT_STRATEGY_HANDLERS,
+    AcquireContext,
     RootsDefaults,
     ensure_dir,
     handle_http_single,
@@ -246,7 +246,9 @@ def extract_artifacts(
     return {"status": "ok", "artifacts": len(files), "results": results}
 
 
-def apply_artifacts_dir(handler: Callable[[AcquireContext, dict[str, Any], Path], list[dict[str, Any]]]):
+def apply_artifacts_dir(
+    handler: Callable[[AcquireContext, dict[str, Any], Path], list[dict[str, Any]]],
+):
     def wrapped(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
         return handler(ctx, row, out_dir / "artifacts")
 
@@ -267,7 +269,9 @@ def metrology_postprocess(
 
 
 def main() -> None:
-    strategy_handlers = {key: apply_artifacts_dir(handler) for key, handler in STRATEGY_HANDLERS.items()}
+    strategy_handlers = {
+        key: apply_artifacts_dir(handler) for key, handler in STRATEGY_HANDLERS.items()
+    }
     run_acquire_worker(
         defaults=DEFAULTS,
         targets_yaml_label="targets_metrology.yaml",

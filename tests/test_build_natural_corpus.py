@@ -7,9 +7,7 @@ import yaml
 from tools import build_natural_corpus
 
 
-def test_build_natural_corpus_defaults_to_sample_pipeline_map(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_build_natural_corpus_defaults_to_sample_pipeline_map(monkeypatch, tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     tools_dir = repo_root / "tools"

@@ -1,17 +1,17 @@
 """Integration tests for the pipeline specification system."""
+
 from __future__ import annotations
 
 import pytest
 
 # Import registry to ensure all specs are registered
 import collector_core.pipeline_specs_registry  # noqa: F401
+from collector_core.pipeline_factory import create_pipeline_driver, get_pipeline_driver
 from collector_core.pipeline_spec import (
     PipelineSpec,
     get_pipeline_spec,
     list_pipelines,
-    register_pipeline,
 )
-from collector_core.pipeline_factory import create_pipeline_driver, get_pipeline_driver
 
 
 class TestPipelineSpecRegistry:

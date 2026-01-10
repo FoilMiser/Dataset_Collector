@@ -12,7 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-import collector_core.acquire_strategies as aw
+import collector_core.acquire_strategies as aw  # noqa: E402
 
 
 class StreamResponse:
@@ -94,7 +94,9 @@ def make_ctx(
         manifests_root=tmp_path / "_manifests",
         logs_root=tmp_path / "_logs",
     )
-    limits = aw.Limits(limit_targets=None, limit_files=None, max_bytes_per_target=max_bytes_per_target)
+    limits = aw.Limits(
+        limit_targets=None, limit_files=None, max_bytes_per_target=max_bytes_per_target
+    )
     mode = aw.RunMode(
         execute=execute,
         overwrite=True,
@@ -137,7 +139,9 @@ def test_http_download_size_mismatch(tmp_path: Path, monkeypatch: pytest.MonkeyP
 
     ctx = make_ctx(tmp_path, verify_sha256=True)
     out_path = tmp_path / "out.txt"
-    result = aw._http_download_with_resume(ctx, "https://example.com/file.txt", out_path, expected_size=10)
+    result = aw._http_download_with_resume(
+        ctx, "https://example.com/file.txt", out_path, expected_size=10
+    )
 
     assert result["status"] == "error"
     assert result["error"] == "size_mismatch"
@@ -159,7 +163,9 @@ def test_zenodo_md5_mismatch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
             }
         )
 
-    def fake_download(ctx: aw.AcquireContext, url: str, out_path: Path, expected_size: int | None = None):
+    def fake_download(
+        ctx: aw.AcquireContext, url: str, out_path: Path, expected_size: int | None = None
+    ):
         out_path.write_bytes(b"actual")
         return {"status": "ok", "path": str(out_path)}
 
@@ -185,7 +191,9 @@ def test_figshare_download(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
             ]
         )
 
-    def fake_download(ctx: aw.AcquireContext, url: str, out_path: Path, expected_size: int | None = None):
+    def fake_download(
+        ctx: aw.AcquireContext, url: str, out_path: Path, expected_size: int | None = None
+    ):
         out_path.write_bytes(b"figshare")
         return {"status": "ok", "path": str(out_path)}
 
@@ -276,8 +284,16 @@ def test_s3_sync_mock(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     assert "--request-payer" in calls[0]
 
 
-def test_http_multi_respects_max_bytes_per_target(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    def fake_download(ctx: aw.AcquireContext, url: str, out_path: Path, expected_size: int | None = None, expected_sha256=None):
+def test_http_multi_respects_max_bytes_per_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fake_download(
+        ctx: aw.AcquireContext,
+        url: str,
+        out_path: Path,
+        expected_size: int | None = None,
+        expected_sha256=None,
+    ):
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_bytes(b"x" * 10)
         return {"status": "ok", "path": str(out_path), "content_length": 10}
@@ -307,7 +323,9 @@ def test_http_multi_respects_max_bytes_per_target(tmp_path: Path, monkeypatch: p
     assert results[1]["limit_type"] == "bytes_per_target"
 
 
-def test_git_clone_post_check_respects_max_bytes_per_target(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_git_clone_post_check_respects_max_bytes_per_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     def fake_run_cmd(cmd: list[str], cwd: Path | None = None) -> str:
         if cmd[:2] == ["git", "clone"]:
             dest = Path(cmd[-1])
@@ -333,7 +351,9 @@ def test_git_clone_post_check_respects_max_bytes_per_target(tmp_path: Path, monk
     assert not out_dir.exists()
 
 
-def test_s3_sync_post_check_respects_max_bytes_per_target(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_s3_sync_post_check_respects_max_bytes_per_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     def fake_run_cmd(cmd: list[str], cwd: Path | None = None) -> str:
         out_dir = Path(cmd[-1])
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -358,8 +378,16 @@ def test_s3_sync_post_check_respects_max_bytes_per_target(tmp_path: Path, monkey
     "handler,row,error",
     [
         (aw.handle_http, {"id": "http", "download": {"strategy": "http"}}, "missing url"),
-        (aw.handle_figshare, {"id": "fig", "download": {"strategy": "figshare"}}, "missing article_id"),
-        (aw.handle_hf_datasets, {"id": "hf", "download": {"strategy": "huggingface_datasets"}}, "missing dataset_id"),
+        (
+            aw.handle_figshare,
+            {"id": "fig", "download": {"strategy": "figshare"}},
+            "missing article_id",
+        ),
+        (
+            aw.handle_hf_datasets,
+            {"id": "hf", "download": {"strategy": "huggingface_datasets"}},
+            "missing dataset_id",
+        ),
         (aw.handle_s3_sync, {"id": "s3", "download": {"strategy": "s3_sync"}}, "missing urls"),
     ],
 )
@@ -376,7 +404,9 @@ def test_strategy_error_paths(
     assert results[0]["error"] == error
 
 
-def test_run_acquire_worker_strict_exits_on_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_acquire_worker_strict_exits_on_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     queue_path = tmp_path / "queue.jsonl"
     queue_path.write_text(
         json.dumps({"id": "bad-target", "download": {"strategy": "fail"}}) + "\n", encoding="utf-8"

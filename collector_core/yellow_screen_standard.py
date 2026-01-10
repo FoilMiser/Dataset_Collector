@@ -77,7 +77,7 @@ def record_pitch(
         if source_url:
             sample["source_url"] = source_url
     if text:
-        sample["text"] = text[:pitch_cfg.text_limit]
+        sample["text"] = text[: pitch_cfg.text_limit]
     if sample_extra:
         sample.update(sample_extra)
     append_jsonl(roots.pitches_root / "yellow_pitch.jsonl", [sample])
@@ -144,14 +144,18 @@ def process_target(
     target_cfg = next((t for t in cfg.get("targets", []) if t.get("id") == target_id), {})
     screen_cfg: ScreeningConfig = merge_screening_config(cfg, target_cfg)
     shard_cfg = sharding_cfg(cfg, "yellow_shard")
-    g = (cfg.get("globals", {}) or {})
+    g = cfg.get("globals", {}) or {}
     require_signoff = bool(g.get("require_yellow_signoff", False))
-    allow_without_signoff = bool((target_cfg.get("yellow_screen", {}) or {}).get("allow_without_signoff", False))
+    allow_without_signoff = bool(
+        (target_cfg.get("yellow_screen", {}) or {}).get("allow_without_signoff", False)
+    )
     manifest_dir = Path(queue_row.get("manifest_dir") or roots.manifests_root / target_id)
     signoff = load_signoff(manifest_dir) or {}
     status = str(signoff.get("status", "") or "").lower()
     pool_dir_base = roots.raw_root / "yellow"
-    license_pools = [p.name for p in pool_dir_base.iterdir() if p.is_dir()] if pool_dir_base.exists() else []
+    license_pools = (
+        [p.name for p in pool_dir_base.iterdir() if p.is_dir()] if pool_dir_base.exists() else []
+    )
     pools = license_pools or [queue_row.get("license_profile", "quarantine")]
 
     passed, pitched = 0, 0
@@ -214,7 +218,9 @@ def process_target(
             continue
         sharder = Sharder(roots.screened_root / pool / "shards", shard_cfg)
 
-        def handle_raw(raw: dict[str, Any], *, pool: str = pool, sharder: Sharder = sharder) -> None:
+        def handle_raw(
+            raw: dict[str, Any], *, pool: str = pool, sharder: Sharder = sharder
+        ) -> None:
             nonlocal passed, pitched
             text = extract_text(raw, screen_cfg.text_fields)
             if not text:
@@ -225,13 +231,23 @@ def process_target(
             if len(text) < screen_cfg.min_chars or len(text) > screen_cfg.max_chars:
                 pitched += 1
                 if execute:
-                    record_pitch(roots, pitch_counts, pitch_cfg, target_id, "length_bounds", raw=raw, text=text)
+                    record_pitch(
+                        roots,
+                        pitch_counts,
+                        pitch_cfg,
+                        target_id,
+                        "length_bounds",
+                        raw=raw,
+                        text=text,
+                    )
                 return
             lic = find_license(raw, screen_cfg.license_fields)
             if screen_cfg.require_record_license and not lic:
                 pitched += 1
                 if execute:
-                    record_pitch(roots, pitch_counts, pitch_cfg, target_id, "missing_record_license", raw=raw)
+                    record_pitch(
+                        roots, pitch_counts, pitch_cfg, target_id, "missing_record_license", raw=raw
+                    )
                 return
             if lic and screen_cfg.allow_spdx and lic not in screen_cfg.allow_spdx:
                 pitched += 1
@@ -250,9 +266,16 @@ def process_target(
             if contains_deny(text, screen_cfg.deny_phrases):
                 pitched += 1
                 if execute:
-                    record_pitch(roots, pitch_counts, pitch_cfg, target_id, "deny_phrase", raw=raw, text=text)
+                    record_pitch(
+                        roots, pitch_counts, pitch_cfg, target_id, "deny_phrase", raw=raw, text=text
+                    )
                 return
-            license_profile = str(raw.get("license_profile") or queue_row.get("license_profile") or pool or "quarantine")
+            license_profile = str(
+                raw.get("license_profile")
+                or queue_row.get("license_profile")
+                or pool
+                or "quarantine"
+            )
             rec = canonical_record(raw, text, target_id, license_profile, lic)
             passed += 1
             if execute:
@@ -292,7 +315,11 @@ def process_target(
                         sample_extra={"path": str(ds_path)},
                     )
                 continue
-            datasets = list(dataset_obj.values()) if isinstance(dataset_obj, DatasetDict) else [dataset_obj]
+            datasets = (
+                list(dataset_obj.values())
+                if isinstance(dataset_obj, DatasetDict)
+                else [dataset_obj]
+            )
             for dataset in datasets:
                 for raw in dataset:
                     handle_raw(dict(raw))
@@ -322,9 +349,23 @@ def main(*, defaults: YellowRootDefaults) -> None:
     ap.add_argument("--targets", required=True, help="Path to targets.yaml")
     ap.add_argument("--queue", required=True, help="YELLOW queue JSONL")
     ap.add_argument("--execute", action="store_true", help="Write outputs (default: dry-run)")
-    ap.add_argument("--dataset-root", default=None, help="Override dataset root (raw/screened/_ledger/_pitches/_manifests)")
-    ap.add_argument("--pitch-sample-limit", type=int, default=None, help="Max pitch samples per reason (override)")
-    ap.add_argument("--pitch-text-limit", type=int, default=None, help="Max chars stored in pitch samples (override)")
+    ap.add_argument(
+        "--dataset-root",
+        default=None,
+        help="Override dataset root (raw/screened/_ledger/_pitches/_manifests)",
+    )
+    ap.add_argument(
+        "--pitch-sample-limit",
+        type=int,
+        default=None,
+        help="Max pitch samples per reason (override)",
+    )
+    ap.add_argument(
+        "--pitch-text-limit",
+        type=int,
+        default=None,
+        help="Max chars stored in pitch samples (override)",
+    )
     args = ap.parse_args()
 
     targets_path = Path(args.targets).expanduser().resolve()

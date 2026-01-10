@@ -4,6 +4,7 @@ acquire_worker.py (v2.0)
 
 Thin wrapper that delegates to the spec-driven generic acquire worker.
 """
+
 from __future__ import annotations
 
 import sys

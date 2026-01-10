@@ -4,6 +4,7 @@ Parses NVD CVE 2.0 JSON feeds into normalized JSONL rows aligned to
 `field_schemas.yaml` (schema: nvd_cve_v2.0.0). Reads a downloaded NVD 2.0
 JSON.gz feed and flattens it into a JSONL stream suitable for the catalog.
 """
+
 from __future__ import annotations
 
 import gzip
@@ -28,7 +29,9 @@ def iter_records(feed: dict) -> Iterable[dict]:
             "last_modified": cve.get("lastModified"),
             "cvss_base_score": (metric.get("cvssData") or {}).get("baseScore"),
             "cvss_vector": (metric.get("cvssData") or {}).get("vectorString"),
-            "cwes": ",".join([w.get("value", "") for w in cve.get("weaknesses", []) if w.get("value")]),
+            "cwes": ",".join(
+                [w.get("value", "") for w in cve.get("weaknesses", []) if w.get("value")]
+            ),
             "cpe_matches": _flatten_cpes(cve.get("configurations", [])),
             "description": _primary_description(cve),
             "references": _flatten_refs(cve.get("references", [])),
@@ -83,7 +86,9 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Normalize NVD CVE 2.0 feed into JSONL")
-    parser.add_argument("--input", required=True, type=Path, help="Path to NVD CVE 2.0 .json.gz feed")
+    parser.add_argument(
+        "--input", required=True, type=Path, help="Path to NVD CVE 2.0 .json.gz feed"
+    )
     parser.add_argument("--output", required=True, type=Path, help="Output JSONL.GZ path")
     args = parser.parse_args()
     run(args.input, args.output)

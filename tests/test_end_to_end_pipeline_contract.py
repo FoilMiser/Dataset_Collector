@@ -14,7 +14,9 @@ datasets = pytest.importorskip("datasets")
 Dataset = datasets.Dataset
 
 OUTPUT_CONTRACT_PATH = Path(__file__).resolve().parents[1] / "collector_core" / "output_contract.py"
-OUTPUT_CONTRACT_SPEC = importlib.util.spec_from_file_location("output_contract", OUTPUT_CONTRACT_PATH)
+OUTPUT_CONTRACT_SPEC = importlib.util.spec_from_file_location(
+    "output_contract", OUTPUT_CONTRACT_PATH
+)
 OUTPUT_CONTRACT_MODULE = importlib.util.module_from_spec(OUTPUT_CONTRACT_SPEC)
 OUTPUT_CONTRACT_SPEC.loader.exec_module(OUTPUT_CONTRACT_MODULE)
 

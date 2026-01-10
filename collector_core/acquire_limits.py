@@ -6,45 +6,49 @@ from pathlib import Path
 from typing import Any
 
 # Default allowed content types for downloads
-DEFAULT_ALLOWED_CONTENT_TYPES: frozenset[str] = frozenset({
-    # Text formats
-    "text/plain",
-    "text/csv",
-    "text/html",
-    "text/xml",
-    "application/json",
-    "application/xml",
-    "application/x-yaml",
-    # Archive formats
-    "application/zip",
-    "application/gzip",
-    "application/x-gzip",
-    "application/x-tar",
-    "application/x-bzip2",
-    "application/x-xz",
-    "application/x-7z-compressed",
-    # Data formats
-    "application/pdf",
-    "application/octet-stream",  # Generic binary
-    # Dataset formats
-    "application/x-hdf5",
-    "application/x-netcdf",
-    "application/parquet",
-    # Images (for datasets with image data)
-    "image/png",
-    "image/jpeg",
-    "image/gif",
-    "image/webp",
-    "image/tiff",
-})
+DEFAULT_ALLOWED_CONTENT_TYPES: frozenset[str] = frozenset(
+    {
+        # Text formats
+        "text/plain",
+        "text/csv",
+        "text/html",
+        "text/xml",
+        "application/json",
+        "application/xml",
+        "application/x-yaml",
+        # Archive formats
+        "application/zip",
+        "application/gzip",
+        "application/x-gzip",
+        "application/x-tar",
+        "application/x-bzip2",
+        "application/x-xz",
+        "application/x-7z-compressed",
+        # Data formats
+        "application/pdf",
+        "application/octet-stream",  # Generic binary
+        # Dataset formats
+        "application/x-hdf5",
+        "application/x-netcdf",
+        "application/parquet",
+        # Images (for datasets with image data)
+        "image/png",
+        "image/jpeg",
+        "image/gif",
+        "image/webp",
+        "image/tiff",
+    }
+)
 
 # Blocked content types that should never be downloaded
-BLOCKED_CONTENT_TYPES: frozenset[str] = frozenset({
-    "text/html",  # Often indicates error pages when expecting data
-    "application/javascript",
-    "application/x-javascript",
-    "text/javascript",
-})
+BLOCKED_CONTENT_TYPES: frozenset[str] = frozenset(
+    {
+        "text/html",  # Often indicates error pages when expecting data
+        "application/javascript",
+        "application/x-javascript",
+        "text/javascript",
+    }
+)
 
 # Default download size limits (in bytes)
 DEFAULT_MAX_BYTES_PER_FILE: int = 10 * 1024 * 1024 * 1024  # 10 GB
@@ -150,7 +154,9 @@ class TargetLimitEnforcer:
             )
         return None
 
-    def check_size_hint(self, size_bytes: int | None, file_label: str | None = None) -> dict[str, Any] | None:
+    def check_size_hint(
+        self, size_bytes: int | None, file_label: str | None = None
+    ) -> dict[str, Any] | None:
         if size_bytes is None:
             return None
         if self.max_bytes_per_file is not None and size_bytes > self.max_bytes_per_file:
@@ -161,7 +167,10 @@ class TargetLimitEnforcer:
                 observed=size_bytes,
                 file_label=file_label,
             )
-        if self.max_bytes_per_target is not None and self.bytes_seen + size_bytes > self.max_bytes_per_target:
+        if (
+            self.max_bytes_per_target is not None
+            and self.bytes_seen + size_bytes > self.max_bytes_per_target
+        ):
             return limit_violation(
                 target_id=self.target_id,
                 limit_type="bytes_per_target",
@@ -171,7 +180,9 @@ class TargetLimitEnforcer:
             )
         return None
 
-    def record_bytes(self, size_bytes: int | None, file_label: str | None = None) -> dict[str, Any] | None:
+    def record_bytes(
+        self, size_bytes: int | None, file_label: str | None = None
+    ) -> dict[str, Any] | None:
         if size_bytes is None:
             return None
         self.bytes_seen += size_bytes

@@ -48,6 +48,7 @@ class SecretStr:
     explicitly empty secret and a ``None`` value; both appear as the empty
     string. This behavior is intentional for redaction purposes.
     """
+
     def __init__(self, value: Any) -> None:
         self._value = "" if value is None else str(value)
 

@@ -4,6 +4,7 @@ test_exception_logging.py
 Tests verifying that exception paths emit appropriate log warnings.
 Ensures best-effort behavior while making failures observable.
 """
+
 from __future__ import annotations
 
 import json
@@ -12,9 +13,9 @@ from pathlib import Path
 
 import pytest
 
-from collector_core.utils import sha256_file, coerce_int
-from collector_core.review_queue import load_existing_signoff, load_license_evidence_meta
 from collector_core.pipeline_driver_base import read_review_signoff
+from collector_core.review_queue import load_existing_signoff, load_license_evidence_meta
+from collector_core.utils import coerce_int, sha256_file
 
 
 class TestUtilsExceptionLogging:
@@ -51,9 +52,7 @@ class TestUtilsExceptionLogging:
         assert result is None
         assert "Failed to compute SHA-256 hash" in caplog.text
 
-    def test_coerce_int_logs_debug_on_failure(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_coerce_int_logs_debug_on_failure(self, caplog: pytest.LogCaptureFixture) -> None:
         """coerce_int should log debug when conversion fails."""
         with caplog.at_level(logging.DEBUG, logger="collector_core.utils"):
             result = coerce_int("not_a_number", default=42)

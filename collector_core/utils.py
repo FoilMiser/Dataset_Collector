@@ -4,6 +4,7 @@ collector_core/utils.py
 Shared utility functions for the Dataset Collector.
 Consolidates common operations that were previously duplicated across modules.
 """
+
 from __future__ import annotations
 
 import gzip
@@ -73,10 +74,7 @@ def write_json(path: Path, obj: dict[str, Any], *, indent: int = 2) -> None:
     """Write dict to JSON file atomically."""
     ensure_dir(path.parent)
     tmp_path = path.with_suffix(path.suffix + ".tmp")
-    tmp_path.write_text(
-        json.dumps(obj, indent=indent, ensure_ascii=False) + "\n",
-        encoding="utf-8"
-    )
+    tmp_path.write_text(json.dumps(obj, indent=indent, ensure_ascii=False) + "\n", encoding="utf-8")
     tmp_path.replace(path)
 
 
@@ -158,9 +156,28 @@ def safe_filename(
 
     # Windows reserved names
     reserved = {
-        "CON", "PRN", "AUX", "NUL",
-        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
-        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+        "CON",
+        "PRN",
+        "AUX",
+        "NUL",
+        "COM1",
+        "COM2",
+        "COM3",
+        "COM4",
+        "COM5",
+        "COM6",
+        "COM7",
+        "COM8",
+        "COM9",
+        "LPT1",
+        "LPT2",
+        "LPT3",
+        "LPT4",
+        "LPT5",
+        "LPT6",
+        "LPT7",
+        "LPT8",
+        "LPT9",
     }
     name_upper = s.upper().split(".")[0]
     if name_upper in reserved:
@@ -172,7 +189,7 @@ def safe_filename(
         if "." in s:
             name, ext = s.rsplit(".", 1)
             ext = ext[:10]  # Limit extension length
-            name = name[:max_length - len(ext) - 1]
+            name = name[: max_length - len(ext) - 1]
             s = f"{name}.{ext}"
         else:
             s = s[:max_length]

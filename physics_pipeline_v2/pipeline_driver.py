@@ -5,6 +5,7 @@ pipeline_driver.py (v2.0)
 Thin wrapper that delegates to the spec-driven pipeline factory.
 Includes custom build_row_extras for physics-specific output fields.
 """
+
 from __future__ import annotations
 
 import sys

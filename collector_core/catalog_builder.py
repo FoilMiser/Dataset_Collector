@@ -13,24 +13,16 @@ import argparse
 import gzip
 import json
 import sys
-import time
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from collector_core.__version__ import __version__ as PIPELINE_VERSION
 from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.config_validator import read_yaml
-from collector_core.__version__ import __version__ as PIPELINE_VERSION
-
-
-def utc_now() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-
-
-def ensure_dir(path: Path) -> None:
-    path.mkdir(parents=True, exist_ok=True)
+from collector_core.utils import ensure_dir, utc_now
 
 
 def count_lines(path: Path, max_lines: int = 0) -> int:
@@ -44,7 +36,11 @@ def count_lines(path: Path, max_lines: int = 0) -> int:
 
 
 def file_stats(path: Path) -> dict[str, Any]:
-    return {"name": path.name, "bytes": path.stat().st_size, "lines_estimate": count_lines(path, max_lines=1000)}
+    return {
+        "name": path.name,
+        "bytes": path.stat().st_size,
+        "lines_estimate": count_lines(path, max_lines=1000),
+    }
 
 
 def collect_raw_stats(root: Path, top_n: int) -> dict[str, Any]:
@@ -85,7 +81,9 @@ def collect_raw_stats(root: Path, top_n: int) -> dict[str, Any]:
                 bucket_stats["files"] += pool_stats["files"]
                 bucket_stats["pools"][pool_dir.name] = pool_stats
         stats["buckets"][bucket] = bucket_stats
-    stats["top_targets_by_bytes"] = sorted(top_targets, key=lambda item: item["bytes"], reverse=True)[:top_n]
+    stats["top_targets_by_bytes"] = sorted(
+        top_targets, key=lambda item: item["bytes"], reverse=True
+    )[:top_n]
     return stats
 
 
@@ -135,10 +133,14 @@ def collect_strategy_counts(cfg: dict[str, Any]) -> dict[str, int]:
     return dict(counter)
 
 
-def build_license_pool_summary(raw_stats: dict[str, Any], queue_stats: dict[str, Any]) -> dict[str, Any]:
+def build_license_pool_summary(
+    raw_stats: dict[str, Any], queue_stats: dict[str, Any]
+) -> dict[str, Any]:
     summary: dict[str, Any] = {"green": {}, "yellow": {}, "red": {}}
     for bucket in ["green", "yellow"]:
-        for pool, pool_stats in (raw_stats.get("buckets", {}).get(bucket, {}).get("pools", {}) or {}).items():
+        for pool, pool_stats in (
+            raw_stats.get("buckets", {}).get(bucket, {}).get("pools", {}) or {}
+        ).items():
             summary[bucket][pool] = {
                 "targets": pool_stats.get("targets", 0),
                 "bytes": pool_stats.get("bytes", 0),
@@ -200,9 +202,11 @@ def default_root(pipeline_slug: str | None, suffix: str) -> Path:
 
 
 def build_catalog(cfg: dict[str, Any], pipeline_slug: str | None = None) -> dict[str, Any]:
-    g = (cfg.get("globals", {}) or {})
+    g = cfg.get("globals", {}) or {}
     raw_root = Path(g.get("raw_root", default_root(pipeline_slug, "raw")))
-    screened_root = Path(g.get("screened_yellow_root", default_root(pipeline_slug, "screened_yellow")))
+    screened_root = Path(
+        g.get("screened_yellow_root", default_root(pipeline_slug, "screened_yellow"))
+    )
     combined_root = Path(g.get("combined_root", default_root(pipeline_slug, "combined")))
     ledger_root = Path(g.get("ledger_root", default_root(pipeline_slug, "_ledger")))
     queues_root = Path(g.get("queues_root", default_root(pipeline_slug, "_queues")))

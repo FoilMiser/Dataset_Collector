@@ -295,7 +295,11 @@ def extract_codebase(ctx: WorkerContext) -> dict[str, Any]:
             raw = "\n".join([ln.rstrip() for ln in raw.splitlines()])
 
         lang = detect_language(rel, raw) or "unknown"
-        if ctx.processing.languages_allowlist and lang not in ctx.processing.languages_allowlist and "multi" not in ctx.processing.languages_allowlist:
+        if (
+            ctx.processing.languages_allowlist
+            and lang not in ctx.processing.languages_allowlist
+            and "multi" not in ctx.processing.languages_allowlist
+        ):
             pitched.append({"path": str(rel), "reason": "lang_not_allowlisted", "language": lang})
             continue
 
@@ -318,7 +322,9 @@ def extract_codebase(ctx: WorkerContext) -> dict[str, Any]:
             if flushed:
                 pass
     final_path = sharder.flush()
-    shard_paths = [str(ctx.output_dir / p.name) for p in ctx.output_dir.glob(f"{ctx.sharding.prefix}_*.jsonl*")]
+    shard_paths = [
+        str(ctx.output_dir / p.name) for p in ctx.output_dir.glob(f"{ctx.sharding.prefix}_*.jsonl*")
+    ]
     if final_path and str(final_path) not in shard_paths:
         shard_paths.append(str(final_path))
     manifest = {
@@ -351,7 +357,7 @@ def extract_codebase(ctx: WorkerContext) -> dict[str, Any]:
 
 
 def sharding_from_cfg(cfg: dict[str, Any]) -> ShardingConfig:
-    g = (cfg.get("globals", {}).get("sharding", {}) or {})
+    g = cfg.get("globals", {}).get("sharding", {}) or {}
     return ShardingConfig(
         max_records_per_shard=int(g.get("max_records_per_shard", 50000)),
         compression=str(g.get("compression", "gzip")),
@@ -360,8 +366,8 @@ def sharding_from_cfg(cfg: dict[str, Any]) -> ShardingConfig:
 
 
 def processing_from_cfg(cfg: dict[str, Any], target: dict[str, Any]) -> CodeProcessingConfig:
-    g = (cfg.get("globals", {}).get("code_processing_defaults", {}) or {})
-    t = (target.get("code_processing") or {})
+    g = cfg.get("globals", {}).get("code_processing_defaults", {}) or {}
+    t = target.get("code_processing") or {}
     deny_globs = list(t.get("path_deny_globs") or g.get("path_deny_globs") or [])
     return CodeProcessingConfig(
         max_file_bytes=int(t.get("max_file_bytes", g.get("max_file_bytes", 250000))),
@@ -369,9 +375,13 @@ def processing_from_cfg(cfg: dict[str, Any], target: dict[str, Any]) -> CodeProc
         max_chunk_chars=int(t.get("max_chunk_chars", g.get("max_chunk_chars", 12000))),
         min_chunk_chars=int(t.get("min_chunk_chars", g.get("min_chunk_chars", 200))),
         include_comments=bool(t.get("include_comments", g.get("include_comments", True))),
-        strip_trailing_whitespace=bool(t.get("strip_trailing_whitespace", g.get("strip_trailing_whitespace", True))),
+        strip_trailing_whitespace=bool(
+            t.get("strip_trailing_whitespace", g.get("strip_trailing_whitespace", True))
+        ),
         normalize_newlines=bool(t.get("normalize_newlines", g.get("normalize_newlines", True))),
-        languages_allowlist=list(t.get("languages_allowlist") or g.get("languages_allowlist") or []),
+        languages_allowlist=list(
+            t.get("languages_allowlist") or g.get("languages_allowlist") or []
+        ),
         path_deny_globs=deny_globs,
     )
 
@@ -397,7 +407,12 @@ def run_extraction(
     output_dir: Path | None = None,
     pitches_root: Path | None = None,
 ) -> dict[str, Any]:
-    cfg_wrapper = {"globals": {"code_processing_defaults": processing_defaults or {}, "sharding": sharding or {}}}
+    cfg_wrapper = {
+        "globals": {
+            "code_processing_defaults": processing_defaults or {},
+            "sharding": sharding or {},
+        }
+    }
     processing_cfg = processing_from_cfg(cfg_wrapper, {})
     sharding_cfg = ShardingConfig(
         max_records_per_shard=int((sharding or {}).get("max_records_per_shard", 50000)),
@@ -425,10 +440,17 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--targets", required=False, help="Path to targets_code.yaml")
     ap.add_argument("--target-id", required=True, help="Target id to process")
     ap.add_argument("--input-dir", required=True, help="Path to downloaded payload directory")
-    ap.add_argument("--bucket", default="green", choices=["green", "yellow"], help="Bucket context (secrets policy)")
+    ap.add_argument(
+        "--bucket",
+        default="green",
+        choices=["green", "yellow"],
+        help="Bucket context (secrets policy)",
+    )
     ap.add_argument("--license-profile", default=None, help="License profile for emitted records")
     ap.add_argument("--license-spdx", default=None, help="Resolved SPDX for emitted records")
-    ap.add_argument("--output-dir", default=None, help="Override output dir (default: <input>/shards)")
+    ap.add_argument(
+        "--output-dir", default=None, help="Override output dir (default: <input>/shards)"
+    )
     args = ap.parse_args(argv)
 
     targets_path = Path(args.targets).expanduser().resolve() if args.targets else None
@@ -436,9 +458,18 @@ def main(argv: list[str] | None = None) -> int:
     target_cfg: dict[str, Any] = {}
     if cfg:
         target_cfg = resolve_target(cfg, args.target_id)
-    routing = (target_cfg.get("routing") or target_cfg.get("code_routing") or target_cfg.get("math_routing") or {})
+    routing = (
+        target_cfg.get("routing")
+        or target_cfg.get("code_routing")
+        or target_cfg.get("math_routing")
+        or {}
+    )
     processing_cfg = processing_from_cfg(cfg, target_cfg) if cfg else processing_from_cfg({}, {})
-    shard_cfg = sharding_from_cfg(cfg) if cfg else ShardingConfig(max_records_per_shard=50000, compression="gzip")
+    shard_cfg = (
+        sharding_from_cfg(cfg)
+        if cfg
+        else ShardingConfig(max_records_per_shard=50000, compression="gzip")
+    )
 
     ctx = WorkerContext(
         target_id=args.target_id,
@@ -446,11 +477,14 @@ def main(argv: list[str] | None = None) -> int:
         license_profile=args.license_profile or target_cfg.get("license_profile", "quarantine"),
         license_spdx=args.license_spdx or target_cfg.get("license_evidence", {}).get("spdx_hint"),
         routing=routing,
-        source_url=(target_cfg.get("download", {}) or {}).get("repo_url") or (target_cfg.get("download", {}) or {}).get("url"),
+        source_url=(target_cfg.get("download", {}) or {}).get("repo_url")
+        or (target_cfg.get("download", {}) or {}).get("url"),
         processing=processing_cfg,
         sharding=shard_cfg,
         input_dir=Path(args.input_dir).expanduser().resolve(),
-        output_dir=Path(args.output_dir).expanduser().resolve() if args.output_dir else Path(args.input_dir).expanduser().resolve() / "shards",
+        output_dir=Path(args.output_dir).expanduser().resolve()
+        if args.output_dir
+        else Path(args.input_dir).expanduser().resolve() / "shards",
         pitches_root=Path(cfg.get("globals", {}).get("pitches_root")) if cfg else None,
     )
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
-import hashlib
 import html
 import ipaddress
 import json
@@ -18,26 +17,14 @@ from typing import Any
 import requests
 
 from collector_core.__version__ import __version__ as VERSION
-from collector_core.utils import (
-    utc_now,
-    ensure_dir,
-    sha256_bytes,
-    sha256_file,
-    normalize_whitespace,
-    lower,
-    write_json,
-    write_jsonl,
-    contains_any,
-    coerce_int,
-)
 from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.companion_files import read_license_maps, resolve_companion_paths
 from collector_core.config_validator import read_yaml
+
 # Denylist functions extracted to denylist_matcher.py for modularity - re-exported for compatibility
 from collector_core.denylist_matcher import (
     build_denylist_haystack,
     denylist_hits,
-    extract_domain,
     load_denylist,
 )
 from collector_core.dependencies import _try_import
@@ -45,6 +32,18 @@ from collector_core.exceptions import ConfigValidationError
 from collector_core.logging_config import add_logging_args, configure_logging
 from collector_core.network_utils import _with_retries
 from collector_core.secrets import REDACTED, SecretStr, redact_headers
+from collector_core.utils import (
+    coerce_int,
+    contains_any,
+    ensure_dir,
+    lower,
+    normalize_whitespace,
+    sha256_bytes,
+    sha256_file,
+    utc_now,
+    write_json,
+    write_jsonl,
+)
 
 logger = logging.getLogger(__name__)
 PdfReader = _try_import("pypdf", "PdfReader")
@@ -263,7 +262,9 @@ def load_license_map(paths: Path | list[Path]) -> LicenseMap:
     )
 
 
-def resolve_retry_config(args: argparse.Namespace, globals_cfg: dict[str, Any]) -> tuple[int, float]:
+def resolve_retry_config(
+    args: argparse.Namespace, globals_cfg: dict[str, Any]
+) -> tuple[int, float]:
     retry_max_env = os.getenv("PIPELINE_RETRY_MAX")
     retry_backoff_env = os.getenv("PIPELINE_RETRY_BACKOFF")
     retry_cfg = globals_cfg.get("retry", {}) or {}
@@ -315,7 +316,9 @@ def redact_headers_for_manifest(headers: dict[str, str] | None) -> dict[str, Any
     return _scrub_secret_values(redact_headers(headers))
 
 
-def resolve_output_roots(args: argparse.Namespace, globals_cfg: dict[str, Any]) -> tuple[Path, Path]:
+def resolve_output_roots(
+    args: argparse.Namespace, globals_cfg: dict[str, Any]
+) -> tuple[Path, Path]:
     dataset_root = resolve_dataset_root(args.dataset_root)
     manifests_override = args.manifests_root or args.out_manifests
     queues_override = args.queues_root or args.out_queues
@@ -324,7 +327,9 @@ def resolve_output_roots(args: argparse.Namespace, globals_cfg: dict[str, Any]) 
     elif dataset_root:
         manifests_root = (dataset_root / "_manifests").resolve()
     else:
-        manifests_root = Path(globals_cfg.get("manifests_root", "./manifests")).expanduser().resolve()
+        manifests_root = (
+            Path(globals_cfg.get("manifests_root", "./manifests")).expanduser().resolve()
+        )
     if queues_override:
         queues_root = Path(queues_override).expanduser().resolve()
     elif dataset_root:
@@ -341,10 +346,16 @@ def load_driver_config(args: argparse.Namespace) -> DriverConfig:
     globals_cfg = targets_cfg.get("globals", {}) or {}
     retry_max, retry_backoff = resolve_retry_config(args, globals_cfg)
     companion = targets_cfg.get("companion_files", {}) or {}
-    license_map_value = args.license_map if args.license_map is not None else companion.get("license_map")
-    license_map_paths = resolve_companion_paths(targets_path, license_map_value, "./license_map.yaml")
+    license_map_value = (
+        args.license_map if args.license_map is not None else companion.get("license_map")
+    )
+    license_map_paths = resolve_companion_paths(
+        targets_path, license_map_value, "./license_map.yaml"
+    )
     license_map = load_license_map(license_map_paths)
-    denylist_paths = resolve_companion_paths(targets_path, companion.get("denylist"), "./denylist.yaml")
+    denylist_paths = resolve_companion_paths(
+        targets_path, companion.get("denylist"), "./denylist.yaml"
+    )
     denylist = load_denylist(denylist_paths)
     manifests_root, queues_root = resolve_output_roots(args, globals_cfg)
     ensure_dir(manifests_root)
@@ -414,7 +425,12 @@ def apply_review_gates(
         if eff_bucket == "GREEN":
             return "YELLOW"
         return eff_bucket
-    if review_status == "approved" and promote_to == "GREEN" and not restriction_hits and eff_bucket != "RED":
+    if (
+        review_status == "approved"
+        and promote_to == "GREEN"
+        and not restriction_hits
+        and eff_bucket != "RED"
+    ):
         return "GREEN"
     return eff_bucket
 
@@ -444,7 +460,9 @@ def resolve_effective_bucket(
     eff_bucket = apply_denylist_bucket(denylist_hits, eff_bucket)
     if evidence.no_fetch_missing_evidence and eff_bucket == "GREEN":
         eff_bucket = "YELLOW"
-    return apply_review_gates(eff_bucket, review_required, review_status, promote_to, restriction_hits)
+    return apply_review_gates(
+        eff_bucket, review_required, review_status, promote_to, restriction_hits
+    )
 
 
 def apply_yellow_signoff_requirement(
@@ -453,7 +471,11 @@ def apply_yellow_signoff_requirement(
     review_required: bool,
     require_yellow_signoff: bool,
 ) -> bool:
-    if require_yellow_signoff and eff_bucket == "YELLOW" and review_status not in {"approved", "rejected"}:
+    if (
+        require_yellow_signoff
+        and eff_bucket == "YELLOW"
+        and review_status not in {"approved", "rejected"}
+    ):
         return True
     return review_required
 
@@ -747,14 +769,21 @@ def apply_normalized_hash_fallback(
     return normalized_hash
 
 
-def compute_file_hashes(path: Path, evidence: dict[str, Any] | None = None) -> tuple[str | None, str | None]:
+def compute_file_hashes(
+    path: Path, evidence: dict[str, Any] | None = None
+) -> tuple[str | None, str | None]:
     raw_hash = sha256_file(path)
     extracted = extract_text_from_path(path, evidence)
     extraction_failed = bool(
         evidence
         and (evidence.get("text_extraction_failed") or evidence.get("pdf_text_extraction_failed"))
     )
-    if not extraction_failed and evidence is None and path.suffix.lower() == ".pdf" and PdfReader is None:
+    if (
+        not extraction_failed
+        and evidence is None
+        and path.suffix.lower() == ".pdf"
+        and PdfReader is None
+    ):
         extraction_failed = True
     normalized_hash = None
     if not extraction_failed:
@@ -913,7 +942,11 @@ def generate_dry_run_report(
             ]
         )
         for r in yellow_rows[:20]:
-            reason = "record-level filtering" if r.get("license_profile") == "record_level" else "manual review"
+            reason = (
+                "record-level filtering"
+                if r.get("license_profile") == "record_level"
+                else "manual review"
+            )
             if r.get("restriction_hits"):
                 reason = f"restriction phrase: {r['restriction_hits'][0]}"
             lines.append(f"  ⚠ {r['id']}: {r['name'][:50]}")
@@ -1020,7 +1053,9 @@ class BasePipelineDriver:
             "domain": domain if domain is not None else self.DEFAULT_ROUTING.get("domain"),
             "category": category if category is not None else self.DEFAULT_ROUTING.get("category"),
             "level": level if level is not None else self.DEFAULT_ROUTING.get("level"),
-            "granularity": granularity if granularity is not None else self.DEFAULT_ROUTING.get("granularity"),
+            "granularity": granularity
+            if granularity is not None
+            else self.DEFAULT_ROUTING.get("granularity"),
             "confidence": confidence,
             "reason": reason,
         }
@@ -1041,7 +1076,9 @@ class BasePipelineDriver:
             "granularity": chosen.get("granularity"),
         }
 
-    def build_evaluation_extras(self, target: dict[str, Any], routing: dict[str, Any]) -> dict[str, Any]:
+    def build_evaluation_extras(
+        self, target: dict[str, Any], routing: dict[str, Any]
+    ) -> dict[str, Any]:
         extras: dict[str, Any] = {}
         for spec in self.ROUTING_BLOCKS:
             extras[spec.name] = self.build_routing_block(target, spec)
@@ -1061,7 +1098,12 @@ class BasePipelineDriver:
         allow_private_hosts: bool = False,
     ) -> tuple[bytes | None, str | None, dict[str, Any]]:
         """Fetch URL with retry and exponential backoff."""
-        meta: dict[str, Any] = {"retries": 0, "errors": [], "timeout": timeout_s, "max_bytes": max_bytes}
+        meta: dict[str, Any] = {
+            "retries": 0,
+            "errors": [],
+            "timeout": timeout_s,
+            "max_bytes": max_bytes,
+        }
         allowed, reason = validate_evidence_url(url, allow_private_hosts)
         if not allowed:
             meta["blocked_url"] = url
@@ -1205,7 +1247,9 @@ class BasePipelineDriver:
             try:
                 existing_meta = json.loads(meta_path.read_text(encoding="utf-8"))
             except Exception:
-                logger.warning("Failed to read existing evidence meta from %s", meta_path, exc_info=True)
+                logger.warning(
+                    "Failed to read existing evidence meta from %s", meta_path, exc_info=True
+                )
                 existing_meta = {}
         previous_normalized_digest = existing_meta.get("sha256_normalized_text")
         if previous_normalized_digest is None and existing_path:
@@ -1372,7 +1416,9 @@ class BasePipelineDriver:
                 results.red_rows.append(row)
         return results
 
-    def prepare_target_context(self, target: dict[str, Any], cfg: DriverConfig) -> tuple[TargetContext, list[dict[str, Any]]]:
+    def prepare_target_context(
+        self, target: dict[str, Any], cfg: DriverConfig
+    ) -> tuple[TargetContext, list[dict[str, Any]]]:
         tid, name, profile, enabled, warnings = build_target_identity(target, cfg.license_map)
         spdx_hint, evidence_url = extract_evidence_fields(target)
         download_cfg = target.get("download", {}) or {}
@@ -1387,7 +1433,9 @@ class BasePipelineDriver:
         signoff = read_review_signoff(target_manifest_dir)
         review_status = str(signoff.get("status", "") or "").lower()
         promote_to = str(signoff.get("promote_to", "") or "").upper()
-        dl_hits = denylist_hits(cfg.denylist, build_denylist_haystack(tid, name, evidence_url, download_urls, target))
+        dl_hits = denylist_hits(
+            cfg.denylist, build_denylist_haystack(tid, name, evidence_url, download_urls, target)
+        )
         routing = self.resolve_routing_fields(target)
         split_group_id = str(target.get("split_group_id", "") or tid)
         ctx = TargetContext(
@@ -1411,14 +1459,20 @@ class BasePipelineDriver:
         )
         return ctx, warnings
 
-    def classify_target(self, ctx: TargetContext, cfg: DriverConfig) -> tuple[dict[str, Any], dict[str, Any]]:
+    def classify_target(
+        self, ctx: TargetContext, cfg: DriverConfig
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
         evidence = self.fetch_evidence(ctx, cfg)
         review_status = ctx.review_status
         promote_to = ctx.promote_to
         review_required = ctx.review_required
-        evidence_raw_sha = evidence.snapshot.get("sha256_raw_bytes") or evidence.snapshot.get("sha256")
+        evidence_raw_sha = evidence.snapshot.get("sha256_raw_bytes") or evidence.snapshot.get(
+            "sha256"
+        )
         evidence_normalized_sha = evidence.snapshot.get("sha256_normalized_text")
-        signoff_raw_sha = ctx.signoff.get("license_evidence_sha256_raw_bytes") or ctx.signoff.get("license_evidence_sha256")
+        signoff_raw_sha = ctx.signoff.get("license_evidence_sha256_raw_bytes") or ctx.signoff.get(
+            "license_evidence_sha256"
+        )
         signoff_normalized_sha = ctx.signoff.get("license_evidence_sha256_normalized_text")
         raw_mismatch, normalized_mismatch, cosmetic_change = compute_signoff_mismatches(
             signoff_raw_sha=signoff_raw_sha,
@@ -1516,7 +1570,9 @@ class BasePipelineDriver:
                     "fetched_at_utc": utc_now(),
                     "offline_mode": True,
                 }
-                raw_hash, normalized_hash = compute_file_hashes(existing_evidence_path, evidence_snapshot)
+                raw_hash, normalized_hash = compute_file_hashes(
+                    existing_evidence_path, evidence_snapshot
+                )
                 evidence_snapshot.update(
                     {
                         "sha256": raw_hash,
@@ -1550,10 +1606,16 @@ class BasePipelineDriver:
         out_pool: str,
     ) -> dict[str, Any]:
         signoff_evidence_sha256 = (ctx.signoff or {}).get("license_evidence_sha256")
-        signoff_evidence_sha256_raw = (ctx.signoff or {}).get("license_evidence_sha256_raw_bytes") or signoff_evidence_sha256
-        signoff_evidence_sha256_normalized = (ctx.signoff or {}).get("license_evidence_sha256_normalized_text")
+        signoff_evidence_sha256_raw = (ctx.signoff or {}).get(
+            "license_evidence_sha256_raw_bytes"
+        ) or signoff_evidence_sha256
+        signoff_evidence_sha256_normalized = (ctx.signoff or {}).get(
+            "license_evidence_sha256_normalized_text"
+        )
         current_evidence_sha256 = evidence.snapshot.get("sha256")
-        current_evidence_sha256_raw = evidence.snapshot.get("sha256_raw_bytes") or current_evidence_sha256
+        current_evidence_sha256_raw = (
+            evidence.snapshot.get("sha256_raw_bytes") or current_evidence_sha256
+        )
         current_evidence_sha256_normalized = evidence.snapshot.get("sha256_normalized_text")
         raw_mismatch, normalized_mismatch, cosmetic_change = compute_signoff_mismatches(
             signoff_raw_sha=signoff_evidence_sha256_raw,
@@ -1601,7 +1663,9 @@ class BasePipelineDriver:
             "signoff_is_stale": signoff_is_stale,
             "signoff_cosmetic_change": cosmetic_change,
             "evidence_raw_changed": evidence.snapshot.get("raw_changed_from_previous"),
-            "evidence_normalized_changed": evidence.snapshot.get("normalized_changed_from_previous"),
+            "evidence_normalized_changed": evidence.snapshot.get(
+                "normalized_changed_from_previous"
+            ),
             "evidence_cosmetic_change": evidence.snapshot.get("cosmetic_change"),
             "download": ctx.target.get("download", {}),
             "build": ctx.target.get("build", {}),
@@ -1630,10 +1694,16 @@ class BasePipelineDriver:
         out_pool: str,
     ) -> dict[str, Any]:
         signoff_evidence_sha256 = (ctx.signoff or {}).get("license_evidence_sha256")
-        signoff_evidence_sha256_raw = (ctx.signoff or {}).get("license_evidence_sha256_raw_bytes") or signoff_evidence_sha256
-        signoff_evidence_sha256_normalized = (ctx.signoff or {}).get("license_evidence_sha256_normalized_text")
+        signoff_evidence_sha256_raw = (ctx.signoff or {}).get(
+            "license_evidence_sha256_raw_bytes"
+        ) or signoff_evidence_sha256
+        signoff_evidence_sha256_normalized = (ctx.signoff or {}).get(
+            "license_evidence_sha256_normalized_text"
+        )
         current_evidence_sha256 = evidence.snapshot.get("sha256")
-        current_evidence_sha256_raw = evidence.snapshot.get("sha256_raw_bytes") or current_evidence_sha256
+        current_evidence_sha256_raw = (
+            evidence.snapshot.get("sha256_raw_bytes") or current_evidence_sha256
+        )
         current_evidence_sha256_normalized = evidence.snapshot.get("sha256_normalized_text")
         raw_mismatch, normalized_mismatch, cosmetic_change = compute_signoff_mismatches(
             signoff_raw_sha=signoff_evidence_sha256_raw,
@@ -1679,7 +1749,9 @@ class BasePipelineDriver:
             "signoff_is_stale": signoff_is_stale,
             "signoff_cosmetic_change": cosmetic_change,
             "evidence_raw_changed": evidence.snapshot.get("raw_changed_from_previous"),
-            "evidence_normalized_changed": evidence.snapshot.get("normalized_changed_from_previous"),
+            "evidence_normalized_changed": evidence.snapshot.get(
+                "normalized_changed_from_previous"
+            ),
             "evidence_cosmetic_change": evidence.snapshot.get("cosmetic_change"),
             "output_pool": out_pool,
             "routing_subject": ctx.routing.get("subject"),
@@ -1763,9 +1835,19 @@ class BasePipelineDriver:
             default=None,
             help="Path to license_map.yaml (defaults to companion_files.license_map)",
         )
-        ap.add_argument("--dataset-root", default=None, help="Override dataset root (sets manifests/queues defaults)")
-        ap.add_argument("--manifests-root", default=None, help="Override manifests_root (alias: --out-manifests)")
-        ap.add_argument("--queues-root", default=None, help="Override queues_root (alias: --out-queues)")
+        ap.add_argument(
+            "--dataset-root",
+            default=None,
+            help="Override dataset root (sets manifests/queues defaults)",
+        )
+        ap.add_argument(
+            "--manifests-root",
+            default=None,
+            help="Override manifests_root (alias: --out-manifests)",
+        )
+        ap.add_argument(
+            "--queues-root", default=None, help="Override queues_root (alias: --out-queues)"
+        )
         ap.add_argument("--out-manifests", default=None, help=argparse.SUPPRESS)
         ap.add_argument("--out-queues", default=None, help=argparse.SUPPRESS)
         ap.add_argument(
@@ -1773,8 +1855,12 @@ class BasePipelineDriver:
             action="store_true",
             help="Do not fetch evidence URLs (offline mode - v0.9: forces YELLOW if no snapshot)",
         )
-        ap.add_argument("--retry-max", type=int, default=None, help="Max retries for evidence fetching")
-        ap.add_argument("--retry-backoff", type=float, default=None, help="Backoff base for evidence fetching")
+        ap.add_argument(
+            "--retry-max", type=int, default=None, help="Max retries for evidence fetching"
+        )
+        ap.add_argument(
+            "--retry-backoff", type=float, default=None, help="Backoff base for evidence fetching"
+        )
         ap.add_argument("--max-retries", type=int, default=None, help=argparse.SUPPRESS)
         ap.add_argument(
             "--min-license-confidence",

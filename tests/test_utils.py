@@ -1,29 +1,25 @@
 """Tests for collector_core.utils module."""
+
 from __future__ import annotations
 
-import gzip
-import json
 from pathlib import Path
 
-import pytest
-
 from collector_core.utils import (
-    utc_now,
-    ensure_dir,
-    sha256_bytes,
-    sha256_text,
-    sha256_file,
-    normalize_whitespace,
-    lower,
-    read_json,
-    write_json,
-    read_jsonl,
-    read_jsonl_list,
-    write_jsonl,
     append_jsonl,
-    safe_filename,
-    contains_any,
     coerce_int,
+    contains_any,
+    ensure_dir,
+    lower,
+    normalize_whitespace,
+    read_json,
+    read_jsonl_list,
+    safe_filename,
+    sha256_bytes,
+    sha256_file,
+    sha256_text,
+    utc_now,
+    write_json,
+    write_jsonl,
 )
 
 
@@ -140,7 +136,11 @@ class TestJsonlIO:
 
 class TestSafeFilename:
     def test_replaces_special_chars(self):
-        assert safe_filename("hello world!@#") == "hello_world_"
+        # Only dangerous filesystem chars are replaced (/<>:"|?*\x00)
+        # !@# are valid filename chars on most systems
+        assert safe_filename("hello world") == "hello_world"
+        assert safe_filename("file<name>") == "file_name_"
+        assert safe_filename("path/to") == "path_to"
 
     def test_truncates(self):
         result = safe_filename("a" * 300, max_length=10)

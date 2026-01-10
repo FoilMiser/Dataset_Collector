@@ -34,25 +34,23 @@ Signoff file schema (see collector_core.__version__.__schema_version__):
   "reviewed_at_utc": "YYYY-MM-DDTHH:MM:SSZ"
 }
 """
+
 from __future__ import annotations
 
 import argparse
 import csv
 import json
 import logging
-import time
 from pathlib import Path
 from typing import Any
 
 from collector_core.__version__ import __version__ as TOOL_VERSION
 from collector_core.config_validator import read_yaml
 from collector_core.logging_config import add_logging_args, configure_logging
+from collector_core.utils import read_jsonl_list as read_jsonl
+from collector_core.utils import utc_now, write_json
 
 logger = logging.getLogger(__name__)
-
-
-def utc_now() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
 def pipeline_slug_from_id(pipeline_id: str | None) -> str | None:
@@ -105,29 +103,6 @@ def resolve_default_queue(pipeline_slug: str | None, cfg: dict[str, Any]) -> str
     if pipeline_slug:
         return f"/data/{pipeline_slug}/_queues/yellow_pipeline.jsonl"
     return "/data/_queues/yellow_pipeline.jsonl"
-
-
-def read_jsonl(path: Path) -> list[dict[str, Any]]:
-    if not path.exists():
-        return []
-    rows = []
-    with path.open("r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                rows.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
-    return rows
-
-
-def write_json(path: Path, obj: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = Path(f"{path}.tmp")
-    tmp_path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    tmp_path.replace(path)
 
 
 def load_existing_signoff(manifest_dir: Path) -> dict[str, Any]:
@@ -305,24 +280,32 @@ def cmd_export(args: argparse.Namespace) -> int:
         status = str(signoff.get("status", "") or "").lower()
 
         if status in {"approved", "rejected", "deferred"}:
-            reviewed.append({
-                "target_id": r.get("id", ""),
-                "name": r.get("name", ""),
-                "license_profile": r.get("license_profile", ""),
-                "resolved_spdx": r.get("resolved_spdx", ""),
-                "license_evidence_url": r.get("license_evidence_url", ""),
-                "license_evidence_sha256_raw_bytes": signoff.get("license_evidence_sha256_raw_bytes", ""),
-                "license_evidence_sha256_normalized_text": signoff.get("license_evidence_sha256_normalized_text", ""),
-                "status": status,
-                "reviewer": signoff.get("reviewer", ""),
-                "reviewer_contact": signoff.get("reviewer_contact", ""),
-                "reason": signoff.get("reason", ""),
-                "promote_to": signoff.get("promote_to", ""),
-                "constraints": signoff.get("constraints", ""),
-                "notes": signoff.get("notes", ""),
-                "evidence_links_checked": ", ".join(signoff.get("evidence_links_checked", []) or []),
-                "reviewed_at_utc": signoff.get("reviewed_at_utc", ""),
-            })
+            reviewed.append(
+                {
+                    "target_id": r.get("id", ""),
+                    "name": r.get("name", ""),
+                    "license_profile": r.get("license_profile", ""),
+                    "resolved_spdx": r.get("resolved_spdx", ""),
+                    "license_evidence_url": r.get("license_evidence_url", ""),
+                    "license_evidence_sha256_raw_bytes": signoff.get(
+                        "license_evidence_sha256_raw_bytes", ""
+                    ),
+                    "license_evidence_sha256_normalized_text": signoff.get(
+                        "license_evidence_sha256_normalized_text", ""
+                    ),
+                    "status": status,
+                    "reviewer": signoff.get("reviewer", ""),
+                    "reviewer_contact": signoff.get("reviewer_contact", ""),
+                    "reason": signoff.get("reason", ""),
+                    "promote_to": signoff.get("promote_to", ""),
+                    "constraints": signoff.get("constraints", ""),
+                    "notes": signoff.get("notes", ""),
+                    "evidence_links_checked": ", ".join(
+                        signoff.get("evidence_links_checked", []) or []
+                    ),
+                    "reviewed_at_utc": signoff.get("reviewed_at_utc", ""),
+                }
+            )
 
     if not reviewed:
         logger.info("No reviewed targets found.")
@@ -334,7 +317,9 @@ def cmd_export(args: argparse.Namespace) -> int:
     if fmt == "json":
         out_path.parent.mkdir(parents=True, exist_ok=True)
         tmp_path = Path(f"{out_path}.tmp")
-        tmp_path.write_text(json.dumps(reviewed, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        tmp_path.write_text(
+            json.dumps(reviewed, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
         tmp_path.replace(out_path)
     elif fmt == "csv":
         out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -371,16 +356,30 @@ def build_parser() -> argparse.ArgumentParser:
 
     # v0.9: Extended signoff fields for approve/reject/defer
     def add_extended_args(parser: argparse.ArgumentParser) -> None:
-        parser.add_argument("--reviewer-contact", dest="reviewer_contact", default="", help="Reviewer email/contact (optional)")
-        parser.add_argument("--evidence-links", dest="evidence_links", default="", help="Comma-separated URLs of checked evidence (optional)")
-        parser.add_argument("--constraints", default="", help="Attribution or usage constraints (optional)")
+        parser.add_argument(
+            "--reviewer-contact",
+            dest="reviewer_contact",
+            default="",
+            help="Reviewer email/contact (optional)",
+        )
+        parser.add_argument(
+            "--evidence-links",
+            dest="evidence_links",
+            default="",
+            help="Comma-separated URLs of checked evidence (optional)",
+        )
+        parser.add_argument(
+            "--constraints", default="", help="Attribution or usage constraints (optional)"
+        )
         parser.add_argument("--notes", default="", help="Additional notes (optional)")
 
     p_app = sub.add_parser("approve", help="Approve a YELLOW item (writes review_signoff.json)")
     p_app.add_argument("--target", required=True)
     p_app.add_argument("--reviewer", required=True)
     p_app.add_argument("--reason", required=True)
-    p_app.add_argument("--promote-to", dest="promote_to", default="", help="Optional: set promote_to=GREEN")
+    p_app.add_argument(
+        "--promote-to", dest="promote_to", default="", help="Optional: set promote_to=GREEN"
+    )
     add_extended_args(p_app)
 
     p_rej = sub.add_parser("reject", help="Reject a YELLOW item (forces RED in next classify pass)")
@@ -396,9 +395,13 @@ def build_parser() -> argparse.ArgumentParser:
     add_extended_args(p_def)
 
     # v0.9: NEW export command
-    p_export = sub.add_parser("export", help="Export reviewed targets to CSV/JSON report (NEW in v0.9)")
+    p_export = sub.add_parser(
+        "export", help="Export reviewed targets to CSV/JSON report (NEW in v0.9)"
+    )
     p_export.add_argument("--output", required=True, help="Output file path")
-    p_export.add_argument("--format", default="csv", choices=["csv", "json"], help="Output format (default: csv)")
+    p_export.add_argument(
+        "--format", default="csv", choices=["csv", "json"], help="Output format (default: csv)"
+    )
 
     return ap
 

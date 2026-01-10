@@ -4,6 +4,7 @@ pipeline_driver.py (v2.0)
 
 Thin wrapper that delegates to the spec-driven pipeline factory.
 """
+
 from __future__ import annotations
 
 import sys

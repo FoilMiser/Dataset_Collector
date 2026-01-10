@@ -19,7 +19,6 @@ import gzip
 import hashlib
 import json
 import re
-import time
 from collections import Counter
 from collections.abc import Iterable, Iterator
 from pathlib import Path
@@ -30,19 +29,12 @@ from datasets import DatasetDict, load_from_disk
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.config_validator import read_yaml
+from collector_core.utils import ensure_dir, read_jsonl, utc_now, write_json, write_jsonl
 from collector_core.yellow_screen_common import (
     PitchConfig,
     resolve_dataset_root,
     resolve_pitch_config,
 )
-
-
-def utc_now() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-
-
-def ensure_dir(path: Path) -> None:
-    path.mkdir(parents=True, exist_ok=True)
 
 
 def sha256_text(text: str) -> str:
@@ -56,33 +48,6 @@ def sha256_obj(obj: Any) -> str:
     except Exception:
         blob = str(obj)
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
-
-
-def read_jsonl(path: Path) -> Iterator[dict[str, Any]]:
-    opener = gzip.open if path.suffix == ".gz" else open
-    with opener(path, "rt", encoding="utf-8", errors="ignore") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                try:
-                    yield json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-
-
-def write_json(path: Path, obj: dict[str, Any]) -> None:
-    ensure_dir(path.parent)
-    tmp_path = Path(f"{path}.tmp")
-    tmp_path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    tmp_path.replace(path)
-
-
-def write_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
-    ensure_dir(path.parent)
-    opener = gzip.open if path.suffix == ".gz" else open
-    with opener(path, "wt", encoding="utf-8") as f:
-        for row in rows:
-            f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
 def append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
@@ -173,11 +138,15 @@ def load_signoff(manifest_dir: Path) -> dict[str, Any] | None:
 def resolve_roots(cfg: dict[str, Any], dataset_root: Path | None = None) -> Roots:
     dataset_root = dataset_root or resolve_dataset_root()
     default_raw = dataset_root / "raw" if dataset_root else Path("/data/kg_nav/raw")
-    default_screened = dataset_root / "screened_yellow" if dataset_root else Path("/data/kg_nav/screened_yellow")
-    default_manifests = dataset_root / "_manifests" if dataset_root else Path("/data/kg_nav/_manifests")
+    default_screened = (
+        dataset_root / "screened_yellow" if dataset_root else Path("/data/kg_nav/screened_yellow")
+    )
+    default_manifests = (
+        dataset_root / "_manifests" if dataset_root else Path("/data/kg_nav/_manifests")
+    )
     default_ledger = dataset_root / "_ledger" if dataset_root else Path("/data/kg_nav/_ledger")
     default_pitches = dataset_root / "_pitches" if dataset_root else Path("/data/kg_nav/_pitches")
-    g = (cfg.get("globals", {}) or {})
+    g = cfg.get("globals", {}) or {}
     return Roots(
         raw_root=Path(g.get("raw_root", default_raw)).expanduser().resolve(),
         screened_root=Path(g.get("screened_yellow_root", default_screened)).expanduser().resolve(),
@@ -188,11 +157,11 @@ def resolve_roots(cfg: dict[str, Any], dataset_root: Path | None = None) -> Root
 
 
 def merge_screening_config(cfg: dict[str, Any], target: dict[str, Any]) -> ScreeningConfig:
-    g = (cfg.get("globals", {}) or {})
-    g_screen = (g.get("screening", {}) or {})
-    g_canon = (g.get("canonicalize", {}) or {})
-    t_screen = (target.get("yellow_screen", {}) or {})
-    t_canon = (target.get("canonicalize", {}) or {})
+    g = cfg.get("globals", {}) or {}
+    g_screen = g.get("screening", {}) or {}
+    g_canon = g.get("canonicalize", {}) or {}
+    t_screen = target.get("yellow_screen", {}) or {}
+    t_canon = target.get("canonicalize", {}) or {}
     return ScreeningConfig(
         text_fields=list(
             t_canon.get("text_field_candidates")
@@ -201,17 +170,32 @@ def merge_screening_config(cfg: dict[str, Any], target: dict[str, Any]) -> Scree
             or g_screen.get("text_field_candidates")
             or ["text"]
         ),
-        license_fields=list(t_screen.get("record_license_field_candidates") or g_screen.get("record_license_field_candidates") or ["license", "license_spdx"]),
+        license_fields=list(
+            t_screen.get("record_license_field_candidates")
+            or g_screen.get("record_license_field_candidates")
+            or ["license", "license_spdx"]
+        ),
         allow_spdx=list(t_screen.get("allow_spdx") or g_screen.get("allow_spdx") or []),
-        deny_phrases=[p.lower() for p in (t_screen.get("deny_phrases") or g_screen.get("deny_phrases") or [])],
-        require_record_license=bool(t_screen.get("require_record_license", g_screen.get("require_record_license", False))),
+        deny_phrases=[
+            p.lower() for p in (t_screen.get("deny_phrases") or g_screen.get("deny_phrases") or [])
+        ],
+        require_record_license=bool(
+            t_screen.get("require_record_license", g_screen.get("require_record_license", False))
+        ),
         min_chars=int(t_screen.get("min_chars", g_screen.get("min_chars", 200))),
-        max_chars=int(t_canon.get("max_chars", t_screen.get("max_chars", g_canon.get("max_chars", g_screen.get("max_chars", 12000))))),
+        max_chars=int(
+            t_canon.get(
+                "max_chars",
+                t_screen.get(
+                    "max_chars", g_canon.get("max_chars", g_screen.get("max_chars", 12000))
+                ),
+            )
+        ),
     )
 
 
 def sharding_cfg(cfg: dict[str, Any], prefix: str) -> ShardingConfig:
-    g = (cfg.get("globals", {}).get("sharding", {}) or {})
+    g = cfg.get("globals", {}).get("sharding", {}) or {}
     return ShardingConfig(
         max_records_per_shard=int(g.get("max_records_per_shard", 50000)),
         compression=str(g.get("compression", "gzip")),
@@ -227,6 +211,7 @@ def find_text(row: dict[str, Any], candidates: list[str]) -> str | None:
                 val = "\n".join(map(str, val))
             return str(val)
     return None
+
 
 def extract_text(row: dict[str, Any], candidates: list[str]) -> str | None:
     if row.get("text"):
@@ -247,8 +232,6 @@ def extract_text(row: dict[str, Any], candidates: list[str]) -> str | None:
         return str(row)
 
 
-
-
 def find_license(row: dict[str, Any], candidates: list[str]) -> str | None:
     for k in candidates:
         if k in row and row[k]:
@@ -256,7 +239,9 @@ def find_license(row: dict[str, Any], candidates: list[str]) -> str | None:
     return None
 
 
-def coalesce_routing(raw: dict[str, Any], queue_routing: dict[str, Any], target_routing: dict[str, Any]) -> dict[str, Any]:
+def coalesce_routing(
+    raw: dict[str, Any], queue_routing: dict[str, Any], target_routing: dict[str, Any]
+) -> dict[str, Any]:
     return (raw.get("routing") or raw.get("route") or queue_routing or target_routing or {}).copy()
 
 
@@ -285,7 +270,9 @@ def scrub_pii_fields(obj: dict[str, Any]) -> dict[str, Any]:
     return cleaned
 
 
-def adapter_wikidata_truthy_edges(raw: dict[str, Any], routing: dict[str, Any]) -> dict[str, Any] | None:
+def adapter_wikidata_truthy_edges(
+    raw: dict[str, Any], routing: dict[str, Any]
+) -> dict[str, Any] | None:
     subj = raw.get("subject") or raw.get("s")
     pred = raw.get("predicate") or raw.get("p")
     obj = raw.get("object") or raw.get("o")
@@ -296,43 +283,79 @@ def adapter_wikidata_truthy_edges(raw: dict[str, Any], routing: dict[str, Any]) 
     return {"record_id": rid, "edge": edge, "routing": routing}
 
 
-def adapter_openalex_minimal_graph(raw: dict[str, Any], routing: dict[str, Any]) -> dict[str, Any] | None:
+def adapter_openalex_minimal_graph(
+    raw: dict[str, Any], routing: dict[str, Any]
+) -> dict[str, Any] | None:
     if not raw:
         return None
-    payload_keys = ["id", "doi", "ids", "referenced_works", "related_works", "cited_by_count", "authorships", "concepts", "host_venue", "type", "publication_year"]
+    payload_keys = [
+        "id",
+        "doi",
+        "ids",
+        "referenced_works",
+        "related_works",
+        "cited_by_count",
+        "authorships",
+        "concepts",
+        "host_venue",
+        "type",
+        "publication_year",
+    ]
     payload = {k: raw.get(k) for k in payload_keys if k in raw}
     payload["record_id"] = raw.get("id") or raw.get("record_id")
     payload["routing"] = routing
     return payload
 
 
-def adapter_crossref_minimal_graph(raw: dict[str, Any], routing: dict[str, Any]) -> dict[str, Any] | None:
+def adapter_crossref_minimal_graph(
+    raw: dict[str, Any], routing: dict[str, Any]
+) -> dict[str, Any] | None:
     doi = raw.get("DOI") or raw.get("doi")
     if not doi and not raw:
         return None
-    payload_keys = ["DOI", "doi", "issued", "type", "references_count", "is-referenced-by-count", "relation", "created", "publisher", "prefix"]
+    payload_keys = [
+        "DOI",
+        "doi",
+        "issued",
+        "type",
+        "references_count",
+        "is-referenced-by-count",
+        "relation",
+        "created",
+        "publisher",
+        "prefix",
+    ]
     payload = {k: raw.get(k) for k in payload_keys if k in raw}
     payload["record_id"] = doi or raw.get("record_id")
     payload["routing"] = routing
     return payload
 
 
-def adapter_opencitations_coci_edges(raw: dict[str, Any], routing: dict[str, Any]) -> dict[str, Any] | None:
+def adapter_opencitations_coci_edges(
+    raw: dict[str, Any], routing: dict[str, Any]
+) -> dict[str, Any] | None:
     citing = raw.get("citing") or raw.get("citing_id")
     cited = raw.get("cited") or raw.get("cited_id")
     oci = raw.get("oci")
     if not citing or not cited:
         return None
-    payload = {"edge": {"src": citing, "rel": "cites", "dst": cited, "oci": oci}, "routing": routing}
+    payload = {
+        "edge": {"src": citing, "rel": "cites", "dst": cited, "oci": oci},
+        "routing": routing,
+    }
     payload["record_id"] = raw.get("record_id") or sha256_obj(payload["edge"])
     return payload
 
 
-def adapter_orcid_scrub_minimal(raw: dict[str, Any], routing: dict[str, Any]) -> dict[str, Any] | None:
+def adapter_orcid_scrub_minimal(
+    raw: dict[str, Any], routing: dict[str, Any]
+) -> dict[str, Any] | None:
     if not raw:
         return None
     payload = scrub_pii_fields(raw)
-    payload["record_id"] = raw.get("orcid-identifier") or raw.get("record_id") or sha256_obj(payload)
+    payload["record_id"] = (
+        raw.get("orcid-identifier") or raw.get("record_id") or sha256_obj(payload)
+    )
     payload["routing"] = routing
     return payload
 
@@ -395,15 +418,28 @@ def record_pitch(
         if source_url:
             sample["source_url"] = source_url
     if text:
-        sample["text"] = text[:pitch_cfg.text_limit]
+        sample["text"] = text[: pitch_cfg.text_limit]
     if sample_extra:
         sample.update(sample_extra)
     append_jsonl(roots.pitches_root / "yellow_pitch.jsonl", [sample])
     pitch_counts[key] = pitch_counts.get(key, 0) + 1
 
 
-def canonical_record(raw: dict[str, Any], payload: dict[str, Any], routing: dict[str, Any], target_id: str, license_profile: str, license_spdx: str | None, text: str | None = None) -> dict[str, Any]:
-    record_id = str(raw.get("record_id") or raw.get("id") or payload.get("record_id") or sha256_obj({"target": target_id, "payload": payload}))
+def canonical_record(
+    raw: dict[str, Any],
+    payload: dict[str, Any],
+    routing: dict[str, Any],
+    target_id: str,
+    license_profile: str,
+    license_spdx: str | None,
+    text: str | None = None,
+) -> dict[str, Any]:
+    record_id = str(
+        raw.get("record_id")
+        or raw.get("id")
+        or payload.get("record_id")
+        or sha256_obj({"target": target_id, "payload": payload})
+    )
     source = raw.get("source", {}) or {}
     content_hash = sha256_obj(payload if payload else raw)
     if text and not payload.get("text"):
@@ -456,17 +492,23 @@ def process_target(
     target_cfg = next((t for t in cfg.get("targets", []) if t.get("id") == target_id), {})
     screen_cfg = merge_screening_config(cfg, target_cfg)
     shard_cfg = sharding_cfg(cfg, "yellow_shard")
-    g = (cfg.get("globals", {}) or {})
+    g = cfg.get("globals", {}) or {}
     require_signoff = bool(g.get("require_yellow_signoff", False))
-    allow_without_signoff = bool((target_cfg.get("yellow_screen", {}) or {}).get("allow_without_signoff", False))
+    allow_without_signoff = bool(
+        (target_cfg.get("yellow_screen", {}) or {}).get("allow_without_signoff", False)
+    )
     manifest_dir = Path(queue_row.get("manifest_dir") or roots.manifests_root / target_id)
     signoff = load_signoff(manifest_dir) or {}
     status = str(signoff.get("status", "") or "").lower()
-    adapter_name = (target_cfg.get("yellow_screen", {}) or {}).get("adapter") or queue_row.get("adapter")
+    adapter_name = (target_cfg.get("yellow_screen", {}) or {}).get("adapter") or queue_row.get(
+        "adapter"
+    )
     target_routing = target_cfg.get("routing") or {}
     queue_routing = queue_row_routing(queue_row)
     pool_dir_base = roots.raw_root / "yellow"
-    license_pools = [p.name for p in pool_dir_base.iterdir() if p.is_dir()] if pool_dir_base.exists() else []
+    license_pools = (
+        [p.name for p in pool_dir_base.iterdir() if p.is_dir()] if pool_dir_base.exists() else []
+    )
     pools = license_pools or [queue_row.get("license_profile", "quarantine")]
 
     passed, pitched = 0, 0
@@ -545,18 +587,36 @@ def process_target(
                 if len(text) < screen_cfg.min_chars or len(text) > screen_cfg.max_chars:
                     pitched += 1
                     if execute:
-                        record_pitch(roots, pitch_counts, pitch_cfg, target_id, "length_bounds", raw=raw, text=text)
+                        record_pitch(
+                            roots,
+                            pitch_counts,
+                            pitch_cfg,
+                            target_id,
+                            "length_bounds",
+                            raw=raw,
+                            text=text,
+                        )
                     return
                 if contains_deny(text, screen_cfg.deny_phrases):
                     pitched += 1
                     if execute:
-                        record_pitch(roots, pitch_counts, pitch_cfg, target_id, "deny_phrase", raw=raw, text=text)
+                        record_pitch(
+                            roots,
+                            pitch_counts,
+                            pitch_cfg,
+                            target_id,
+                            "deny_phrase",
+                            raw=raw,
+                            text=text,
+                        )
                     return
 
             if screen_cfg.require_record_license and not license_spdx:
                 pitched += 1
                 if execute:
-                    record_pitch(roots, pitch_counts, pitch_cfg, target_id, "missing_record_license", raw=raw)
+                    record_pitch(
+                        roots, pitch_counts, pitch_cfg, target_id, "missing_record_license", raw=raw
+                    )
                 return
             if license_spdx and screen_cfg.allow_spdx and license_spdx not in screen_cfg.allow_spdx:
                 pitched += 1
@@ -597,8 +657,15 @@ def process_target(
                     )
                 return
 
-            license_profile = str(raw.get("license_profile") or queue_row.get("license_profile") or pool or "quarantine")
-            rec = canonical_record(raw, payload, routing, target_id, license_profile, license_spdx, text=text)
+            license_profile = str(
+                raw.get("license_profile")
+                or queue_row.get("license_profile")
+                or pool
+                or "quarantine"
+            )
+            rec = canonical_record(
+                raw, payload, routing, target_id, license_profile, license_spdx, text=text
+            )
             if "hash" not in rec or not rec["hash"].get("content_sha256"):
                 rec["hash"] = {"content_sha256": sha256_obj(rec)}
             passed += 1
@@ -641,7 +708,11 @@ def process_target(
                         sample_extra={"path": str(ds_path)},
                     )
                 continue
-            datasets = list(dataset_obj.values()) if isinstance(dataset_obj, DatasetDict) else [dataset_obj]
+            datasets = (
+                list(dataset_obj.values())
+                if isinstance(dataset_obj, DatasetDict)
+                else [dataset_obj]
+            )
             for dataset in datasets:
                 for raw in dataset:
                     handle_raw(dict(raw))
@@ -671,9 +742,23 @@ def main() -> None:
     ap.add_argument("--targets", required=True, help="Path to targets_kg_nav.yaml")
     ap.add_argument("--queue", required=True, help="YELLOW queue JSONL")
     ap.add_argument("--execute", action="store_true", help="Write outputs (default: dry-run)")
-    ap.add_argument("--dataset-root", default=None, help="Override dataset root (raw/screened/_ledger/_pitches/_manifests)")
-    ap.add_argument("--pitch-sample-limit", type=int, default=None, help="Max pitch samples per reason (override)")
-    ap.add_argument("--pitch-text-limit", type=int, default=None, help="Max chars stored in pitch samples (override)")
+    ap.add_argument(
+        "--dataset-root",
+        default=None,
+        help="Override dataset root (raw/screened/_ledger/_pitches/_manifests)",
+    )
+    ap.add_argument(
+        "--pitch-sample-limit",
+        type=int,
+        default=None,
+        help="Max pitch samples per reason (override)",
+    )
+    ap.add_argument(
+        "--pitch-text-limit",
+        type=int,
+        default=None,
+        help="Max chars stored in pitch samples (override)",
+    )
     args = ap.parse_args()
 
     targets_path = Path(args.targets).expanduser().resolve()

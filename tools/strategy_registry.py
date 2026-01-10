@@ -6,6 +6,12 @@ from typing import Any
 StrategySpec = dict[str, Any]
 
 STRATEGY_REGISTRY: dict[str, StrategySpec] = {
+    # Placeholder strategy - no download required
+    "none": {
+        "status": "supported",
+        "required": [],
+        "external_tools": [],
+    },
     "http": {
         "status": "supported",
         "required": [
@@ -150,6 +156,67 @@ STRATEGY_REGISTRY: dict[str, StrategySpec] = {
         ],
         "external_tools": [],
     },
+    # Domain-specific strategies
+    "api_tabular": {
+        "status": "supported",
+        "required": [
+            {
+                "keys": ("base_url", "url"),
+                "message": "download.base_url or url required for api_tabular strategy",
+            }
+        ],
+        "external_tools": [],
+    },
+    "faa_ac_crawl": {
+        "status": "supported",
+        "required": [
+            {
+                "keys": ("base_url", "url"),
+                "message": "download.base_url or url required for faa_ac_crawl strategy",
+            }
+        ],
+        "external_tools": [],
+    },
+    "noaa_ir_json": {
+        "status": "supported",
+        "required": [
+            {
+                "keys": ("base_url", "url"),
+                "message": "download.base_url or url required for noaa_ir_json strategy",
+            }
+        ],
+        "external_tools": [],
+    },
+    "ntrs_openapi": {
+        "status": "supported",
+        "required": [
+            {
+                "keys": ("base_url", "url"),
+                "message": "download.base_url or url required for ntrs_openapi strategy",
+            }
+        ],
+        "external_tools": [],
+    },
+    "pmc_oa": {
+        "status": "supported",
+        "required": [
+            {
+                "keys": ("base_url", "url"),
+                "message": "download.base_url or url required for pmc_oa strategy",
+            }
+        ],
+        "external_tools": [],
+    },
+    "usgs_pubs_warehouse": {
+        "status": "supported",
+        "required": [
+            {
+                "keys": ("base_url", "url"),
+                "message": "download.base_url or url required for usgs_pubs_warehouse strategy",
+            }
+        ],
+        "external_tools": [],
+    },
 }
 
 
@@ -181,7 +248,9 @@ def _validate_github_release(download: dict[str, Any]) -> list[str]:
     if not repo:
         return ["download.repo/repository required for github_release strategy"]
     if "/" not in str(repo) and not owner:
-        return ["download.owner required when repo is not in 'owner/repo' form for github_release strategy"]
+        return [
+            "download.owner required when repo is not in 'owner/repo' form for github_release strategy"
+        ]
     return []
 
 

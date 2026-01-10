@@ -3,6 +3,7 @@
 Parses GHSA YAML advisories into flattened JSONL rows that align to
 `field_schemas.yaml` (schema: github_advisory_v1.0.0).
 """
+
 from __future__ import annotations
 
 import gzip

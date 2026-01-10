@@ -43,9 +43,7 @@ def test_constraints_check_passes(tmp_path: Path, monkeypatch) -> None:
     assert check_constraints.main() == 0
 
 
-def test_constraints_check_reports_missing_pin(
-    tmp_path: Path, monkeypatch, capsys
-) -> None:
+def test_constraints_check_reports_missing_pin(tmp_path: Path, monkeypatch, capsys) -> None:
     monkeypatch.chdir(tmp_path)
     _write(tmp_path / "requirements.in", "requests>=2.0\n")
     _write(tmp_path / "requirements-dev.in", "-r requirements.in\n")
@@ -57,9 +55,7 @@ def test_constraints_check_reports_missing_pin(
     assert "requirements.constraints.txt: missing pin for requests" in captured
 
 
-def test_constraints_check_reports_missing_include(
-    tmp_path: Path, monkeypatch, capsys
-) -> None:
+def test_constraints_check_reports_missing_include(tmp_path: Path, monkeypatch, capsys) -> None:
     monkeypatch.chdir(tmp_path)
     _write(tmp_path / "requirements.in", "requests>=2.0\n")
     _write(tmp_path / "requirements-dev.in", "-r requirements.in\npytest-cov\n")

@@ -1,3 +1,24 @@
+"""
+collector_core/exceptions.py
+
+Exception classes for Dataset Collector.
+
+Error Handling Convention:
+--------------------------
+1. **Exceptions** (this module) are raised for programmer/config errors:
+   - ConfigValidationError: Invalid configuration (missing fields, schema violations)
+   - YamlParseError: YAML file parsing failures
+   - DependencyMissingError: Required package not installed
+   - OutputPathsBuilderError: Output configuration error
+
+2. **Result types** (collector_core.result) are returned for recoverable runtime issues:
+   - Network failures, timeouts, retries exhausted
+   - File download/verification failures
+   - External service errors
+
+See collector_core.result for the Result type documentation.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -11,7 +32,9 @@ class CollectorError(Exception):
     code: str = "collector_error"
     context: dict[str, Any] = field(default_factory=dict)
 
-    def __init__(self, message: str, *, code: str | None = None, context: Mapping[str, Any] | None = None) -> None:
+    def __init__(
+        self, message: str, *, code: str | None = None, context: Mapping[str, Any] | None = None
+    ) -> None:
         super().__init__(message)
         self.message = message
         self.code = code or self.code

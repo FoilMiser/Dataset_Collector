@@ -18,16 +18,20 @@ from typing import Any
 from urllib.parse import urlparse
 
 from collector_core.__version__ import __version__ as VERSION
-from collector_core.acquire_limits import build_target_limit_enforcer, cleanup_path, resolve_result_bytes
+from collector_core.acquire_limits import (
+    build_target_limit_enforcer,
+    cleanup_path,
+    resolve_result_bytes,
+)
 from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.config_validator import read_yaml
 from collector_core.dependencies import _try_import, requires
 from collector_core.network_utils import _with_retries
 from collector_core.utils import (
-    utc_now,
     ensure_dir,
-    write_json,
     safe_filename,
+    utc_now,
+    write_json,
 )
 
 # Alias for backwards compatibility
@@ -38,7 +42,9 @@ FTP = _try_import("ftplib", "FTP")
 
 
 StrategyHandler = Callable[["AcquireContext", dict[str, Any], Path], list[dict[str, Any]]]
-PostProcessor = Callable[["AcquireContext", dict[str, Any], Path, str, dict[str, Any]], dict[str, Any] | None]
+PostProcessor = Callable[
+    ["AcquireContext", dict[str, Any], Path, str, dict[str, Any]], dict[str, Any] | None
+]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -200,7 +206,13 @@ def md5_file(path: Path) -> str:
 
 
 def run_cmd(cmd: list[str], cwd: Path | None = None) -> str:
-    p = subprocess.run(cmd, cwd=str(cwd) if cwd else None, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    p = subprocess.run(
+        cmd,
+        cwd=str(cwd) if cwd else None,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
     return p.stdout.decode("utf-8", errors="ignore")
 
 
@@ -238,7 +250,9 @@ def _http_download_with_resume(
     blocked_url: str | None = None
     blocked_reason: str | None = None
 
-    def _stream_response(response: requests.Response, write_mode: str, existing_offset: int) -> None:
+    def _stream_response(
+        response: requests.Response, write_mode: str, existing_offset: int
+    ) -> None:
         nonlocal content_length, resolved_url
         resolved_url = response.url
         content_length = _parse_content_length(response, existing_offset)
@@ -298,7 +312,9 @@ def _http_download_with_resume(
         try:
             with requests.get(url, stream=True, headers=headers, timeout=(15, 300)) as r:
                 r.raise_for_status()
-                allowed, reason, blocked = _validate_redirect_chain(r, ctx.allow_non_global_download_hosts)
+                allowed, reason, blocked = _validate_redirect_chain(
+                    r, ctx.allow_non_global_download_hosts
+                )
                 if not allowed:
                     blocked_reason = reason
                     blocked_url = blocked
@@ -387,7 +403,10 @@ def _http_download_with_resume(
 # Strategy handlers
 # ---------------------------------
 
-def handle_http_multi(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
+
+def handle_http_multi(
+    ctx: AcquireContext, row: dict[str, Any], out_dir: Path
+) -> list[dict[str, Any]]:
     download = normalize_download(row.get("download", {}) or {})
     enforcer = build_target_limit_enforcer(
         target_id=str(row.get("id", "unknown")),
@@ -474,7 +493,9 @@ def handle_http_multi(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -
     return results
 
 
-def handle_http_single(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
+def handle_http_single(
+    ctx: AcquireContext, row: dict[str, Any], out_dir: Path
+) -> list[dict[str, Any]]:
     download = normalize_download(row.get("download", {}) or {})
     enforcer = build_target_limit_enforcer(
         target_id=str(row.get("id", "unknown")),
@@ -495,7 +516,9 @@ def handle_http_single(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) 
     if limit_error:
         return [limit_error]
     size_hint = download.get("expected_size")
-    limit_error = enforcer.check_size_hint(int(size_hint) if size_hint is not None else None, filename)
+    limit_error = enforcer.check_size_hint(
+        int(size_hint) if size_hint is not None else None, filename
+    )
     if limit_error:
         return [limit_error]
     out_path = out_dir / filename
@@ -506,7 +529,9 @@ def handle_http_single(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) 
         return [limit_error] if limit_error else [result]
     if not ctx.mode.execute:
         return [{"status": "noop", "path": str(out_path)}]
-    result = _http_download_with_resume(ctx, url, out_path, size_hint, download.get("expected_sha256"))
+    result = _http_download_with_resume(
+        ctx, url, out_path, size_hint, download.get("expected_sha256")
+    )
     size_bytes = resolve_result_bytes(result, out_path)
     limit_error = enforcer.record_bytes(size_bytes, filename)
     if limit_error:
@@ -599,7 +624,12 @@ def handle_git(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
         max_bytes_per_target=ctx.limits.max_bytes_per_target,
         download=download,
     )
-    repo = download.get("repo") or download.get("repo_url") or download.get("url") or download.get("url")
+    repo = (
+        download.get("repo")
+        or download.get("repo_url")
+        or download.get("url")
+        or download.get("url")
+    )
     branch = download.get("branch")
     commit = download.get("commit")
     tag = download.get("tag")
@@ -677,6 +707,7 @@ def handle_zenodo(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> li
         return [{"status": "error", "error": missing}]
     if not ctx.mode.execute:
         return [{"status": "noop", "path": str(out_dir)}]
+
     def _fetch() -> requests.Response:
         resp = requests.get(api_url, timeout=60)
         resp.raise_for_status()
@@ -708,7 +739,9 @@ def handle_zenodo(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> li
             results.append(limit_error)
             break
         size_hint = f.get("size")
-        limit_error = enforcer.check_size_hint(int(size_hint) if size_hint is not None else None, filename)
+        limit_error = enforcer.check_size_hint(
+            int(size_hint) if size_hint is not None else None, filename
+        )
         if limit_error:
             results.append(limit_error)
             continue
@@ -730,7 +763,9 @@ def handle_zenodo(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> li
     return results or [{"status": "noop", "reason": "no files"}]
 
 
-def handle_dataverse(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
+def handle_dataverse(
+    ctx: AcquireContext, row: dict[str, Any], out_dir: Path
+) -> list[dict[str, Any]]:
     download = normalize_download(row.get("download", {}) or {})
     enforcer = build_target_limit_enforcer(
         target_id=str(row.get("id", "unknown")),
@@ -798,7 +833,9 @@ def handle_dataverse(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) ->
     ]
 
 
-def handle_figshare_article(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
+def handle_figshare_article(
+    ctx: AcquireContext, row: dict[str, Any], out_dir: Path
+) -> list[dict[str, Any]]:
     missing = requires("requests", requests, install="pip install requests")
     if missing:
         return [{"status": "error", "error": missing}]
@@ -821,6 +858,7 @@ def handle_figshare_article(ctx: AcquireContext, row: dict[str, Any], out_dir: P
     endpoint = f"{api_base}/articles/{article_id}"
     if not ctx.mode.execute:
         return [{"status": "noop", "article_id": article_id, "path": str(out_dir)}]
+
     def _fetch() -> requests.Response:
         resp = requests.get(endpoint, timeout=60)
         resp.raise_for_status()
@@ -838,7 +876,9 @@ def handle_figshare_article(ctx: AcquireContext, row: dict[str, Any], out_dir: P
     for idx, fmeta in enumerate(files):
         download_url = fmeta.get("download_url") or (fmeta.get("links") or {}).get("download")
         if not download_url:
-            results.append({"status": "error", "error": "missing_download_url", "file": fmeta.get("name")})
+            results.append(
+                {"status": "error", "error": "missing_download_url", "file": fmeta.get("name")}
+            )
             continue
         fname = safe_name(fmeta.get("name") or fmeta.get("id") or f"figshare_file_{idx}")
         limit_error = enforcer.start_file(fname)
@@ -850,7 +890,9 @@ def handle_figshare_article(ctx: AcquireContext, row: dict[str, Any], out_dir: P
             results.append(limit_error)
             break
         expected_size = fmeta.get("size")
-        limit_error = enforcer.check_size_hint(int(expected_size) if expected_size is not None else None, fname)
+        limit_error = enforcer.check_size_hint(
+            int(expected_size) if expected_size is not None else None, fname
+        )
         if limit_error:
             results.append(limit_error)
             continue
@@ -871,7 +913,9 @@ def handle_figshare_article(ctx: AcquireContext, row: dict[str, Any], out_dir: P
 handle_figshare = handle_figshare_article
 
 
-def handle_figshare_files(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
+def handle_figshare_files(
+    ctx: AcquireContext, row: dict[str, Any], out_dir: Path
+) -> list[dict[str, Any]]:
     download = normalize_download(row.get("download", {}) or {})
     enforcer = build_target_limit_enforcer(
         target_id=str(row.get("id", "unknown")),
@@ -880,7 +924,9 @@ def handle_figshare_files(ctx: AcquireContext, row: dict[str, Any], out_dir: Pat
         download=download,
     )
     article_id = download.get("article_id") or download.get("id")
-    api = download.get("api") or (f"https://api.figshare.com/v2/articles/{article_id}/files" if article_id else None)
+    api = download.get("api") or (
+        f"https://api.figshare.com/v2/articles/{article_id}/files" if article_id else None
+    )
     if not article_id or not api:
         return [{"status": "error", "error": "missing article_id"}]
     missing = requires("requests", requests, install="pip install requests")
@@ -888,6 +934,7 @@ def handle_figshare_files(ctx: AcquireContext, row: dict[str, Any], out_dir: Pat
         return [{"status": "error", "error": missing}]
     if not ctx.mode.execute:
         return [{"status": "noop", "path": str(out_dir)}]
+
     def _fetch() -> requests.Response:
         resp = requests.get(api, timeout=120)
         resp.raise_for_status()
@@ -917,7 +964,9 @@ def handle_figshare_files(ctx: AcquireContext, row: dict[str, Any], out_dir: Pat
             results.append(limit_error)
             break
         size_hint = f.get("size")
-        limit_error = enforcer.check_size_hint(int(size_hint) if size_hint is not None else None, filename)
+        limit_error = enforcer.check_size_hint(
+            int(size_hint) if size_hint is not None else None, filename
+        )
         if limit_error:
             results.append(limit_error)
             continue
@@ -934,7 +983,9 @@ def handle_figshare_files(ctx: AcquireContext, row: dict[str, Any], out_dir: Pat
 
 
 def make_github_release_handler(user_agent: str) -> StrategyHandler:
-    def _handle_github_release(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
+    def _handle_github_release(
+        ctx: AcquireContext, row: dict[str, Any], out_dir: Path
+    ) -> list[dict[str, Any]]:
         missing = requires("requests", requests, install="pip install requests")
         if missing:
             return [{"status": "error", "error": missing}]
@@ -980,7 +1031,9 @@ def make_github_release_handler(user_agent: str) -> StrategyHandler:
         for idx, asset in enumerate(assets):
             download_url = asset.get("browser_download_url") or asset.get("url")
             if not download_url:
-                results.append({"status": "error", "error": "missing_download_url", "asset": asset.get("name")})
+                results.append(
+                    {"status": "error", "error": "missing_download_url", "asset": asset.get("name")}
+                )
                 continue
             fname = safe_name(asset.get("name") or f"{repo}_asset_{idx}")
             limit_error = enforcer.start_file(fname)
@@ -992,7 +1045,9 @@ def make_github_release_handler(user_agent: str) -> StrategyHandler:
                 results.append(limit_error)
                 break
             size_hint = asset.get("size")
-            limit_error = enforcer.check_size_hint(int(size_hint) if size_hint is not None else None, fname)
+            limit_error = enforcer.check_size_hint(
+                int(size_hint) if size_hint is not None else None, fname
+            )
             if limit_error:
                 results.append(limit_error)
                 continue
@@ -1012,7 +1067,9 @@ def make_github_release_handler(user_agent: str) -> StrategyHandler:
     return _handle_github_release
 
 
-def handle_hf_datasets(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
+def handle_hf_datasets(
+    ctx: AcquireContext, row: dict[str, Any], out_dir: Path
+) -> list[dict[str, Any]]:
     download = normalize_download(row.get("download", {}) or {})
     enforcer = build_target_limit_enforcer(
         target_id=str(row.get("id", "unknown")),
@@ -1137,7 +1194,9 @@ def handle_s3_sync(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> l
     return results
 
 
-def handle_aws_requester_pays(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
+def handle_aws_requester_pays(
+    ctx: AcquireContext, row: dict[str, Any], out_dir: Path
+) -> list[dict[str, Any]]:
     download = normalize_download(row.get("download", {}) or {})
     enforcer = build_target_limit_enforcer(
         target_id=str(row.get("id", "unknown")),
@@ -1167,7 +1226,18 @@ def handle_aws_requester_pays(ctx: AcquireContext, row: dict[str, Any], out_dir:
     ensure_dir(out_path.parent)
     payer = download.get("request_payer", "requester")
     temp_path = out_path.with_name(f"{out_path.name}.part")
-    cmd = ["aws", "s3api", "get-object", "--bucket", bucket, "--key", key, str(temp_path), "--request-payer", payer]
+    cmd = [
+        "aws",
+        "s3api",
+        "get-object",
+        "--bucket",
+        bucket,
+        "--key",
+        key,
+        str(temp_path),
+        "--request-payer",
+        payer,
+    ]
     log = run_cmd(cmd)
     content_length = temp_path.stat().st_size
     sha256 = sha256_file(temp_path)
@@ -1260,7 +1330,11 @@ def resolve_output_dir(ctx: AcquireContext, bucket: str, pool: str, target_id: s
 
 
 def write_done_marker(
-    ctx: AcquireContext, target_id: str, bucket: str, status: str, extra: dict[str, Any] | None = None
+    ctx: AcquireContext,
+    target_id: str,
+    bucket: str,
+    status: str,
+    extra: dict[str, Any] | None = None,
 ) -> None:
     marker = ctx.roots.manifests_root / safe_name(target_id) / "acquire_done.json"
     payload = {
@@ -1340,7 +1414,11 @@ def run_target(
     )
     write_json(out_dir / "download_manifest.json", manifest)
 
-    status = "ok" if any(r.get("status") == "ok" for r in manifest["results"]) else manifest["results"][0].get("status", "error")
+    status = (
+        "ok"
+        if any(r.get("status") == "ok" for r in manifest["results"])
+        else manifest["results"][0].get("status", "error")
+    )
     if post_processors:
         for proc in post_processors.values():
             if isinstance(proc, dict) and proc.get("status") not in {"ok", "noop"}:
@@ -1357,10 +1435,14 @@ def load_config(targets_path: Path | None) -> dict[str, Any]:
     return cfg
 
 
-def load_roots(cfg: dict[str, Any], overrides: argparse.Namespace, defaults: RootsDefaults) -> Roots:
-    g = (cfg.get("globals", {}) or {})
+def load_roots(
+    cfg: dict[str, Any], overrides: argparse.Namespace, defaults: RootsDefaults
+) -> Roots:
+    g = cfg.get("globals", {}) or {}
     raw_root = Path(overrides.raw_root or g.get("raw_root", defaults.raw_root))
-    manifests_root = Path(overrides.manifests_root or g.get("manifests_root", defaults.manifests_root))
+    manifests_root = Path(
+        overrides.manifests_root or g.get("manifests_root", defaults.manifests_root)
+    )
     logs_root = Path(overrides.logs_root or g.get("logs_root", defaults.logs_root))
     return Roots(
         raw_root=raw_root.expanduser().resolve(),
@@ -1379,13 +1461,17 @@ def run_acquire_worker(
     ap = argparse.ArgumentParser(description=f"Acquire Worker v{VERSION}")
     ap.add_argument("--queue", required=True, help="Queue JSONL emitted by pipeline_driver.py")
     ap.add_argument("--targets-yaml", default=None, help=f"Path to {targets_yaml_label} for roots")
-    ap.add_argument("--bucket", required=True, choices=["green", "yellow"], help="Bucket being processed")
+    ap.add_argument(
+        "--bucket", required=True, choices=["green", "yellow"], help="Bucket being processed"
+    )
     ap.add_argument("--raw-root", default=None, help="Override raw root")
     ap.add_argument("--manifests-root", default=None, help="Override manifests root")
     ap.add_argument("--logs-root", default=None, help="Override logs root")
     ap.add_argument("--execute", action="store_true", help="Perform downloads")
     ap.add_argument("--overwrite", action="store_true", help="Overwrite existing outputs")
-    ap.add_argument("--verify-sha256", action="store_true", help="Compute sha256 for http downloads")
+    ap.add_argument(
+        "--verify-sha256", action="store_true", help="Compute sha256 for http downloads"
+    )
     ap.add_argument("--verify-zenodo-md5", action="store_true", help="Verify Zenodo md5")
     ap.add_argument(
         "--allow-non-global-download-hosts",
@@ -1448,7 +1534,10 @@ def run_acquire_worker(
         with ThreadPoolExecutor(max_workers=ctx.mode.workers) as ex:
             results_by_index = [None] * len(rows)
             futures = {
-                ex.submit(run_target, ctx, args.bucket, row, strategy_handlers, postprocess): (idx, row)
+                ex.submit(run_target, ctx, args.bucket, row, strategy_handlers, postprocess): (
+                    idx,
+                    row,
+                )
                 for idx, row in enumerate(rows)
             }
             for fut in as_completed(futures):
@@ -1473,5 +1562,9 @@ def run_acquire_worker(
     ]
 
     write_json(roots.logs_root / f"acquire_summary_{args.bucket}.json", summary)
-    if ctx.mode.execute and args.strict and any(r.get("status") == "error" for r in summary["results"]):
+    if (
+        ctx.mode.execute
+        and args.strict
+        and any(r.get("status") == "error" for r in summary["results"])
+    ):
         sys.exit(1)
