@@ -1101,6 +1101,16 @@ def handle_hf_datasets(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) 
     return results
 
 
+DEFAULT_STRATEGY_HANDLERS: dict[str, StrategyHandler] = {
+    "http": handle_http_multi,
+    "ftp": handle_ftp,
+    "git": handle_git,
+    "zenodo": handle_zenodo,
+    "dataverse": handle_dataverse,
+    "huggingface_datasets": handle_hf_datasets,
+}
+
+
 def handle_s3_sync(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     download = normalize_download(row.get("download", {}) or {})
     enforcer = build_target_limit_enforcer(

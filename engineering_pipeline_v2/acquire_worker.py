@@ -21,26 +21,14 @@ if __package__ in (None, ""):
 
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.acquire_strategies import (
+    DEFAULT_STRATEGY_HANDLERS,
     RootsDefaults,
-    handle_dataverse,
-    handle_ftp,
-    handle_git,
-    handle_hf_datasets,
-    handle_http_multi,
-    handle_zenodo,
     run_acquire_worker,
 )
 
 __all__ = ["main", "VERSION"]
 
-STRATEGY_HANDLERS = {
-    "http": handle_http_multi,
-    "ftp": handle_ftp,
-    "git": handle_git,
-    "zenodo": handle_zenodo,
-    "dataverse": handle_dataverse,
-    "huggingface_datasets": handle_hf_datasets,
-}
+STRATEGY_HANDLERS = DEFAULT_STRATEGY_HANDLERS
 
 DEFAULTS = RootsDefaults(
     raw_root="/data/engineering/raw",

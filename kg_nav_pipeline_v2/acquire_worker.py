@@ -21,32 +21,19 @@ if __package__ in (None, ""):
 
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.acquire_strategies import (
+    DEFAULT_STRATEGY_HANDLERS,
     RootsDefaults,
     handle_aws_requester_pays,
-    handle_dataverse,
     handle_figshare_files,
-    handle_ftp,
-    handle_git,
-    handle_hf_datasets,
-    handle_http_multi,
     handle_s3_sync,
     handle_torrent,
-    handle_zenodo,
     run_acquire_worker,
 )
 
 __all__ = ["main", "VERSION"]
 
-handle_http = handle_http_multi
-handle_figshare = handle_figshare_files
-
 STRATEGY_HANDLERS = {
-    "http": handle_http_multi,
-    "ftp": handle_ftp,
-    "git": handle_git,
-    "zenodo": handle_zenodo,
-    "dataverse": handle_dataverse,
-    "huggingface_datasets": handle_hf_datasets,
+    **DEFAULT_STRATEGY_HANDLERS,
     "figshare": handle_figshare_files,
     "s3_sync": handle_s3_sync,
     "aws_requester_pays": handle_aws_requester_pays,
