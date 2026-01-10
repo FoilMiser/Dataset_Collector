@@ -64,7 +64,9 @@ Targets and catalog entries may specify a `license_profile` value. Supported val
 ## Reproducible installs (recommended)
 
 Use the base + extras flow: install the shared base constraints once, then layer in the
-pipeline-specific extras you need.
+pipeline-specific extras you need. Dependency source of truth lives in
+`pyproject.toml` (`[project.dependencies]` and `[project.optional-dependencies]`); the
+requirements/constraints files exist to support deterministic CI installs.
 
 ```bash
 pip install -r requirements.constraints.txt
@@ -76,7 +78,8 @@ pip install -r math_pipeline_v2/requirements.txt
 ### Regenerate the constraints files
 
 These constraints are version-pinned but do not use hash checking, and they are not a
-full lockfile that pins every transitive dependency.
+full lockfile that pins every transitive dependency. Update `pyproject.toml` first, then
+sync `requirements*.in` and recompile the constraints.
 
 ```bash
 uv pip compile requirements.in -o requirements.constraints.txt

@@ -45,6 +45,7 @@ dev = [
   "pytest",
   "pytest-cov",
   "ruff",
+  "yamllint",
   "pytest_httpserver",
   "jupyterlab",
   "ipykernel",
