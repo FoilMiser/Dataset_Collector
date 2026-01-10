@@ -81,17 +81,10 @@ if __package__ in (None, ""):
 
 ---
 
-## 5) `tools/preflight.py --quiet` flag is currently not implemented
+## 5) `tools/preflight.py --quiet` flag suppresses warnings/info
 
-**Problem**  
-The CLI advertises `--quiet`, but its behavior is not applied (no conditional suppression of output).
-
-**Fix options**
-- **Option A (cleanest):** Remove the flag and update help text + CI usage.
-- **Option B:** Implement `--quiet` as:
-  - suppress warnings and info
-  - print only errors and final summary
-- **Option C:** Implement exactly as documented (but ensure it’s actually different from default output).
+**Status**  
+`--quiet` now suppresses warning/info output while still printing errors and a final summary.
 
 ---
 
