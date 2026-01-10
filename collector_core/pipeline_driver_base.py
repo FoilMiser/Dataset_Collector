@@ -76,7 +76,9 @@ def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
 
 def write_json(path: Path, obj: dict[str, Any]) -> None:
     ensure_dir(path.parent)
-    path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    tmp_path = Path(f"{path}.tmp")
+    tmp_path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    tmp_path.replace(path)
 
 
 def normalize_whitespace(text: str) -> str:

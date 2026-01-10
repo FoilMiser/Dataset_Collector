@@ -524,7 +524,9 @@ def main() -> int:
         output_path = Path(args.output)
         if not output_path.is_absolute():
             output_path = root / output_path
-        output_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+        tmp_path = Path(f"{output_path}.tmp")
+        tmp_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+        tmp_path.replace(output_path)
 
     exit_code = 1 if report["errors"] or (args.strict and report["warnings"]) else 0
     summary = {

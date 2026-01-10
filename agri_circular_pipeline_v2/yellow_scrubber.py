@@ -132,7 +132,9 @@ def write_plan(output_path: Path, entries: list[QueueEntry], summary: dict[str, 
         "summary": summary,
         "entries": [asdict(e) for e in entries],
     }
-    output_path.write_text(json.dumps(plan, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    tmp_path = Path(f"{output_path}.tmp")
+    tmp_path.write_text(json.dumps(plan, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    tmp_path.replace(output_path)
 
 
 def main() -> None:

@@ -76,7 +76,9 @@ def read_json(path: Path) -> list[dict[str, Any]]:
 
 def write_json(path: Path, obj: dict[str, Any]) -> None:
     ensure_dir(path.parent)
-    path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    tmp_path = Path(f"{path}.tmp")
+    tmp_path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    tmp_path.replace(path)
 
 
 def write_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
