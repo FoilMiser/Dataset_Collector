@@ -19,6 +19,7 @@ from urllib.parse import urlparse
 
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.acquire_limits import build_target_limit_enforcer, cleanup_path, resolve_result_bytes
+from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.config_validator import read_yaml
 from collector_core.dependencies import _try_import, requires
 from collector_core.network_utils import _with_retries
@@ -1288,6 +1289,12 @@ def write_done_marker(
         "written_at_utc": utc_now(),
         "version": VERSION,
     }
+    payload.update(
+        build_artifact_metadata(
+            written_at_utc=payload["written_at_utc"],
+            git_commit=extra.get("git_commit") if extra else None,
+        )
+    )
     if extra:
         payload.update(extra)
     write_json(marker, payload)
@@ -1311,7 +1318,6 @@ def run_target(
         "license_pool": pool,
         "strategy": strat,
         "started_at_utc": utc_now(),
-        "pipeline_version": VERSION,
         "output_dir": str(out_dir),
         "results": [],
     }
@@ -1345,6 +1351,12 @@ def run_target(
             break
     if git_info:
         manifest.update(git_info)
+    manifest.update(
+        build_artifact_metadata(
+            written_at_utc=manifest["finished_at_utc"],
+            git_commit=git_info.get("git_commit") if git_info else None,
+        )
+    )
     write_json(out_dir / "download_manifest.json", manifest)
 
     status = "ok" if any(r.get("status") == "ok" for r in manifest["results"]) else manifest["results"][0].get("status", "error")
@@ -1444,12 +1456,12 @@ def run_acquire_worker(
 
     summary = {
         "run_at_utc": utc_now(),
-        "pipeline_version": VERSION,
         "queue": str(queue_path),
         "bucket": args.bucket,
         "execute": ctx.mode.execute,
         "results": [],
     }
+    summary.update(build_artifact_metadata(written_at_utc=summary["run_at_utc"]))
 
     if ctx.mode.workers > 1 and ctx.mode.execute:
         with ThreadPoolExecutor(max_workers=ctx.mode.workers) as ex:

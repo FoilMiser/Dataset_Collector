@@ -34,6 +34,7 @@ from pathlib import Path
 from typing import Any
 
 from collector_core.__version__ import __version__ as TOOL_VERSION
+from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.config_validator import read_yaml
 from collector_core.dependencies import _try_import, requires
 from collector_core.exceptions import (
@@ -627,7 +628,6 @@ def run_pmc_worker(
 
     index = {
         "created_at_utc": utc_now(),
-        "pipeline_version": version,
         "records_seen": len(rows),
         "successful": successful,
         "train_rows": total_train,
@@ -635,6 +635,7 @@ def run_pmc_worker(
         "train_shards": shard_files["train"],
         "valid_shards": shard_files["valid"],
     }
+    index.update(build_artifact_metadata(pipeline_version=version, written_at_utc=index["created_at_utc"]))
     write_json(out_root / "dataset_index.json", index)
     write_json(manifests_dir / f"pmc_run_{int(time.time())}.json", index)
 

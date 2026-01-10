@@ -19,6 +19,7 @@ from typing import Any
 import requests
 
 from collector_core.__version__ import __version__ as VERSION
+from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.companion_files import read_denylist_raw, read_license_maps, resolve_companion_paths
 from collector_core.config_validator import read_yaml
 from collector_core.dependencies import _try_import
@@ -1589,6 +1590,7 @@ class BasePipelineDriver:
                 result["status"] = "error"
                 result["error"] = "Evidence file rename/write verification failed."
 
+        result.update(build_artifact_metadata(written_at_utc=result.get("fetched_at_utc")))
         write_json(manifest_dir / "license_evidence_meta.json", result)
         return result
 
@@ -1967,7 +1969,6 @@ class BasePipelineDriver:
         )
         summary = {
             "run_at_utc": utc_now(),
-            "pipeline_version": VERSION,
             "targets_total": len(cfg.targets),
             "queued_green": len(results.green_rows),
             "queued_yellow": len(results.yellow_rows),
@@ -1980,6 +1981,7 @@ class BasePipelineDriver:
             "counts": dict(counts),
             "failed_targets": failed_targets,
         }
+        summary.update(build_artifact_metadata(written_at_utc=summary["run_at_utc"]))
         write_json(cfg.queues_root / "run_summary.json", summary)
 
     def emit_report(self, cfg: DriverConfig, results: ClassificationResult) -> None:

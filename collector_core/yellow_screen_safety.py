@@ -28,6 +28,7 @@ from typing import Any
 from datasets import DatasetDict, load_from_disk
 
 from collector_core.__version__ import __version__ as VERSION
+from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.companion_files import read_field_schemas, resolve_companion_paths
 from collector_core.config_validator import read_yaml
 from collector_core.yellow_screen_common import (
@@ -463,6 +464,7 @@ def process_target(
                 "reason": "yellow_signoff_rejected",
                 "finished_at_utc": utc_now(),
             }
+            manifest.update(build_artifact_metadata(written_at_utc=manifest["finished_at_utc"]))
             if execute:
                 ensure_dir(roots.manifests_root / target_id)
                 write_json(roots.manifests_root / target_id / "screen_yellow_done.json", manifest)
@@ -486,6 +488,7 @@ def process_target(
                 "reason": "yellow_signoff_missing",
                 "finished_at_utc": utc_now(),
             }
+            manifest.update(build_artifact_metadata(written_at_utc=manifest["finished_at_utc"]))
             if execute:
                 ensure_dir(roots.manifests_root / target_id)
                 write_json(roots.manifests_root / target_id / "screen_yellow_done.json", manifest)
@@ -642,6 +645,7 @@ def process_target(
         "status": "ok",
         "finished_at_utc": utc_now(),
     }
+    manifest.update(build_artifact_metadata(written_at_utc=manifest["finished_at_utc"]))
     if execute:
         ensure_dir(roots.manifests_root / target_id)
         write_json(roots.manifests_root / target_id / "screen_yellow_done.json", manifest)
@@ -672,11 +676,11 @@ def main() -> None:
 
     summary = {
         "run_at_utc": utc_now(),
-        "pipeline_version": VERSION,
         "targets_seen": len(queue_rows),
         "execute": args.execute,
         "results": [],
     }
+    summary.update(build_artifact_metadata(written_at_utc=summary["run_at_utc"]))
 
     for row in queue_rows:
         res = process_target(cfg, schemas, roots, row, args.execute, pitch_cfg)

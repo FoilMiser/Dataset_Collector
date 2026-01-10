@@ -20,8 +20,8 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.config_validator import read_yaml
-from collector_core.__version__ import __schema_version__ as SCHEMA_VERSION
 from collector_core.__version__ import __version__ as PIPELINE_VERSION
 
 
@@ -215,9 +215,6 @@ def build_catalog(cfg: dict[str, Any], pipeline_slug: str | None = None) -> dict
     license_counts = Counter(queue_stats.get("license_counts", {}))
     catalog = {
         "generated_at_utc": generated_at,
-        "written_at_utc": generated_at,
-        "pipeline_version": PIPELINE_VERSION,
-        "schema_version": SCHEMA_VERSION,
         "version": PIPELINE_VERSION,
         "raw": raw_stats,
         "screened_yellow": collect_shard_stage(screened_root),
@@ -228,6 +225,7 @@ def build_catalog(cfg: dict[str, Any], pipeline_slug: str | None = None) -> dict
         "strategy_counts": collect_strategy_counts(cfg),
         "top_licenses": top_n_counts(license_counts, top_n),
     }
+    catalog.update(build_artifact_metadata(written_at_utc=generated_at))
     catalog["top_targets_by_bytes"] = raw_stats.get("top_targets_by_bytes", [])
 
     for ledger_name in ["yellow_passed.jsonl", "yellow_pitched.jsonl", "combined_index.jsonl"]:
