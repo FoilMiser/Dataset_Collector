@@ -3,8 +3,10 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import hashlib
+import ipaddress
 import json
 import os
+import socket
 import subprocess
 import sys
 import time
@@ -72,6 +74,7 @@ class AcquireContext:
     limits: Limits
     mode: RunMode
     retry: RetryConfig
+    allow_non_global_download_hosts: bool = False
     cfg: dict[str, Any] | None = None
 
 
@@ -112,6 +115,71 @@ def safe_name(s: str) -> str:
 
     s = re.sub(r"[^a-zA-Z0-9._-]+", "_", (s or "").strip())
     return s[:200] if s else "file"
+
+
+def _non_global_ip_reason(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> str:
+    if ip.is_private:
+        return "private"
+    if ip.is_loopback:
+        return "loopback"
+    if ip.is_link_local:
+        return "link_local"
+    if ip.is_multicast:
+        return "multicast"
+    if ip.is_reserved:
+        return "reserved"
+    if ip.is_unspecified:
+        return "unspecified"
+    return "non_global"
+
+
+def _resolve_host_ips(hostname: str) -> list[str]:
+    ips: set[str] = set()
+    try:
+        addrinfo = socket.getaddrinfo(hostname, None)
+    except socket.gaierror:
+        return []
+    for item in addrinfo:
+        sockaddr = item[4]
+        if sockaddr:
+            ips.add(sockaddr[0])
+    return sorted(ips)
+
+
+def validate_download_url(url: str, allow_non_global_hosts: bool) -> tuple[bool, str | None]:
+    parsed = urlparse(url)
+    scheme = (parsed.scheme or "").lower()
+    if scheme not in {"http", "https"}:
+        return False, f"unsupported_scheme:{scheme or 'missing'}"
+    if not parsed.hostname:
+        return False, "missing_hostname"
+    if allow_non_global_hosts:
+        return True, None
+    hostname = parsed.hostname
+    try:
+        ip_value = ipaddress.ip_address(hostname)
+    except ValueError:
+        ips = _resolve_host_ips(hostname)
+        if not ips:
+            return False, "unresolvable_hostname"
+        for ip_str in ips:
+            ip_value = ipaddress.ip_address(ip_str)
+            if not ip_value.is_global:
+                return False, f"blocked_ip:{ip_str}:{_non_global_ip_reason(ip_value)}"
+        return True, None
+    if not ip_value.is_global:
+        return False, f"blocked_ip:{ip_value}:{_non_global_ip_reason(ip_value)}"
+    return True, None
+
+
+def _validate_redirect_chain(
+    response: requests.Response, allow_non_global_hosts: bool
+) -> tuple[bool, str | None, str | None]:
+    for resp in response.history + [response]:
+        allowed, reason = validate_download_url(resp.url, allow_non_global_hosts)
+        if not allowed:
+            return False, reason, resp.url
+    return True, None, None
 
 
 def normalize_download(download: dict[str, Any]) -> dict[str, Any]:
@@ -184,6 +252,8 @@ def _http_download_with_resume(
 
     content_length: int | None = None
     resolved_url: str | None = None
+    blocked_url: str | None = None
+    blocked_reason: str | None = None
 
     def _stream_response(response: requests.Response, write_mode: str, existing_offset: int) -> None:
         nonlocal content_length, resolved_url
@@ -222,6 +292,15 @@ def _http_download_with_resume(
             ),
         )
 
+    allowed, reason = validate_download_url(url, ctx.allow_non_global_download_hosts)
+    if not allowed:
+        return {
+            "status": "error",
+            "error": "blocked_url",
+            "reason": reason,
+            "url": url,
+        }
+
     for attempt in range(max_attempts):
         headers: dict[str, str] = {}
         mode = "wb"
@@ -236,6 +315,11 @@ def _http_download_with_resume(
         try:
             with requests.get(url, stream=True, headers=headers, timeout=(15, 300)) as r:
                 r.raise_for_status()
+                allowed, reason, blocked = _validate_redirect_chain(r, ctx.allow_non_global_download_hosts)
+                if not allowed:
+                    blocked_reason = reason
+                    blocked_url = blocked
+                    break
                 if existing and ctx.mode.enable_resume:
                     content_range = r.headers.get("Content-Range")
                     valid_range = _valid_content_range(content_range, existing)
@@ -249,6 +333,13 @@ def _http_download_with_resume(
                         if r.status_code == 200:
                             with requests.get(url, stream=True, timeout=(15, 300)) as fresh:
                                 fresh.raise_for_status()
+                                allowed, reason, blocked = _validate_redirect_chain(
+                                    fresh, ctx.allow_non_global_download_hosts
+                                )
+                                if not allowed:
+                                    blocked_reason = reason
+                                    blocked_url = blocked
+                                    break
                                 _stream_response(fresh, "wb", 0)
                         else:
                             raise RuntimeError(
@@ -263,6 +354,15 @@ def _http_download_with_resume(
             time.sleep(sleep_time)
             continue
         break
+    if blocked_url:
+        temp_path.unlink(missing_ok=True)
+        return {
+            "status": "error",
+            "error": "blocked_url",
+            "reason": blocked_reason,
+            "url": url,
+            "blocked_url": blocked_url,
+        }
     actual_size = temp_path.stat().st_size
     if content_length is None:
         content_length = actual_size
@@ -955,6 +1055,11 @@ def run_acquire_worker(
     ap.add_argument("--verify-sha256", action="store_true", help="Compute sha256 for http downloads")
     ap.add_argument("--verify-zenodo-md5", action="store_true", help="Verify Zenodo md5")
     ap.add_argument(
+        "--allow-non-global-download-hosts",
+        action="store_true",
+        help="Allow downloads from non-global IPs (private/loopback/link-local/multicast/reserved/unspecified).",
+    )
+    ap.add_argument(
         "--resume",
         action=argparse.BooleanOptionalAction,
         default=True,
@@ -989,6 +1094,7 @@ def run_acquire_worker(
             max(1, args.workers),
         ),
         retry=RetryConfig(args.retry_max, args.retry_backoff),
+        allow_non_global_download_hosts=args.allow_non_global_download_hosts,
         cfg=cfg,
     )
 
