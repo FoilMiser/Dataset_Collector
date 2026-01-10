@@ -10,17 +10,12 @@ from pathlib import Path
 
 # Import registry to ensure specs are registered
 import collector_core.pipeline_specs_registry  # noqa: F401
-from collector_core import merge, yellow_screen_standard
+from collector_core import merge
 from collector_core.acquire_strategies import RootsDefaults, run_acquire_worker
 from collector_core.pipeline_factory import run_pipeline
 from collector_core.pipeline_registry import resolve_acquire_hooks, resolve_pipeline_context
 from collector_core.pipeline_spec import list_pipelines
-from collector_core.yellow_screen_chem import main as yellow_screen_chem
-from collector_core.yellow_screen_common import default_yellow_roots
-from collector_core.yellow_screen_econ import main as yellow_screen_econ
-from collector_core.yellow_screen_kg_nav import main as yellow_screen_kg_nav
-from collector_core.yellow_screen_nlp import main as yellow_screen_nlp
-from collector_core.yellow_screen_safety import main as yellow_screen_safety
+from collector_core.yellow_screen_dispatch import get_yellow_screen_main
 
 STAGE_ACQUIRE = "acquire"
 STAGE_MERGE = "merge"
@@ -113,24 +108,37 @@ def _run_merge(pipeline_id: str, slug: str, targets_path: Path | None, args: lis
 
 def _run_yellow_screen(slug: str, targets_path: Path | None, args: list[str], ctx) -> int:
     args = _resolve_targets_arg(args, targets_path, "--targets")
-    module = (
-        (ctx.overrides.get("yellow_screen") or "standard")
-        if isinstance(ctx.overrides, dict)
-        else "standard"
-    )
-    if module == "chem":
-        return _run_with_args(yellow_screen_chem, args)
-    if module == "econ":
-        return _run_with_args(yellow_screen_econ, args)
-    if module == "kg_nav":
-        return _run_with_args(yellow_screen_kg_nav, args)
-    if module == "nlp":
-        return _run_with_args(yellow_screen_nlp, args)
-    if module == "safety":
-        return _run_with_args(yellow_screen_safety, args)
+    try:
+        main_fn = get_yellow_screen_main(slug)
+        return _run_with_args(main_fn, args)
+    except ValueError:
+        # Fallback: if domain is not registered, check overrides
+        module = (
+            (ctx.overrides.get("yellow_screen") or "standard")
+            if isinstance(ctx.overrides, dict)
+            else "standard"
+        )
+        if module != "standard":
+            # Try to get from dispatch with override module name
+            from collector_core.pipeline_spec import get_pipeline_spec
 
-    defaults = default_yellow_roots(slug)
-    return _run_with_args(lambda: yellow_screen_standard.main(defaults=defaults), args)
+            spec = get_pipeline_spec(slug)
+            if spec is None:
+                # Create a temporary lookup using the override module
+                import importlib
+
+                module_name = f"collector_core.yellow_screen_{module}"
+                try:
+                    mod = importlib.import_module(module_name)
+                    return _run_with_args(mod.main, args)
+                except ImportError:
+                    pass
+        # Ultimate fallback to standard
+        from collector_core import yellow_screen_standard
+        from collector_core.yellow_screen_common import default_yellow_roots
+
+        defaults = default_yellow_roots(slug)
+        return _run_with_args(lambda: yellow_screen_standard.main(defaults=defaults), args)
 
 
 def main() -> int:

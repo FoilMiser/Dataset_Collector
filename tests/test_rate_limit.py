@@ -18,6 +18,7 @@ from collector_core.rate_limit import (  # noqa: E402
     RateLimiter,
     RateLimiterConfig,
     get_rate_limiter,
+    get_resolver_rate_limiter,
     get_service_rate_limiter,
     reset_rate_limiters,
 )
@@ -165,6 +166,50 @@ class TestRateLimiterConfig:
 
         assert limiter.available_tokens() == 10.0
 
+    def test_from_dict_requests_per_minute(self) -> None:
+        """Config converts requests_per_minute to refill_rate."""
+        config = RateLimiterConfig.from_dict({"requests_per_minute": 60})
+        assert config.refill_rate == 1.0  # 60/60 = 1 per second
+
+        config = RateLimiterConfig.from_dict({"requests_per_minute": 120})
+        assert config.refill_rate == 2.0  # 120/60 = 2 per second
+
+    def test_from_dict_requests_per_hour(self) -> None:
+        """Config converts requests_per_hour to refill_rate."""
+        config = RateLimiterConfig.from_dict({"requests_per_hour": 3600})
+        assert config.refill_rate == 1.0  # 3600/3600 = 1 per second
+
+        config = RateLimiterConfig.from_dict({"requests_per_hour": 60})
+        assert abs(config.refill_rate - (60 / 3600)) < 0.0001  # ~0.0167 per second
+
+    def test_from_dict_requests_per_second(self) -> None:
+        """Config uses requests_per_second directly."""
+        config = RateLimiterConfig.from_dict({"requests_per_second": 5.0})
+        assert config.refill_rate == 5.0
+
+    def test_from_dict_burst(self) -> None:
+        """Config uses burst as capacity."""
+        config = RateLimiterConfig.from_dict({"burst": 100})
+        assert config.capacity == 100.0
+
+    def test_from_dict_retry_options(self) -> None:
+        """Config loads retry options."""
+        config = RateLimiterConfig.from_dict(
+            {"retry_on_429": False, "retry_on_403": True, "exponential_backoff": False}
+        )
+        assert config.retry_on_429 is False
+        assert config.retry_on_403 is True
+        assert config.exponential_backoff is False
+
+    def test_from_dict_yaml_friendly_combination(self) -> None:
+        """Config handles typical YAML config from targets file."""
+        # Example config from targets_*.yaml
+        yaml_config = {"requests_per_minute": 30, "burst": 10, "retry_on_403": True}
+        config = RateLimiterConfig.from_dict(yaml_config)
+        assert config.capacity == 10.0  # burst
+        assert config.refill_rate == 0.5  # 30/60
+        assert config.retry_on_403 is True
+
 
 class TestSharedLimiters:
     """Tests for shared rate limiter registry."""
@@ -272,3 +317,56 @@ class TestRateLimitNoRequestBursts:
         clock.advance(0.21)
         assert limiter.try_acquire() is True
         assert limiter.try_acquire() is False  # Only ~1 token was added
+
+
+class TestGetResolverRateLimiter:
+    """Tests for get_resolver_rate_limiter function."""
+
+    def setup_method(self) -> None:
+        reset_rate_limiters()
+
+    def test_returns_none_limiter_when_no_config(self) -> None:
+        """Returns None limiter when no rate_limit config."""
+        limiter, config = get_resolver_rate_limiter(None, "github")
+        assert limiter is None
+        # But config should be the default for github
+        assert config.capacity == DEFAULT_RATE_LIMITS["github"].capacity
+
+    def test_returns_none_limiter_when_no_resolver_config(self) -> None:
+        """Returns None limiter when resolver has no rate_limit."""
+        cfg = {"resolvers": {"github": {"base_url": "https://api.github.com"}}}
+        limiter, config = get_resolver_rate_limiter(cfg, "github")
+        assert limiter is None
+
+    def test_returns_limiter_when_rate_limit_configured(self) -> None:
+        """Returns limiter when rate_limit is configured."""
+        cfg = {
+            "resolvers": {
+                "github": {
+                    "rate_limit": {"requests_per_minute": 60, "burst": 10, "retry_on_403": True}
+                }
+            }
+        }
+        limiter, config = get_resolver_rate_limiter(cfg, "github")
+        assert limiter is not None
+        assert limiter.capacity == 10.0  # burst
+        assert limiter.refill_rate == 1.0  # 60/60
+        assert config.retry_on_403 is True
+
+    def test_resolver_rate_limiter_figshare(self) -> None:
+        """Figshare rate limiting from config."""
+        cfg = {
+            "resolvers": {
+                "figshare": {"rate_limit": {"requests_per_minute": 30, "burst": 5}}
+            }
+        }
+        limiter, config = get_resolver_rate_limiter(cfg, "figshare")
+        assert limiter is not None
+        assert limiter.capacity == 5.0
+        assert limiter.refill_rate == 0.5  # 30/60
+
+    def test_unknown_resolver_returns_default_config(self) -> None:
+        """Unknown resolver returns default config."""
+        limiter, config = get_resolver_rate_limiter({}, "unknown_resolver")
+        assert limiter is None
+        assert config.capacity == RateLimiterConfig().capacity

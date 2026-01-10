@@ -59,16 +59,52 @@ class RateLimiterConfig:
     capacity: float = 60.0  # Maximum tokens (burst size)
     refill_rate: float = 1.0  # Tokens added per second
     initial_tokens: float | None = None  # Starting tokens (defaults to capacity)
+    retry_on_429: bool = True  # Retry on HTTP 429 Too Many Requests
+    retry_on_403: bool = False  # Retry on HTTP 403 (GitHub uses for rate limits)
+    exponential_backoff: bool = True  # Use exponential backoff on rate limit
 
     @classmethod
     def from_dict(cls, d: dict[str, Any] | None) -> RateLimiterConfig:
-        """Create config from dict (e.g., YAML config)."""
+        """Create config from dict (e.g., YAML config).
+
+        Supports both internal keys (capacity, refill_rate) and YAML-friendly keys:
+          - requests_per_second -> refill_rate
+          - requests_per_minute -> refill_rate (converted: rpm/60)
+          - requests_per_hour -> refill_rate (converted: rph/3600)
+          - burst -> capacity
+        """
         if not d:
             return cls()
+
+        # Determine capacity (burst size)
+        capacity = float(d.get("capacity", 60.0))
+        if "burst" in d:
+            capacity = float(d["burst"])
+
+        # Determine refill rate (tokens per second)
+        refill_rate = float(d.get("refill_rate", 1.0))
+        if "requests_per_second" in d:
+            refill_rate = float(d["requests_per_second"])
+        elif "requests_per_minute" in d:
+            refill_rate = float(d["requests_per_minute"]) / 60.0
+        elif "requests_per_hour" in d:
+            refill_rate = float(d["requests_per_hour"]) / 3600.0
+
+        # Determine initial tokens
+        initial_tokens = float(d["initial_tokens"]) if d.get("initial_tokens") else None
+
+        # Retry behavior options
+        retry_on_429 = bool(d.get("retry_on_429", True))
+        retry_on_403 = bool(d.get("retry_on_403", False))
+        exponential_backoff = bool(d.get("exponential_backoff", True))
+
         return cls(
-            capacity=float(d.get("capacity", 60.0)),
-            refill_rate=float(d.get("refill_rate", 1.0)),
-            initial_tokens=float(d["initial_tokens"]) if d.get("initial_tokens") else None,
+            capacity=capacity,
+            refill_rate=refill_rate,
+            initial_tokens=initial_tokens,
+            retry_on_429=retry_on_429,
+            retry_on_403=retry_on_403,
+            exponential_backoff=exponential_backoff,
         )
 
 
@@ -239,11 +275,51 @@ def get_service_rate_limiter(
     """
     default_cfg = DEFAULT_RATE_LIMITS.get(service, RateLimiterConfig())
     if config_override:
-        cfg = RateLimiterConfig(
-            capacity=config_override.get("capacity", default_cfg.capacity),
-            refill_rate=config_override.get("refill_rate", default_cfg.refill_rate),
-            initial_tokens=config_override.get("initial_tokens"),
-        )
+        # Use from_dict to support both old and new config keys
+        cfg = RateLimiterConfig.from_dict(config_override)
+        # Apply defaults for missing fields
+        if "capacity" not in config_override and "burst" not in config_override:
+            cfg = RateLimiterConfig(
+                capacity=default_cfg.capacity,
+                refill_rate=cfg.refill_rate,
+                initial_tokens=cfg.initial_tokens,
+                retry_on_429=cfg.retry_on_429,
+                retry_on_403=cfg.retry_on_403,
+                exponential_backoff=cfg.exponential_backoff,
+            )
     else:
         cfg = default_cfg
     return get_rate_limiter(service, config=cfg)
+
+
+def get_resolver_rate_limiter(
+    cfg: dict[str, Any] | None, resolver_name: str
+) -> tuple[RateLimiter | None, RateLimiterConfig]:
+    """
+    Get rate limiter from targets configuration for a specific resolver.
+
+    Looks up config at: cfg["resolvers"][resolver_name]["rate_limit"]
+
+    Args:
+        cfg: The full targets configuration dict (from YAML)
+        resolver_name: The resolver name (e.g., "github", "figshare")
+
+    Returns:
+        Tuple of (RateLimiter or None, RateLimiterConfig)
+        If no config found, returns (None, default_config)
+    """
+    if not cfg:
+        default_cfg = DEFAULT_RATE_LIMITS.get(resolver_name, RateLimiterConfig())
+        return None, default_cfg
+
+    resolvers = cfg.get("resolvers", {}) or {}
+    resolver_cfg = resolvers.get(resolver_name, {}) or {}
+    rate_limit_cfg = resolver_cfg.get("rate_limit")
+
+    if rate_limit_cfg:
+        config = RateLimiterConfig.from_dict(rate_limit_cfg)
+        limiter = get_rate_limiter(resolver_name, config=config)
+        return limiter, config
+    else:
+        default_cfg = DEFAULT_RATE_LIMITS.get(resolver_name, RateLimiterConfig())
+        return None, default_cfg
