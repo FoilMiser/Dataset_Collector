@@ -14,6 +14,7 @@ import gzip
 import json
 import sys
 import time
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -46,25 +47,113 @@ def file_stats(path: Path) -> dict[str, Any]:
     return {"name": path.name, "bytes": path.stat().st_size, "lines_estimate": count_lines(path, max_lines=1000)}
 
 
-def collect_raw_stats(root: Path) -> dict[str, Any]:
-    stats: dict[str, Any] = {"path": str(root), "buckets": {}}
+def collect_raw_stats(root: Path, top_n: int) -> dict[str, Any]:
+    stats: dict[str, Any] = {"path": str(root), "buckets": {}, "top_targets_by_bytes": []}
+    top_targets: list[dict[str, Any]] = []
     for bucket in ["green", "yellow"]:
         bucket_dir = root / bucket
-        bucket_stats = {"targets": 0, "bytes": 0, "files": 0}
+        bucket_stats = {"targets": 0, "bytes": 0, "files": 0, "pools": {}}
         if bucket_dir.exists():
             for pool_dir in bucket_dir.iterdir():
                 if not pool_dir.is_dir():
                     continue
+                pool_stats = {"targets": 0, "bytes": 0, "files": 0}
                 for target_dir in pool_dir.iterdir():
                     if not target_dir.is_dir():
                         continue
-                    bucket_stats["targets"] += 1
+                    pool_stats["targets"] += 1
+                    target_bytes = 0
+                    target_files = 0
                     for fp in target_dir.glob("**/*"):
                         if fp.is_file():
-                            bucket_stats["files"] += 1
-                            bucket_stats["bytes"] += fp.stat().st_size
+                            size = fp.stat().st_size
+                            target_files += 1
+                            target_bytes += size
+                            pool_stats["files"] += 1
+                            pool_stats["bytes"] += size
+                    top_targets.append(
+                        {
+                            "target_id": target_dir.name,
+                            "bucket": bucket,
+                            "pool": pool_dir.name,
+                            "bytes": target_bytes,
+                            "files": target_files,
+                        }
+                    )
+                bucket_stats["targets"] += pool_stats["targets"]
+                bucket_stats["bytes"] += pool_stats["bytes"]
+                bucket_stats["files"] += pool_stats["files"]
+                bucket_stats["pools"][pool_dir.name] = pool_stats
         stats["buckets"][bucket] = bucket_stats
+    stats["top_targets_by_bytes"] = sorted(top_targets, key=lambda item: item["bytes"], reverse=True)[:top_n]
     return stats
+
+
+def iter_jsonl(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rows.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+    return rows
+
+
+def collect_queue_stats(root: Path) -> dict[str, Any]:
+    queue_files = {
+        "green": root / "green_download.jsonl",
+        "yellow": root / "yellow_pipeline.jsonl",
+        "red": root / "red_rejected.jsonl",
+    }
+    stats: dict[str, Any] = {"path": str(root), "buckets": {}, "license_counts": {}}
+    license_counts: Counter[str] = Counter()
+    for bucket, path in queue_files.items():
+        pool_counts: Counter[str] = Counter()
+        rows = iter_jsonl(path)
+        for row in rows:
+            pool = row.get("output_pool") or row.get("license_profile") or "unknown"
+            pool_counts[str(pool)] += 1
+            license_name = row.get("resolved_spdx") or row.get("spdx_hint") or "unknown"
+            license_counts[str(license_name)] += 1
+        stats["buckets"][bucket] = {"targets": len(rows), "pools": dict(pool_counts)}
+    stats["license_counts"] = dict(license_counts)
+    return stats
+
+
+def collect_strategy_counts(cfg: dict[str, Any]) -> dict[str, int]:
+    counter: Counter[str] = Counter()
+    for target in cfg.get("targets", []) or []:
+        download = target.get("download", {}) or {}
+        strategy = download.get("strategy") or "unknown"
+        counter[str(strategy)] += 1
+    return dict(counter)
+
+
+def build_license_pool_summary(raw_stats: dict[str, Any], queue_stats: dict[str, Any]) -> dict[str, Any]:
+    summary: dict[str, Any] = {"green": {}, "yellow": {}, "red": {}}
+    for bucket in ["green", "yellow"]:
+        for pool, pool_stats in (raw_stats.get("buckets", {}).get(bucket, {}).get("pools", {}) or {}).items():
+            summary[bucket][pool] = {
+                "targets": pool_stats.get("targets", 0),
+                "bytes": pool_stats.get("bytes", 0),
+            }
+    red_pools = queue_stats.get("buckets", {}).get("red", {}).get("pools", {}) or {}
+    for pool, count in red_pools.items():
+        summary["red"][pool] = {"targets": count, "bytes": 0}
+    return summary
+
+
+def top_n_counts(counter: Counter[str], top_n: int) -> list[dict[str, Any]]:
+    return [
+        {"license": value, "count": count}
+        for value, count in sorted(counter.items(), key=lambda item: (-item[1], item[0]))[:top_n]
+    ]
 
 
 def collect_shard_stage(root: Path) -> dict[str, Any]:
@@ -116,19 +205,30 @@ def build_catalog(cfg: dict[str, Any], pipeline_slug: str | None = None) -> dict
     screened_root = Path(g.get("screened_yellow_root", default_root(pipeline_slug, "screened_yellow")))
     combined_root = Path(g.get("combined_root", default_root(pipeline_slug, "combined")))
     ledger_root = Path(g.get("ledger_root", default_root(pipeline_slug, "_ledger")))
+    queues_root = Path(g.get("queues_root", default_root(pipeline_slug, "_queues")))
+    top_n = int(g.get("catalog_top_n", 10))
 
     generated_at = utc_now()
+    raw_stats = collect_raw_stats(raw_root, top_n)
+    queue_stats = collect_queue_stats(queues_root)
+    license_pool_summary = build_license_pool_summary(raw_stats, queue_stats)
+    license_counts = Counter(queue_stats.get("license_counts", {}))
     catalog = {
         "generated_at_utc": generated_at,
         "written_at_utc": generated_at,
         "pipeline_version": PIPELINE_VERSION,
         "schema_version": SCHEMA_VERSION,
         "version": PIPELINE_VERSION,
-        "raw": collect_raw_stats(raw_root),
+        "raw": raw_stats,
         "screened_yellow": collect_shard_stage(screened_root),
         "combined": collect_shard_stage(combined_root),
         "ledgers": {},
+        "queues": queue_stats,
+        "license_pools": license_pool_summary,
+        "strategy_counts": collect_strategy_counts(cfg),
+        "top_licenses": top_n_counts(license_counts, top_n),
     }
+    catalog["top_targets_by_bytes"] = raw_stats.get("top_targets_by_bytes", [])
 
     for ledger_name in ["yellow_passed.jsonl", "yellow_pitched.jsonl", "combined_index.jsonl"]:
         lp = ledger_root / ledger_name
