@@ -28,6 +28,13 @@ StrategyHandler = Callable[["AcquireContext", dict[str, Any], Path], list[dict[s
 PostProcessor = Callable[["AcquireContext", dict[str, Any], Path, str, dict[str, Any]], dict[str, Any] | None]
 
 
+class MaxBytesExceeded(RuntimeError):
+    def __init__(self, downloaded: int, max_bytes: int) -> None:
+        super().__init__(f"Downloaded {downloaded} bytes which exceeds max of {max_bytes}.")
+        self.downloaded = downloaded
+        self.max_bytes = max_bytes
+
+
 @dataclasses.dataclass(frozen=True)
 class RootsDefaults:
     raw_root: str
@@ -151,6 +158,111 @@ def run_cmd(cmd: list[str], cwd: Path | None = None) -> str:
     return p.stdout.decode("utf-8", errors="ignore")
 
 
+def _dir_size(path: Path) -> int:
+    total = 0
+    if not path.exists():
+        return total
+    for p in path.rglob("*"):
+        if p.is_file():
+            total += p.stat().st_size
+    return total
+
+
+@dataclasses.dataclass
+class TargetLimitState:
+    max_bytes: int
+    total_bytes: int
+
+
+def _init_limit_state(ctx: AcquireContext, out_dir: Path) -> TargetLimitState | None:
+    if not ctx.limits.max_bytes_per_target:
+        return None
+    existing = _dir_size(out_dir)
+    return TargetLimitState(max_bytes=ctx.limits.max_bytes_per_target, total_bytes=existing)
+
+
+def _limit_exceeded_error(total_bytes: int, max_bytes: int, reason: str) -> dict[str, Any]:
+    return {
+        "status": "error",
+        "error": "max_bytes_exceeded",
+        "message": reason,
+        "bytes": total_bytes,
+        "max_bytes_per_target": max_bytes,
+        "aborted": True,
+        "fatal": True,
+    }
+
+
+def _remaining_bytes(limit_state: TargetLimitState | None) -> int | None:
+    if not limit_state:
+        return None
+    return limit_state.max_bytes - limit_state.total_bytes
+
+
+def _apply_limit_result(
+    limit_state: TargetLimitState | None,
+    result: dict[str, Any],
+    path: Path | None,
+    source: str | None = None,
+) -> dict[str, Any] | None:
+    if not limit_state:
+        return None
+    if result.get("status") != "ok":
+        return None
+    if result.get("cached"):
+        return None
+    size = result.get("content_length") or result.get("bytes")
+    if size is None and path:
+        try:
+            size = path.stat().st_size
+        except FileNotFoundError:
+            size = 0
+    limit_state.total_bytes += int(size or 0)
+    if limit_state.total_bytes > limit_state.max_bytes:
+        if path and path.exists():
+            path.unlink(missing_ok=True)
+        reason = f"Downloaded bytes exceeded max_bytes_per_target after {source or 'download'}."
+        return _limit_exceeded_error(limit_state.total_bytes, limit_state.max_bytes, reason)
+    return None
+
+
+def _http_download_with_limit(
+    ctx: AcquireContext,
+    url: str,
+    out_path: Path,
+    limit_state: TargetLimitState | None,
+    expected_size: int | None = None,
+    expected_sha256: str | None = None,
+) -> dict[str, Any]:
+    remaining = _remaining_bytes(limit_state)
+    if remaining is not None and remaining <= 0:
+        return _limit_exceeded_error(limit_state.total_bytes, limit_state.max_bytes, "Max bytes per target reached.")
+    result = _http_download_with_resume(
+        ctx,
+        url,
+        out_path,
+        expected_size,
+        expected_sha256,
+        max_bytes=remaining,
+    )
+    if result.get("status") == "error" and result.get("error") == "max_bytes_exceeded" and limit_state:
+        total = limit_state.total_bytes + int(result.get("bytes") or 0)
+        reason = f"Download exceeded max_bytes_per_target while fetching {url}."
+        return _limit_exceeded_error(total, limit_state.max_bytes, reason)
+    limit_error = _apply_limit_result(limit_state, result, out_path, source=url)
+    return limit_error or result
+
+
+def _check_target_size_limit(ctx: AcquireContext, out_dir: Path, reason: str) -> dict[str, Any] | None:
+    limit = ctx.limits.max_bytes_per_target
+    if not limit:
+        return None
+    total = _dir_size(out_dir)
+    if total > limit:
+        return _limit_exceeded_error(total, limit, reason)
+    return None
+
+
 def _parse_content_length(response: requests.Response, existing: int) -> int | None:
     content_range = response.headers.get("Content-Range")
     if content_range and "/" in content_range:
@@ -172,6 +284,7 @@ def _http_download_with_resume(
     out_path: Path,
     expected_size: int | None = None,
     expected_sha256: str | None = None,
+    max_bytes: int | None = None,
 ) -> dict[str, Any]:
     missing = requires("requests", requests, install="pip install requests")
     if missing:
@@ -187,9 +300,18 @@ def _http_download_with_resume(
         nonlocal content_length, resolved_url
         resolved_url = response.url
         content_length = _parse_content_length(response, existing_offset)
+        if max_bytes is not None:
+            if content_length is not None and content_length > max_bytes:
+                raise MaxBytesExceeded(content_length, max_bytes)
+            if existing_offset >= max_bytes:
+                raise MaxBytesExceeded(existing_offset, max_bytes)
         with temp_path.open(write_mode) as f:
+            total = existing_offset
             for chunk in response.iter_content(chunk_size=1024 * 1024):
                 if chunk:
+                    total += len(chunk)
+                    if max_bytes is not None and total > max_bytes:
+                        raise MaxBytesExceeded(total, max_bytes)
                     f.write(chunk)
 
     def _valid_content_range(header: str | None, start_offset: int) -> bool:
@@ -254,6 +376,16 @@ def _http_download_with_resume(
                             )
                 else:
                     _stream_response(r, mode, existing)
+        except MaxBytesExceeded as exc:
+            temp_path.unlink(missing_ok=True)
+            return {
+                "status": "error",
+                "error": "max_bytes_exceeded",
+                "message": str(exc),
+                "bytes": exc.downloaded,
+                "max_bytes": exc.max_bytes,
+                "resolved_url": resolved_url,
+            }
         except Exception as exc:
             if not _is_transient_error(exc) or attempt >= max_attempts - 1:
                 raise
@@ -304,6 +436,15 @@ def _http_download_with_resume(
 
 def handle_http_multi(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     download = normalize_download(row.get("download", {}) or {})
+    limit_state = _init_limit_state(ctx, out_dir)
+    if limit_state and limit_state.total_bytes > limit_state.max_bytes:
+        return [
+            _limit_exceeded_error(
+                limit_state.total_bytes,
+                limit_state.max_bytes,
+                "Existing data exceeds max_bytes_per_target before download.",
+            )
+        ]
     urls: list[str] = []
     if download.get("url"):
         urls.append(download["url"])
@@ -340,12 +481,24 @@ def handle_http_multi(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -
             expected = expected_sha256s[idx] if idx < len(expected_sha256s) else None
         elif expected_sha256_map is not None:
             expected = expected_sha256_map.get(filename) or expected_sha256_map.get(url)
-        results.append(_http_download_with_resume(ctx, url, out_path, download.get("expected_size"), expected))
+        result = _http_download_with_limit(ctx, url, out_path, limit_state, download.get("expected_size"), expected)
+        results.append(result)
+        if result.get("error") == "max_bytes_exceeded":
+            break
     return results
 
 
 def handle_http_single(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     download = normalize_download(row.get("download", {}) or {})
+    limit_state = _init_limit_state(ctx, out_dir)
+    if limit_state and limit_state.total_bytes > limit_state.max_bytes:
+        return [
+            _limit_exceeded_error(
+                limit_state.total_bytes,
+                limit_state.max_bytes,
+                "Existing data exceeds max_bytes_per_target before download.",
+            )
+        ]
     url = download.get("url") or download.get("urls", [None])[0]
     if not url:
         return [{"status": "error", "error": "missing url"}]
@@ -358,7 +511,14 @@ def handle_http_single(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) 
     if not ctx.mode.execute:
         return [{"status": "noop", "path": str(out_path)}]
     return [
-        _http_download_with_resume(ctx, url, out_path, download.get("expected_size"), download.get("expected_sha256"))
+        _http_download_with_limit(
+            ctx,
+            url,
+            out_path,
+            limit_state,
+            download.get("expected_size"),
+            download.get("expected_sha256"),
+        )
     ]
 
 
@@ -377,6 +537,15 @@ def handle_ftp(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
     download = normalize_download(row.get("download", {}) or {})
     base = download.get("base_url")
     globs = download.get("globs", ["*"])
+    limit_state = _init_limit_state(ctx, out_dir)
+    if limit_state and limit_state.total_bytes > limit_state.max_bytes:
+        return [
+            _limit_exceeded_error(
+                limit_state.total_bytes,
+                limit_state.max_bytes,
+                "Existing data exceeds max_bytes_per_target before download.",
+            )
+        ]
     missing = requires("ftplib", FTP, install="use a standard Python build that includes ftplib")
     if missing:
         return [{"status": "error", "error": missing}]
@@ -392,6 +561,16 @@ def handle_ftp(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
         for g in globs:
             files = ftp.nlst(g)
             for fname in files[: ctx.limits.limit_files or len(files)]:
+                remaining = _remaining_bytes(limit_state)
+                if remaining is not None and remaining <= 0:
+                    results.append(
+                        _limit_exceeded_error(
+                            limit_state.total_bytes,
+                            limit_state.max_bytes,
+                            "Max bytes per target reached before FTP download.",
+                        )
+                    )
+                    return results
                 local = out_dir / fname
                 ensure_dir(local.parent)
                 temp_path = local.with_name(f"{local.name}.part")
@@ -410,6 +589,10 @@ def handle_ftp(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
                         "sha256": sha256,
                     }
                 )
+                limit_error = _apply_limit_result(limit_state, results[-1], local, source=resolved_url)
+                if limit_error:
+                    results.append(limit_error)
+                    return results
     return results
 
 
@@ -435,6 +618,13 @@ def handle_git(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
                 run_cmd(["git", "-C", str(out_dir), "fetch", "--all", "--prune"])
             run_cmd(["git", "-C", str(out_dir), "checkout", revision])
         resolved = run_cmd(["git", "-C", str(out_dir), "rev-parse", "HEAD"]).strip()
+        limit_error = _check_target_size_limit(
+            ctx,
+            out_dir,
+            "Repository size exceeds max_bytes_per_target after checkout.",
+        )
+        if limit_error:
+            return [limit_error]
         result = {"status": "ok", "path": str(out_dir), "cached": True, "git_commit": resolved}
         if revision:
             result["git_revision"] = revision
@@ -448,6 +638,13 @@ def handle_git(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
     if revision:
         run_cmd(["git", "-C", str(out_dir), "checkout", revision])
     resolved = run_cmd(["git", "-C", str(out_dir), "rev-parse", "HEAD"]).strip()
+    limit_error = _check_target_size_limit(
+        ctx,
+        out_dir,
+        "Repository size exceeds max_bytes_per_target after clone.",
+    )
+    if limit_error:
+        return [limit_error]
     result = {"status": "ok", "path": str(out_dir), "log": log, "git_commit": resolved}
     if revision:
         result["git_revision"] = revision
@@ -474,6 +671,15 @@ def handle_zenodo(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> li
         return [{"status": "error", "error": missing}]
     if not ctx.mode.execute:
         return [{"status": "noop", "path": str(out_dir)}]
+    limit_state = _init_limit_state(ctx, out_dir)
+    if limit_state and limit_state.total_bytes > limit_state.max_bytes:
+        return [
+            _limit_exceeded_error(
+                limit_state.total_bytes,
+                limit_state.max_bytes,
+                "Existing data exceeds max_bytes_per_target before download.",
+            )
+        ]
     def _fetch() -> requests.Response:
         resp = requests.get(api_url, timeout=60)
         resp.raise_for_status()
@@ -498,7 +704,10 @@ def handle_zenodo(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> li
         filename = f.get("key") or f.get("name") or safe_name(link)
         out_path = out_dir / filename
         ensure_dir(out_path.parent)
-        r = _http_download_with_resume(ctx, link, out_path)
+        r = _http_download_with_limit(ctx, link, out_path, limit_state, f.get("size"))
+        if r.get("error") == "max_bytes_exceeded":
+            results.append(r)
+            break
         if ctx.mode.verify_zenodo_md5 and f.get("checksum", "").startswith("md5:"):
             expected_md5 = f["checksum"].split(":", 1)[1]
             if md5_file(out_path) != expected_md5:
@@ -511,6 +720,15 @@ def handle_dataverse(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) ->
     download = normalize_download(row.get("download", {}) or {})
     pid = download.get("persistent_id") or download.get("pid")
     instance = download.get("instance") or "https://dataverse.harvard.edu"
+    limit_state = _init_limit_state(ctx, out_dir)
+    if limit_state and limit_state.total_bytes > limit_state.max_bytes:
+        return [
+            _limit_exceeded_error(
+                limit_state.total_bytes,
+                limit_state.max_bytes,
+                "Existing data exceeds max_bytes_per_target before download.",
+            )
+        ]
     if not pid:
         return [{"status": "error", "error": "missing persistent_id"}]
     missing = requires("requests", requests, install="pip install requests")
@@ -519,14 +737,42 @@ def handle_dataverse(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) ->
     if not ctx.mode.execute:
         return [{"status": "noop", "path": str(out_dir)}]
     url = f"{instance}/api/access/dvobject/{pid}"
-    resp = requests.get(url, allow_redirects=True, timeout=60)
+    remaining = _remaining_bytes(limit_state)
+    if remaining is not None and remaining <= 0:
+        return [_limit_exceeded_error(limit_state.total_bytes, limit_state.max_bytes, "Max bytes per target reached.")]
+    resp = requests.get(url, allow_redirects=True, timeout=60, stream=True)
     resp.raise_for_status()
     filename = safe_name(urlparse(resp.url).path.split("/")[-1] or pid)
     out_path = out_dir / filename
     ensure_dir(out_path.parent)
     temp_path = out_path.with_name(f"{out_path.name}.part")
+    content_length_header = resp.headers.get("Content-Length")
+    if remaining is not None and content_length_header and content_length_header.isdigit():
+        if int(content_length_header) > remaining:
+            resp.close()
+            return [
+                _limit_exceeded_error(
+                    limit_state.total_bytes + int(content_length_header),
+                    limit_state.max_bytes,
+                    f"Dataverse download exceeds max_bytes_per_target for {pid}.",
+                )
+            ]
     with temp_path.open("wb") as f:
-        f.write(resp.content)
+        total = 0
+        for chunk in resp.iter_content(chunk_size=1024 * 1024):
+            if chunk:
+                total += len(chunk)
+                if remaining is not None and total > remaining:
+                    resp.close()
+                    temp_path.unlink(missing_ok=True)
+                    return [
+                        _limit_exceeded_error(
+                            limit_state.total_bytes + total,
+                            limit_state.max_bytes,
+                            f"Dataverse download exceeded max_bytes_per_target for {pid}.",
+                        )
+                    ]
+                f.write(chunk)
     content_length = temp_path.stat().st_size
     sha256 = sha256_file(temp_path)
     expected_sha256 = download.get("expected_sha256")
@@ -544,15 +790,15 @@ def handle_dataverse(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) ->
             }
         ]
     temp_path.replace(out_path)
-    return [
-        {
-            "status": "ok",
-            "path": str(out_path),
-            "resolved_url": resp.url,
-            "content_length": content_length,
-            "sha256": sha256,
-        }
-    ]
+    result = {
+        "status": "ok",
+        "path": str(out_path),
+        "resolved_url": resp.url,
+        "content_length": content_length,
+        "sha256": sha256,
+    }
+    limit_error = _apply_limit_result(limit_state, result, out_path, source=resp.url)
+    return [limit_error or result]
 
 
 def handle_figshare_article(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
@@ -572,6 +818,15 @@ def handle_figshare_article(ctx: AcquireContext, row: dict[str, Any], out_dir: P
     endpoint = f"{api_base}/articles/{article_id}"
     if not ctx.mode.execute:
         return [{"status": "noop", "article_id": article_id, "path": str(out_dir)}]
+    limit_state = _init_limit_state(ctx, out_dir)
+    if limit_state and limit_state.total_bytes > limit_state.max_bytes:
+        return [
+            _limit_exceeded_error(
+                limit_state.total_bytes,
+                limit_state.max_bytes,
+                "Existing data exceeds max_bytes_per_target before download.",
+            )
+        ]
     def _fetch() -> requests.Response:
         resp = requests.get(endpoint, timeout=60)
         resp.raise_for_status()
@@ -595,7 +850,10 @@ def handle_figshare_article(ctx: AcquireContext, row: dict[str, Any], out_dir: P
             continue
         fname = safe_name(fmeta.get("name") or fmeta.get("id") or f"figshare_file_{idx}")
         expected_size = fmeta.get("size")
-        results.append(_http_download_with_resume(ctx, download_url, out_dir / fname, expected_size))
+        result = _http_download_with_limit(ctx, download_url, out_dir / fname, limit_state, expected_size)
+        results.append(result)
+        if result.get("error") == "max_bytes_exceeded":
+            break
     write_json(out_dir / "figshare_article.json", meta)
     return results
 
@@ -614,6 +872,15 @@ def handle_figshare_files(ctx: AcquireContext, row: dict[str, Any], out_dir: Pat
         return [{"status": "error", "error": missing}]
     if not ctx.mode.execute:
         return [{"status": "noop", "path": str(out_dir)}]
+    limit_state = _init_limit_state(ctx, out_dir)
+    if limit_state and limit_state.total_bytes > limit_state.max_bytes:
+        return [
+            _limit_exceeded_error(
+                limit_state.total_bytes,
+                limit_state.max_bytes,
+                "Existing data exceeds max_bytes_per_target before download.",
+            )
+        ]
     def _fetch() -> requests.Response:
         resp = requests.get(api, timeout=120)
         resp.raise_for_status()
@@ -636,7 +903,10 @@ def handle_figshare_files(ctx: AcquireContext, row: dict[str, Any], out_dir: Pat
         filename = safe_name(f.get("name") or f.get("id") or str(article_id))
         out_path = out_dir / filename
 
-        results.append(_http_download_with_resume(ctx, link, out_path))
+        result = _http_download_with_limit(ctx, link, out_path, limit_state)
+        results.append(result)
+        if result.get("error") == "max_bytes_exceeded":
+            break
     return results or [{"status": "noop", "reason": "no files"}]
 
 
@@ -673,6 +943,15 @@ def make_github_release_handler(user_agent: str) -> StrategyHandler:
             url = f"{base}/latest"
         if not ctx.mode.execute:
             return [{"status": "noop", "release_url": url, "path": str(out_dir)}]
+        limit_state = _init_limit_state(ctx, out_dir)
+        if limit_state and limit_state.total_bytes > limit_state.max_bytes:
+            return [
+                _limit_exceeded_error(
+                    limit_state.total_bytes,
+                    limit_state.max_bytes,
+                    "Existing data exceeds max_bytes_per_target before download.",
+                )
+            ]
         resp = requests.get(url, headers=headers, timeout=60)
         resp.raise_for_status()
         meta = resp.json()
@@ -686,7 +965,10 @@ def make_github_release_handler(user_agent: str) -> StrategyHandler:
                 results.append({"status": "error", "error": "missing_download_url", "asset": asset.get("name")})
                 continue
             fname = safe_name(asset.get("name") or f"{repo}_asset_{idx}")
-            results.append(_http_download_with_resume(ctx, download_url, out_dir / fname, asset.get("size")))
+            result = _http_download_with_limit(ctx, download_url, out_dir / fname, limit_state, asset.get("size"))
+            results.append(result)
+            if result.get("error") == "max_bytes_exceeded":
+                break
         write_json(out_dir / "github_release.json", meta)
         return results
 
@@ -746,6 +1028,14 @@ def handle_s3_sync(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> l
             cmd += ["--request-payer", str(download.get("request_payer"))]
         cmd += [str(a) for a in extra_args]
         log = run_cmd(cmd)
+        limit_error = _check_target_size_limit(
+            ctx,
+            out_dir,
+            "S3 sync size exceeds max_bytes_per_target.",
+        )
+        if limit_error:
+            results.append(limit_error)
+            break
         results.append({"status": "ok", "path": str(out_dir), "log": log})
     return results
 
@@ -754,6 +1044,15 @@ def handle_aws_requester_pays(ctx: AcquireContext, row: dict[str, Any], out_dir:
     download = normalize_download(row.get("download", {}) or {})
     bucket = download.get("bucket")
     key = download.get("key")
+    limit_state = _init_limit_state(ctx, out_dir)
+    if limit_state and limit_state.total_bytes > limit_state.max_bytes:
+        return [
+            _limit_exceeded_error(
+                limit_state.total_bytes,
+                limit_state.max_bytes,
+                "Existing data exceeds max_bytes_per_target before download.",
+            )
+        ]
     if not bucket or not key:
         return [{"status": "error", "error": "missing bucket/key"}]
     dest_filename = download.get("dest_filename") or safe_name(Path(key).name)
@@ -762,6 +1061,9 @@ def handle_aws_requester_pays(ctx: AcquireContext, row: dict[str, Any], out_dir:
         return [{"status": "ok", "path": str(out_path), "cached": True}]
     if not ctx.mode.execute:
         return [{"status": "noop", "path": str(out_path)}]
+    remaining = _remaining_bytes(limit_state)
+    if remaining is not None and remaining <= 0:
+        return [_limit_exceeded_error(limit_state.total_bytes, limit_state.max_bytes, "Max bytes per target reached.")]
     ensure_dir(out_path.parent)
     payer = download.get("request_payer", "requester")
     temp_path = out_path.with_name(f"{out_path.name}.part")
@@ -793,7 +1095,8 @@ def handle_aws_requester_pays(ctx: AcquireContext, row: dict[str, Any], out_dir:
         "content_length": content_length,
         "sha256": sha256,
     }
-    return [result]
+    limit_error = _apply_limit_result(limit_state, result, out_path, source=f"s3://{bucket}/{key}")
+    return [limit_error or result]
 
 
 def handle_torrent(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
@@ -902,6 +1205,8 @@ def run_target(
     write_json(out_dir / "download_manifest.json", manifest)
 
     status = "ok" if any(r.get("status") == "ok" for r in manifest["results"]) else manifest["results"][0].get("status", "error")
+    if any(r.get("fatal") for r in manifest["results"]):
+        status = "error"
     if post_processors:
         for proc in post_processors.values():
             if isinstance(proc, dict) and proc.get("status") not in {"ok", "noop"}:
