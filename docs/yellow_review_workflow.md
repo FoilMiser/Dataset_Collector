@@ -38,7 +38,7 @@ Each YELLOW target MUST have a manifest directory and review signoff artifacts. 
      - `evidence_links_checked` (list)
      - `notes`
 3. **`yellow_screen_done.json` in the manifest directory**
-   - Written by `yellow_screen_worker.py` to record screening outcome.
+   - Written by the yellow-screen stage (`dc run --stage yellow_screen`) to record screening outcome.
    - Includes `status`, `reason`, and counts for `passed` and `pitched`.
 4. **Ledger outputs**
    - `*_ledger/yellow_passed.jsonl`
@@ -55,7 +55,7 @@ Each pipeline writes queue files to a per-pipeline queues root, configured via `
   yellow_pipeline.jsonl
 ```
 
-If `globals.queues_root` is not set, each pipeline falls back to a default `/data/<pipeline>/_queues` path (see each pipeline's `run_pipeline.sh` for defaults).
+If `globals.queues_root` is not set, each pipeline falls back to a default `/data/<pipeline>/_queues` path (the same defaults used by `dc run`).
 
 ### Unified review queue helper
 
@@ -87,19 +87,19 @@ The workflow is consistent across all pipelines:
 
 1. **Classify (`pipeline_driver.py`)**
    - Emits `green_download.jsonl` and `yellow_pipeline.jsonl` in the queues root.
-2. **Acquire YELLOW (`acquire_worker.py`)**
-   - Downloads YELLOW data into the raw YELLOW bucket.
+2. **Acquire YELLOW (`dc run --stage acquire`)**
+   - Downloads YELLOW data into the raw YELLOW bucket (legacy `acquire_worker.py` scripts are deprecated).
 3. **Manual review (`review-queue`)**
    - `list` to see pending entries.
    - `approve` for `ALLOW` or `ALLOW_WITH_RESTRICTIONS`.
    - `reject` for `PITCH`.
    - Writes `review_signoff.json` into the target manifest directory.
-4. **Screen YELLOW (`yellow_screen_worker.py`)**
+4. **Screen YELLOW (`dc run --stage yellow_screen`)**
    - If `globals.require_yellow_signoff: true` and no signoff is present, the target is pitched (`yellow_signoff_missing`).
    - If signoff `status` is `rejected`, the target is pitched (`yellow_signoff_rejected`).
    - If signoff `status` is `approved`, the target is screened and eligible for inclusion.
    - Outputs `screened_yellow/*/shards/*.jsonl.gz` and `yellow_screen_done.json`.
-5. **Merge (`merge_worker.py`)**
+5. **Merge (`dc run --stage merge`)**
    - Combines GREEN records with `screened_yellow` shards only.
    - Pitched YELLOW records never enter combined output.
 6. **Catalog (`catalog-builder`)**

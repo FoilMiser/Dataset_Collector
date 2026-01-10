@@ -97,33 +97,30 @@ For the shortest single-command run, expected output folders, log/manifest/ledge
 and clean-room rerun steps (what to delete vs. keep), see
 `docs/run_instructions.md`.
 
-## Standard CLI contract (`run_pipeline.sh`)
+## Unified CLI (`dc run`)
 
-All `*_pipeline_v2` directories expose a `run_pipeline.sh` entrypoint with a shared CLI contract. Individual pipelines may add additional flags, but the following is standardized.
+Use the unified CLI to run a single stage for any pipeline:
 
 ```bash
-./run_pipeline.sh --targets <targets.yaml> --stage <stage> [--execute] [other flags]
-
-Flags:
-  --targets <path>     Required path to the pipeline targets YAML.
-  --stage <stage>      Stage name to execute (see Stage names).
-  --execute            Perform the actual work (required for writes).
-  --help               Show usage.
+dc run --pipeline physics --stage acquire -- --queue /data/physics/_queues/green_pipeline.jsonl --bucket green --execute
+dc run --pipeline physics --stage merge -- --queue /data/physics/_queues/green_pipeline.jsonl --execute
+dc run --pipeline physics --stage yellow_screen -- --queue /data/physics/_queues/yellow_pipeline.jsonl --execute
 ```
 
-### Stage names
-Stages are pipeline-specific, but common stage names include:
+The `--` separator passes additional flags directly to the underlying stage worker (so you can continue to use
+`--targets`, `--queue`, `--execute`, etc.). Pipeline-specific overrides live in `configs/pipelines.yaml`, and can
+point to optional plugin hooks for specialized acquisition or yellow-screen logic.
 
-- `classify`
-- `acquire_green`
-- `acquire_yellow`
-- `screen_yellow`
-- `merge`
-- `catalog`
+Available stages are `acquire`, `merge`, and `yellow_screen`.
 
-## Example sequential execution flow
+### Deprecated pipeline scripts
+The per-pipeline worker scripts (`acquire_worker.py`, `merge_worker.py`, `yellow_screen_worker.py`) and the
+`run_pipeline.sh` wrappers are deprecated in favor of `dc run`. They remain in place for backwards compatibility,
+but new usage should prefer the unified CLI.
 
-A typical end-to-end execution sequence:
+## Example sequential execution flow (legacy wrapper)
+
+The legacy `run_pipeline.sh` wrapper is deprecated but still supported for existing workflows. A typical end-to-end execution sequence:
 
 ```bash
 ./run_pipeline.sh --targets targets_math.yaml --stage classify --execute
@@ -144,7 +141,8 @@ To preview the actions without writing data, omit `--execute` (dry-run):
 
 ### Jupyter (Windows-first, bash optional)
 
-The notebook runs on Windows-first Python. Use `bash run_pipeline.sh ...` cells if
+The notebook runs on Windows-first Python. If you are still using the legacy
+`run_pipeline.sh` wrappers (deprecated), use `bash run_pipeline.sh ...` cells when
 you have WSL or another shell with `bash` available; otherwise use the Windows-native
 orchestrator below.
 
@@ -204,7 +202,7 @@ Within each `*_pipeline_v2` directory, you should expect:
 
 ```
 *_pipeline_v2/
-  run_pipeline.sh
+  run_pipeline.sh  # deprecated legacy wrapper
   requirements.txt
   pipeline_driver.py
   acquire_worker.py
@@ -220,6 +218,7 @@ configs/
     license_map.yaml
     field_schemas.yaml
     denylist.yaml
+  pipelines.yaml
 ```
 
 Targets YAMLs point at companion files using relative paths, for example in

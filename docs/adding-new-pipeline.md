@@ -16,7 +16,7 @@ The scaffolded directory includes:
 ```
 your_domain_pipeline_v2/
   README.md
-  run_pipeline.sh
+  run_pipeline.sh  # deprecated legacy wrapper
   pipeline_driver.py
   acquire_worker.py
   yellow_screen_worker.py
@@ -29,15 +29,12 @@ your_domain_pipeline_v2/
 
 Use existing pipelines as references for domain-specific customization.
 
-## 2. Implement the CLI entrypoint
+## 2. Wire the unified CLI configuration
 
-Ensure `run_pipeline.sh` follows the standard CLI contract documented in the README:
-
-```bash
-./run_pipeline.sh --targets <targets.yaml> --stage <stage> [--execute]
-```
-
-This script should call the Python driver with the same arguments.
+The preferred entrypoint is `dc run`, which uses `configs/pipelines.yaml` to register any
+pipeline-specific hooks (custom acquisition strategies, yellow-screen modules, etc.).
+If your new pipeline needs special behavior, add a new entry under `pipelines:` for its slug.
+Legacy `run_pipeline.sh` scripts remain for backwards compatibility but are deprecated.
 
 ## 3. Wire up the driver and workers
 
@@ -95,7 +92,7 @@ pipelines:
 Run a dry-run classification to validate the wiring:
 
 ```bash
-./run_pipeline.sh --targets targets_your_domain.yaml --stage classify
+python your_domain_pipeline_v2/pipeline_driver.py --targets targets_your_domain.yaml
 ```
 
 Then run with `--execute` once the dry-run succeeds.
