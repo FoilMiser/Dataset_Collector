@@ -21,7 +21,7 @@ def _write_pipeline(repo_root: Path, name: str, targets: list[dict]) -> None:
     )
     _write_yaml(
         pipeline_dir / "targets.yaml",
-        {"schema_version": "1.0", "targets": targets},
+        {"schema_version": "0.9", "targets": targets},
     )
 
 
