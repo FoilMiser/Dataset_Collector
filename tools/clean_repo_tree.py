@@ -21,6 +21,27 @@ OUTPUT_DIR_NAMES = {
     "_pitches",
 }
 
+RUNTIME_CACHE_DIR_NAMES = {
+    ".cache",
+    ".mypy_cache",
+    ".nox",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".tox",
+    ".venv",
+    ".eggs",
+    "venv",
+    "__pycache__",
+    "build",
+    "dist",
+    "htmlcov",
+}
+
+RUNTIME_CACHE_FILE_NAMES = {
+    ".coverage",
+    "coverage.xml",
+}
+
 
 def _remove_runtime_artifacts(repo_root: Path) -> None:
     runtime_cache = repo_root / "tools" / "__pycache__"
@@ -29,17 +50,23 @@ def _remove_runtime_artifacts(repo_root: Path) -> None:
 
 
 def _iter_candidates(repo_root: Path) -> Iterable[Path]:
-    for path in repo_root.rglob(".pytest_cache"):
-        if path.is_dir():
-            yield path
-    for path in repo_root.rglob("__pycache__"):
-        if path.is_dir():
-            yield path
-    for path in repo_root.rglob("*.pyc"):
-        if path.is_file():
-            yield path
     for path in repo_root.rglob("*"):
         if path.is_dir() and path.name in OUTPUT_DIR_NAMES:
+            yield path
+            continue
+        if path.is_dir() and path.name in RUNTIME_CACHE_DIR_NAMES:
+            yield path
+            continue
+        if path.is_dir() and path.name.endswith(".egg-info"):
+            yield path
+            continue
+        if path.is_dir() and path.name == ".ipynb_checkpoints":
+            yield path
+            continue
+        if path.is_file() and path.suffix == ".pyc":
+            yield path
+            continue
+        if path.is_file() and path.name in RUNTIME_CACHE_FILE_NAMES:
             yield path
 
 
