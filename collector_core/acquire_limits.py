@@ -5,6 +5,85 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+# Default allowed content types for downloads
+DEFAULT_ALLOWED_CONTENT_TYPES: frozenset[str] = frozenset({
+    # Text formats
+    "text/plain",
+    "text/csv",
+    "text/html",
+    "text/xml",
+    "application/json",
+    "application/xml",
+    "application/x-yaml",
+    # Archive formats
+    "application/zip",
+    "application/gzip",
+    "application/x-gzip",
+    "application/x-tar",
+    "application/x-bzip2",
+    "application/x-xz",
+    "application/x-7z-compressed",
+    # Data formats
+    "application/pdf",
+    "application/octet-stream",  # Generic binary
+    # Dataset formats
+    "application/x-hdf5",
+    "application/x-netcdf",
+    "application/parquet",
+    # Images (for datasets with image data)
+    "image/png",
+    "image/jpeg",
+    "image/gif",
+    "image/webp",
+    "image/tiff",
+})
+
+# Blocked content types that should never be downloaded
+BLOCKED_CONTENT_TYPES: frozenset[str] = frozenset({
+    "text/html",  # Often indicates error pages when expecting data
+    "application/javascript",
+    "application/x-javascript",
+    "text/javascript",
+})
+
+# Default download size limits (in bytes)
+DEFAULT_MAX_BYTES_PER_FILE: int = 10 * 1024 * 1024 * 1024  # 10 GB
+DEFAULT_MAX_BYTES_PER_TARGET: int = 100 * 1024 * 1024 * 1024  # 100 GB
+DEFAULT_MAX_FILES_PER_TARGET: int = 10000
+
+
+def validate_content_type(
+    content_type: str | None,
+    allowed: frozenset[str] | None = None,
+    blocked: frozenset[str] | None = None,
+) -> tuple[bool, str | None]:
+    """
+    Validate that a content type is acceptable.
+
+    Args:
+        content_type: The Content-Type header value
+        allowed: Set of allowed content types (None = allow all except blocked)
+        blocked: Set of blocked content types
+
+    Returns:
+        (is_valid, reason) tuple
+    """
+    if content_type is None:
+        return True, None  # No content type is acceptable
+
+    # Normalize: strip parameters (e.g., "text/html; charset=utf-8" -> "text/html")
+    normalized = content_type.split(";")[0].strip().lower()
+
+    # Check blocked list
+    if blocked and normalized in blocked:
+        return False, f"blocked_content_type:{normalized}"
+
+    # If allowed list is specified, check it
+    if allowed and normalized not in allowed:
+        return False, f"unexpected_content_type:{normalized}"
+
+    return True, None
+
 
 def _as_int(value: Any) -> int | None:
     if value is None:

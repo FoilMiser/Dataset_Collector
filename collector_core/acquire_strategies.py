@@ -23,6 +23,15 @@ from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.config_validator import read_yaml
 from collector_core.dependencies import _try_import, requires
 from collector_core.network_utils import _with_retries
+from collector_core.utils import (
+    utc_now,
+    ensure_dir,
+    write_json,
+    safe_filename,
+)
+
+# Alias for backwards compatibility
+safe_name = safe_filename
 
 requests = _try_import("requests")
 FTP = _try_import("ftplib", "FTP")
@@ -80,15 +89,8 @@ class AcquireContext:
     cfg: dict[str, Any] | None = None
 
 
-def utc_now() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-
-
-def ensure_dir(path: Path) -> None:
-    path.mkdir(parents=True, exist_ok=True)
-
-
-def read_jsonl(path: Path) -> list[dict[str, Any]]:
+def _read_jsonl_list(path: Path) -> list[dict[str, Any]]:
+    """Read JSONL file and return as list (local non-gzip version for backwards compatibility)."""
     rows: list[dict[str, Any]] = []
     with path.open("r", encoding="utf-8") as f:
         for line in f:
@@ -96,27 +98,6 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
             if line:
                 rows.append(json.loads(line))
     return rows
-
-
-def write_json(path: Path, obj: dict[str, Any]) -> None:
-    ensure_dir(path.parent)
-    tmp_path = Path(f"{path}.tmp")
-    tmp_path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    tmp_path.replace(path)
-
-
-def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
-    ensure_dir(path.parent)
-    with path.open("w", encoding="utf-8") as f:
-        for row in rows:
-            f.write(json.dumps(row, ensure_ascii=False) + "\n")
-
-
-def safe_name(s: str) -> str:
-    import re
-
-    s = re.sub(r"[^a-zA-Z0-9._-]+", "_", (s or "").strip())
-    return s[:200] if s else "file"
 
 
 def _non_global_ip_reason(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> str:
@@ -1427,7 +1408,7 @@ def run_acquire_worker(
     args = ap.parse_args()
 
     queue_path = Path(args.queue).expanduser().resolve()
-    rows = read_jsonl(queue_path)
+    rows = _read_jsonl_list(queue_path)
 
     targets_path = Path(args.targets_yaml).expanduser().resolve() if args.targets_yaml else None
     cfg = load_config(targets_path)

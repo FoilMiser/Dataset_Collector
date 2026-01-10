@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextvars
 import json
 import logging
 import time
@@ -8,6 +9,51 @@ from typing import Any
 from collector_core.secrets import redact_string, redact_structure
 
 _CONFIGURED = False
+
+# Context variables for structured logging
+_log_context: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar(
+    "log_context", default={}
+)
+
+
+def get_log_context() -> dict[str, Any]:
+    """Get the current logging context."""
+    return _log_context.get().copy()
+
+
+def set_log_context(**kwargs: Any) -> None:
+    """Set the current logging context (replaces existing)."""
+    _log_context.set(dict(kwargs))
+
+
+def update_log_context(**kwargs: Any) -> None:
+    """Update the current logging context (merges with existing)."""
+    current = _log_context.get().copy()
+    current.update(kwargs)
+    _log_context.set(current)
+
+
+def clear_log_context() -> None:
+    """Clear the current logging context."""
+    _log_context.set({})
+
+
+class LogContext:
+    """Context manager for temporary log context."""
+
+    def __init__(self, **kwargs: Any):
+        self.kwargs = kwargs
+        self.token: contextvars.Token | None = None
+
+    def __enter__(self) -> "LogContext":
+        current = _log_context.get().copy()
+        current.update(self.kwargs)
+        self.token = _log_context.set(current)
+        return self
+
+    def __exit__(self, *args: Any) -> None:
+        if self.token is not None:
+            _log_context.reset(self.token)
 
 
 class TextFormatter(logging.Formatter):
@@ -41,6 +87,12 @@ class JsonFormatter(logging.Formatter):
             "logger": record.name,
             "message": message,
         }
+
+        # Include structured context
+        context = get_log_context()
+        if context:
+            payload["context"] = redact_structure(context)
+
         if record.exc_info:
             payload["exc_info"] = redact_string(self.formatException(record.exc_info))
         return json.dumps(payload, ensure_ascii=False)

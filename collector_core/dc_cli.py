@@ -9,13 +9,18 @@ from typing import Callable
 
 from collector_core import merge, yellow_screen_standard
 from collector_core.acquire_strategies import RootsDefaults, run_acquire_worker
+from collector_core.pipeline_factory import get_pipeline_driver, run_pipeline
 from collector_core.pipeline_registry import resolve_acquire_hooks, resolve_pipeline_context
+from collector_core.pipeline_spec import list_pipelines
 from collector_core.yellow_screen_common import default_yellow_roots
 from collector_core.yellow_screen_chem import main as yellow_screen_chem
 from collector_core.yellow_screen_econ import main as yellow_screen_econ
 from collector_core.yellow_screen_kg_nav import main as yellow_screen_kg_nav
 from collector_core.yellow_screen_nlp import main as yellow_screen_nlp
 from collector_core.yellow_screen_safety import main as yellow_screen_safety
+
+# Import registry to ensure specs are registered
+import collector_core.pipeline_specs_registry  # noqa: F401
 
 STAGE_ACQUIRE = "acquire"
 STAGE_MERGE = "merge"
@@ -38,7 +43,12 @@ def _run_with_args(func: Callable[[], int | None], argv: list[str]) -> int:
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Dataset Collector CLI.")
-    sub = parser.add_subparsers(dest="command", required=True)
+    parser.add_argument(
+        "--list-pipelines",
+        action="store_true",
+        help="List all available pipelines.",
+    )
+    sub = parser.add_subparsers(dest="command")
     run = sub.add_parser("run", help="Run a pipeline stage.")
     run.add_argument("--pipeline", help="Pipeline id or slug (e.g. physics_pipeline_v2 or physics).")
     run.add_argument(
@@ -53,6 +63,12 @@ def _parse_args() -> argparse.Namespace:
         help="Repository root containing pipeline directories (default: .).",
     )
     run.add_argument("args", nargs=argparse.REMAINDER)
+
+    # Add pipeline subcommand for running full pipeline drivers
+    pipeline_parser = sub.add_parser("pipeline", help="Run a full pipeline driver.")
+    pipeline_parser.add_argument("domain", help="Pipeline domain (e.g., chem, physics).")
+    pipeline_parser.add_argument("args", nargs=argparse.REMAINDER)
+
     return parser.parse_args()
 
 
@@ -113,6 +129,26 @@ def _run_yellow_screen(slug: str, targets_path: Path | None, args: list[str], ct
 
 def main() -> int:
     args = _parse_args()
+
+    # Handle --list-pipelines flag
+    if args.list_pipelines:
+        print("Available pipelines:")
+        for domain in list_pipelines():
+            print(f"  - {domain}")
+        return 0
+
+    if not args.command:
+        print("No command specified. Use 'run' or 'pipeline', or --list-pipelines.")
+        return 1
+
+    # Handle pipeline command (run full pipeline driver)
+    if args.command == "pipeline":
+        passthrough = list(args.args)
+        if passthrough[:1] == ["--"]:
+            passthrough = passthrough[1:]
+        return _run_with_args(lambda: run_pipeline(args.domain), passthrough)
+
+    # Handle run command (individual stages)
     passthrough = list(args.args)
     if passthrough[:1] == ["--"]:
         passthrough = passthrough[1:]

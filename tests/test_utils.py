@@ -1,0 +1,189 @@
+"""Tests for collector_core.utils module."""
+from __future__ import annotations
+
+import gzip
+import json
+from pathlib import Path
+
+import pytest
+
+from collector_core.utils import (
+    utc_now,
+    ensure_dir,
+    sha256_bytes,
+    sha256_text,
+    sha256_file,
+    normalize_whitespace,
+    lower,
+    read_json,
+    write_json,
+    read_jsonl,
+    read_jsonl_list,
+    write_jsonl,
+    append_jsonl,
+    safe_filename,
+    contains_any,
+    coerce_int,
+)
+
+
+class TestUtcNow:
+    def test_format(self):
+        result = utc_now()
+        assert result.endswith("Z")
+        assert "T" in result
+        assert len(result) == 20  # YYYY-MM-DDTHH:MM:SSZ
+
+
+class TestEnsureDir:
+    def test_creates_nested_dirs(self, tmp_path: Path):
+        target = tmp_path / "a" / "b" / "c"
+        ensure_dir(target)
+        assert target.exists()
+        assert target.is_dir()
+
+    def test_idempotent(self, tmp_path: Path):
+        target = tmp_path / "exists"
+        target.mkdir()
+        ensure_dir(target)  # Should not raise
+        assert target.exists()
+
+
+class TestSha256:
+    def test_sha256_bytes(self):
+        result = sha256_bytes(b"hello")
+        assert len(result) == 64
+        assert result == "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+
+    def test_sha256_text_normalizes_whitespace(self):
+        result1 = sha256_text("hello  world")
+        result2 = sha256_text("hello world")
+        result3 = sha256_text("hello\n\tworld")
+        assert result1 == result2 == result3
+
+    def test_sha256_file(self, tmp_path: Path):
+        file = tmp_path / "test.txt"
+        file.write_bytes(b"hello")
+        result = sha256_file(file)
+        assert result == "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+
+    def test_sha256_file_missing(self, tmp_path: Path):
+        result = sha256_file(tmp_path / "nonexistent.txt")
+        assert result is None
+
+
+class TestNormalizeWhitespace:
+    def test_collapses_spaces(self):
+        assert normalize_whitespace("a  b   c") == "a b c"
+
+    def test_handles_newlines_tabs(self):
+        assert normalize_whitespace("a\n\tb") == "a b"
+
+    def test_strips(self):
+        assert normalize_whitespace("  hello  ") == "hello"
+
+    def test_handles_none(self):
+        assert normalize_whitespace(None) == ""
+
+
+class TestLower:
+    def test_lowercases(self):
+        assert lower("HELLO") == "hello"
+
+    def test_handles_none(self):
+        assert lower(None) == ""
+
+
+class TestJsonIO:
+    def test_write_read_json(self, tmp_path: Path):
+        file = tmp_path / "test.json"
+        data = {"key": "value", "number": 42}
+        write_json(file, data)
+        result = read_json(file)
+        assert result == data
+
+    def test_write_json_atomic(self, tmp_path: Path):
+        file = tmp_path / "test.json"
+        write_json(file, {"a": 1})
+        # No .tmp file should remain
+        assert not (tmp_path / "test.json.tmp").exists()
+
+
+class TestJsonlIO:
+    def test_write_read_jsonl(self, tmp_path: Path):
+        file = tmp_path / "test.jsonl"
+        rows = [{"a": 1}, {"b": 2}]
+        write_jsonl(file, rows)
+        result = read_jsonl_list(file)
+        assert result == rows
+
+    def test_write_read_jsonl_gzip(self, tmp_path: Path):
+        file = tmp_path / "test.jsonl.gz"
+        rows = [{"a": 1}, {"b": 2}]
+        write_jsonl(file, rows)
+        result = read_jsonl_list(file)
+        assert result == rows
+
+    def test_append_jsonl(self, tmp_path: Path):
+        file = tmp_path / "test.jsonl"
+        write_jsonl(file, [{"a": 1}])
+        append_jsonl(file, [{"b": 2}])
+        result = read_jsonl_list(file)
+        assert result == [{"a": 1}, {"b": 2}]
+
+    def test_read_jsonl_skips_invalid(self, tmp_path: Path):
+        file = tmp_path / "test.jsonl"
+        file.write_text('{"valid": true}\ninvalid json\n{"also": "valid"}\n')
+        result = read_jsonl_list(file)
+        assert len(result) == 2
+
+
+class TestSafeFilename:
+    def test_replaces_special_chars(self):
+        assert safe_filename("hello world!@#") == "hello_world_"
+
+    def test_truncates(self):
+        result = safe_filename("a" * 300, max_length=10)
+        assert len(result) == 10
+
+    def test_handles_empty(self):
+        assert safe_filename("") == "file"
+        assert safe_filename(None) == "file"
+
+    def test_removes_directory_separators(self):
+        result = safe_filename("path/to/file.txt")
+        assert "/" not in result
+        assert result == "path_to_file.txt"
+
+    def test_handles_windows_reserved_names(self):
+        result = safe_filename("CON")
+        assert result == "_CON"
+        result = safe_filename("NUL.txt")
+        assert result == "_NUL.txt"
+
+
+class TestContainsAny:
+    def test_finds_matches(self):
+        result = contains_any("Hello World", ["hello", "foo"])
+        assert result == ["hello"]
+
+    def test_case_insensitive(self):
+        result = contains_any("HELLO", ["hello"])
+        assert result == ["hello"]
+
+    def test_no_matches(self):
+        result = contains_any("hello", ["foo", "bar"])
+        assert result == []
+
+
+class TestCoerceInt:
+    def test_valid_int(self):
+        assert coerce_int("42") == 42
+        assert coerce_int(42) == 42
+
+    def test_invalid_returns_default(self):
+        assert coerce_int("not a number", default=0) == 0
+        assert coerce_int(None, default=-1) == -1
+
+    def test_invalid_no_default(self):
+        assert coerce_int("invalid") is None
