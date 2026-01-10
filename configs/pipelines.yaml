@@ -1,0 +1,36 @@
+pipelines:
+  3d_modeling:
+    acquire:
+      plugin_module: acquire_worker.py
+      postprocess: modeling_postprocess
+  chem:
+    acquire:
+      figshare_variant: article
+      github_release_repo: chem-corpus-acquire
+    yellow_screen: chem
+  code:
+    acquire:
+      plugin_module: acquire_worker.py
+      postprocess: code_postprocess
+  econ_stats_decision_adaptation:
+    yellow_screen: econ
+  kg_nav:
+    acquire:
+      figshare_variant: files
+      extra_handlers:
+        - s3_sync
+        - aws_requester_pays
+        - torrent
+    yellow_screen: kg_nav
+  metrology:
+    acquire:
+      plugin_module: acquire_worker.py
+      postprocess: metrology_postprocess
+      wrap_handlers: apply_artifacts_dir
+  nlp:
+    acquire:
+      figshare_variant: article
+      github_release_repo: nlp-corpus-acquire
+    yellow_screen: nlp
+  safety_incident:
+    yellow_screen: safety

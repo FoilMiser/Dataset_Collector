@@ -5,6 +5,9 @@ behave across every `*_pipeline_v2/` directory. It complements
 `docs/output_contract.md` (what files are produced) by defining **how** the
 CLI/runtime determines those locations and retries.
 
+The preferred entrypoint for these stages is `dc run --pipeline <slug> --stage <acquire|merge|yellow_screen> -- ...`.
+Direct use of per-pipeline `*_worker.py` scripts or `run_pipeline.sh` wrappers is deprecated but still supported.
+
 ## Scope
 
 Applies to:
