@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-import importlib.util
+import ast
 import json
 import shutil
 import sys
@@ -30,17 +30,48 @@ def _load_yaml(path: Path, schema_name: str) -> dict[str, Any]:
 
 
 def _load_strategy_handlers(acquire_worker_path: Path) -> set[str]:
-    module_name = f"acquire_worker_{acquire_worker_path.parent.name}"
-    spec = importlib.util.spec_from_file_location(module_name, acquire_worker_path)
-    if not spec or not spec.loader:
-        raise RuntimeError(f"Unable to load module from {acquire_worker_path}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = module
-    spec.loader.exec_module(module)
-    handlers = getattr(module, "STRATEGY_HANDLERS", None)
-    if not isinstance(handlers, dict):
+    source = acquire_worker_path.read_text(encoding="utf-8")
+    tree = ast.parse(source, filename=str(acquire_worker_path))
+    handlers_node: ast.AST | None = None
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == "STRATEGY_HANDLERS":
+                    handlers_node = node.value
+        elif isinstance(node, ast.AnnAssign):
+            target = node.target
+            if isinstance(target, ast.Name) and target.id == "STRATEGY_HANDLERS":
+                handlers_node = node.value
+
+    if handlers_node is None:
         raise RuntimeError(f"STRATEGY_HANDLERS not found in {acquire_worker_path}")
-    return set(handlers.keys())
+
+    if not isinstance(handlers_node, ast.Dict):
+        raise RuntimeError(
+            f"STRATEGY_HANDLERS must be a dict literal in {acquire_worker_path}"
+        )
+
+    handler_keys: set[str] = set()
+    for key_node in handlers_node.keys:
+        if key_node is None:
+            continue
+        try:
+            key_value = ast.literal_eval(key_node)
+        except (ValueError, SyntaxError) as exc:
+            raise RuntimeError(
+                f"Non-literal STRATEGY_HANDLERS key in {acquire_worker_path}"
+            ) from exc
+        if not isinstance(key_value, str):
+            raise RuntimeError(
+                f"STRATEGY_HANDLERS keys must be strings in {acquire_worker_path}"
+            )
+        handler_keys.add(key_value)
+
+    if not handler_keys:
+        raise RuntimeError(f"STRATEGY_HANDLERS has no keys in {acquire_worker_path}")
+
+    return handler_keys
 
 
 def run_preflight(
