@@ -1,5 +1,8 @@
 # Dataset Collector - Combined Requirements
 #
+# Source of truth: pyproject.toml [project.dependencies].
+# Keep this file in sync for constraint generation/CI installs.
+#
 # Core dependencies required across pipelines
 pyyaml>=6.0
 requests>=2.32.2,<2.33

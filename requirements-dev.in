@@ -1,3 +1,4 @@
+# Source of truth: pyproject.toml [project.optional-dependencies]. Keep in sync.
 -r requirements.in
 jupyterlab
 ipykernel
