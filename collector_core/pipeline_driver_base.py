@@ -922,13 +922,17 @@ def spdx_bucket(license_map: LicenseMap, spdx: str) -> str:
 
 def extract_text_from_path(path: Path, evidence: dict[str, Any] | None = None) -> str:
     if not path.exists():
+        if evidence is not None:
+            evidence["text_extraction_failed"] = True
         return ""
     if path.suffix.lower() == ".pdf":
         if evidence is not None:
             evidence["pdf_text_extraction_failed"] = False
+            evidence["text_extraction_failed"] = False
         if PdfReader is None:
             if evidence is not None:
                 evidence["pdf_text_extraction_failed"] = True
+                evidence["text_extraction_failed"] = True
             return ""
         try:
             reader = PdfReader(str(path))
@@ -940,15 +944,21 @@ def extract_text_from_path(path: Path, evidence: dict[str, Any] | None = None) -
             extracted = "\n\n".join(pages).strip()
             if not extracted and evidence is not None:
                 evidence["pdf_text_extraction_failed"] = True
+                evidence["text_extraction_failed"] = True
             return extracted
         except Exception:
             if evidence is not None:
                 evidence["pdf_text_extraction_failed"] = True
+                evidence["text_extraction_failed"] = True
             return ""
     try:
         raw = path.read_text(encoding="utf-8", errors="ignore")
     except Exception:
+        if evidence is not None:
+            evidence["text_extraction_failed"] = True
         return ""
+    if evidence is not None:
+        evidence["text_extraction_failed"] = False
     if path.suffix.lower() in {".html", ".htm"}:
         return html_to_text(raw)
     return raw
@@ -961,21 +971,71 @@ def extract_text_for_scanning(evidence: dict[str, Any]) -> str:
     return extract_text_from_path(Path(saved), evidence)
 
 
-def compute_normalized_text_hash(text: str, extraction_failed: bool = False) -> str | None:
-    if extraction_failed:
-        return None
+def compute_normalized_text_hash(text: str) -> str:
     normalized = normalize_evidence_text(text)
     return sha256_bytes(normalized.encode("utf-8"))
+
+
+def apply_normalized_hash_fallback(
+    *,
+    evidence: dict[str, Any] | None,
+    raw_hash: str | None,
+    extraction_failed: bool,
+    normalized_hash: str | None,
+) -> str | None:
+    if extraction_failed and raw_hash:
+        if evidence is not None:
+            evidence["normalized_hash_fallback"] = "raw_bytes"
+            evidence["text_extraction_failed"] = True
+        return raw_hash
+    return normalized_hash
 
 
 def compute_file_hashes(path: Path, evidence: dict[str, Any] | None = None) -> tuple[str | None, str | None]:
     raw_hash = sha256_file(path)
     extracted = extract_text_from_path(path, evidence)
-    extraction_failed = bool(evidence and evidence.get("pdf_text_extraction_failed"))
+    extraction_failed = bool(
+        evidence
+        and (evidence.get("text_extraction_failed") or evidence.get("pdf_text_extraction_failed"))
+    )
     if not extraction_failed and evidence is None and path.suffix.lower() == ".pdf" and PdfReader is None:
         extraction_failed = True
-    normalized_hash = compute_normalized_text_hash(extracted, extraction_failed=extraction_failed)
+    normalized_hash = None
+    if not extraction_failed:
+        normalized_hash = compute_normalized_text_hash(extracted)
+    normalized_hash = apply_normalized_hash_fallback(
+        evidence=evidence,
+        raw_hash=raw_hash,
+        extraction_failed=extraction_failed,
+        normalized_hash=normalized_hash,
+    )
     return raw_hash, normalized_hash
+
+
+def compute_signoff_mismatches(
+    *,
+    signoff_raw_sha: str | None,
+    signoff_normalized_sha: str | None,
+    current_raw_sha: str | None,
+    current_normalized_sha: str | None,
+    text_extraction_failed: bool,
+) -> tuple[bool, bool, bool]:
+    raw_mismatch = bool(signoff_raw_sha and current_raw_sha and signoff_raw_sha != current_raw_sha)
+    normalized_mismatch = bool(
+        signoff_normalized_sha
+        and current_normalized_sha
+        and signoff_normalized_sha != current_normalized_sha
+    )
+    if text_extraction_failed and raw_mismatch:
+        normalized_mismatch = True
+    cosmetic_change = bool(
+        raw_mismatch
+        and not normalized_mismatch
+        and signoff_normalized_sha
+        and current_normalized_sha
+        and not text_extraction_failed
+    )
+    return raw_mismatch, normalized_mismatch, cosmetic_change
 
 
 def merge_gates(default_gates: list[str], gates_override: dict[str, Any]) -> list[str]:
@@ -1475,9 +1535,17 @@ class BasePipelineDriver:
             result["status"] = "error"
             result["error"] = "Evidence file write verification failed."
         normalized_text = extract_text_for_scanning(result)
-        normalized_digest = compute_normalized_text_hash(
-            normalized_text,
-            extraction_failed=bool(result.get("pdf_text_extraction_failed")),
+        extraction_failed = bool(
+            result.get("text_extraction_failed") or result.get("pdf_text_extraction_failed")
+        )
+        normalized_digest = None
+        if not extraction_failed:
+            normalized_digest = compute_normalized_text_hash(normalized_text)
+        normalized_digest = apply_normalized_hash_fallback(
+            evidence=result,
+            raw_hash=digest,
+            extraction_failed=extraction_failed,
+            normalized_hash=normalized_digest,
         )
         normalized_changed_from_previous = bool(
             previous_normalized_digest
@@ -1594,15 +1662,12 @@ class BasePipelineDriver:
         evidence_normalized_sha = evidence.snapshot.get("sha256_normalized_text")
         signoff_raw_sha = ctx.signoff.get("license_evidence_sha256_raw_bytes") or ctx.signoff.get("license_evidence_sha256")
         signoff_normalized_sha = ctx.signoff.get("license_evidence_sha256_normalized_text")
-        raw_mismatch = bool(signoff_raw_sha and evidence_raw_sha and signoff_raw_sha != evidence_raw_sha)
-        normalized_mismatch = bool(
-            signoff_normalized_sha and evidence_normalized_sha and signoff_normalized_sha != evidence_normalized_sha
-        )
-        cosmetic_change = bool(
-            raw_mismatch
-            and not normalized_mismatch
-            and signoff_normalized_sha
-            and evidence_normalized_sha
+        raw_mismatch, normalized_mismatch, cosmetic_change = compute_signoff_mismatches(
+            signoff_raw_sha=signoff_raw_sha,
+            signoff_normalized_sha=signoff_normalized_sha,
+            current_raw_sha=evidence_raw_sha,
+            current_normalized_sha=evidence_normalized_sha,
+            text_extraction_failed=bool(evidence.snapshot.get("text_extraction_failed")),
         )
         change_requires_review = resolve_evidence_change(
             raw_mismatch,
@@ -1732,21 +1797,12 @@ class BasePipelineDriver:
         current_evidence_sha256 = evidence.snapshot.get("sha256")
         current_evidence_sha256_raw = evidence.snapshot.get("sha256_raw_bytes") or current_evidence_sha256
         current_evidence_sha256_normalized = evidence.snapshot.get("sha256_normalized_text")
-        raw_mismatch = bool(
-            signoff_evidence_sha256_raw
-            and current_evidence_sha256_raw
-            and signoff_evidence_sha256_raw != current_evidence_sha256_raw
-        )
-        normalized_mismatch = bool(
-            signoff_evidence_sha256_normalized
-            and current_evidence_sha256_normalized
-            and signoff_evidence_sha256_normalized != current_evidence_sha256_normalized
-        )
-        cosmetic_change = bool(
-            raw_mismatch
-            and not normalized_mismatch
-            and signoff_evidence_sha256_normalized
-            and current_evidence_sha256_normalized
+        raw_mismatch, normalized_mismatch, cosmetic_change = compute_signoff_mismatches(
+            signoff_raw_sha=signoff_evidence_sha256_raw,
+            signoff_normalized_sha=signoff_evidence_sha256_normalized,
+            current_raw_sha=current_evidence_sha256_raw,
+            current_normalized_sha=current_evidence_sha256_normalized,
+            text_extraction_failed=bool(evidence.snapshot.get("text_extraction_failed")),
         )
         signoff_is_stale = resolve_evidence_change(
             raw_mismatch,
@@ -1821,21 +1877,12 @@ class BasePipelineDriver:
         current_evidence_sha256 = evidence.snapshot.get("sha256")
         current_evidence_sha256_raw = evidence.snapshot.get("sha256_raw_bytes") or current_evidence_sha256
         current_evidence_sha256_normalized = evidence.snapshot.get("sha256_normalized_text")
-        raw_mismatch = bool(
-            signoff_evidence_sha256_raw
-            and current_evidence_sha256_raw
-            and signoff_evidence_sha256_raw != current_evidence_sha256_raw
-        )
-        normalized_mismatch = bool(
-            signoff_evidence_sha256_normalized
-            and current_evidence_sha256_normalized
-            and signoff_evidence_sha256_normalized != current_evidence_sha256_normalized
-        )
-        cosmetic_change = bool(
-            raw_mismatch
-            and not normalized_mismatch
-            and signoff_evidence_sha256_normalized
-            and current_evidence_sha256_normalized
+        raw_mismatch, normalized_mismatch, cosmetic_change = compute_signoff_mismatches(
+            signoff_raw_sha=signoff_evidence_sha256_raw,
+            signoff_normalized_sha=signoff_evidence_sha256_normalized,
+            current_raw_sha=current_evidence_sha256_raw,
+            current_normalized_sha=current_evidence_sha256_normalized,
+            text_extraction_failed=bool(evidence.snapshot.get("text_extraction_failed")),
         )
         signoff_is_stale = resolve_evidence_change(
             raw_mismatch,
