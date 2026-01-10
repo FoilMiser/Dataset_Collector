@@ -1,0 +1,274 @@
+"""
+Tests for collector_core.rate_limit module.
+
+All tests use deterministic clocks (no real sleeping).
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from collector_core.rate_limit import (  # noqa: E402
+    DEFAULT_RATE_LIMITS,
+    RateLimiter,
+    RateLimiterConfig,
+    get_rate_limiter,
+    get_service_rate_limiter,
+    reset_rate_limiters,
+)
+
+
+class DeterministicClock:
+    """A clock that advances only when explicitly told to."""
+
+    def __init__(self, start: float = 0.0) -> None:
+        self.time = start
+        self.sleep_calls: list[float] = []
+
+    def __call__(self) -> float:
+        return self.time
+
+    def advance(self, seconds: float) -> None:
+        self.time += seconds
+
+    def sleep(self, seconds: float) -> None:
+        """Fake sleep that records calls and advances time."""
+        self.sleep_calls.append(seconds)
+        self.advance(seconds)
+
+
+class TestRateLimiter:
+    """Tests for RateLimiter class."""
+
+    def test_initial_tokens_at_capacity(self) -> None:
+        """Limiter starts with full capacity."""
+        clock = DeterministicClock()
+        limiter = RateLimiter(capacity=10, refill_rate=1.0, clock=clock, sleep=clock.sleep)
+        assert limiter.available_tokens() == 10.0
+
+    def test_try_acquire_succeeds_with_tokens(self) -> None:
+        """try_acquire returns True when tokens available."""
+        clock = DeterministicClock()
+        limiter = RateLimiter(capacity=5, refill_rate=1.0, clock=clock, sleep=clock.sleep)
+
+        assert limiter.try_acquire() is True
+        assert limiter.available_tokens() == 4.0
+
+    def test_try_acquire_fails_when_empty(self) -> None:
+        """try_acquire returns False when no tokens available."""
+        clock = DeterministicClock()
+        limiter = RateLimiter(capacity=2, refill_rate=1.0, clock=clock, sleep=clock.sleep)
+
+        assert limiter.try_acquire() is True
+        assert limiter.try_acquire() is True
+        assert limiter.try_acquire() is False  # Empty
+
+    def test_tokens_refill_over_time(self) -> None:
+        """Tokens are refilled based on elapsed time."""
+        clock = DeterministicClock()
+        limiter = RateLimiter(capacity=10, refill_rate=2.0, clock=clock, sleep=clock.sleep)
+
+        # Drain all tokens
+        for _ in range(10):
+            limiter.try_acquire()
+        assert limiter.available_tokens() == 0.0
+
+        # Advance 3 seconds at 2 tokens/sec = 6 tokens
+        clock.advance(3.0)
+        assert limiter.available_tokens() == 6.0
+
+    def test_tokens_capped_at_capacity(self) -> None:
+        """Tokens don't exceed capacity."""
+        clock = DeterministicClock()
+        limiter = RateLimiter(capacity=10, refill_rate=100.0, clock=clock, sleep=clock.sleep)
+
+        clock.advance(1000.0)  # Would add 100,000 tokens
+        assert limiter.available_tokens() == 10.0  # Capped at capacity
+
+    def test_acquire_waits_when_empty(self) -> None:
+        """acquire blocks and returns wait time."""
+        clock = DeterministicClock()
+        limiter = RateLimiter(capacity=1, refill_rate=1.0, clock=clock, sleep=clock.sleep)
+
+        limiter.try_acquire()  # Empty the bucket
+        waited = limiter.acquire()  # Should wait for refill
+
+        assert waited > 0
+        assert len(clock.sleep_calls) > 0
+
+    def test_acquire_multiple_tokens(self) -> None:
+        """Can acquire multiple tokens at once."""
+        clock = DeterministicClock()
+        limiter = RateLimiter(capacity=10, refill_rate=1.0, clock=clock, sleep=clock.sleep)
+
+        assert limiter.try_acquire(5) is True
+        assert limiter.available_tokens() == 5.0
+
+        assert limiter.try_acquire(6) is False  # Not enough
+        assert limiter.try_acquire(5) is True  # Exact amount
+        assert limiter.available_tokens() == 0.0
+
+    def test_reset_restores_capacity(self) -> None:
+        """reset() fills bucket to capacity."""
+        clock = DeterministicClock()
+        limiter = RateLimiter(capacity=10, refill_rate=1.0, clock=clock, sleep=clock.sleep)
+
+        for _ in range(10):
+            limiter.try_acquire()
+        assert limiter.available_tokens() == 0.0
+
+        limiter.reset()
+        assert limiter.available_tokens() == 10.0
+
+
+class TestRateLimiterConfig:
+    """Tests for RateLimiterConfig class."""
+
+    def test_from_dict_with_all_fields(self) -> None:
+        """Config loads all fields from dict."""
+        config = RateLimiterConfig.from_dict(
+            {"capacity": 100, "refill_rate": 5.0, "initial_tokens": 50}
+        )
+        assert config.capacity == 100.0
+        assert config.refill_rate == 5.0
+        assert config.initial_tokens == 50.0
+
+    def test_from_dict_with_defaults(self) -> None:
+        """Config uses defaults for missing fields."""
+        config = RateLimiterConfig.from_dict({})
+        assert config.capacity == 60.0
+        assert config.refill_rate == 1.0
+        assert config.initial_tokens is None
+
+    def test_from_dict_with_none(self) -> None:
+        """Config handles None input."""
+        config = RateLimiterConfig.from_dict(None)
+        assert config.capacity == 60.0
+
+    def test_from_config_with_initial_tokens(self) -> None:
+        """Limiter respects initial_tokens from config."""
+        config = RateLimiterConfig(capacity=100, refill_rate=1.0, initial_tokens=25)
+        clock = DeterministicClock()
+        limiter = RateLimiter.from_config(config, clock=clock)
+
+        assert limiter.available_tokens() == 25.0
+
+    def test_initial_tokens_capped_at_capacity(self) -> None:
+        """initial_tokens can't exceed capacity."""
+        config = RateLimiterConfig(capacity=10, refill_rate=1.0, initial_tokens=100)
+        limiter = RateLimiter.from_config(config)
+
+        assert limiter.available_tokens() == 10.0
+
+
+class TestSharedLimiters:
+    """Tests for shared rate limiter registry."""
+
+    def setup_method(self) -> None:
+        """Clear registry before each test."""
+        reset_rate_limiters()
+
+    def test_get_rate_limiter_creates_new(self) -> None:
+        """get_rate_limiter creates a new limiter."""
+        limiter = get_rate_limiter("test_service", capacity=50, refill_rate=2.0)
+        assert limiter.capacity == 50.0
+        assert limiter.refill_rate == 2.0
+
+    def test_get_rate_limiter_returns_existing(self) -> None:
+        """get_rate_limiter returns existing limiter for same name."""
+        limiter1 = get_rate_limiter("test_service", capacity=50)
+        limiter2 = get_rate_limiter("test_service", capacity=100)  # Different capacity
+
+        assert limiter1 is limiter2
+        assert limiter1.capacity == 50.0  # Original value kept
+
+    def test_different_names_different_limiters(self) -> None:
+        """Different names get different limiters."""
+        limiter1 = get_rate_limiter("service_a", capacity=10)
+        limiter2 = get_rate_limiter("service_b", capacity=20)
+
+        assert limiter1 is not limiter2
+        assert limiter1.capacity == 10.0
+        assert limiter2.capacity == 20.0
+
+    def test_reset_rate_limiters_clears_all(self) -> None:
+        """reset_rate_limiters clears the registry."""
+        limiter1 = get_rate_limiter("test", capacity=10)
+        reset_rate_limiters()
+        limiter2 = get_rate_limiter("test", capacity=20)
+
+        assert limiter1 is not limiter2
+        assert limiter2.capacity == 20.0
+
+
+class TestServiceRateLimiters:
+    """Tests for service-specific rate limiters."""
+
+    def setup_method(self) -> None:
+        reset_rate_limiters()
+
+    def test_github_default_config(self) -> None:
+        """GitHub limiter uses default config."""
+        limiter = get_service_rate_limiter("github")
+
+        cfg = DEFAULT_RATE_LIMITS["github"]
+        assert limiter.capacity == cfg.capacity
+        assert limiter.refill_rate == cfg.refill_rate
+
+    def test_service_with_override(self) -> None:
+        """Service config can be overridden."""
+        limiter = get_service_rate_limiter("github", {"capacity": 1000, "refill_rate": 10.0})
+
+        assert limiter.capacity == 1000.0
+        assert limiter.refill_rate == 10.0
+
+    def test_unknown_service_uses_defaults(self) -> None:
+        """Unknown service gets default RateLimiterConfig."""
+        limiter = get_service_rate_limiter("unknown_api")
+
+        cfg = RateLimiterConfig()  # Default values
+        assert limiter.capacity == cfg.capacity
+
+
+class TestRateLimitNoRequestBursts:
+    """Test that rate limits actually prevent request bursts."""
+
+    def test_burst_prevention(self) -> None:
+        """
+        Verify configured rate limits throttle requests.
+
+        This is the acceptance criterion from the checklist:
+        "Configured rate limits actually throttle requests;
+        tests validate no request bursts beyond the configured capacity."
+        """
+        clock = DeterministicClock()
+        # 5 requests per second, burst of 3
+        limiter = RateLimiter(capacity=3, refill_rate=5.0, clock=clock, sleep=clock.sleep)
+
+        # Should immediately get 3 (burst capacity)
+        acquired_count = 0
+        for _ in range(10):
+            if limiter.try_acquire():
+                acquired_count += 1
+
+        assert acquired_count == 3, "Should only allow burst capacity"
+
+        # After 1 second, should be able to get 5 more (refill_rate)
+        clock.advance(1.0)
+
+        acquired_count = 0
+        for _ in range(10):
+            if limiter.try_acquire():
+                acquired_count += 1
+
+        assert acquired_count == 3, "Tokens capped at capacity"
+
+        # After another 0.21 seconds, should get ~1 token (0.21 * 5 = 1.05)
+        clock.advance(0.21)
+        assert limiter.try_acquire() is True
+        assert limiter.try_acquire() is False  # Only ~1 token was added

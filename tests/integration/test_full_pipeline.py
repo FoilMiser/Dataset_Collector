@@ -185,7 +185,9 @@ def test_resume_partial_download(tmp_path: Path, httpserver: HTTPServer) -> None
             },
         )
 
-    httpserver.expect_request(file_path, headers={"Range": f"bytes={len(partial)}-"}).respond_with_handler(range_handler)
+    httpserver.expect_request(
+        file_path, headers={"Range": f"bytes={len(partial)}-"}
+    ).respond_with_handler(range_handler)
 
     out_path = tmp_path / "partial.bin"
     out_path.write_bytes(partial)

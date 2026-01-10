@@ -19,7 +19,6 @@ import gzip
 import hashlib
 import json
 import re
-import time
 from collections import Counter
 from collections.abc import Iterable, Iterator
 from pathlib import Path
@@ -31,6 +30,7 @@ from collector_core.__version__ import __version__ as VERSION
 from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.companion_files import read_field_schemas, resolve_companion_paths
 from collector_core.config_validator import read_yaml
+from collector_core.utils import ensure_dir, read_jsonl, utc_now, write_json, write_jsonl
 from collector_core.yellow_screen_common import (
     PitchConfig,
     resolve_dataset_root,
@@ -38,44 +38,9 @@ from collector_core.yellow_screen_common import (
 )
 
 
-def utc_now() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-
-
-def ensure_dir(path: Path) -> None:
-    path.mkdir(parents=True, exist_ok=True)
-
-
 def sha256_text(text: str) -> str:
     norm = re.sub(r"\s+", " ", (text or "").strip())
     return hashlib.sha256(norm.encode("utf-8")).hexdigest()
-
-
-def read_jsonl(path: Path) -> Iterator[dict[str, Any]]:
-    opener = gzip.open if path.suffix == ".gz" else open
-    with opener(path, "rt", encoding="utf-8", errors="ignore") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                try:
-                    yield json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-
-
-def write_json(path: Path, obj: dict[str, Any]) -> None:
-    ensure_dir(path.parent)
-    tmp_path = Path(f"{path}.tmp")
-    tmp_path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    tmp_path.replace(path)
-
-
-def write_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
-    ensure_dir(path.parent)
-    opener = gzip.open if path.suffix == ".gz" else open
-    with opener(path, "wt", encoding="utf-8") as f:
-        for row in rows:
-            f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
 def append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
@@ -98,6 +63,7 @@ def load_yaml(path: Path, schema_name: str | None = None) -> dict[str, Any]:
 # ------------------------------
 # Field schemas (lightweight)
 # ------------------------------
+
 
 @dataclasses.dataclass
 class FieldSpec:
@@ -174,6 +140,7 @@ def validate_record(record: dict[str, Any], schema: dict[str, FieldSpec]) -> tup
 # Routing helpers
 # ------------------------------
 
+
 def resolve_routing(raw: dict[str, Any], queue_row: dict[str, Any]) -> dict[str, Any]:
     rt = (raw.get("routing") or raw.get("chem_routing") or raw.get("math_routing") or {}) or {}
     routing = {
@@ -244,6 +211,7 @@ def iter_text_files(raw_dir: Path) -> Iterator[Path]:
 # PubChem helpers
 # ------------------------------
 
+
 def iter_sdf_records_from_gz(path: Path) -> Iterator[str]:
     buffer: list[str] = []
     opener = gzip.open if path.suffix.endswith("gz") else open
@@ -286,6 +254,7 @@ def parse_sdf_tags(record: str) -> dict[str, str]:
 # ------------------------------
 # Config dataclasses
 # ------------------------------
+
 
 @dataclasses.dataclass
 class Roots:
@@ -376,11 +345,15 @@ def load_signoff(manifest_dir: Path) -> dict[str, Any] | None:
 def resolve_roots(cfg: dict[str, Any], dataset_root: Path | None = None) -> Roots:
     dataset_root = dataset_root or resolve_dataset_root()
     default_raw = dataset_root / "raw" if dataset_root else Path("/data/chem/raw")
-    default_screened = dataset_root / "screened_yellow" if dataset_root else Path("/data/chem/screened_yellow")
-    default_manifests = dataset_root / "_manifests" if dataset_root else Path("/data/chem/_manifests")
+    default_screened = (
+        dataset_root / "screened_yellow" if dataset_root else Path("/data/chem/screened_yellow")
+    )
+    default_manifests = (
+        dataset_root / "_manifests" if dataset_root else Path("/data/chem/_manifests")
+    )
     default_ledger = dataset_root / "_ledger" if dataset_root else Path("/data/chem/_ledger")
     default_pitches = dataset_root / "_pitches" if dataset_root else Path("/data/chem/_pitches")
-    g = (cfg.get("globals", {}) or {})
+    g = cfg.get("globals", {}) or {}
     return Roots(
         raw_root=Path(g.get("raw_root", default_raw)).expanduser().resolve(),
         screened_root=Path(g.get("screened_yellow_root", default_screened)).expanduser().resolve(),
@@ -391,11 +364,11 @@ def resolve_roots(cfg: dict[str, Any], dataset_root: Path | None = None) -> Root
 
 
 def merge_screening_config(cfg: dict[str, Any], target: dict[str, Any]) -> ScreeningConfig:
-    g = (cfg.get("globals", {}) or {})
-    g_screen = (g.get("screening", {}) or {})
-    g_canon = (g.get("canonicalize", {}) or {})
-    t_screen = (target.get("yellow_screen", {}) or {})
-    t_canon = (target.get("canonicalize", {}) or {})
+    g = cfg.get("globals", {}) or {}
+    g_screen = g.get("screening", {}) or {}
+    g_canon = g.get("canonicalize", {}) or {}
+    t_screen = target.get("yellow_screen", {}) or {}
+    t_canon = target.get("canonicalize", {}) or {}
     return ScreeningConfig(
         text_fields=list(
             t_canon.get("text_field_candidates")
@@ -404,17 +377,32 @@ def merge_screening_config(cfg: dict[str, Any], target: dict[str, Any]) -> Scree
             or g_screen.get("text_field_candidates")
             or ["text"]
         ),
-        license_fields=list(t_screen.get("record_license_field_candidates") or g_screen.get("record_license_field_candidates") or ["license", "license_spdx"]),
+        license_fields=list(
+            t_screen.get("record_license_field_candidates")
+            or g_screen.get("record_license_field_candidates")
+            or ["license", "license_spdx"]
+        ),
         allow_spdx=list(t_screen.get("allow_spdx") or g_screen.get("allow_spdx") or []),
-        deny_phrases=[p.lower() for p in (t_screen.get("deny_phrases") or g_screen.get("deny_phrases") or [])],
-        require_record_license=bool(t_screen.get("require_record_license", g_screen.get("require_record_license", False))),
+        deny_phrases=[
+            p.lower() for p in (t_screen.get("deny_phrases") or g_screen.get("deny_phrases") or [])
+        ],
+        require_record_license=bool(
+            t_screen.get("require_record_license", g_screen.get("require_record_license", False))
+        ),
         min_chars=int(t_screen.get("min_chars", g_screen.get("min_chars", 200))),
-        max_chars=int(t_canon.get("max_chars", t_screen.get("max_chars", g_canon.get("max_chars", g_screen.get("max_chars", 12000))))),
+        max_chars=int(
+            t_canon.get(
+                "max_chars",
+                t_screen.get(
+                    "max_chars", g_canon.get("max_chars", g_screen.get("max_chars", 12000))
+                ),
+            )
+        ),
     )
 
 
 def sharding_cfg(cfg: dict[str, Any], prefix: str) -> ShardingConfig:
-    g = (cfg.get("globals", {}).get("sharding", {}) or {})
+    g = cfg.get("globals", {}).get("sharding", {}) or {}
     return ShardingConfig(
         max_records_per_shard=int(g.get("max_records_per_shard", 50000)),
         compression=str(g.get("compression", "gzip")),
@@ -492,7 +480,7 @@ def log_pitch(
     if sample_id:
         sample["sample_id"] = sample_id
     if text:
-        sample["text"] = text[:ctx.pitch_cfg.text_limit]
+        sample["text"] = text[: ctx.pitch_cfg.text_limit]
     if sample_extra:
         sample.update(sample_extra)
     append_jsonl(ctx.roots.pitches_root / "yellow_pitch.jsonl", [sample])
@@ -527,7 +515,9 @@ def flush_sharder(sharder: Sharder, shard_paths: list[str]) -> None:
 def screen_jsonl_mode(ctx: ScreenContext) -> dict[str, Any]:
     target_id = ctx.queue_row["id"]
     pool_dir_base = ctx.roots.raw_root / "yellow"
-    license_pools = [p.name for p in pool_dir_base.iterdir() if p.is_dir()] if pool_dir_base.exists() else []
+    license_pools = (
+        [p.name for p in pool_dir_base.iterdir() if p.is_dir()] if pool_dir_base.exists() else []
+    )
     pools = license_pools or [ctx.queue_row.get("license_profile", "quarantine")]
 
     passed, pitched = 0, 0
@@ -562,13 +552,20 @@ def screen_jsonl_mode(ctx: ScreenContext) -> dict[str, Any]:
                 return
             if lic and ctx.screen_cfg.allow_spdx and lic not in ctx.screen_cfg.allow_spdx:
                 pitched += 1
-                log_pitch(ctx, "license_not_allowlisted", raw.get("id"), sample_extra={"license": lic})
+                log_pitch(
+                    ctx, "license_not_allowlisted", raw.get("id"), sample_extra={"license": lic}
+                )
                 return
             if contains_deny(text, ctx.screen_cfg.deny_phrases):
                 pitched += 1
                 log_pitch(ctx, "deny_phrase", raw.get("id"), text=text)
                 return
-            license_profile = str(raw.get("license_profile") or ctx.queue_row.get("license_profile") or pool or "quarantine")
+            license_profile = str(
+                raw.get("license_profile")
+                or ctx.queue_row.get("license_profile")
+                or pool
+                or "quarantine"
+            )
             routing = resolve_routing(raw, ctx.queue_row)
             rec = canonical_record(raw, text, target_id, license_profile, lic, routing)
             passed += 1
@@ -588,9 +585,15 @@ def screen_jsonl_mode(ctx: ScreenContext) -> dict[str, Any]:
                 dataset_obj = load_from_disk(str(ds_path))
             except Exception as exc:
                 pitched += 1
-                log_pitch(ctx, "hf_load_failed", sample_extra={"path": str(ds_path), "error": str(exc)})
+                log_pitch(
+                    ctx, "hf_load_failed", sample_extra={"path": str(ds_path), "error": str(exc)}
+                )
                 continue
-            datasets = list(dataset_obj.values()) if isinstance(dataset_obj, DatasetDict) else [dataset_obj]
+            datasets = (
+                list(dataset_obj.values())
+                if isinstance(dataset_obj, DatasetDict)
+                else [dataset_obj]
+            )
             for dataset in datasets:
                 for raw in dataset:
                     handle_raw(dict(raw))
@@ -610,7 +613,7 @@ def screen_jsonl_mode(ctx: ScreenContext) -> dict[str, Any]:
 
 def screen_pubchem_computed_only(ctx: ScreenContext) -> dict[str, Any]:
     target_id = ctx.queue_row["id"]
-    ys_cfg = (ctx.target_cfg.get("yellow_screen") or {})
+    ys_cfg = ctx.target_cfg.get("yellow_screen") or {}
     include_globs = ys_cfg.get("input_glob", "*.sdf.gz")
     include_fields = ys_cfg.get("include_fields") or [
         "PUBCHEM_COMPOUND_CID",
@@ -646,7 +649,9 @@ def screen_pubchem_computed_only(ctx: ScreenContext) -> dict[str, Any]:
                     valid, _ = validate_record(record, schema)
                     if not valid:
                         pitched += 1
-                        log_pitch(ctx, "schema_validation_failed", str(record.get("PUBCHEM_COMPOUND_CID")))
+                        log_pitch(
+                            ctx, "schema_validation_failed", str(record.get("PUBCHEM_COMPOUND_CID"))
+                        )
                         continue
             cid = record.get("PUBCHEM_COMPOUND_CID")
             if cid is None:
@@ -661,7 +666,9 @@ def screen_pubchem_computed_only(ctx: ScreenContext) -> dict[str, Any]:
                 continue
             base_raw = {"record_id": str(cid), "source": {"origin": "pubchem_computed_only"}}
             routing = resolve_routing(base_raw, ctx.queue_row)
-            rec = canonical_record(base_raw, text, target_id, output_pool, ctx.queue_row.get("resolved_spdx"), routing)
+            rec = canonical_record(
+                base_raw, text, target_id, output_pool, ctx.queue_row.get("resolved_spdx"), routing
+            )
             passed += 1
             if ctx.execute:
                 current_shard = sharder._next_path()
@@ -684,7 +691,7 @@ def screen_pubchem_computed_only(ctx: ScreenContext) -> dict[str, Any]:
 
 def screen_pmc_oa(ctx: ScreenContext) -> dict[str, Any]:
     target_id = ctx.queue_row["id"]
-    ys_cfg = (ctx.target_cfg.get("yellow_screen") or {})
+    ys_cfg = ctx.target_cfg.get("yellow_screen") or {}
     raw_pool = ys_cfg.get("input_pool") or ctx.queue_row.get("license_profile") or "quarantine"
     output_pool = ys_cfg.get("output_pool") or raw_pool
     raw_dir = ctx.roots.raw_root / "yellow" / raw_pool / target_id
@@ -702,7 +709,9 @@ def screen_pmc_oa(ctx: ScreenContext) -> dict[str, Any]:
                     log_pitch(ctx, "no_text", raw.get("id"))
                     continue
                 routing = resolve_routing(raw, ctx.queue_row)
-                lic = find_license(raw, ctx.screen_cfg.license_fields) or ctx.queue_row.get("resolved_spdx")
+                lic = find_license(raw, ctx.screen_cfg.license_fields) or ctx.queue_row.get(
+                    "resolved_spdx"
+                )
                 rec = canonical_record(raw, text, target_id, output_pool, lic, routing)
                 passed += 1
                 if ctx.execute:
@@ -717,11 +726,18 @@ def screen_pmc_oa(ctx: ScreenContext) -> dict[str, Any]:
                 text = f.read()
             if not text or len(text) < ctx.screen_cfg.min_chars:
                 pitched += 1
-                log_pitch(ctx, "empty_text_file", file_path.name, sample_extra={"file": file_path.name})
+                log_pitch(
+                    ctx, "empty_text_file", file_path.name, sample_extra={"file": file_path.name}
+                )
                 continue
-            raw = {"record_id": sha256_text(f"{target_id}:{file_path.name}"), "source": {"origin": "pmc_oa_file", "source_url": str(file_path)}}
+            raw = {
+                "record_id": sha256_text(f"{target_id}:{file_path.name}"),
+                "source": {"origin": "pmc_oa_file", "source_url": str(file_path)},
+            }
             routing = resolve_routing(raw, ctx.queue_row)
-            rec = canonical_record(raw, text, target_id, output_pool, ctx.queue_row.get("resolved_spdx"), routing)
+            rec = canonical_record(
+                raw, text, target_id, output_pool, ctx.queue_row.get("resolved_spdx"), routing
+            )
             passed += 1
             if ctx.execute:
                 current_shard = sharder._next_path()
@@ -750,10 +766,14 @@ MODE_HANDLERS = {
 
 
 def process_target(ctx: ScreenContext) -> dict[str, Any]:
-    g = (ctx.cfg.get("globals", {}) or {})
+    g = ctx.cfg.get("globals", {}) or {}
     require_signoff = bool(g.get("require_yellow_signoff", False))
-    allow_without_signoff = bool((ctx.target_cfg.get("yellow_screen", {}) or {}).get("allow_without_signoff", False))
-    manifest_dir = Path(ctx.queue_row.get("manifest_dir") or ctx.roots.manifests_root / ctx.queue_row["id"])
+    allow_without_signoff = bool(
+        (ctx.target_cfg.get("yellow_screen", {}) or {}).get("allow_without_signoff", False)
+    )
+    manifest_dir = Path(
+        ctx.queue_row.get("manifest_dir") or ctx.roots.manifests_root / ctx.queue_row["id"]
+    )
     signoff = load_signoff(manifest_dir) or {}
     status = str(signoff.get("status", "") or "").lower()
     if require_signoff and not allow_without_signoff:
@@ -803,9 +823,23 @@ def main() -> None:
     ap.add_argument("--targets", required=True, help="Path to targets_chem.yaml")
     ap.add_argument("--queue", required=True, help="YELLOW queue JSONL")
     ap.add_argument("--execute", action="store_true", help="Write outputs (default: dry-run)")
-    ap.add_argument("--dataset-root", default=None, help="Override dataset root (raw/screened/_ledger/_pitches/_manifests)")
-    ap.add_argument("--pitch-sample-limit", type=int, default=None, help="Max pitch samples per reason (override)")
-    ap.add_argument("--pitch-text-limit", type=int, default=None, help="Max chars stored in pitch samples (override)")
+    ap.add_argument(
+        "--dataset-root",
+        default=None,
+        help="Override dataset root (raw/screened/_ledger/_pitches/_manifests)",
+    )
+    ap.add_argument(
+        "--pitch-sample-limit",
+        type=int,
+        default=None,
+        help="Max pitch samples per reason (override)",
+    )
+    ap.add_argument(
+        "--pitch-text-limit",
+        type=int,
+        default=None,
+        help="Max chars stored in pitch samples (override)",
+    )
     args = ap.parse_args()
 
     targets_path = Path(args.targets).expanduser().resolve()
@@ -816,8 +850,10 @@ def main() -> None:
     ensure_dir(roots.ledger_root)
     ensure_dir(roots.pitches_root)
 
-    companion = (cfg.get("companion_files") or {})
-    field_schemas_paths = resolve_companion_paths(targets_path, companion.get("field_schemas"), "./field_schemas.yaml")
+    companion = cfg.get("companion_files") or {}
+    field_schemas_paths = resolve_companion_paths(
+        targets_path, companion.get("field_schemas"), "./field_schemas.yaml"
+    )
     schemas: dict[str, dict[str, FieldSpec]] = {}
     if field_schemas_paths:
         schemas = load_field_schemas(field_schemas_paths)

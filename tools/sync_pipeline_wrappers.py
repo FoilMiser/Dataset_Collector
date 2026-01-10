@@ -10,6 +10,7 @@ Usage:
     python tools/sync_pipeline_wrappers.py --check  # Check without writing (CI mode)
     python tools/sync_pipeline_wrappers.py --dry-run # Show what would be written
 """
+
 from __future__ import annotations
 
 import argparse
@@ -21,7 +22,7 @@ from typing import NamedTuple
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from collector_core.pipeline_spec import list_pipelines, get_pipeline_spec  # noqa: E402
+from collector_core.pipeline_spec import get_pipeline_spec, list_pipelines  # noqa: E402
 
 
 class WrapperTemplate(NamedTuple):
@@ -127,9 +128,21 @@ if __name__ == "__main__":
 '''
 
 TEMPLATES = [
-    WrapperTemplate("pipeline_driver.py", PIPELINE_DRIVER_TEMPLATE, skip_if_large=True, max_lines_for_overwrite=50),
-    WrapperTemplate("acquire_worker.py", ACQUIRE_WORKER_TEMPLATE, skip_if_large=True, max_lines_for_overwrite=30),
-    WrapperTemplate("yellow_scrubber.py", YELLOW_SCRUBBER_TEMPLATE, skip_if_large=True, max_lines_for_overwrite=30),
+    WrapperTemplate(
+        "pipeline_driver.py",
+        PIPELINE_DRIVER_TEMPLATE,
+        skip_if_large=True,
+        max_lines_for_overwrite=50,
+    ),
+    WrapperTemplate(
+        "acquire_worker.py", ACQUIRE_WORKER_TEMPLATE, skip_if_large=True, max_lines_for_overwrite=30
+    ),
+    WrapperTemplate(
+        "yellow_scrubber.py",
+        YELLOW_SCRUBBER_TEMPLATE,
+        skip_if_large=True,
+        max_lines_for_overwrite=30,
+    ),
     WrapperTemplate("yellow_screen_worker.py", YELLOW_SCREEN_WORKER_TEMPLATE, skip_if_large=False),
 ]
 
@@ -229,7 +242,8 @@ def main() -> int:
         help="Only sync a specific domain (default: all domains)",
     )
     parser.add_argument(
-        "--verbose", "-v",
+        "--verbose",
+        "-v",
         action="store_true",
         help="Verbose output",
     )
@@ -255,11 +269,12 @@ def main() -> int:
     # In check mode, any mismatch or missing file is an error
     if args.check:
         has_problems = any(
-            issue.startswith("MISMATCH:") or issue.startswith("MISSING:")
-            for issue in all_issues
+            issue.startswith("MISMATCH:") or issue.startswith("MISSING:") for issue in all_issues
         )
         if has_problems:
-            print("\nWrapper sync check failed. Run 'python tools/sync_pipeline_wrappers.py' to fix.")
+            print(
+                "\nWrapper sync check failed. Run 'python tools/sync_pipeline_wrappers.py' to fix."
+            )
             return 1
 
     return 0

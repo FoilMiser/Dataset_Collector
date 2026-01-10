@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import re
-import time
 from typing import Any
+
+from collector_core.utils import utc_now
 
 REQUIRED_FIELDS: dict[str, type] = {
     "dataset_id": str,
@@ -22,10 +23,6 @@ REQUIRED_FIELDS: dict[str, type] = {
     "timestamp_created": str,
     "timestamp_updated": str,
 }
-
-
-def utc_now() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
 def sha256_text(text: str) -> str:
@@ -53,7 +50,9 @@ def normalize_output_record(
     if content_hash:
         out["content_sha256"] = content_hash
 
-    normalized_hash = out.get("normalized_sha256") or (out.get("hash") or {}).get("normalized_sha256")
+    normalized_hash = out.get("normalized_sha256") or (out.get("hash") or {}).get(
+        "normalized_sha256"
+    )
     if not normalized_hash and content_hash:
         normalized_hash = content_hash
     if normalized_hash:

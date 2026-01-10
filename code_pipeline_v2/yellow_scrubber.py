@@ -98,7 +98,9 @@ def print_summary(entries: list[QueueEntry]) -> None:
     for e in entries:
         restriction = f" restriction_hits={len(e.restriction_hits)}" if e.restriction_hits else ""
         routing = f" routing={e.routing_subject}/{e.routing_domain}/{e.routing_category}/l{e.routing_level}"
-        print(f"- {e.id} ({e.name}) [{e.license_profile}] spdx={e.resolved_spdx}{restriction}{routing} strategy={e.download_strategy}")
+        print(
+            f"- {e.id} ({e.name}) [{e.license_profile}] spdx={e.resolved_spdx}{restriction}{routing} strategy={e.download_strategy}"
+        )
 
 
 def queue_entry_from_row(row: dict[str, Any]) -> QueueEntry:
@@ -121,15 +123,25 @@ def queue_entry_from_row(row: dict[str, Any]) -> QueueEntry:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description=f"Yellow scrubber v{TOOL_VERSION} (schema {SCHEMA_VERSION})")
+    ap = argparse.ArgumentParser(
+        description=f"Yellow scrubber v{TOOL_VERSION} (schema {SCHEMA_VERSION})"
+    )
     ap.add_argument("--targets", required=True, help="targets_code.yaml")
-    ap.add_argument("--queue", default=None, help="Override queue path (defaults to globals.queues_root/yellow_pipeline.jsonl)")
+    ap.add_argument(
+        "--queue",
+        default=None,
+        help="Override queue path (defaults to globals.queues_root/yellow_pipeline.jsonl)",
+    )
     ap.add_argument("--limit", type=int, default=None, help="Limit number of entries")
     ap.add_argument("--output", default=None, help="Path to write review plan JSON")
     args = ap.parse_args()
 
     targets_path = Path(args.targets).expanduser().resolve()
-    queue_path = Path(args.queue) if args.queue else queue_root_from_targets(targets_path) / "yellow_pipeline.jsonl"
+    queue_path = (
+        Path(args.queue)
+        if args.queue
+        else queue_root_from_targets(targets_path) / "yellow_pipeline.jsonl"
+    )
     rows = load_queue(queue_path)
     rows = [r for r in rows if r.get("enabled", True) and r.get("id")]
     if args.limit:

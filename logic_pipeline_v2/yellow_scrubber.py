@@ -4,6 +4,7 @@ yellow_scrubber.py (v2.0)
 
 Thin wrapper that delegates to the spec-driven yellow review helper.
 """
+
 from __future__ import annotations
 
 import sys

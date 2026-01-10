@@ -21,11 +21,11 @@ from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.config_validator import read_yaml
 from collector_core.output_contract import normalize_output_record, validate_output_contract
 from collector_core.utils import (
-    utc_now,
-    ensure_dir,
-    sha256_text,
-    read_jsonl,
     append_jsonl,
+    ensure_dir,
+    read_jsonl,
+    sha256_text,
+    utc_now,
     write_json,
 )
 
@@ -306,7 +306,9 @@ def resolve_dataset_root(explicit: str | None = None) -> Path | None:
     return Path(value).expanduser().resolve()
 
 
-def resolve_roots(cfg: dict[str, Any], defaults: RootDefaults, dataset_root: Path | None = None) -> Roots:
+def resolve_roots(
+    cfg: dict[str, Any], defaults: RootDefaults, dataset_root: Path | None = None
+) -> Roots:
     dataset_root = dataset_root or resolve_dataset_root()
     if dataset_root:
         defaults = RootDefaults(
@@ -315,17 +317,19 @@ def resolve_roots(cfg: dict[str, Any], defaults: RootDefaults, dataset_root: Pat
             combined_root=str(dataset_root / "combined"),
             ledger_root=str(dataset_root / "_ledger"),
         )
-    g = (cfg.get("globals", {}) or {})
+    g = cfg.get("globals", {}) or {}
     return Roots(
         raw_root=Path(g.get("raw_root", defaults.raw_root)).expanduser().resolve(),
-        screened_root=Path(g.get("screened_yellow_root", defaults.screened_root)).expanduser().resolve(),
+        screened_root=Path(g.get("screened_yellow_root", defaults.screened_root))
+        .expanduser()
+        .resolve(),
         combined_root=Path(g.get("combined_root", defaults.combined_root)).expanduser().resolve(),
         ledger_root=Path(g.get("ledger_root", defaults.ledger_root)).expanduser().resolve(),
     )
 
 
 def sharding_cfg(cfg: dict[str, Any]) -> ShardingConfig:
-    g = (cfg.get("globals", {}).get("sharding", {}) or {})
+    g = cfg.get("globals", {}).get("sharding", {}) or {}
     return ShardingConfig(
         max_records_per_shard=int(g.get("max_records_per_shard", 50000)),
         compression=str(g.get("compression", "gzip")),
@@ -345,15 +349,23 @@ def resolve_merge_runtime(
     dedupe_partitions: int | None = None,
     ledger_root: Path | None = None,
 ) -> MergeRuntimeConfig:
-    g = (cfg.get("globals", {}) or {})
-    g_merge = (g.get("merge", {}) or {})
+    g = cfg.get("globals", {}) or {}
+    g_merge = g.get("merge", {}) or {}
     resolved_progress = bool(progress if progress is not None else g_merge.get("progress", False))
-    interval_value = progress_interval if progress_interval is not None else g_merge.get("progress_interval", 10000)
+    interval_value = (
+        progress_interval
+        if progress_interval is not None
+        else g_merge.get("progress_interval", 10000)
+    )
     resolved_interval = max(int(interval_value or 10000), 1)
-    resolved_trace = bool(trace_memory if trace_memory is not None else g_merge.get("trace_memory", False))
+    resolved_trace = bool(
+        trace_memory if trace_memory is not None else g_merge.get("trace_memory", False)
+    )
     resolved_profile = bool(profile if profile is not None else g_merge.get("profile", False))
     resolved_profile_sort = str(profile_sort or g_merge.get("profile_sort", "tottime"))
-    partitions_value = dedupe_partitions if dedupe_partitions is not None else g_merge.get("dedupe_partitions", 1)
+    partitions_value = (
+        dedupe_partitions if dedupe_partitions is not None else g_merge.get("dedupe_partitions", 1)
+    )
     resolved_partitions = max(int(partitions_value or 1), 1)
     resolved_profile_path: Path | None = None
     if resolved_profile:
@@ -373,10 +385,12 @@ def resolve_merge_runtime(
     )
 
 
-def resolve_canonicalize_config(cfg: dict[str, Any], target_cfg: dict[str, Any] | None) -> tuple[list[str], int | None]:
-    g = (cfg.get("globals", {}) or {})
-    g_canon = (g.get("canonicalize", {}) or {})
-    g_screen = (g.get("screening", {}) or {})
+def resolve_canonicalize_config(
+    cfg: dict[str, Any], target_cfg: dict[str, Any] | None
+) -> tuple[list[str], int | None]:
+    g = cfg.get("globals", {}) or {}
+    g_canon = g.get("canonicalize", {}) or {}
+    g_screen = g.get("screening", {}) or {}
     t_screen = (target_cfg.get("yellow_screen", {}) or {}) if target_cfg else {}
     t_canon = (target_cfg.get("canonicalize", {}) or {}) if target_cfg else {}
     candidates = list(
@@ -446,7 +460,9 @@ def canonicalize_row(
         text = text[:max_chars]
     record = dict(raw)
     record.setdefault("text", text)
-    record_id = str(record.get("record_id") or record.get("id") or sha256_text(f"{target_id}:{text}"))
+    record_id = str(
+        record.get("record_id") or record.get("id") or sha256_text(f"{target_id}:{text}")
+    )
     record.setdefault("record_id", record_id)
     meta = target_meta or {}
     record = normalize_output_record(
@@ -499,7 +515,9 @@ def iter_green_records(roots: Roots) -> Iterator[GreenInput | GreenSkip]:
                 continue
             target_id = target_dir.name
             jsonl_files = sorted([fp for fp in target_dir.rglob("*.jsonl") if fp.is_file()])
-            jsonl_files.extend(sorted([fp for fp in target_dir.rglob("*.jsonl.gz") if fp.is_file()]))
+            jsonl_files.extend(
+                sorted([fp for fp in target_dir.rglob("*.jsonl.gz") if fp.is_file()])
+            )
             jsonl_set = {fp.resolve() for fp in jsonl_files}
             for fp in jsonl_files:
                 for raw in read_jsonl(fp):
@@ -641,7 +659,8 @@ def register_flushed_records(
 def build_target_meta(cfg: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return {
         str(target.get("id")): {
-            "dataset_id": (target.get("download", {}) or {}).get("dataset_id") or target.get("dataset_id"),
+            "dataset_id": (target.get("download", {}) or {}).get("dataset_id")
+            or target.get("dataset_id"),
             "config": (target.get("download", {}) or {}).get("config"),
         }
         for target in (cfg.get("targets", []) or [])
@@ -649,7 +668,9 @@ def build_target_meta(cfg: dict[str, Any]) -> dict[str, dict[str, Any]]:
     }
 
 
-def build_target_canon(cfg: dict[str, Any]) -> tuple[dict[str, tuple[list[str], int | None]], tuple[list[str], int | None]]:
+def build_target_canon(
+    cfg: dict[str, Any],
+) -> tuple[dict[str, tuple[list[str], int | None]], tuple[list[str], int | None]]:
     target_canon = {
         str(target.get("id")): resolve_canonicalize_config(cfg, target)
         for target in (cfg.get("targets", []) or [])
@@ -820,7 +841,9 @@ def process_green_records(
                 state.execute,
             )
             continue
-        handle_record(canonical, item.source_kind, item.source_path, roots, state, item.target_id, item.pool)
+        handle_record(
+            canonical, item.source_kind, item.source_path, roots, state, item.target_id, item.pool
+        )
 
 
 def process_screened_yellow(roots: Roots, state: MergeState) -> None:
@@ -857,11 +880,14 @@ def apply_pending_updates(roots: Roots, state: MergeState) -> None:
         path = Path(shard_path)
         temp_path = path.with_suffix(path.suffix + ".tmp")
         opener = gzip.open if path.suffix == ".gz" else open
-        with opener(path, "rt", encoding="utf-8", errors="ignore") as src, opener(
-            temp_path,
-            "wt",
-            encoding="utf-8",
-        ) as dst:
+        with (
+            opener(path, "rt", encoding="utf-8", errors="ignore") as src,
+            opener(
+                temp_path,
+                "wt",
+                encoding="utf-8",
+            ) as dst,
+        ):
             for line in src:
                 raw = line.strip()
                 if not raw:
@@ -976,7 +1002,9 @@ def main(*, pipeline_id: str, defaults: RootDefaults) -> None:
     ap = argparse.ArgumentParser(description=f"Merge Worker v{VERSION}")
     ap.add_argument("--targets", required=True, help="targets.yaml")
     ap.add_argument("--execute", action="store_true", help="Write combined shards")
-    ap.add_argument("--dataset-root", default=None, help="Override dataset root (raw/screened/combined/_ledger)")
+    ap.add_argument(
+        "--dataset-root", default=None, help="Override dataset root (raw/screened/combined/_ledger)"
+    )
     ap.add_argument("--progress", action="store_true", help="Show merge progress")
     ap.add_argument(
         "--progress-interval",
@@ -984,7 +1012,9 @@ def main(*, pipeline_id: str, defaults: RootDefaults) -> None:
         default=None,
         help="Log progress every N items when tqdm is unavailable",
     )
-    ap.add_argument("--trace-memory", action="store_true", help="Track memory usage with tracemalloc")
+    ap.add_argument(
+        "--trace-memory", action="store_true", help="Track memory usage with tracemalloc"
+    )
     ap.add_argument("--profile-merge", action="store_true", help="Enable cProfile for merge paths")
     ap.add_argument(
         "--profile-path",

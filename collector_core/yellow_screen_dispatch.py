@@ -4,12 +4,13 @@ collector_core/yellow_screen_dispatch.py
 Unified dispatcher for yellow screen workers. Routes to domain-specific
 modules when configured in PipelineSpec, otherwise uses yellow_screen_standard.
 """
+
 from __future__ import annotations
 
 import importlib
-from typing import Any
 
 from collector_core import yellow_screen_standard
+from collector_core.__version__ import __version__ as VERSION  # noqa: F401
 from collector_core.pipeline_spec import get_pipeline_spec
 from collector_core.yellow_screen_common import default_yellow_roots
 

@@ -124,6 +124,7 @@ def test_preflight_main_defaults_to_sample_pipeline_map(monkeypatch, tmp_path) -
     result = preflight.main(["--repo-root", str(repo_root)])
 
     assert result == 0
-    assert captured["pipeline_map_path"] == (
-        repo_root / "tools" / "pipeline_map.sample.yaml"
-    ).resolve()
+    assert (
+        captured["pipeline_map_path"]
+        == (repo_root / "tools" / "pipeline_map.sample.yaml").resolve()
+    )

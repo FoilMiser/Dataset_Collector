@@ -1,4 +1,5 @@
 """Tests for collector_core.yellow_review_helpers module."""
+
 from __future__ import annotations
 
 import json
@@ -11,7 +12,6 @@ from collector_core.yellow_review_helpers import (
     QueueEntry,
     load_queue,
     print_summary,
-    read_jsonl_list,
     summarize,
     write_plan,
 )
@@ -140,9 +140,7 @@ class TestSummarize:
 
 
 class TestWritePlan:
-    def test_write_plan_creates_file(
-        self, tmp_path: Path, sample_queue_file: Path
-    ):
+    def test_write_plan_creates_file(self, tmp_path: Path, sample_queue_file: Path):
         entries = load_queue(sample_queue_file)
         summary = summarize(entries)
         output_path = tmp_path / "review_plan.json"
@@ -156,9 +154,7 @@ class TestWritePlan:
         assert "summary" in plan
         assert "entries" in plan
 
-    def test_write_plan_entries_serializable(
-        self, tmp_path: Path, sample_queue_file: Path
-    ):
+    def test_write_plan_entries_serializable(self, tmp_path: Path, sample_queue_file: Path):
         entries = load_queue(sample_queue_file)
         summary = summarize(entries)
         output_path = tmp_path / "review_plan.json"
@@ -171,9 +167,7 @@ class TestWritePlan:
 
 
 class TestPrintSummary:
-    def test_print_summary_runs_without_error(
-        self, sample_queue_file: Path, capsys
-    ):
+    def test_print_summary_runs_without_error(self, sample_queue_file: Path, capsys):
         entries = load_queue(sample_queue_file)
         summary = summarize(entries)
 

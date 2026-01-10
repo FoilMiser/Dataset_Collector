@@ -4,14 +4,14 @@ collector_core/metrics.py
 Metrics collection for pipeline operations.
 Provides a simple, lightweight interface for tracking operational metrics.
 """
+
 from __future__ import annotations
 
 import time
-from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any
 
-from collector_core.utils import utc_now, write_json
+from collector_core.utils import utc_now
 
 
 @dataclass
@@ -73,7 +73,7 @@ class Timer:
     duration_ms: float | None = None
     labels: dict[str, str] = field(default_factory=dict)
 
-    def start(self) -> "Timer":
+    def start(self) -> Timer:
         """Start the timer."""
         self.start_time = time.time()
         return self
@@ -85,7 +85,7 @@ class Timer:
         self.duration_ms = (time.time() - self.start_time) * 1000
         return self.duration_ms
 
-    def __enter__(self) -> "Timer":
+    def __enter__(self) -> Timer:
         return self.start()
 
     def __exit__(self, *args: Any) -> None:
@@ -133,11 +133,13 @@ class MetricsCollector:
 
     def event(self, name: str, **data: Any) -> None:
         """Record an event."""
-        self.events.append({
-            "name": name,
-            "timestamp": utc_now(),
-            **data,
-        })
+        self.events.append(
+            {
+                "name": name,
+                "timestamp": utc_now(),
+                **data,
+            }
+        )
 
     def to_dict(self) -> dict[str, Any]:
         """Convert all metrics to dictionary."""

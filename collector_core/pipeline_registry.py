@@ -1,16 +1,20 @@
 """Pipeline configuration and plugin registry for the unified CLI."""
+
 from __future__ import annotations
 
 import importlib.util
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
-from typing import Any, Callable
+from typing import Any
 
 from collector_core import acquire_strategies
 from collector_core.config_validator import read_yaml
 
-STRATEGY_HANDLER = Callable[[acquire_strategies.AcquireContext, dict[str, Any], Path], list[dict[str, Any]]]
+STRATEGY_HANDLER = Callable[
+    [acquire_strategies.AcquireContext, dict[str, Any], Path], list[dict[str, Any]]
+]
 POSTPROCESSOR = Callable[
     [acquire_strategies.AcquireContext, dict[str, Any], Path, str, dict[str, Any]],
     dict[str, Any] | None,
@@ -94,7 +98,9 @@ def resolve_pipeline_context(*, pipeline_id: str | None, repo_root: Path) -> Pip
         slug = normalized.removesuffix("_pipeline_v2")
     else:
         if not pipeline_dir:
-            raise SystemExit("Missing --pipeline and no pipeline directory detected from the current path.")
+            raise SystemExit(
+                "Missing --pipeline and no pipeline directory detected from the current path."
+            )
         normalized = pipeline_dir.name
         slug = normalized.removesuffix("_pipeline_v2")
 
@@ -145,7 +151,9 @@ def resolve_acquire_hooks(
         if postprocess_name:
             postprocess = getattr(module, str(postprocess_name), None)
             if postprocess_name and not callable(postprocess):
-                raise SystemExit(f"Plugin module {plugin_module} missing postprocess {postprocess_name}")
+                raise SystemExit(
+                    f"Plugin module {plugin_module} missing postprocess {postprocess_name}"
+                )
         return handlers, postprocess
 
     http_handler = overrides.get("http_handler", "multi")

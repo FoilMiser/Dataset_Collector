@@ -7,6 +7,7 @@ Convert STIX 2.x bundles into:
 Integrate this worker in the yellow pipeline once ready; keep raw bundles for
 auditability.
 """
+
 from __future__ import annotations
 
 import gzip

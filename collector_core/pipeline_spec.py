@@ -4,10 +4,10 @@ collector_core/pipeline_spec.py
 Defines the specification for a domain pipeline, enabling configuration-driven
 pipeline creation instead of duplicated boilerplate files.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
 
@@ -17,7 +17,7 @@ class PipelineSpec:
 
     # Required fields
     domain: str  # e.g., "chem", "bio", "physics"
-    name: str    # Human-readable name, e.g., "Chemistry Pipeline"
+    name: str  # Human-readable name, e.g., "Chemistry Pipeline"
 
     # Targets configuration
     targets_yaml: str  # e.g., "targets_chem.yaml"
@@ -28,13 +28,15 @@ class PipelineSpec:
     # Routing configuration
     routing_keys: list[str] = field(default_factory=list)
     routing_confidence_keys: list[str] = field(default_factory=list)
-    default_routing: dict[str, Any] = field(default_factory=lambda: {
-        "subject": "misc",
-        "domain": "misc",
-        "category": "misc",
-        "level": 5,
-        "granularity": "target"
-    })
+    default_routing: dict[str, Any] = field(
+        default_factory=lambda: {
+            "subject": "misc",
+            "domain": "misc",
+            "category": "misc",
+            "level": 5,
+            "granularity": "target",
+        }
+    )
 
     # Custom worker modules (relative to pipeline directory)
     yellow_screen_module: str | None = None  # e.g., "yellow_screen_chem"

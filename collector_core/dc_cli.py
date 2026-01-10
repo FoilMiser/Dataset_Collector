@@ -1,26 +1,26 @@
 #!/usr/bin/env python3
 """Unified CLI for running pipeline stages via configuration."""
+
 from __future__ import annotations
 
 import argparse
 import sys
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
+# Import registry to ensure specs are registered
+import collector_core.pipeline_specs_registry  # noqa: F401
 from collector_core import merge, yellow_screen_standard
 from collector_core.acquire_strategies import RootsDefaults, run_acquire_worker
-from collector_core.pipeline_factory import get_pipeline_driver, run_pipeline
+from collector_core.pipeline_factory import run_pipeline
 from collector_core.pipeline_registry import resolve_acquire_hooks, resolve_pipeline_context
 from collector_core.pipeline_spec import list_pipelines
-from collector_core.yellow_screen_common import default_yellow_roots
 from collector_core.yellow_screen_chem import main as yellow_screen_chem
+from collector_core.yellow_screen_common import default_yellow_roots
 from collector_core.yellow_screen_econ import main as yellow_screen_econ
 from collector_core.yellow_screen_kg_nav import main as yellow_screen_kg_nav
 from collector_core.yellow_screen_nlp import main as yellow_screen_nlp
 from collector_core.yellow_screen_safety import main as yellow_screen_safety
-
-# Import registry to ensure specs are registered
-import collector_core.pipeline_specs_registry  # noqa: F401
 
 STAGE_ACQUIRE = "acquire"
 STAGE_MERGE = "merge"
@@ -50,7 +50,9 @@ def _parse_args() -> argparse.Namespace:
     )
     sub = parser.add_subparsers(dest="command")
     run = sub.add_parser("run", help="Run a pipeline stage.")
-    run.add_argument("--pipeline", help="Pipeline id or slug (e.g. physics_pipeline_v2 or physics).")
+    run.add_argument(
+        "--pipeline", help="Pipeline id or slug (e.g. physics_pipeline_v2 or physics)."
+    )
     run.add_argument(
         "--stage",
         required=True,
@@ -111,7 +113,11 @@ def _run_merge(pipeline_id: str, slug: str, targets_path: Path | None, args: lis
 
 def _run_yellow_screen(slug: str, targets_path: Path | None, args: list[str], ctx) -> int:
     args = _resolve_targets_arg(args, targets_path, "--targets")
-    module = (ctx.overrides.get("yellow_screen") or "standard") if isinstance(ctx.overrides, dict) else "standard"
+    module = (
+        (ctx.overrides.get("yellow_screen") or "standard")
+        if isinstance(ctx.overrides, dict)
+        else "standard"
+    )
     if module == "chem":
         return _run_with_args(yellow_screen_chem, args)
     if module == "econ":

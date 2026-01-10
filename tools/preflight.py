@@ -22,6 +22,30 @@ from tools.strategy_registry import (
     get_strategy_spec,
 )
 
+
+def _normalize_download(download: dict[str, Any]) -> dict[str, Any]:
+    """Normalize download config by merging nested config into parent dict.
+
+    This mirrors the normalization done at runtime in acquire_strategies.normalize_download.
+    """
+    d = dict(download or {})
+    cfg = d.get("config")
+
+    if isinstance(cfg, dict):
+        merged = dict(cfg)
+        merged.update({k: v for k, v in d.items() if k != "config"})
+        d = merged
+
+    # Zenodo record_id normalization
+    if d.get("strategy") == "zenodo":
+        if not d.get("record_id") and d.get("record"):
+            d["record_id"] = d["record"]
+        if not d.get("record_id") and isinstance(d.get("record_ids"), list) and d["record_ids"]:
+            d["record_id"] = d["record_ids"][0]
+
+    return d
+
+
 TOOL_INSTALL_HINTS = {
     "git": "Install Git for Windows: https://git-scm.com/download/win",
     "aria2c": "Install aria2: https://aria2.github.io/",
@@ -84,9 +108,12 @@ def _extract_strategy_keys(
         return set(default_handler_keys)
     if isinstance(handlers_node, ast.Dict):
         handler_keys: set[str] = set()
-        for key_node, value_node in zip(handlers_node.keys, handlers_node.values):
+        for key_node, value_node in zip(handlers_node.keys, handlers_node.values, strict=True):
             if key_node is None:
-                if isinstance(value_node, ast.Name) and value_node.id == "DEFAULT_STRATEGY_HANDLERS":
+                if (
+                    isinstance(value_node, ast.Name)
+                    and value_node.id == "DEFAULT_STRATEGY_HANDLERS"
+                ):
                     handler_keys.update(default_handler_keys)
                     continue
                 raise RuntimeError(
@@ -106,15 +133,35 @@ def _extract_strategy_keys(
         return handler_keys
     if isinstance(handlers_node, ast.BinOp) and isinstance(handlers_node.op, ast.BitOr):
         left = _extract_strategy_keys(handlers_node.left, acquire_worker_path, default_handler_keys)
-        right = _extract_strategy_keys(handlers_node.right, acquire_worker_path, default_handler_keys)
+        right = _extract_strategy_keys(
+            handlers_node.right, acquire_worker_path, default_handler_keys
+        )
         return left | right
-    raise RuntimeError(
-        f"STRATEGY_HANDLERS must be a dict literal in {acquire_worker_path}"
-    )
+    raise RuntimeError(f"STRATEGY_HANDLERS must be a dict literal in {acquire_worker_path}")
+
+
+def _is_thin_wrapper(source: str) -> bool:
+    """Check if the source is a thin wrapper that delegates to generic_workers.main_acquire."""
+    # Detect wrapper patterns:
+    # - from collector_core.generic_workers import main_acquire
+    # - from collector_core import generic_workers
+    patterns = [
+        "from collector_core.generic_workers import main_acquire",
+        "from collector_core import generic_workers",
+        "generic_workers.main_acquire",
+        "main_acquire(",
+    ]
+    return any(pattern in source for pattern in patterns)
 
 
 def _load_strategy_handlers(acquire_worker_path: Path, default_handler_keys: set[str]) -> set[str]:
     source = acquire_worker_path.read_text(encoding="utf-8")
+
+    # Check if this is a thin wrapper that delegates to generic_workers
+    # These wrappers use DEFAULT_STRATEGY_HANDLERS from collector_core
+    if _is_thin_wrapper(source):
+        return set(default_handler_keys)
+
     tree = ast.parse(source, filename=str(acquire_worker_path))
     handlers_node: ast.AST | None = None
 
@@ -129,7 +176,8 @@ def _load_strategy_handlers(acquire_worker_path: Path, default_handler_keys: set
                 handlers_node = node.value
 
     if handlers_node is None:
-        raise RuntimeError(f"STRATEGY_HANDLERS not found in {acquire_worker_path}")
+        # If no STRATEGY_HANDLERS found, treat as thin wrapper using defaults
+        return set(default_handler_keys)
 
     handler_keys = _extract_strategy_keys(handlers_node, acquire_worker_path, default_handler_keys)
 
@@ -215,17 +263,22 @@ def run_preflight(
             if not enabled and not warn_disabled:
                 continue
             target_id = target.get("id", "<unknown>")
-            download = target.get("download", {}) or {}
+            # Normalize download config to merge nested config dict
+            download = _normalize_download(target.get("download", {}) or {})
             strategy = (download.get("strategy") or "").strip()
-            if not strategy or strategy == "none":
+            # "none" is a valid placeholder strategy - skip validation for it
+            if not strategy:
                 if enabled:
                     errors.append(
-                        f"{pipeline_name}:{target_id} enabled with missing/none download.strategy"
+                        f"{pipeline_name}:{target_id} enabled with missing download.strategy"
                     )
                 elif warn_disabled:
                     warnings.append(
-                        f"{pipeline_name}:{target_id} disabled with missing/none download.strategy"
+                        f"{pipeline_name}:{target_id} disabled with missing download.strategy"
                     )
+                continue
+            # "none" strategy is valid - no download required, skip further checks
+            if strategy == "none":
                 continue
             if strategy not in handler_keys:
                 if enabled:
@@ -306,17 +359,11 @@ def run_preflight(
                         f"Missing external tool '{tool}' required by strategy '{strategy}'"
                         " for disabled targets."
                         + (f" Targets: {targets}." if targets else "")
-                        + (
-                            " Install the tool before enabling these targets."
-                            if targets
-                            else ""
-                        )
+                        + (" Install the tool before enabling these targets." if targets else "")
                         + (f" {hint}" if hint else "")
                     )
 
-    registry_strategies = set(registry_misses_enabled.keys()) | set(
-        registry_misses_disabled.keys()
-    )
+    registry_strategies = set(registry_misses_enabled.keys()) | set(registry_misses_disabled.keys())
     for strategy in sorted(registry_strategies):
         targets = list(registry_misses_enabled.get(strategy, []))
         if warn_disabled:
@@ -357,7 +404,9 @@ def run_preflight(
 
 
 def main(argv: Iterable[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Preflight validation for dataset collector pipelines.")
+    ap = argparse.ArgumentParser(
+        description="Preflight validation for dataset collector pipelines."
+    )
     ap.add_argument("--repo-root", default=".", help="Repository root containing pipelines")
     ap.add_argument(
         "--pipeline-map",

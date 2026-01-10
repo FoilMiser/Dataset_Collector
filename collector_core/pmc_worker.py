@@ -43,6 +43,15 @@ from collector_core.exceptions import (
     OutputPathsBuilderError,
 )
 from collector_core.logging_config import add_logging_args, configure_logging
+from collector_core.utils import (
+    ensure_dir,
+    sha256_file,
+    utc_now,
+    write_json,
+)
+from collector_core.utils import (
+    read_jsonl_list as read_jsonl,
+)
 
 requests = _try_import("requests")
 FTP = _try_import("ftplib", "FTP")
@@ -50,37 +59,10 @@ FTP = _try_import("ftplib", "FTP")
 logger = logging.getLogger(__name__)
 
 
-def utc_now() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-
-
-def ensure_dir(p: Path) -> None:
-    p.mkdir(parents=True, exist_ok=True)
-
-
-def read_jsonl(path: Path) -> list[dict[str, Any]]:
-    return [json.loads(ln) for ln in path.read_text().splitlines() if ln.strip()]
-
-
-def write_json(path: Path, obj: dict[str, Any]) -> None:
-    ensure_dir(path.parent)
-    tmp_path = Path(f"{path}.tmp")
-    tmp_path.write_text(json.dumps(obj, indent=2) + "\n", encoding="utf-8")
-    tmp_path.replace(path)
-
-
 def append_jsonl(path: Path, obj: dict[str, Any]) -> None:
     ensure_dir(path.parent)
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(obj) + "\n")
-
-
-def sha256_file(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            h.update(chunk)
-    return h.hexdigest()
 
 
 def sha256_bytes(b: bytes) -> str:
@@ -141,13 +123,15 @@ def chunk_text(text: str, max_chars: int, min_chars: int) -> list[str]:
             buf, buf_len = ([p] if len(p) <= max_chars else []), 0
             if len(p) > max_chars:
                 for i in range(0, len(p), max_chars):
-                    chunks.append(p[i:i + max_chars])
+                    chunks.append(p[i : i + max_chars])
     if buf:
         chunks.append("\n\n".join(buf))
     return [c for c in chunks if len(c) >= min_chars]
 
 
-def http_get_bytes(url: str, timeout_s: int = 120, user_agent_version: str = TOOL_VERSION) -> tuple[bytes, dict]:
+def http_get_bytes(
+    url: str, timeout_s: int = 120, user_agent_version: str = TOOL_VERSION
+) -> tuple[bytes, dict]:
     missing = requires("requests", requests, install="pip install requests")
     if missing:
         raise DependencyMissingError(
@@ -269,12 +253,22 @@ def get_text(elem: ET.Element | None) -> str:
     return normalize_whitespace("".join(elem.itertext()))
 
 
-def extract_article_text(nxml: bytes, drop_refs: bool, include_section_headers: bool,
-                         include_figure_captions: bool, include_table_captions: bool) -> dict[str, Any]:
+def extract_article_text(
+    nxml: bytes,
+    drop_refs: bool,
+    include_section_headers: bool,
+    include_figure_captions: bool,
+    include_table_captions: bool,
+) -> dict[str, Any]:
     result: dict[str, Any] = {
-        "title": "", "abstract": "", "body_text": "",
-        "sections": [], "figure_captions": [], "table_captions": [],
-        "doi": "", "pmid": "",
+        "title": "",
+        "abstract": "",
+        "body_text": "",
+        "sections": [],
+        "figure_captions": [],
+        "table_captions": [],
+        "doi": "",
+        "pmid": "",
     }
 
     root = ET.fromstring(nxml)
@@ -312,7 +306,9 @@ def extract_article_text(nxml: bytes, drop_refs: bool, include_section_headers: 
         if refs is not None:
             refs_text = get_text(refs)
             if refs_text:
-                result["body_text"] = (result["body_text"] + "\n\nReferences:\n" + refs_text).strip()
+                result["body_text"] = (
+                    result["body_text"] + "\n\nReferences:\n" + refs_text
+                ).strip()
 
     if include_figure_captions:
         for fig in root.findall(".//fig"):
@@ -429,9 +425,12 @@ def run_pmc_worker(
     args: list[str] | None = None,
     configure_parser: Callable[[argparse.ArgumentParser], None] | None = None,
     log_path_builder: Callable[[Path], Path] | None = None,
-    output_paths_builder: Callable[[argparse.Namespace, Path], tuple[Path, Path | None]] | None = None,
+    output_paths_builder: Callable[[argparse.Namespace, Path], tuple[Path, Path | None]]
+    | None = None,
     chunk_defaults_loader: Callable[[Path], dict[str, Any]] = chunk_defaults_from_targets_yaml,
-    extract_article_text_fn: Callable[[bytes, bool, bool, bool, bool], dict[str, Any]] = extract_article_text,
+    extract_article_text_fn: Callable[
+        [bytes, bool, bool, bool, bool], dict[str, Any]
+    ] = extract_article_text,
     extract_nxml_fn: Callable[[bytes], tuple[bytes | None, list[str]]] = extract_nxml,
     include_pools_root_arg: bool = True,
 ) -> None:
@@ -469,10 +468,16 @@ def run_pmc_worker(
             )
         pools_root = Path(parsed.pools_root).expanduser().resolve()
 
-        def output_paths_builder(parsed_args: argparse.Namespace, target_path: Path) -> tuple[Path, Path | None]:
+        def output_paths_builder(
+            parsed_args: argparse.Namespace, target_path: Path
+        ) -> tuple[Path, Path | None]:
             pools = pools_from_targets_yaml(target_path, pools_root)
             out_root = pools.permissive / output_subdir
-            cache_dir = pools.quarantine / "pmc_oa_fulltext" / "_cache" if parsed_args.enable_cache else None
+            cache_dir = (
+                pools.quarantine / "pmc_oa_fulltext" / "_cache"
+                if parsed_args.enable_cache
+                else None
+            )
             return out_root, cache_dir
 
     out_root, cache_dir = output_paths_builder(parsed, targets_path)
@@ -513,7 +518,9 @@ def run_pmc_worker(
             with gzip.open(path, "wt", encoding="utf-8") as f:
                 for r in train_buf:
                     f.write(json.dumps(r) + "\n")
-            shard_files["train"].append({"path": str(path), "rows": len(train_buf), "sha256": sha256_file(path)})
+            shard_files["train"].append(
+                {"path": str(path), "rows": len(train_buf), "sha256": sha256_file(path) or ""}
+            )
             total_train += len(train_buf)
             train_buf = []
             train_idx += 1
@@ -522,7 +529,9 @@ def run_pmc_worker(
             with gzip.open(path, "wt", encoding="utf-8") as f:
                 for r in valid_buf:
                     f.write(json.dumps(r) + "\n")
-            shard_files["valid"].append({"path": str(path), "rows": len(valid_buf), "sha256": sha256_file(path)})
+            shard_files["valid"].append(
+                {"path": str(path), "rows": len(valid_buf), "sha256": sha256_file(path) or ""}
+            )
             total_valid += len(valid_buf)
             valid_buf = []
             valid_idx += 1
@@ -614,7 +623,10 @@ def run_pmc_worker(
                 flush("valid")
 
         successful += 1
-        append_jsonl(log_path, {**event, "status": "ok", "chunks": len(chunks), "cached": meta.get("cached", False)})
+        append_jsonl(
+            log_path,
+            {**event, "status": "ok", "chunks": len(chunks), "cached": meta.get("cached", False)},
+        )
         processed.add(key)
         state["processed"] = sorted(processed)
         write_json(resume_path, state)
@@ -635,7 +647,9 @@ def run_pmc_worker(
         "train_shards": shard_files["train"],
         "valid_shards": shard_files["valid"],
     }
-    index.update(build_artifact_metadata(pipeline_version=version, written_at_utc=index["created_at_utc"]))
+    index.update(
+        build_artifact_metadata(pipeline_version=version, written_at_utc=index["created_at_utc"])
+    )
     write_json(out_root / "dataset_index.json", index)
     write_json(manifests_dir / f"pmc_run_{int(time.time())}.json", index)
 

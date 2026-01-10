@@ -12,9 +12,8 @@ Covers:
 
 All tests are local (no network calls).
 """
-from __future__ import annotations
 
-import pytest
+from __future__ import annotations
 
 from collector_core.pipeline_driver_base import (
     compute_normalized_text_hash,
@@ -24,7 +23,6 @@ from collector_core.pipeline_driver_base import (
     resolve_evidence_change,
 )
 from collector_core.utils import contains_any
-
 
 # =============================================================================
 # resolve_evidence_change policy tests
@@ -49,80 +47,104 @@ class TestResolveEvidenceChange:
     def test_raw_policy_only_considers_raw_changes(self) -> None:
         """With raw policy, only raw_changed matters."""
         # Raw changed, normalized unchanged
-        assert resolve_evidence_change(
-            raw_changed=True,
-            normalized_changed=False,
-            cosmetic_change=True,
-            evidence_policy="raw",
-            cosmetic_policy="warn_only",
-        ) is True
+        assert (
+            resolve_evidence_change(
+                raw_changed=True,
+                normalized_changed=False,
+                cosmetic_change=True,
+                evidence_policy="raw",
+                cosmetic_policy="warn_only",
+            )
+            is True
+        )
 
         # Raw unchanged, normalized changed
-        assert resolve_evidence_change(
-            raw_changed=False,
-            normalized_changed=True,
-            cosmetic_change=False,
-            evidence_policy="raw",
-            cosmetic_policy="warn_only",
-        ) is False
+        assert (
+            resolve_evidence_change(
+                raw_changed=False,
+                normalized_changed=True,
+                cosmetic_change=False,
+                evidence_policy="raw",
+                cosmetic_policy="warn_only",
+            )
+            is False
+        )
 
     def test_normalized_policy_only_considers_normalized_changes(self) -> None:
         """With normalized policy, only normalized_changed matters."""
         # Raw changed, normalized unchanged (cosmetic change)
-        assert resolve_evidence_change(
-            raw_changed=True,
-            normalized_changed=False,
-            cosmetic_change=True,
-            evidence_policy="normalized",
-            cosmetic_policy="warn_only",
-        ) is False
+        assert (
+            resolve_evidence_change(
+                raw_changed=True,
+                normalized_changed=False,
+                cosmetic_change=True,
+                evidence_policy="normalized",
+                cosmetic_policy="warn_only",
+            )
+            is False
+        )
 
         # Both changed
-        assert resolve_evidence_change(
-            raw_changed=True,
-            normalized_changed=True,
-            cosmetic_change=False,
-            evidence_policy="normalized",
-            cosmetic_policy="warn_only",
-        ) is True
+        assert (
+            resolve_evidence_change(
+                raw_changed=True,
+                normalized_changed=True,
+                cosmetic_change=False,
+                evidence_policy="normalized",
+                cosmetic_policy="warn_only",
+            )
+            is True
+        )
 
         # Only normalized changed (edge case)
-        assert resolve_evidence_change(
-            raw_changed=False,
-            normalized_changed=True,
-            cosmetic_change=False,
-            evidence_policy="normalized",
-            cosmetic_policy="warn_only",
-        ) is True
+        assert (
+            resolve_evidence_change(
+                raw_changed=False,
+                normalized_changed=True,
+                cosmetic_change=False,
+                evidence_policy="normalized",
+                cosmetic_policy="warn_only",
+            )
+            is True
+        )
 
     def test_either_policy_considers_both(self) -> None:
         """With either policy, either raw_changed or normalized_changed triggers."""
         # Only raw changed
-        assert resolve_evidence_change(
-            raw_changed=True,
-            normalized_changed=False,
-            cosmetic_change=True,
-            evidence_policy="either",
-            cosmetic_policy="warn_only",
-        ) is True
+        assert (
+            resolve_evidence_change(
+                raw_changed=True,
+                normalized_changed=False,
+                cosmetic_change=True,
+                evidence_policy="either",
+                cosmetic_policy="warn_only",
+            )
+            is True
+        )
 
         # Only normalized changed
-        assert resolve_evidence_change(
-            raw_changed=False,
-            normalized_changed=True,
-            cosmetic_change=False,
-            evidence_policy="either",
-            cosmetic_policy="warn_only",
-        ) is True
+        assert (
+            resolve_evidence_change(
+                raw_changed=False,
+                normalized_changed=True,
+                cosmetic_change=False,
+                evidence_policy="either",
+                cosmetic_policy="warn_only",
+            )
+            is True
+        )
 
         # Both changed
-        assert resolve_evidence_change(
-            raw_changed=True,
-            normalized_changed=True,
-            cosmetic_change=False,
-            evidence_policy="either",
-            cosmetic_policy="warn_only",
-        ) is True
+        assert (
+            resolve_evidence_change(
+                raw_changed=True,
+                normalized_changed=True,
+                cosmetic_change=False,
+                evidence_policy="either",
+                cosmetic_policy="warn_only",
+            )
+            is True
+        )
 
     def test_cosmetic_change_warn_only_does_not_trigger(self) -> None:
         """With warn_only policy, cosmetic changes don't trigger evidence change."""
@@ -370,7 +392,9 @@ class TestHtmlToText:
         hash_v1 = compute_normalized_text_hash(text_v1)
         hash_v2 = compute_normalized_text_hash(text_v2)
 
-        assert hash_v1 == hash_v2, "HTML formatting-only changes should produce same normalized hash"
+        assert hash_v1 == hash_v2, (
+            "HTML formatting-only changes should produce same normalized hash"
+        )
 
 
 # =============================================================================
@@ -449,17 +473,12 @@ class TestEvidenceChangeIntegrationScenarios:
         2. Commercial use requires a license.
         """
 
-        # Compute hashes
-        old_raw_hash = compute_normalized_text_hash(old_terms)  # Using as proxy for raw hash
-        new_raw_hash = compute_normalized_text_hash(new_terms)  # These will differ
-
+        # Compute normalized hashes
         old_normalized_hash = compute_normalized_text_hash(old_terms)
         new_normalized_hash = compute_normalized_text_hash(new_terms)
 
-        # Raw bytes would differ (timestamp is different)
-        raw_changed = old_raw_hash != new_raw_hash  # Actually these are normalized, so same
-        # For this test, simulate raw bytes differing:
-        raw_changed = True
+        # Raw bytes would differ (timestamp is different) in real scenario
+        # For this test, we simulate raw bytes differing via compute_signoff_mismatches
 
         # But normalized should be same (timestamp removed)
         normalized_changed = old_normalized_hash != new_normalized_hash
@@ -524,7 +543,9 @@ class TestEvidenceChangeIntegrationScenarios:
         old_normalized = compute_normalized_text_hash(old_terms)
         new_normalized = compute_normalized_text_hash(new_terms)
 
-        assert old_normalized != new_normalized, "Content change should produce different normalized hashes"
+        assert old_normalized != new_normalized, (
+            "Content change should produce different normalized hashes"
+        )
 
     def test_html_formatting_only_change_not_detected(self) -> None:
         """
@@ -557,7 +578,9 @@ class TestEvidenceChangeIntegrationScenarios:
         old_normalized = compute_normalized_text_hash(old_text)
         new_normalized = compute_normalized_text_hash(new_text)
 
-        assert old_normalized == new_normalized, "HTML formatting changes should not affect normalized hash"
+        assert old_normalized == new_normalized, (
+            "HTML formatting changes should not affect normalized hash"
+        )
 
         # Simulate raw bytes being different
         raw_mismatch, norm_mismatch, cosmetic = compute_signoff_mismatches(
@@ -606,7 +629,9 @@ class TestEvidenceChangeIntegrationScenarios:
         old_normalized = compute_normalized_text_hash(old_terms)
         new_normalized = compute_normalized_text_hash(new_terms)
 
-        assert old_normalized != new_normalized, "Real content changes should produce different hashes"
+        assert old_normalized != new_normalized, (
+            "Real content changes should produce different hashes"
+        )
 
         # This should trigger with any policy
         for policy in ("raw", "normalized", "either"):

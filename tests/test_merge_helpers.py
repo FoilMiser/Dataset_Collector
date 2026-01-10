@@ -31,7 +31,9 @@ def test_get_sharder_reuses_instance(tmp_path) -> None:
     state = merge.MergeState(
         summary={"written": 0, "deduped": 0, "skipped": 0, "shards": []},
         dedupe=merge.DedupeIndex(roots.ledger_root / "dedupe.sqlite"),
-        shard_cfg=merge.ShardingConfig(max_records_per_shard=10, compression="gzip", prefix="combined"),
+        shard_cfg=merge.ShardingConfig(
+            max_records_per_shard=10, compression="gzip", prefix="combined"
+        ),
         pool_sharders={},
         target_meta={},
         pipeline_id="test",
@@ -56,7 +58,9 @@ def test_handle_record_writes_index_and_shard(tmp_path) -> None:
     state = merge.MergeState(
         summary={"written": 0, "deduped": 0, "skipped": 0, "shards": []},
         dedupe=merge.DedupeIndex(roots.ledger_root / "dedupe.sqlite"),
-        shard_cfg=merge.ShardingConfig(max_records_per_shard=10, compression="gzip", prefix="combined"),
+        shard_cfg=merge.ShardingConfig(
+            max_records_per_shard=10, compression="gzip", prefix="combined"
+        ),
         pool_sharders={},
         target_meta={},
         pipeline_id="test",

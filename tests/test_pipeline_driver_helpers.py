@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from pathlib import Path
 import socket
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -21,8 +21,8 @@ from collector_core.pipeline_driver_base import (
     denylist_hits,
     extract_download_urls,
     redact_headers_for_manifest,
-    resolve_evidence_change,
     resolve_effective_bucket,
+    resolve_evidence_change,
     resolve_retry_config,
     sort_queue_rows,
 )
@@ -42,7 +42,9 @@ def test_redact_headers_for_manifest_scrubs_sensitive_values() -> None:
     assert redacted["User-Agent"] == "demo"
 
 
-def test_snapshot_evidence_manifest_redacts_headers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_snapshot_evidence_manifest_redacts_headers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     driver = BasePipelineDriver()
     secret = "supersecret"
     headers = {"Authorization": f"Bearer {secret}", "X-Api-Key": secret}
@@ -67,7 +69,9 @@ def test_snapshot_evidence_manifest_redacts_headers(tmp_path: Path, monkeypatch:
     assert REDACTED in meta_text
 
 
-def test_snapshot_evidence_write_mismatch_marks_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_snapshot_evidence_write_mismatch_marks_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     driver = BasePipelineDriver()
 
     def fake_fetch(
@@ -97,7 +101,9 @@ def test_snapshot_evidence_write_mismatch_marks_error(tmp_path: Path, monkeypatc
     assert "verification" in result.get("error", "").lower()
 
 
-def test_snapshot_evidence_removes_stale_siblings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_snapshot_evidence_removes_stale_siblings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     driver = BasePipelineDriver()
 
     def fake_fetch(
@@ -165,7 +171,7 @@ def test_fetch_url_with_retry_blocks_private_redirect(monkeypatch: pytest.Monkey
         def iter_content(self, chunk_size: int = 1024) -> list[bytes]:
             return [b"ok"]
 
-        def __enter__(self) -> "DummyResponse":
+        def __enter__(self) -> DummyResponse:
             return self
 
         def __exit__(self, exc_type: object, exc: object, tb: object) -> bool:

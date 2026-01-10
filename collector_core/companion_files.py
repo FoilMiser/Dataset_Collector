@@ -53,7 +53,9 @@ def read_license_maps(paths: Sequence[Path]) -> dict[str, Any]:
         _extend_unique(merged["normalization"]["rules"], normalization.get("rules", []) or [])
 
         restriction_scan = data.get("restriction_scan", {}) or {}
-        _extend_unique(merged["restriction_scan"]["phrases"], restriction_scan.get("phrases", []) or [])
+        _extend_unique(
+            merged["restriction_scan"]["phrases"], restriction_scan.get("phrases", []) or []
+        )
 
         gating = data.get("gating", {}) or {}
         merged["gating"].update(gating)

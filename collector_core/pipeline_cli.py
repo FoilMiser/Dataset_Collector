@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Unified CLI for running pipeline helpers from a single entrypoint."""
+
 from __future__ import annotations
 
 import argparse
 import sys
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from collector_core import catalog_builder, review_queue
 

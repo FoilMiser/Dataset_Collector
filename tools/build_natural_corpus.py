@@ -75,8 +75,7 @@ def pick_existing(queues_root: Path, candidates: list[str]) -> Path:
         if path.exists():
             return path
     raise FileNotFoundError(
-        f"None of {candidates} exist under {queues_root}. "
-        "Did you run the classify stage first?"
+        f"None of {candidates} exist under {queues_root}. Did you run the classify stage first?"
     )
 
 
@@ -178,7 +177,9 @@ def main(argv: Iterable[str] | None = None) -> int:
     ap.add_argument("--dest-root", default=None, help="Destination root for Natural corpus")
     ap.add_argument("--pipelines", nargs="+", default=["all"], help="Pipelines to run or 'all'")
     ap.add_argument("--stages", nargs="+", default=DEFAULT_STAGES, help="Stages to execute")
-    ap.add_argument("--mode", choices=sorted(MODE_STAGES.keys()), default="full", help="Stage preset to run")
+    ap.add_argument(
+        "--mode", choices=sorted(MODE_STAGES.keys()), default="full", help="Stage preset to run"
+    )
     ap.add_argument("--workers", type=int, default=8, help="Worker count for acquisition")
     ap.add_argument("--execute", action="store_true", help="Execute pipeline stages")
     args = ap.parse_args(argv)
@@ -234,9 +235,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         for stage in stages:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             log_path = (
-                dataset_root_fs
-                / "_logs"
-                / f"orchestrator_{pipeline_name}_{stage}_{timestamp}.log"
+                dataset_root_fs / "_logs" / f"orchestrator_{pipeline_name}_{stage}_{timestamp}.log"
             )
             _run_stage(
                 pipeline_dir=pipeline_dir,

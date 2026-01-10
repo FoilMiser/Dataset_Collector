@@ -149,7 +149,9 @@ def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
 def write_parquet(path: Path, rows: list[dict[str, Any]]) -> None:
     missing = requires("pyarrow", pa, install="pip install pyarrow")
     if missing or pq is None:
-        raise RuntimeError(missing or "missing dependency: pyarrow.parquet (install: pip install pyarrow)")
+        raise RuntimeError(
+            missing or "missing dependency: pyarrow.parquet (install: pip install pyarrow)"
+        )
     ensure_dir(path.parent)
     table = pa.Table.from_pylist(rows)
     pq.write_table(table, path)
@@ -178,7 +180,9 @@ def process_file(
 
     thumb_path = None
     if generate_thumbnails:
-        thumb_path = render_thumbnail(mesh, output_root / "thumbnails" / relative.with_suffix(".png"))
+        thumb_path = render_thumbnail(
+            mesh, output_root / "thumbnails" / relative.with_suffix(".png")
+        )
 
     pc_path = None
     if generate_point_clouds:
@@ -221,9 +225,19 @@ def main() -> None:
     ap.add_argument("--license-spdx", default="CC0-1.0", help="License to apply to outputs")
     ap.add_argument("--attribution", default=None, help="Attribution text if required")
     ap.add_argument("--creator", default=None, help="Creator/author if available")
-    ap.add_argument("--emit-parquet", action="store_true", help="Emit parquet alongside JSONL (requires pyarrow)")
-    ap.add_argument("--generate-thumbnails", action="store_true", help="Render thumbnails (requires PIL)")
-    ap.add_argument("--generate-point-clouds", action="store_true", help="Emit sampled point clouds (requires numpy)")
+    ap.add_argument(
+        "--emit-parquet",
+        action="store_true",
+        help="Emit parquet alongside JSONL (requires pyarrow)",
+    )
+    ap.add_argument(
+        "--generate-thumbnails", action="store_true", help="Render thumbnails (requires PIL)"
+    )
+    ap.add_argument(
+        "--generate-point-clouds",
+        action="store_true",
+        help="Emit sampled point clouds (requires numpy)",
+    )
     args = ap.parse_args()
 
     if trimesh is None or np is None:

@@ -88,7 +88,32 @@
           "download": {
             "type": "object",
             "properties": {
-              "strategy": { "type": "string" }
+              "strategy": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "http",
+                  "ftp",
+                  "git",
+                  "zenodo",
+                  "dataverse",
+                  "figshare",
+                  "github_release",
+                  "huggingface_datasets",
+                  "s3_public",
+                  "s3_sync",
+                  "aws_requester_pays",
+                  "torrent",
+                  "api",
+                  "api_tabular",
+                  "web_crawl",
+                  "faa_ac_crawl",
+                  "noaa_ir_json",
+                  "ntrs_openapi",
+                  "pmc_oa",
+                  "usgs_pubs_warehouse"
+                ]
+              }
             },
             "additionalProperties": true
           }

@@ -12,6 +12,7 @@ import yaml
 
 from collector_core.secrets import REDACTED
 
+
 @dataclasses.dataclass(frozen=True)
 class PipelineTestConfig:
     manifests_root: Path
@@ -101,10 +102,14 @@ def minimal_config(tmp_path: Path, minimal_license_map: Path) -> PipelineTestCon
 def read_jsonl(path: Path) -> list[dict[str, object]]:
     if not path.exists():
         return []
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    return [
+        json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()
+    ]
 
 
-def run_driver(targets_path: Path, license_map_path: Path, extra_args: list[str] | None = None) -> None:
+def run_driver(
+    targets_path: Path, license_map_path: Path, extra_args: list[str] | None = None
+) -> None:
     driver_path = Path("regcomp_pipeline_v2/pipeline_driver.py").resolve()
     env = os.environ.copy()
     env["PYTHONPATH"] = str(Path(".").resolve())
@@ -123,7 +128,9 @@ def run_driver(targets_path: Path, license_map_path: Path, extra_args: list[str]
     subprocess.run(args, check=True, cwd=Path(".").resolve(), env=env)
 
 
-def test_green_yellow_red_classification(tmp_path: Path, minimal_config: PipelineTestConfig) -> None:
+def test_green_yellow_red_classification(
+    tmp_path: Path, minimal_config: PipelineTestConfig
+) -> None:
     targets = [
         {
             "id": "green_target",
@@ -157,7 +164,9 @@ def test_green_yellow_red_classification(tmp_path: Path, minimal_config: Pipelin
     assert {row["id"] for row in red_rows} == {"red_target"}
 
 
-def test_offline_snapshot_terms_forces_yellow(tmp_path: Path, minimal_config: PipelineTestConfig) -> None:
+def test_offline_snapshot_terms_forces_yellow(
+    tmp_path: Path, minimal_config: PipelineTestConfig
+) -> None:
     targets = [
         {
             "id": "offline_target",
@@ -178,12 +187,16 @@ def test_offline_snapshot_terms_forces_yellow(tmp_path: Path, minimal_config: Pi
     assert not green_rows
     assert {row["id"] for row in yellow_rows} == {"offline_target"}
     evaluation = json.loads(
-        (minimal_config.manifests_root / "offline_target" / "evaluation.json").read_text(encoding="utf-8")
+        (minimal_config.manifests_root / "offline_target" / "evaluation.json").read_text(
+            encoding="utf-8"
+        )
     )
     assert evaluation["no_fetch_missing_evidence"] is True
 
 
-def test_evaluation_manifest_redacts_headers(tmp_path: Path, minimal_config: PipelineTestConfig) -> None:
+def test_evaluation_manifest_redacts_headers(
+    tmp_path: Path, minimal_config: PipelineTestConfig
+) -> None:
     secret = "supersecret"
     targets = [
         {
@@ -232,7 +245,9 @@ def _collect_strings(value: object) -> list[str]:
     return []
 
 
-def test_manifests_omit_or_redact_secret_headers(tmp_path: Path, minimal_config: PipelineTestConfig) -> None:
+def test_manifests_omit_or_redact_secret_headers(
+    tmp_path: Path, minimal_config: PipelineTestConfig
+) -> None:
     secret = "supersecret"
     targets = [
         {

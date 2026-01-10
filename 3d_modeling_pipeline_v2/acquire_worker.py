@@ -31,8 +31,8 @@ from urllib.robotparser import RobotFileParser
 
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.acquire_strategies import (
-    AcquireContext,
     DEFAULT_STRATEGY_HANDLERS,
+    AcquireContext,
     RootsDefaults,
     ensure_dir,
     handle_http_single,
@@ -84,14 +84,21 @@ def handle_api(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
                 yield ep
 
     if not ctx.mode.execute:
-        return [{"status": "planned", "base_url": base_url, "endpoints": list(iter_endpoints()), "query": shared_query}]
+        return [
+            {
+                "status": "planned",
+                "base_url": base_url,
+                "endpoints": list(iter_endpoints()),
+                "query": shared_query,
+            }
+        ]
 
     results: list[dict[str, Any]] = []
     call_log: list[dict[str, Any]] = []
 
     for idx, ep in enumerate(iter_endpoints()):
         path = ep.get("path", "")
-        name = ep.get("name") or safe_name(path or f"endpoint_{idx+1}")
+        name = ep.get("name") or safe_name(path or f"endpoint_{idx + 1}")
         method = (ep.get("method") or default_method).upper()
         params = dict(shared_query)
         params.update(ep.get("params") or {})
@@ -102,7 +109,9 @@ def handle_api(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
         page_start = int(ep.get("page_start", default_page_start))
         max_pages = int(ep.get("max_pages", default_max_pages))
 
-        url = urljoin(base_url if base_url.endswith("/") or path.startswith("/") else f"{base_url}/", path)
+        url = urljoin(
+            base_url if base_url.endswith("/") or path.startswith("/") else f"{base_url}/", path
+        )
         for page in range(max_pages):
             page_num = page_start + page
             call_params = dict(params)
@@ -144,13 +153,18 @@ def handle_api(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
                 continue
 
             content_type = resp.headers.get("Content-Type", "").lower()
-            suffix = ".json" if "json" in content_type else ".html" if "html" in content_type else ".txt"
+            suffix = (
+                ".json" if "json" in content_type else ".html" if "html" in content_type else ".txt"
+            )
             dest = out_dir / f"{name}{'' if max_pages == 1 else f'_page{page_num}'}{suffix}"
 
             try:
                 if "json" in content_type:
                     tmp_path = Path(f"{dest}.tmp")
-                    tmp_path.write_text(json.dumps(resp.json(), indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+                    tmp_path.write_text(
+                        json.dumps(resp.json(), indent=2, ensure_ascii=False) + "\n",
+                        encoding="utf-8",
+                    )
                     tmp_path.replace(dest)
                 elif "html" in content_type or "xml" in content_type:
                     dest.write_text(resp.text, encoding="utf-8")
@@ -160,7 +174,14 @@ def handle_api(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
                 dest.write_bytes(resp.content)
 
             payload_size = dest.stat().st_size
-            result_meta.update({"status": "ok", "path": str(dest), "bytes": payload_size, "sha256": sha256_file(dest)})
+            result_meta.update(
+                {
+                    "status": "ok",
+                    "path": str(dest),
+                    "bytes": payload_size,
+                    "sha256": sha256_file(dest),
+                }
+            )
             results.append(result_meta)
             call_log.append(result_meta)
 
@@ -177,7 +198,9 @@ def handle_api(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
     return results
 
 
-def handle_s3_public(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
+def handle_s3_public(
+    ctx: AcquireContext, row: dict[str, Any], out_dir: Path
+) -> list[dict[str, Any]]:
     download = normalize_download(row.get("download", {}) or {})
     bucket = download.get("bucket")
     prefix = download.get("prefix", "").lstrip("/")
@@ -195,7 +218,14 @@ def handle_s3_public(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) ->
         return [{"status": "error", "error": hint}]
 
     if not ctx.mode.execute:
-        return [{"status": "planned", "bucket": bucket, "prefix": prefix, "include_globs": include_globs}]
+        return [
+            {
+                "status": "planned",
+                "bucket": bucket,
+                "prefix": prefix,
+                "include_globs": include_globs,
+            }
+        ]
 
     ensure_dir(out_dir)
     catalog_dir = out_dir / "_catalogs"
@@ -219,7 +249,9 @@ def handle_s3_public(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) ->
                             "key": key,
                             "size": obj.get("Size"),
                             "etag": obj.get("ETag", "").strip('"'),
-                            "last_modified": obj.get("LastModified").isoformat() if obj.get("LastModified") else None,
+                            "last_modified": obj.get("LastModified").isoformat()
+                            if obj.get("LastModified")
+                            else None,
                         }
                     )
             if not resp.get("IsTruncated"):
@@ -229,11 +261,13 @@ def handle_s3_public(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) ->
 
     results: list[dict[str, Any]] = []
     objects = list_objects()
-    write_json(catalog_dir / "listing.json", {"bucket": bucket, "prefix": prefix, "objects": objects})
+    write_json(
+        catalog_dir / "listing.json", {"bucket": bucket, "prefix": prefix, "objects": objects}
+    )
 
     for obj in objects:
         key = obj["key"]
-        rel = key[len(prefix):].lstrip("/") if prefix else key
+        rel = key[len(prefix) :].lstrip("/") if prefix else key
         dest = out_dir / rel
         ensure_dir(dest.parent)
         meta = {"status": "planned", "key": key, "dest": str(dest)}
@@ -242,7 +276,14 @@ def handle_s3_public(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) ->
             continue
         try:
             s3.download_file(bucket, key, str(dest))
-            meta.update({"status": "ok", "bytes": dest.stat().st_size, "sha256": sha256_file(dest), "etag": obj.get("etag")})
+            meta.update(
+                {
+                    "status": "ok",
+                    "bytes": dest.stat().st_size,
+                    "sha256": sha256_file(dest),
+                    "etag": obj.get("etag"),
+                }
+            )
         except Exception as e:
             meta["status"] = "error"
             meta["error"] = repr(e)
@@ -250,7 +291,9 @@ def handle_s3_public(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) ->
     return results
 
 
-def handle_web_crawl(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
+def handle_web_crawl(
+    ctx: AcquireContext, row: dict[str, Any], out_dir: Path
+) -> list[dict[str, Any]]:
     missing = requires("requests", requests, install="pip install requests")
     if missing:
         return [{"status": "error", "error": missing}]
@@ -313,9 +356,13 @@ def handle_web_crawl(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) ->
             results.append({"status": "skipped", "reason": "robots_disallow", "url": url})
             continue
         try:
-            resp = requests.get(url, timeout=20, headers={"User-Agent": f"3d-modeling-crawler/{VERSION}"})
+            resp = requests.get(
+                url, timeout=20, headers={"User-Agent": f"3d-modeling-crawler/{VERSION}"}
+            )
             if resp.status_code >= 400:
-                results.append({"status": "error", "url": url, "error": f"status {resp.status_code}"})
+                results.append(
+                    {"status": "error", "url": url, "error": f"status {resp.status_code}"}
+                )
                 continue
             content_type = resp.headers.get("Content-Type", "")
             if "text/html" in content_type:
@@ -336,19 +383,44 @@ def handle_web_crawl(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) ->
                 dest = out_dir / safe_name(path_part)
                 ensure_dir(dest.parent)
                 dest.write_bytes(resp.content)
-                results.append({"status": "ok", "url": url, "path": str(dest), "bytes": dest.stat().st_size, "sha256": sha256_file(dest)})
+                results.append(
+                    {
+                        "status": "ok",
+                        "url": url,
+                        "path": str(dest),
+                        "bytes": dest.stat().st_size,
+                        "sha256": sha256_file(dest),
+                    }
+                )
             else:
                 results.append({"status": "visited", "url": url})
         except Exception as e:
             results.append({"status": "error", "url": url, "error": repr(e)})
         time.sleep(delay)
 
-    write_json(catalog_dir / "crawl_run.json", {"seeds": seeds, "visited": list(visited), "results_count": len(results)})
+    write_json(
+        catalog_dir / "crawl_run.json",
+        {"seeds": seeds, "visited": list(visited), "results_count": len(results)},
+    )
     return results
 
 
-def index_mesh_assets(row: dict[str, Any], out_dir: Path, results: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    mesh_exts = {".stl", ".obj", ".fbx", ".ply", ".glb", ".gltf", ".stp", ".step", ".iges", ".igs", ".3mf"}
+def index_mesh_assets(
+    row: dict[str, Any], out_dir: Path, results: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    mesh_exts = {
+        ".stl",
+        ".obj",
+        ".fbx",
+        ".ply",
+        ".glb",
+        ".gltf",
+        ".stp",
+        ".step",
+        ".iges",
+        ".igs",
+        ".3mf",
+    }
     index_rows: list[dict[str, Any]] = []
     routing = {
         "subject": row.get("routing_subject"),
@@ -376,7 +448,10 @@ def index_mesh_assets(row: dict[str, Any], out_dir: Path, results: list[dict[str
                 "asset_path": str(rel),
                 "license_spdx": row.get("resolved_spdx") or row.get("license_spdx"),
                 "license_profile": row.get("license_profile"),
-                "source": {"target_id": row.get("id"), "source_url": row.get("license_evidence_url")},
+                "source": {
+                    "target_id": row.get("id"),
+                    "source_url": row.get("license_evidence_url"),
+                },
                 "routing": {k: v for k, v in routing.items() if v is not None},
                 "hash": {"content_sha256": sha256_file(asset_path)},
             }

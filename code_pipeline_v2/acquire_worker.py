@@ -25,8 +25,8 @@ from typing import Any
 
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.acquire_strategies import (
-    AcquireContext,
     DEFAULT_STRATEGY_HANDLERS,
+    AcquireContext,
     RootsDefaults,
     handle_figshare_article,
     make_github_release_handler,
@@ -59,7 +59,9 @@ def should_run_code_worker(row: dict[str, Any]) -> bool:
     return "code" in [str(t).lower() for t in data_types] or bool(flags.get("enabled", False))
 
 
-def run_code_worker(ctx: AcquireContext, row: dict[str, Any], out_dir: Path, bucket: str) -> dict[str, Any]:
+def run_code_worker(
+    ctx: AcquireContext, row: dict[str, Any], out_dir: Path, bucket: str
+) -> dict[str, Any]:
     try:
         from code_worker import run_extraction  # type: ignore
     except Exception as exc:  # pragma: no cover - optional dependency
@@ -73,14 +75,18 @@ def run_code_worker(ctx: AcquireContext, row: dict[str, Any], out_dir: Path, buc
         if t.get("id") == row.get("id"):
             target_cfg = t
             break
-    processing_overrides = target_cfg.get("code_processing", {}) if isinstance(target_cfg, dict) else {}
+    processing_overrides = (
+        target_cfg.get("code_processing", {}) if isinstance(target_cfg, dict) else {}
+    )
     if processing_overrides:
         processing_defaults = {**processing_defaults, **processing_overrides}
     sharding_cfg = globals_cfg.get("sharding", {}) or {}
     routing = row.get("routing") or row.get("code_routing") or target_cfg.get("routing") or {}
     download_cfg = row.get("download", {}) or {}
     source_url = download_cfg.get("repo") or download_cfg.get("repo_url") or download_cfg.get("url")
-    license_spdx = row.get("resolved_spdx") or (row.get("license_evidence", {}) or {}).get("spdx_hint")
+    license_spdx = row.get("resolved_spdx") or (row.get("license_evidence", {}) or {}).get(
+        "spdx_hint"
+    )
     pitches_root = globals_cfg.get("pitches_root")
 
     summary = run_extraction(

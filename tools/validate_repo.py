@@ -107,12 +107,14 @@ READ_YAML_EXCEPTIONS = (
 
 
 def _append_read_error(errors: list[dict[str, Any]], path: Path, exc: Exception) -> None:
-    errors.append({
-        "type": "read_yaml_error",
-        "path": str(path),
-        "exception": exc.__class__.__name__,
-        "message": str(exc),
-    })
+    errors.append(
+        {
+            "type": "read_yaml_error",
+            "path": str(path),
+            "exception": exc.__class__.__name__,
+            "message": str(exc),
+        }
+    )
 
 
 def _load_pipeline_map(
@@ -141,12 +143,14 @@ def validate_pipeline_layout(root: Path) -> tuple[list[dict[str, Any]], list[Pat
         for pipeline_name, pipeline_entry in pipelines_cfg.items():
             pipeline_dir = root / pipeline_name
             if not pipeline_dir.is_dir():
-                errors.append({
-                    "type": "missing_pipeline_directory",
-                    "pipeline": pipeline_name,
-                    "path": str(pipeline_dir),
-                    "pipeline_map": str(pipeline_map_path),
-                })
+                errors.append(
+                    {
+                        "type": "missing_pipeline_directory",
+                        "pipeline": pipeline_name,
+                        "path": str(pipeline_dir),
+                        "pipeline_map": str(pipeline_map_path),
+                    }
+                )
                 continue
             pipeline_dirs.append(pipeline_dir)
             required_files = [
@@ -155,26 +159,32 @@ def validate_pipeline_layout(root: Path) -> tuple[list[dict[str, Any]], list[Pat
             ]
             for required_path in required_files:
                 if not required_path.exists():
-                    errors.append({
-                        "type": "missing_pipeline_file",
-                        "pipeline": pipeline_name,
-                        "path": str(required_path),
-                    })
+                    errors.append(
+                        {
+                            "type": "missing_pipeline_file",
+                            "pipeline": pipeline_name,
+                            "path": str(required_path),
+                        }
+                    )
             targets_yaml = pipeline_entry.get("targets_yaml")
             if not targets_yaml:
-                errors.append({
-                    "type": "missing_pipeline_targets_yaml",
-                    "pipeline": pipeline_name,
-                    "pipeline_map": str(pipeline_map_path),
-                })
+                errors.append(
+                    {
+                        "type": "missing_pipeline_targets_yaml",
+                        "pipeline": pipeline_name,
+                        "pipeline_map": str(pipeline_map_path),
+                    }
+                )
             else:
                 targets_path = pipeline_dir / targets_yaml
                 if not targets_path.exists():
-                    errors.append({
-                        "type": "missing_pipeline_targets_file",
-                        "pipeline": pipeline_name,
-                        "path": str(targets_path),
-                    })
+                    errors.append(
+                        {
+                            "type": "missing_pipeline_targets_file",
+                            "pipeline": pipeline_name,
+                            "path": str(targets_path),
+                        }
+                    )
     else:
         for pipeline_dir in sorted(root.glob("*_pipeline_v2")):
             if not pipeline_dir.is_dir():
@@ -186,20 +196,58 @@ def validate_pipeline_layout(root: Path) -> tuple[list[dict[str, Any]], list[Pat
             ]
             for required_path in required_files:
                 if not required_path.exists():
-                    errors.append({
-                        "type": "missing_pipeline_file",
-                        "pipeline": pipeline_dir.name,
-                        "path": str(required_path),
-                    })
+                    errors.append(
+                        {
+                            "type": "missing_pipeline_file",
+                            "pipeline": pipeline_dir.name,
+                            "path": str(required_path),
+                        }
+                    )
             targets_files = list(pipeline_dir.glob("targets_*.yaml"))
             if not targets_files:
-                errors.append({
-                    "type": "missing_pipeline_targets_file",
-                    "pipeline": pipeline_dir.name,
-                    "path": str(pipeline_dir),
-                })
+                errors.append(
+                    {
+                        "type": "missing_pipeline_targets_file",
+                        "pipeline": pipeline_dir.name,
+                        "path": str(pipeline_dir),
+                    }
+                )
 
     return errors, pipeline_dirs
+
+
+def _is_thin_wrapper_driver(text: str) -> bool:
+    """Check if driver is a thin wrapper delegating to pipeline_factory."""
+    patterns = [
+        "from collector_core.pipeline_factory import get_pipeline_driver",
+        "from collector_core import pipeline_factory",
+        "pipeline_factory.get_pipeline_driver",
+        "get_pipeline_driver(",
+    ]
+    return any(pattern in text for pattern in patterns)
+
+
+def _is_thin_wrapper_worker(text: str) -> bool:
+    """Check if worker is a thin wrapper delegating to generic_workers."""
+    patterns = [
+        "from collector_core.generic_workers import main_acquire",
+        "from collector_core.generic_workers import main_yellow_screen",
+        "from collector_core import generic_workers",
+        "generic_workers.main_acquire",
+        "generic_workers.main_yellow_screen",
+        "main_acquire(",
+        "main_yellow_screen(",
+    ]
+    return any(pattern in text for pattern in patterns)
+
+
+def _is_thin_wrapper_scrubber(text: str) -> bool:
+    """Check if yellow_scrubber is a thin wrapper using make_main."""
+    patterns = [
+        "from collector_core.yellow_scrubber_base import make_main",
+        "make_main(",
+    ]
+    return any(pattern in text for pattern in patterns)
 
 
 def validate_pipeline_driver_versions(pipeline_dirs: Iterable[Path]) -> list[dict[str, Any]]:
@@ -210,46 +258,71 @@ def validate_pipeline_driver_versions(pipeline_dirs: Iterable[Path]) -> list[dic
     for driver in drivers:
         text = driver.read_text(encoding="utf-8")
         if version_assignment.search(text):
-            errors.append({
-                "type": "hardcoded_pipeline_version",
-                "path": str(driver),
-                "message": "Remove VERSION assignment from pipeline drivers.",
-            })
+            errors.append(
+                {
+                    "type": "hardcoded_pipeline_version",
+                    "path": str(driver),
+                    "message": "Remove VERSION assignment from pipeline drivers.",
+                }
+            )
+        # Thin wrappers that delegate to pipeline_factory don't need VERSION import
+        if _is_thin_wrapper_driver(text):
+            continue
         if "collector_core.__version__" not in text:
-            errors.append({
-                "type": "missing_pipeline_version_import",
-                "path": str(driver),
-                "message": "Import VERSION from collector_core.__version__.",
-            })
+            errors.append(
+                {
+                    "type": "missing_pipeline_version_import",
+                    "path": str(driver),
+                    "message": "Import VERSION from collector_core.__version__.",
+                }
+            )
 
     return errors
 
 
 def validate_versioned_modules(root: Path) -> list[dict[str, Any]]:
     errors: list[dict[str, Any]] = []
-    versioned_files = [
-        *iter_acquire_workers(root),
-        *iter_yellow_scrubbers(root),
-        *iter_collector_core_versioned_modules(root),
-    ]
+    acquire_workers = list(iter_acquire_workers(root))
+    yellow_scrubbers = list(iter_yellow_scrubbers(root))
+    core_modules = list(iter_collector_core_versioned_modules(root))
+
+    versioned_files = acquire_workers + yellow_scrubbers + core_modules
     if not versioned_files:
         return errors
 
     hardcoded_version = re.compile(r"^\s*VERSION\s*=\s*[\"']\d", re.M)
     for path in versioned_files:
         text = path.read_text(encoding="utf-8")
+
+        # Always check for hardcoded versions (not allowed in any module)
         if hardcoded_version.search(text):
-            errors.append({
-                "type": "hardcoded_version_string",
-                "path": str(path),
-                "message": "Remove hardcoded VERSION strings and import from collector_core.__version__.",
-            })
+            errors.append(
+                {
+                    "type": "hardcoded_version_string",
+                    "path": str(path),
+                    "message": "Remove hardcoded VERSION strings and import from collector_core.__version__.",
+                }
+            )
+
+        # Thin wrappers don't need VERSION import - they delegate to core
+        is_acquire_worker = path in acquire_workers
+        is_yellow_scrubber = path in yellow_scrubbers
+
+        if is_acquire_worker and _is_thin_wrapper_worker(text):
+            continue
+        if is_yellow_scrubber and (
+            _is_thin_wrapper_scrubber(text) or _is_thin_wrapper_worker(text)
+        ):
+            continue
+
         if "collector_core.__version__" not in text:
-            errors.append({
-                "type": "missing_version_import",
-                "path": str(path),
-                "message": "Import VERSION from collector_core.__version__.",
-            })
+            errors.append(
+                {
+                    "type": "missing_version_import",
+                    "path": str(path),
+                    "message": "Import VERSION from collector_core.__version__.",
+                }
+            )
 
     return errors
 
@@ -312,22 +385,26 @@ def _collect_updated_utc_warnings(
 
     parsed = _parse_updated_utc(updated)
     if parsed is None:
-        warnings.append({
-            "type": "updated_utc_invalid_format",
-            "path": str(path),
-            "updated_utc": updated,
-            "expected_format": "YYYY-MM-DD",
-        })
+        warnings.append(
+            {
+                "type": "updated_utc_invalid_format",
+                "path": str(path),
+                "updated_utc": updated,
+                "expected_format": "YYYY-MM-DD",
+            }
+        )
         return warnings
 
     today = datetime.now(timezone.utc).date()
     if parsed.date() > today:
-        warnings.append({
-            "type": "updated_utc_future_date",
-            "path": str(path),
-            "updated_utc": updated,
-            "today_utc": today.isoformat(),
-        })
+        warnings.append(
+            {
+                "type": "updated_utc_future_date",
+                "path": str(path),
+                "updated_utc": updated,
+                "today_utc": today.isoformat(),
+            }
+        )
 
     return warnings
 
@@ -355,24 +432,32 @@ def validate_targets_file(path: Path) -> tuple[list[dict[str, Any]], list[dict[s
     warnings.extend(_collect_updated_utc_warnings(path, "targets", errors))
     schema_version = str(cfg.get("schema_version", ""))
     if schema_version and schema_version != EXPECTED_TARGETS_SCHEMA:
-        errors.append({
-            "type": "schema_version_mismatch",
-            "targets_path": str(path),
-            "expected": EXPECTED_TARGETS_SCHEMA,
-            "found": schema_version,
-        })
+        errors.append(
+            {
+                "type": "schema_version_mismatch",
+                "targets_path": str(path),
+                "expected": EXPECTED_TARGETS_SCHEMA,
+                "found": schema_version,
+            }
+        )
 
     companion = cfg.get("companion_files", {}) or {}
-    license_map_paths = resolve_companion_paths(path, companion.get("license_map"), "license_map.yaml")
+    license_map_paths = resolve_companion_paths(
+        path, companion.get("license_map"), "license_map.yaml"
+    )
     for license_map_path in license_map_paths:
         if license_map_path.exists():
             warnings.extend(_collect_updated_utc_warnings(license_map_path, "license_map", errors))
     profiles = load_profiles(license_map_paths, errors)
 
-    field_schemas_paths = resolve_companion_paths(path, companion.get("field_schemas"), "field_schemas.yaml")
+    field_schemas_paths = resolve_companion_paths(
+        path, companion.get("field_schemas"), "field_schemas.yaml"
+    )
     for field_schemas_path in field_schemas_paths:
         if field_schemas_path.exists():
-            warnings.extend(_collect_updated_utc_warnings(field_schemas_path, "field_schemas", errors))
+            warnings.extend(
+                _collect_updated_utc_warnings(field_schemas_path, "field_schemas", errors)
+            )
 
     denylist_paths = resolve_companion_paths(path, companion.get("denylist"), "denylist.yaml")
     for denylist_path in denylist_paths:
@@ -386,92 +471,116 @@ def validate_targets_file(path: Path) -> tuple[list[dict[str, Any]], list[dict[s
         evidence = target.get("license_evidence", {}) or {}
         evidence_url = str(evidence.get("url", "")).strip()
         if not evidence_url:
-            errors.append({
-                "type": "missing_license_evidence_url",
-                "targets_path": str(path),
-                "target_id": tid,
-            })
+            errors.append(
+                {
+                    "type": "missing_license_evidence_url",
+                    "targets_path": str(path),
+                    "target_id": tid,
+                }
+            )
 
         download = normalize_download(target.get("download", {}) or {})
         strategy = str(download.get("strategy", ""))
         if not strategy:
-            errors.append({
-                "type": "missing_download_strategy",
-                "targets_path": str(path),
-                "target_id": tid,
-                "message": "download.strategy is required for enabled targets",
-            })
+            errors.append(
+                {
+                    "type": "missing_download_strategy",
+                    "targets_path": str(path),
+                    "target_id": tid,
+                    "message": "download.strategy is required for enabled targets",
+                }
+            )
             continue
         if _is_placeholder_strategy(strategy):
-            errors.append({
-                "type": "todo_download_strategy",
-                "targets_path": str(path),
-                "target_id": tid,
-                "strategy": strategy,
-                "message": f"Enabled target {tid} uses TODO/not implemented strategy '{strategy}'.",
-            })
-            continue
-        strategy_spec = get_strategy_spec(strategy)
-        if strategy_spec is not None:
-            status = str(strategy_spec.get("status", "supported") or "supported").strip().lower()
-            if status in {"todo", "not implemented", "not_implemented", "not-implemented", "placeholder"}:
-                errors.append({
+            errors.append(
+                {
                     "type": "todo_download_strategy",
                     "targets_path": str(path),
                     "target_id": tid,
                     "strategy": strategy,
-                    "message": (
-                        f"Enabled target {tid} uses TODO/not implemented strategy '{strategy}' "
-                        f"(status: {status})."
-                    ),
-                })
+                    "message": f"Enabled target {tid} uses TODO/not implemented strategy '{strategy}'.",
+                }
+            )
+            continue
+        strategy_spec = get_strategy_spec(strategy)
+        if strategy_spec is not None:
+            status = str(strategy_spec.get("status", "supported") or "supported").strip().lower()
+            if status in {
+                "todo",
+                "not implemented",
+                "not_implemented",
+                "not-implemented",
+                "placeholder",
+            }:
+                errors.append(
+                    {
+                        "type": "todo_download_strategy",
+                        "targets_path": str(path),
+                        "target_id": tid,
+                        "strategy": strategy,
+                        "message": (
+                            f"Enabled target {tid} uses TODO/not implemented strategy '{strategy}' "
+                            f"(status: {status})."
+                        ),
+                    }
+                )
                 continue
         if strategy_spec is None:
-            errors.append({
-                "type": "unknown_download_strategy",
-                "targets_path": str(path),
-                "target_id": tid,
-                "strategy": strategy,
-                "known_strategies": sorted(iter_registry_strategies()),
-            })
+            errors.append(
+                {
+                    "type": "unknown_download_strategy",
+                    "targets_path": str(path),
+                    "target_id": tid,
+                    "strategy": strategy,
+                    "known_strategies": sorted(iter_registry_strategies()),
+                }
+            )
             continue
         for msg in get_download_requirement_errors(download, strategy):
-            errors.append({
-                "type": "missing_download_requirement",
-                "targets_path": str(path),
-                "target_id": tid,
-                "strategy": strategy,
-                "message": msg,
-            })
+            errors.append(
+                {
+                    "type": "missing_download_requirement",
+                    "targets_path": str(path),
+                    "target_id": tid,
+                    "strategy": strategy,
+                    "message": msg,
+                }
+            )
 
         profile = str(target.get("license_profile", "unknown"))
         if profile and profiles and profile not in profiles:
-            warnings.append({
-                "type": "unknown_license_profile",
-                "targets_path": str(path),
-                "target_id": tid,
-                "license_profile": profile,
-                "known_profiles": sorted(profiles.keys()),
-            })
+            warnings.append(
+                {
+                    "type": "unknown_license_profile",
+                    "targets_path": str(path),
+                    "target_id": tid,
+                    "license_profile": profile,
+                    "known_profiles": sorted(profiles.keys()),
+                }
+            )
 
         if target.get("review_required", False) and not str(target.get("review_notes", "")).strip():
-            errors.append({
-                "type": "missing_review_notes",
-                "targets_path": str(path),
-                "target_id": tid,
-            })
+            errors.append(
+                {
+                    "type": "missing_review_notes",
+                    "targets_path": str(path),
+                    "target_id": tid,
+                }
+            )
 
         if strategy == "huggingface_datasets":
             canonicalize = target.get("canonicalize", {}) or {}
             candidates = canonicalize.get("text_field_candidates") or []
             if not candidates:
-                warnings.append({
-                    "type": "missing_canonicalize_text_field_candidates",
-                    "targets_path": str(path),
-                    "target_id": tid,
-                    "strategy": strategy,
-                    "message": "Add canonicalize.text_field_candidates for HF targets to improve text extraction.",
-                })
+                warnings.append(
+                    {
+                        "type": "missing_canonicalize_text_field_candidates",
+                        "targets_path": str(path),
+                        "target_id": tid,
+                        "strategy": strategy,
+                        "message": "Add canonicalize.text_field_candidates for HF targets to improve text extraction.",
+                    }
+                )
 
     return errors, warnings
 

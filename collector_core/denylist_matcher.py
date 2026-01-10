@@ -9,6 +9,7 @@ This module handles:
 - Denylist loading and normalization
 - Hit detection against target metadata
 """
+
 from __future__ import annotations
 
 import logging
@@ -65,7 +66,9 @@ def _normalize_denylist(data: dict[str, Any]) -> dict[str, Any]:
                 "type": kind,
                 "value": value,
                 "fields": [str(f) for f in (fields or [])],
-                "severity": str(p.get("severity", "hard_red")).lower(),  # v0.9: hard_red | force_yellow
+                "severity": str(
+                    p.get("severity", "hard_red")
+                ).lower(),  # v0.9: hard_red | force_yellow
                 "reason": str(p.get("reason", p.get("rationale", "")) or ""),
                 "link": str(p.get("link", "") or ""),  # v0.9: provenance
                 "rationale": str(p.get("rationale", "") or ""),  # v0.9: provenance

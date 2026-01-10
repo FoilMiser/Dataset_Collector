@@ -67,7 +67,9 @@ def test_spdx_bucket_respects_allow_and_denies(license_map):
 
 
 def test_restriction_phrase_scanning(license_map):
-    hits = contains_any("This dataset has no ai training permitted.", license_map.restriction_phrases)
+    hits = contains_any(
+        "This dataset has no ai training permitted.", license_map.restriction_phrases
+    )
     assert "no ai" in hits
 
 

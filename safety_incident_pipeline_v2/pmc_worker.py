@@ -29,9 +29,15 @@ def configure_parser(parser) -> None:
 
 
 def output_paths_builder(parsed, targets_path: Path) -> tuple[Path, Path | None]:
-    raw_root = raw_root_from_targets_yaml(targets_path, Path(parsed.raw_root).expanduser().resolve())
+    raw_root = raw_root_from_targets_yaml(
+        targets_path, Path(parsed.raw_root).expanduser().resolve()
+    )
     out_root = raw_root / "green" / "permissive" / parsed.target_id
-    cache_dir = raw_root / "yellow" / "quarantine" / parsed.target_id / "_cache" if parsed.enable_cache else None
+    cache_dir = (
+        raw_root / "yellow" / "quarantine" / parsed.target_id / "_cache"
+        if parsed.enable_cache
+        else None
+    )
     return out_root, cache_dir
 
 
