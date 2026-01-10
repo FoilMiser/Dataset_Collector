@@ -48,12 +48,51 @@ from collector_core.utils import (
 logger = logging.getLogger(__name__)
 PdfReader = _try_import("pypdf", "PdfReader")
 
-SUPPORTED_GATES = {
+SUPPORTED_LICENSE_GATES = {
     "manual_legal_review",
     "manual_review",
     "no_restrictions",
     "restriction_phrase_scan",
     "snapshot_terms",
+}
+SUPPORTED_CONTENT_CHECKS = {
+    "code_and_docs_chunking",
+    "collect_statistics",
+    "computed_only_extract",
+    "distribution_statement_scan",
+    "domain_filter_arxiv_math",
+    "domain_filter_math_stackexchange",
+    "domain_filter_math_textbooks",
+    "dual_use_instruction_scan",
+    "dual_use_scan",
+    "exploit_code_scan",
+    "emit_attribution_bundle",
+    "emit_training_manifest",
+    "extract_latex_aware_chunks",
+    "extract_text_chunks",
+    "formal_chunk_by_entry",
+    "formal_chunk_by_lemma",
+    "formal_chunk_by_module",
+    "formal_chunk_by_theorem",
+    "html_crawl",
+    "license_metadata_validate",
+    "mesh_extract_metadata",
+    "mesh_geometry_dedupe",
+    "mesh_render_thumbnails",
+    "mesh_sanitize",
+    "mesh_validate",
+    "near_duplicate_detection",
+    "pdf_extract",
+    "pii_phi_scan",
+    "pii_scan",
+    "pii_scan_and_redact",
+    "pii_scan_and_redact_strict",
+    "record_level_filter",
+    "secret_scan",
+    "segregate_copyleft_pool",
+    "strip_third_party_media",
+    "validate_schema",
+    "weapon_trademark_filter",
 }
 EVIDENCE_CHANGE_POLICIES = {"raw", "normalized", "either"}
 COSMETIC_CHANGE_POLICIES = {"warn_only", "treat_as_changed"}
@@ -196,7 +235,8 @@ class DriverConfig:
     denylist: dict[str, Any]
     manifests_root: Path
     queues_root: Path
-    default_gates: list[str]
+    default_license_gates: list[str]
+    default_content_checks: list[str]
     targets: list[dict[str, Any]]
     require_yellow_signoff: bool
 
@@ -219,7 +259,8 @@ class TargetContext:
     spdx_hint: str
     download_blob: str
     review_required: bool
-    gates: list[str]
+    license_gates: list[str]
+    content_checks: list[str]
     target_manifest_dir: Path
     signoff: dict[str, Any]
     review_status: str
@@ -372,7 +413,8 @@ def load_driver_config(args: argparse.Namespace) -> DriverConfig:
         denylist=denylist,
         manifests_root=manifests_root,
         queues_root=queues_root,
-        default_gates=globals_cfg.get("default_gates", []) or [],
+        default_license_gates=globals_cfg.get("default_license_gates", []) or [],
+        default_content_checks=globals_cfg.get("default_content_checks", []) or [],
         targets=targets_cfg.get("targets", []) or [],
         require_yellow_signoff=bool(globals_cfg.get("require_yellow_signoff", False)),
     )
@@ -437,7 +479,7 @@ def apply_review_gates(
 
 def resolve_effective_bucket(
     license_map: LicenseMap,
-    gates: list[str],
+    license_gates: list[str],
     evidence: EvidenceResult,
     spdx: str,
     restriction_hits: list[str],
@@ -450,7 +492,7 @@ def resolve_effective_bucket(
 ) -> str:
     eff_bucket = compute_effective_bucket(
         license_map,
-        gates,
+        license_gates,
         spdx,
         restriction_hits,
         evidence.snapshot,
@@ -526,21 +568,25 @@ def build_target_identity(
     return tid, name, profile, enabled, warnings
 
 
-def validate_target_gates(
-    gates: list[str],
+def validate_target_values(
+    values: list[str],
     target_id: str,
     *,
+    field: str,
+    supported_values: set[str],
     strict: bool,
 ) -> list[dict[str, Any]]:
-    unknown_gates = sorted({gate for gate in gates if gate not in SUPPORTED_GATES})
-    if not unknown_gates:
+    unknown_values = sorted({value for value in values if value not in supported_values})
+    if not unknown_values:
         return []
-    message = f"Target {target_id} uses unsupported gates: {', '.join(unknown_gates)}."
+    message = (
+        f"Target {target_id} uses unsupported {field}: {', '.join(unknown_values)}."
+    )
     warning = {
-        "type": "unknown_gate",
+        "type": f"unknown_{field}",
         "target_id": target_id,
-        "unknown_gates": unknown_gates,
-        "supported_gates": sorted(SUPPORTED_GATES),
+        "unknown_values": unknown_values,
+        "supported_values": sorted(supported_values),
         "message": message,
     }
     if strict:
@@ -548,8 +594,8 @@ def validate_target_gates(
             message,
             context={
                 "target_id": target_id,
-                "unknown_gates": unknown_gates,
-                "supported_gates": sorted(SUPPORTED_GATES),
+                "unknown_values": unknown_values,
+                "supported_values": sorted(supported_values),
             },
         )
     return [warning]
@@ -823,11 +869,11 @@ def compute_signoff_mismatches(
     return raw_mismatch, normalized_mismatch, cosmetic_change
 
 
-def merge_gates(default_gates: list[str], gates_override: dict[str, Any]) -> list[str]:
-    """Merge default gates with overrides from target config."""
-    merged = list(default_gates)
-    add = gates_override.get("add", []) or []
-    remove = gates_override.get("remove", []) or []
+def merge_override(default_values: list[str], overrides: dict[str, Any]) -> list[str]:
+    """Merge default values with overrides from target config."""
+    merged = list(default_values)
+    add = overrides.get("add", []) or []
+    remove = overrides.get("remove", []) or []
 
     for g in add:
         if g not in merged:
@@ -838,7 +884,7 @@ def merge_gates(default_gates: list[str], gates_override: dict[str, Any]) -> lis
     return merged
 
 
-def canonicalize_gates(gates: list[str]) -> list[str]:
+def canonicalize_license_gates(gates: list[str]) -> list[str]:
     canonical_map = {
         "no_restrictions": "restriction_phrase_scan",
         "manual_review": "manual_legal_review",
@@ -851,9 +897,17 @@ def canonicalize_gates(gates: list[str]) -> list[str]:
     return canonicalized
 
 
+def canonicalize_checks(checks: list[str]) -> list[str]:
+    canonicalized: list[str] = []
+    for check in checks:
+        if check not in canonicalized:
+            canonicalized.append(check)
+    return canonicalized
+
+
 def compute_effective_bucket(
     license_map: LicenseMap,
-    gates: list[str],
+    license_gates: list[str],
     resolved_spdx: str,
     restriction_hits: list[str],
     evidence_snapshot: dict[str, Any],
@@ -867,21 +921,25 @@ def compute_effective_bucket(
     if resolved_confidence < min_confidence and bucket == "GREEN":
         bucket = license_map.gating.get("low_confidence_bucket", "YELLOW")
 
-    if "snapshot_terms" in gates and evidence_snapshot.get("status") != "ok":
+    if "snapshot_terms" in license_gates and evidence_snapshot.get("status") != "ok":
         # If we require snapshot and failed, force YELLOW
         bucket = "YELLOW"
 
     if evidence_snapshot.get("changed_from_previous"):
         bucket = "YELLOW"
 
-    if ("restriction_phrase_scan" in gates or "no_restrictions" in gates) and restriction_hits:
+    if (
+        "restriction_phrase_scan" in license_gates or "no_restrictions" in license_gates
+    ) and restriction_hits:
         bucket = "YELLOW"
-    if ("restriction_phrase_scan" in gates or "no_restrictions" in gates) and evidence_snapshot.get(
+    if (
+        "restriction_phrase_scan" in license_gates or "no_restrictions" in license_gates
+    ) and evidence_snapshot.get(
         "pdf_text_extraction_failed"
     ):
         bucket = "YELLOW"
 
-    if "manual_legal_review" in gates or "manual_review" in gates:
+    if "manual_legal_review" in license_gates or "manual_review" in license_gates:
         bucket = "YELLOW"
 
     return bucket
@@ -1425,9 +1483,32 @@ class BasePipelineDriver:
         download_blob = json.dumps(download_cfg, ensure_ascii=False)
         download_urls = extract_download_urls(target)
         review_required = bool(target.get("review_required", False))
-        merged_gates = merge_gates(cfg.default_gates, target.get("gates_override", {}) or {})
-        warnings.extend(validate_target_gates(merged_gates, tid, strict=cfg.args.strict))
-        gates = canonicalize_gates(merged_gates)
+        merged_license_gates = merge_override(
+            cfg.default_license_gates, target.get("license_gates", {}) or {}
+        )
+        merged_content_checks = merge_override(
+            cfg.default_content_checks, target.get("content_checks", {}) or {}
+        )
+        warnings.extend(
+            validate_target_values(
+                merged_license_gates,
+                tid,
+                field="license_gates",
+                supported_values=SUPPORTED_LICENSE_GATES,
+                strict=cfg.args.strict,
+            )
+        )
+        warnings.extend(
+            validate_target_values(
+                merged_content_checks,
+                tid,
+                field="content_checks",
+                supported_values=SUPPORTED_CONTENT_CHECKS,
+                strict=cfg.args.strict,
+            )
+        )
+        license_gates = canonicalize_license_gates(merged_license_gates)
+        content_checks = canonicalize_checks(merged_content_checks)
         target_manifest_dir = cfg.manifests_root / tid
         ensure_dir(target_manifest_dir)
         signoff = read_review_signoff(target_manifest_dir)
@@ -1447,7 +1528,8 @@ class BasePipelineDriver:
             spdx_hint=spdx_hint,
             download_blob=download_blob,
             review_required=review_required,
-            gates=gates,
+            license_gates=license_gates,
+            content_checks=content_checks,
             target_manifest_dir=target_manifest_dir,
             signoff=signoff,
             review_status=review_status,
@@ -1498,7 +1580,7 @@ class BasePipelineDriver:
         )
         eff_bucket = resolve_effective_bucket(
             cfg.license_map,
-            ctx.gates,
+            ctx.license_gates,
             evidence,
             resolved,
             restriction_hits,
@@ -1547,7 +1629,7 @@ class BasePipelineDriver:
         evidence_text = ""
         license_change_detected = False
         no_fetch_missing_evidence = False
-        if "snapshot_terms" in ctx.gates and not cfg.args.no_fetch:
+        if "snapshot_terms" in ctx.license_gates and not cfg.args.no_fetch:
             evidence_snapshot = self.snapshot_evidence(
                 ctx.target_manifest_dir,
                 ctx.evidence_url,
@@ -1560,7 +1642,7 @@ class BasePipelineDriver:
             )
             evidence_text = extract_text_for_scanning(evidence_snapshot)
             license_change_detected = bool(evidence_snapshot.get("changed_from_previous"))
-        elif "snapshot_terms" in ctx.gates and cfg.args.no_fetch:
+        elif "snapshot_terms" in ctx.license_gates and cfg.args.no_fetch:
             existing_evidence_path = find_existing_evidence(ctx.target_manifest_dir)
             if existing_evidence_path:
                 evidence_snapshot = {
@@ -1647,7 +1729,8 @@ class BasePipelineDriver:
             "resolved_spdx_confidence": resolved_confidence,
             "resolved_spdx_confidence_reason": confidence_reason,
             "restriction_hits": restriction_hits,
-            "gates": ctx.gates,
+            "license_gates": ctx.license_gates,
+            "content_checks": ctx.content_checks,
             "effective_bucket": eff_bucket,
             "queue_bucket": eff_bucket,
             "license_evidence_url": ctx.evidence_url,
@@ -1882,7 +1965,7 @@ class BasePipelineDriver:
         ap.add_argument(
             "--strict",
             action="store_true",
-            help="Treat config warnings (such as unknown gates) as errors.",
+            help="Treat config warnings (such as unknown license_gates/content_checks) as errors.",
         )
         ap.add_argument("--quiet", action="store_true", help="Suppress dry-run report output")
         add_logging_args(ap)

@@ -66,10 +66,10 @@ globals:
     max_concurrent_workers: 4
     user_agent: "bio-corpus-pipeline/2.0"
 
-  default_gates:
+  default_license_gates:
     - "snapshot_terms"
     - "restriction_phrase_scan"
-
+  default_content_checks: []
 queues:
   emit:
     - id: "green_download"
@@ -187,9 +187,8 @@ targets:
         - "answer_key"
         - "grading_fn"
         - "metadata"
-    gates_override:
+    content_checks:
       add: ["emit_training_manifest"]
-
   # -------------------------------------------------------------------
   # 1) High-signal open reference databases (structured biology)
   # -------------------------------------------------------------------
@@ -213,7 +212,7 @@ targets:
       integrity:
         verify_size: true
         compute_sha256: true
-    gates_override:
+    content_checks:
       add: ["validate_schema", "collect_statistics"]
     output:
       pool: "permissive"
@@ -237,7 +236,7 @@ targets:
       integrity:
         verify_size: true
         compute_sha256: true
-    gates_override:
+    content_checks:
       add: ["computed_only_extract", "validate_schema", "collect_statistics"]
     output:
       pool: "permissive"
@@ -278,7 +277,7 @@ targets:
       urls:
         - "http://purl.obolibrary.org/obo/go.obo"
         - "http://purl.obolibrary.org/obo/go.owl"
-    gates_override:
+    content_checks:
       add: ["validate_schema"]
     output:
       pool: "permissive"
@@ -354,8 +353,10 @@ targets:
     download:
       strategy: "http"
       urls: ["https://obofoundry.org/registry/ontologies.jsonld"]
-    gates_override:
-      add: ["record_level_filter", "manual_legal_review"]
+    license_gates:
+      add: ["manual_legal_review"]
+    content_checks:
+      add: ["record_level_filter"]
     output:
       pool: "quarantine"
       formats: ["jsonld"]
@@ -382,8 +383,10 @@ targets:
       integrity:
         verify_size: true
         compute_sha256: true
-    gates_override:
-      add: ["computed_only_extract", "manual_legal_review"]
+    license_gates:
+      add: ["manual_legal_review"]
+    content_checks:
+      add: ["computed_only_extract"]
     output:
       pool: "quarantine"
       formats: ["tar.gz", "txt"]
@@ -403,8 +406,10 @@ targets:
       strategy: "ftp"
       base_url: "ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/"
       include_globs: ["gene_info.gz", "gene2go.gz", "gene2refseq.gz"]
-    gates_override:
-      add: ["computed_only_extract", "manual_legal_review", "collect_statistics"]
+    license_gates:
+      add: ["manual_legal_review"]
+    content_checks:
+      add: ["computed_only_extract", "collect_statistics"]
     output:
       pool: "quarantine"
       formats: ["gz"]
@@ -431,7 +436,7 @@ targets:
         enabled: true
         cache_dir: "quarantine/pmc_oa_fulltext/_cache"
         max_cache_size_gb: 150
-    gates_override:
+    content_checks:
       add: ["record_level_filter", "extract_text_chunks", "collect_statistics"]
     text_processing:
       include_section_headers: true
@@ -460,7 +465,7 @@ targets:
       splits: ["train"]
     canonicalize:
       text_field_candidates: ["text", "abstract", "body", "article", "content", "title"]
-    gates_override:
+    content_checks:
       add: ["extract_text_chunks", "collect_statistics"]
     output:
       pool: "permissive"
@@ -484,7 +489,7 @@ targets:
       splits: ["train"]
     canonicalize:
       text_field_candidates: ["text", "abstract", "body", "article", "content", "title"]
-    gates_override:
+    content_checks:
       add: ["extract_text_chunks", "collect_statistics"]
     output:
       pool: "permissive"
@@ -508,7 +513,7 @@ targets:
       splits: ["train"]
     canonicalize:
       text_field_candidates: ["text", "content", "body", "document", "plain_text"]
-    gates_override:
+    content_checks:
       add: ["extract_text_chunks", "collect_statistics"]
     output:
       pool: "permissive"
@@ -527,7 +532,7 @@ targets:
       category: "textbook"
     download:
       strategy: "none"
-    gates_override:
+    content_checks:
       add: ["extract_text_chunks"]
     output:
       pool: "permissive"
@@ -546,7 +551,7 @@ targets:
       category: "textbook"
     download:
       strategy: "none"
-    gates_override:
+    content_checks:
       add: ["extract_text_chunks"]
     output:
       pool: "permissive"
@@ -569,8 +574,10 @@ targets:
       category: "government_reports"
     download:
       strategy: "none"
-    gates_override:
-      add: ["snapshot_terms", "extract_text_chunks", "collect_statistics"]
+    license_gates:
+      add: ["snapshot_terms"]
+    content_checks:
+      add: ["extract_text_chunks", "collect_statistics"]
     output:
       pool: "permissive"
       formats: ["html", "jsonl.gz"]
@@ -593,7 +600,7 @@ targets:
       splits: ["train"]
     canonicalize:
       text_field_candidates: ["text", "content", "body", "document", "plain_text"]
-    gates_override:
+    content_checks:
       add: ["extract_text_chunks"]
     output:
       pool: "permissive"
@@ -617,8 +624,10 @@ targets:
       splits: ["train"]
     canonicalize:
       text_field_candidates: ["text", "content", "body", "document", "comment_text"]
-    gates_override:
-      add: ["restriction_phrase_scan", "pii_phi_scan", "manual_legal_review"]
+    license_gates:
+      add: ["restriction_phrase_scan", "manual_legal_review"]
+    content_checks:
+      add: ["pii_phi_scan"]
     output:
       pool: "quarantine"
       formats: ["jsonl.gz"]
@@ -636,7 +645,7 @@ targets:
       category: "open_data"
     download:
       strategy: "none"
-    gates_override:
+    license_gates:
       add: ["manual_legal_review"]
     output:
       pool: "quarantine"
@@ -660,8 +669,10 @@ targets:
     download:
       strategy: "http"
       urls: ["https://dumps.wikimedia.org/enwiki/latest/"]
-    gates_override:
-      add: ["manual_legal_review", "segregate_copyleft_pool", "extract_text_chunks"]
+    license_gates:
+      add: ["manual_legal_review"]
+    content_checks:
+      add: ["segregate_copyleft_pool", "extract_text_chunks"]
     output:
       pool: "copyleft"
       formats: ["bz2", "jsonl.gz"]
@@ -683,8 +694,10 @@ targets:
       category: "occurrence_records"
     download:
       strategy: "none"  # TODO: implement GBIF download API workflow + record-level license filter
-    gates_override:
-      add: ["record_level_filter", "manual_legal_review"]
+    license_gates:
+      add: ["manual_legal_review"]
+    content_checks:
+      add: ["record_level_filter"]
     output:
       pool: "quarantine"
       formats: ["dwca", "csv", "jsonl.gz"]
@@ -702,8 +715,10 @@ targets:
       category: "observations"
     download:
       strategy: "none"  # TODO: implement export + per-record license selection (CC0/CC-BY only)
-    gates_override:
-      add: ["record_level_filter", "manual_legal_review", "pii_phi_scan"]
+    license_gates:
+      add: ["manual_legal_review"]
+    content_checks:
+      add: ["record_level_filter", "pii_phi_scan"]
     output:
       pool: "quarantine"
       formats: ["json", "csv"]
@@ -721,7 +736,7 @@ targets:
       category: "restricted"
     download:
       strategy: "none"
-    gates_override:
+    license_gates:
       add: ["manual_legal_review"]
     output:
       pool: "quarantine"

@@ -23,3 +23,35 @@ def test_validate_file_reports_schema_error(tmp_path: Path) -> None:
     errors = validate_file(path, "targets")
     assert len(errors) == 1
     assert "Schema validation failed" in errors[0]
+
+
+@pytest.mark.skipif(Draft7Validator is None, reason="jsonschema not available")
+def test_validate_file_rejects_unknown_license_gates(tmp_path: Path) -> None:
+    path = tmp_path / "targets.yaml"
+    path.write_text(
+        "schema_version: '0.9'\n"
+        "targets:\n"
+        "  - id: example\n"
+        "    license_gates:\n"
+        "      add: [unknown_gate]\n",
+        encoding="utf-8",
+    )
+    errors = validate_file(path, "targets")
+    assert len(errors) == 1
+    assert "Schema validation failed" in errors[0]
+
+
+@pytest.mark.skipif(Draft7Validator is None, reason="jsonschema not available")
+def test_validate_file_rejects_unknown_content_checks(tmp_path: Path) -> None:
+    path = tmp_path / "targets.yaml"
+    path.write_text(
+        "schema_version: '0.9'\n"
+        "targets:\n"
+        "  - id: example\n"
+        "    content_checks:\n"
+        "      add: [unknown_check]\n",
+        encoding="utf-8",
+    )
+    errors = validate_file(path, "targets")
+    assert len(errors) == 1
+    assert "Schema validation failed" in errors[0]

@@ -33,10 +33,10 @@ globals:
     allow_spdx: [CC-BY-4.0, CC0-1.0, MIT, Apache-2.0, CC-BY-SA-4.0]
     deny_phrases: [noai, "no tdm", "no machine learning"]
 
-  default_gates:
-    - snapshot_terms
-    - restriction_phrase_scan
-
+  default_license_gates:
+    - "snapshot_terms"
+    - "restriction_phrase_scan"
+  default_content_checks: []
 queues:
   emit:
     - id: green_download

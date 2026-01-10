@@ -46,9 +46,10 @@ globals:
       - noai
       - "no tdm"
       - "no machine learning"
-  default_gates:
+  default_license_gates:
     - "snapshot_terms"
     - "restriction_phrase_scan"
+  default_content_checks: []
   text_processing_defaults:
     max_chunk_chars: 6000
     min_chunk_chars: 500

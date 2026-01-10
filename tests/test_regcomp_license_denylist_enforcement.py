@@ -69,7 +69,8 @@ def test_regcomp_license_map_and_denylist_enforced(tmp_path: Path) -> None:
         "globals": {
             "manifests_root": str(manifests_root),
             "queues_root": str(queues_root),
-            "default_gates": [],
+            "default_license_gates": [],
+            "default_content_checks": [],
         },
         "companion_files": {
             "license_map": str(license_map_path),

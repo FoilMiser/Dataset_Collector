@@ -30,7 +30,8 @@ class PipelineTestConfig:
         globals_cfg = {
             "manifests_root": str(self.manifests_root),
             "queues_root": str(self.queues_root),
-            "default_gates": [],
+            "default_license_gates": [],
+            "default_content_checks": [],
         }
         if globals_override:
             globals_cfg.update(globals_override)
@@ -176,7 +177,7 @@ def test_offline_snapshot_terms_forces_yellow(
         }
     ]
     targets_path = minimal_config.write_targets(
-        tmp_path, targets, globals_override={"default_gates": ["snapshot_terms"]}
+        tmp_path, targets, globals_override={"default_license_gates": ["snapshot_terms"]}
     )
 
     run_driver(targets_path, minimal_config.license_map_path)

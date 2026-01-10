@@ -238,7 +238,7 @@ def test_resolve_effective_bucket_applies_no_fetch_guard() -> None:
     )
     bucket = resolve_effective_bucket(
         license_map,
-        gates=[],
+        license_gates=[],
         evidence=evidence,
         spdx="MIT",
         restriction_hits=[],
@@ -272,7 +272,7 @@ def test_resolve_effective_bucket_denies_hard_red() -> None:
     )
     bucket = resolve_effective_bucket(
         license_map,
-        gates=[],
+        license_gates=[],
         evidence=evidence,
         spdx="MIT",
         restriction_hits=[],

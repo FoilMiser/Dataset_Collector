@@ -55,10 +55,10 @@ globals:
       - "no machine learning"
       - "no ai training"
 
-  default_gates:
-    - snapshot_terms
-    - restriction_phrase_scan
-
+  default_license_gates:
+    - "snapshot_terms"
+    - "restriction_phrase_scan"
+  default_content_checks: []
 queues:
   emit:
     - id: green_download
@@ -562,11 +562,12 @@ targets:
       jurisdiction: MULTI
       doc_type: mixed
       language: en
-    gates_override:
+    license_gates:
       add:
-        - record_level_filter
-        - manual_legal_review
-
+        - "manual_legal_review"
+    content_checks:
+      add:
+        - "record_level_filter"
   - id: regulations_gov_dockets
     name: Regulations.gov dockets (rulemaking materials)
     enabled: true

@@ -45,15 +45,15 @@ globals:
       - "no tdm"
       - "no machine learning"
 
-  default_gates:
+  default_license_gates:
     - "snapshot_terms"
     - "restriction_phrase_scan"
-    # Cyber-specific gates (planned; requires small code additions in pipeline_driver.py / yellow_scrubber.py)
+  default_content_checks:
+    # Cyber-specific checks (planned; requires small code additions in pipeline_driver.py / yellow_scrubber.py)
     - "secret_scan"
     - "pii_scan"
     - "dual_use_instruction_scan"
     - "exploit_code_scan"
-
   download_defaults:
     retry_max: 3
     retry_backoff_base: 2.0
@@ -117,9 +117,8 @@ targets:
         - "grading_fn"
         - "rubric"
         - "safety_tags"
-    gates_override:
+    content_checks:
       add: ["emit_training_manifest"]
-
   # A) Vulnerability + asset vocabularies (GREEN)
 
   - id: "nvd_cve_2_0_delta"
