@@ -15,6 +15,14 @@ def _write_yaml(path: Path, payload: dict) -> None:
 def _write_pipeline(repo_root: Path, name: str, targets: list[dict]) -> None:
     pipeline_dir = repo_root / name
     pipeline_dir.mkdir(parents=True)
+    core_dir = repo_root / "collector_core"
+    core_dir.mkdir(parents=True, exist_ok=True)
+    acquire_strategies_path = core_dir / "acquire_strategies.py"
+    if not acquire_strategies_path.exists():
+        acquire_strategies_path.write_text(
+            "DEFAULT_STRATEGY_HANDLERS = {'http': None}\n",
+            encoding="utf-8",
+        )
     (pipeline_dir / "acquire_worker.py").write_text(
         "STRATEGY_HANDLERS = {'http': None, 'custom': None}\n",
         encoding="utf-8",

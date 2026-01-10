@@ -32,14 +32,10 @@ from typing import Any
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.acquire_strategies import (
     AcquireContext,
+    DEFAULT_STRATEGY_HANDLERS,
     RootsDefaults,
     ensure_dir,
-    handle_dataverse,
-    handle_ftp,
-    handle_git,
-    handle_hf_datasets,
     handle_http_single,
-    handle_zenodo,
     normalize_download,
     run_acquire_worker,
     utc_now,
@@ -54,12 +50,8 @@ BeautifulSoup = _try_import("bs4", "BeautifulSoup")
 trafilatura = _try_import("trafilatura")
 
 STRATEGY_HANDLERS = {
+    **DEFAULT_STRATEGY_HANDLERS,
     "http": handle_http_single,
-    "ftp": handle_ftp,
-    "git": handle_git,
-    "zenodo": handle_zenodo,
-    "dataverse": handle_dataverse,
-    "huggingface_datasets": handle_hf_datasets,
 }
 
 DEFAULTS = RootsDefaults(

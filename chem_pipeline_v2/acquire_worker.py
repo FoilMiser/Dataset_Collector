@@ -21,14 +21,9 @@ if __package__ in (None, ""):
 
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.acquire_strategies import (
+    DEFAULT_STRATEGY_HANDLERS,
     RootsDefaults,
-    handle_dataverse,
     handle_figshare_article,
-    handle_ftp,
-    handle_git,
-    handle_hf_datasets,
-    handle_http_multi,
-    handle_zenodo,
     make_github_release_handler,
     run_acquire_worker,
 )
@@ -38,14 +33,9 @@ __all__ = ["main", "VERSION"]
 GITHUB_RELEASE_HANDLER = make_github_release_handler("chem-corpus-acquire")
 
 STRATEGY_HANDLERS = {
-    "http": handle_http_multi,
-    "ftp": handle_ftp,
-    "git": handle_git,
-    "zenodo": handle_zenodo,
-    "dataverse": handle_dataverse,
+    **DEFAULT_STRATEGY_HANDLERS,
     "figshare": handle_figshare_article,
     "github_release": GITHUB_RELEASE_HANDLER,
-    "huggingface_datasets": handle_hf_datasets,
 }
 
 DEFAULTS = RootsDefaults(
