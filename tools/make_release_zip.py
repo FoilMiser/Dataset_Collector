@@ -30,6 +30,7 @@ DEFAULT_IGNORE_PATTERNS = (
     ".coverage",
     "coverage.xml",
     "htmlcov",
+    ".ipynb_checkpoints",
 )
 
 
