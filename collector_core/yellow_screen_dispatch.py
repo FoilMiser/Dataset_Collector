@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import importlib
 
-from collector_core import yellow_screen_standard
 from collector_core.__version__ import __version__ as VERSION  # noqa: F401
 from collector_core.pipeline_spec import get_pipeline_spec
 from collector_core.yellow_screen_common import default_yellow_roots
@@ -40,6 +39,9 @@ def get_yellow_screen_main(domain: str):
     defaults = default_yellow_roots(spec.prefix)
 
     def _standard_main() -> None:
+        # Lazy import to avoid requiring datasets module at module load time
+        from collector_core import yellow_screen_standard
+
         yellow_screen_standard.main(defaults=defaults)
 
     return _standard_main

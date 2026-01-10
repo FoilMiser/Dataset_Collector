@@ -27,6 +27,7 @@ from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.config_validator import read_yaml
 from collector_core.dependencies import _try_import, requires
 from collector_core.network_utils import _with_retries
+from collector_core.rate_limit import get_resolver_rate_limiter
 from collector_core.utils import (
     ensure_dir,
     safe_filename,
@@ -859,7 +860,13 @@ def handle_figshare_article(
     if not ctx.mode.execute:
         return [{"status": "noop", "article_id": article_id, "path": str(out_dir)}]
 
+    # Get rate limiter from config
+    rate_limiter, rate_config = get_resolver_rate_limiter(ctx.cfg, "figshare")
+
     def _fetch() -> requests.Response:
+        # Acquire rate limit token before API request
+        if rate_limiter:
+            rate_limiter.acquire()
         resp = requests.get(endpoint, timeout=60)
         resp.raise_for_status()
         return resp
@@ -869,6 +876,8 @@ def handle_figshare_article(
         max_attempts=ctx.retry.max_attempts,
         backoff_base=ctx.retry.backoff_base,
         backoff_max=ctx.retry.backoff_max,
+        retry_on_429=rate_config.retry_on_429,
+        retry_on_403=rate_config.retry_on_403,
     )
     meta = resp.json()
     files = meta.get("files", []) or []
@@ -935,7 +944,13 @@ def handle_figshare_files(
     if not ctx.mode.execute:
         return [{"status": "noop", "path": str(out_dir)}]
 
+    # Get rate limiter from config
+    rate_limiter, rate_config = get_resolver_rate_limiter(ctx.cfg, "figshare")
+
     def _fetch() -> requests.Response:
+        # Acquire rate limit token before API request
+        if rate_limiter:
+            rate_limiter.acquire()
         resp = requests.get(api, timeout=120)
         resp.raise_for_status()
         return resp
@@ -945,6 +960,8 @@ def handle_figshare_files(
         max_attempts=ctx.retry.max_attempts,
         backoff_base=ctx.retry.backoff_base,
         backoff_max=ctx.retry.backoff_max,
+        retry_on_429=rate_config.retry_on_429,
+        retry_on_403=rate_config.retry_on_403,
     )
     files = resp.json() or []
     ensure_dir(out_dir)
@@ -1023,8 +1040,26 @@ def make_github_release_handler(user_agent: str) -> StrategyHandler:
             url = f"{base}/latest"
         if not ctx.mode.execute:
             return [{"status": "noop", "release_url": url, "path": str(out_dir)}]
-        resp = requests.get(url, headers=headers, timeout=60)
-        resp.raise_for_status()
+
+        # Get rate limiter from config - GitHub uses 403 for rate limits
+        rate_limiter, rate_config = get_resolver_rate_limiter(ctx.cfg, "github")
+
+        def _fetch() -> requests.Response:
+            # Acquire rate limit token before API request
+            if rate_limiter:
+                rate_limiter.acquire()
+            resp = requests.get(url, headers=headers, timeout=60)
+            resp.raise_for_status()
+            return resp
+
+        resp = _with_retries(
+            _fetch,
+            max_attempts=ctx.retry.max_attempts,
+            backoff_base=ctx.retry.backoff_base,
+            backoff_max=ctx.retry.backoff_max,
+            retry_on_429=rate_config.retry_on_429,
+            retry_on_403=rate_config.retry_on_403,  # GitHub uses 403 for rate limits
+        )
         meta = resp.json()
         assets = meta.get("assets", []) or []
         results: list[dict[str, Any]] = []

@@ -52,7 +52,7 @@ Targets and catalog entries may specify a `license_profile` value. Supported val
 - **Excluded sources**: RED-labeled sources are excluded by design and are not collected or merged. Some targets may be disabled in `targets_*.yaml` or omitted from `tools/pipeline_map.sample.yaml`, which means they are intentionally not part of the run.
 - **Non-goals**: This repository does not perform data cleaning, deduplication across domains, or final dataset curation beyond the per-pipeline merge step. It also does not guarantee license compatibility checks outside the configured `license_map.yaml` entries.
 - **Corpus constraints**: Outputs are constrained to the `combined/` stage described in `docs/output_contract.md`; there is no final, unified post-processing stage here. Downstream consumers should expect per-pipeline catalogs and manifests with varying completeness based on enabled targets and available credentials.
-- **Rate limiting configuration**: Some `targets_*.yaml` files include `resolvers: ... rate_limit: ...` blocks (e.g., for GitHub API), but this configuration is not currently consumed by the codebase. The schema does not validate these blocks. Until rate limiting is implemented, these serve as documentation of intended behavior only.
+- **Rate limiting configuration**: `targets_*.yaml` files can include `resolvers: ... rate_limit: ...` blocks (e.g., for GitHub API) which are now consumed by the acquisition handlers for GitHub and Figshare. The schema validates rate_limit blocks with keys: `requests_per_minute`, `requests_per_hour`, `requests_per_second`, `burst`, and retry options (`retry_on_429`, `retry_on_403`).
 
 ## Documentation
 
