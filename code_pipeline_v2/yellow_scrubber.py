@@ -142,7 +142,9 @@ def main() -> None:
     out_path = Path(args.output) if args.output else queue_path.parent / "yellow_review_plan.json"
     out_path = out_path.expanduser().resolve()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(plan, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    tmp_path = Path(f"{out_path}.tmp")
+    tmp_path.write_text(json.dumps(plan, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    tmp_path.replace(out_path)
     print(f"[yellow_scrubber] Review plan written to: {out_path}")
 
 

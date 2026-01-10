@@ -125,7 +125,9 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
 
 def write_json(path: Path, obj: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    tmp_path = Path(f"{path}.tmp")
+    tmp_path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    tmp_path.replace(path)
 
 
 def load_existing_signoff(manifest_dir: Path) -> dict[str, Any]:
@@ -329,7 +331,9 @@ def cmd_export(args: argparse.Namespace) -> int:
 
     if fmt == "json":
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_text(json.dumps(reviewed, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        tmp_path = Path(f"{out_path}.tmp")
+        tmp_path.write_text(json.dumps(reviewed, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        tmp_path.replace(out_path)
     elif fmt == "csv":
         out_path.parent.mkdir(parents=True, exist_ok=True)
         with out_path.open("w", newline="", encoding="utf-8") as f:

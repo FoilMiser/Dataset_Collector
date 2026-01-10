@@ -339,7 +339,9 @@ def extract_codebase(ctx: WorkerContext) -> dict[str, Any]:
     }
     manifest_path = ctx.output_dir.parent / "code_worker_manifest.json"
     ensure_dir(manifest_path.parent)
-    manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    tmp_path = Path(f"{manifest_path}.tmp")
+    tmp_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    tmp_path.replace(manifest_path)
     if ctx.pitches_root and pitched:
         ensure_dir(ctx.pitches_root)
         with (ctx.pitches_root / "code_worker_pitches.jsonl").open("a", encoding="utf-8") as f:

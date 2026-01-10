@@ -144,7 +144,9 @@ def main(*, pipeline_id: str | None = None) -> None:
     catalog = build_catalog(cfg, pipeline_slug=pipeline_slug)
     out_path = Path(args.output).expanduser().resolve()
     ensure_dir(out_path.parent)
-    out_path.write_text(json.dumps(catalog, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    tmp_path = Path(f"{out_path}.tmp")
+    tmp_path.write_text(json.dumps(catalog, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    tmp_path.replace(out_path)
 
 
 if __name__ == "__main__":

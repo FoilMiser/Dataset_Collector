@@ -153,7 +153,9 @@ def handle_api(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
 
             try:
                 if "json" in content_type:
-                    dest.write_text(json.dumps(resp.json(), indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+                    tmp_path = Path(f"{dest}.tmp")
+                    tmp_path.write_text(json.dumps(resp.json(), indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+                    tmp_path.replace(dest)
                 elif "html" in content_type or "xml" in content_type:
                     dest.write_text(resp.text, encoding="utf-8")
                 else:
