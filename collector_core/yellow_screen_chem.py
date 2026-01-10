@@ -28,6 +28,7 @@ from typing import Any
 from datasets import DatasetDict, load_from_disk
 
 from collector_core.__version__ import __version__ as VERSION
+from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.companion_files import read_field_schemas, resolve_companion_paths
 from collector_core.config_validator import read_yaml
 from collector_core.yellow_screen_common import (
@@ -762,7 +763,7 @@ def process_target(ctx: ScreenContext) -> dict[str, Any]:
                 "yellow_signoff_rejected",
                 sample_extra={"details": f"manifest_dir={manifest_dir}"},
             )
-            return {
+            manifest = {
                 "target_id": ctx.queue_row["id"],
                 "passed": 0,
                 "pitched": 0,
@@ -771,13 +772,15 @@ def process_target(ctx: ScreenContext) -> dict[str, Any]:
                 "reason": "yellow_signoff_rejected",
                 "finished_at_utc": utc_now(),
             }
+            manifest.update(build_artifact_metadata(written_at_utc=manifest["finished_at_utc"]))
+            return manifest
         if status != "approved":
             log_pitch(
                 ctx,
                 "yellow_signoff_missing",
                 sample_extra={"details": f"manifest_dir={manifest_dir}"},
             )
-            return {
+            manifest = {
                 "target_id": ctx.queue_row["id"],
                 "passed": 0,
                 "pitched": 0,
@@ -786,9 +789,13 @@ def process_target(ctx: ScreenContext) -> dict[str, Any]:
                 "reason": "yellow_signoff_missing",
                 "finished_at_utc": utc_now(),
             }
+            manifest.update(build_artifact_metadata(written_at_utc=manifest["finished_at_utc"]))
+            return manifest
     mode = (ctx.target_cfg.get("yellow_screen", {}) or {}).get("mode", "jsonl")
     handler = MODE_HANDLERS.get(mode, screen_jsonl_mode)
-    return handler(ctx)
+    manifest = handler(ctx)
+    manifest.update(build_artifact_metadata(written_at_utc=manifest["finished_at_utc"]))
+    return manifest
 
 
 def main() -> None:
@@ -820,11 +827,11 @@ def main() -> None:
 
     summary = {
         "run_at_utc": utc_now(),
-        "pipeline_version": VERSION,
         "targets_seen": len(queue_rows),
         "execute": args.execute,
         "results": [],
     }
+    summary.update(build_artifact_metadata(written_at_utc=summary["run_at_utc"]))
 
     for row in queue_rows:
         target_cfg = next((t for t in cfg.get("targets", []) if t.get("id") == row.get("id")), {})
