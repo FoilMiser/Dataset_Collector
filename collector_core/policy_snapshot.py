@@ -1,8 +1,8 @@
 from __future__ import annotations
+from pathlib import Path
 
 import hashlib
 import subprocess
-from pathlib import Path
 from typing import Any, Sequence
 
 from collector_core.__version__ import __schema_version__ as SCHEMA_VERSION

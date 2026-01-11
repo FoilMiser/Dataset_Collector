@@ -12,12 +12,10 @@ from __future__ import annotations
 import argparse
 import gzip
 import json
-import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from collector_core.__version__ import __version__ as PIPELINE_VERSION
 from collector_core.artifact_metadata import build_artifact_metadata

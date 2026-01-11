@@ -1,9 +1,9 @@
 from __future__ import annotations
+from pathlib import Path
 
 import dataclasses
 import threading
 import shutil
-from pathlib import Path
 from typing import Any
 
 # Default allowed content types for downloads

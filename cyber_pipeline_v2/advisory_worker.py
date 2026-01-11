@@ -5,12 +5,11 @@ Parses GHSA YAML advisories into flattened JSONL rows that align to
 """
 
 from __future__ import annotations
+from pathlib import Path
 
 import gzip
 import json
 from collections.abc import Iterable
-from pathlib import Path
-
 from collector_core.config_validator import read_yaml
 
 

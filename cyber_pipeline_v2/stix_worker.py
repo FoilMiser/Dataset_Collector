@@ -9,13 +9,11 @@ auditability.
 """
 
 from __future__ import annotations
+from pathlib import Path
 
 import gzip
 import json
 from collections.abc import Iterable
-from pathlib import Path
-
-
 def load_bundle(path: Path) -> dict:
     with path.open("r", encoding="utf-8") as f:
         return json.load(f)

@@ -115,11 +115,8 @@ def render_pipeline_driver(spec: PipelineSpec) -> str:
             f"""
         #!/usr/bin/env python3
         from __future__ import annotations
-
-        import sys
         from pathlib import Path
 
-        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
         from collector_core.__version__ import __version__ as VERSION
         from collector_core.pipeline_driver_base import BasePipelineDriver, RoutingBlockSpec
@@ -157,11 +154,8 @@ def render_acquire_worker(spec: PipelineSpec) -> str:
         """
 
         from __future__ import annotations
-
-        import sys
         from pathlib import Path
 
-        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
         from collector_core.acquire_strategies import (
             AcquireContext,
@@ -208,11 +202,8 @@ def render_yellow_screen_worker(spec: PipelineSpec) -> str:
         """
 
         from __future__ import annotations
-
-        import sys
         from pathlib import Path
 
-        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
         from collector_core import yellow_screen_standard as core_yellow
         from collector_core.yellow_screen_common import default_yellow_roots
@@ -248,11 +239,8 @@ def render_merge_worker(spec: PipelineSpec) -> str:
         """
 
         from __future__ import annotations
-
-        import sys
         from pathlib import Path
 
-        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
         from collector_core import merge as core_merge
         from collector_core.generic_workers import main_merge
@@ -302,11 +290,8 @@ def render_catalog_builder() -> str:
         """
 
         from __future__ import annotations
-
-        import sys
         from pathlib import Path
 
-        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
         from collector_core.generic_workers import main_catalog
 
@@ -337,11 +322,8 @@ def render_review_queue() -> str:
         """
 
         from __future__ import annotations
-
-        import sys
         from pathlib import Path
 
-        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
         from collector_core.generic_workers import main_review_queue
 

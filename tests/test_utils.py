@@ -6,7 +6,6 @@ import io
 import tarfile
 import zipfile
 from pathlib import Path
-
 from collector_core.utils import (
     append_jsonl,
     coerce_int,

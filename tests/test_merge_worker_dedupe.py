@@ -1,10 +1,7 @@
 import hashlib
 import json
-import sys
 import tracemalloc
 from pathlib import Path
-
-sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from chem_pipeline_v2 import merge_worker
 
