@@ -35,6 +35,7 @@ from collector_core.denylist_matcher import (
 from collector_core.dataset_root import resolve_dataset_root
 from collector_core.exceptions import ConfigValidationError
 from collector_core.logging_config import add_logging_args, configure_logging
+from collector_core.metrics import MetricsCollector, clear_collector, set_collector
 from collector_core.policy_snapshot import build_policy_snapshot
 from collector_core.queue.emission import emit_queues
 from collector_core.utils import (
@@ -182,6 +183,11 @@ class ClassificationResult:
     yellow_rows: list[dict[str, Any]]
     red_rows: list[dict[str, Any]]
     warnings: list[dict[str, Any]]
+    evidence_bytes: int = 0
+    evidence_fetches: int = 0
+    evidence_fetch_ok: int = 0
+    evidence_fetch_errors: int = 0
+    evidence_fetch_skipped: int = 0
 
 
 def load_license_map(paths: Path | list[Path]) -> LicenseMap:
@@ -729,22 +735,41 @@ class BasePipelineDriver:
 
     def run(self, args: argparse.Namespace) -> None:
         cfg = load_driver_config(args)
-        policy_snapshot = build_policy_snapshot(
-            run_id=cfg.checks_run_id,
-            targets_path=cfg.targets_path,
-            targets_cfg=cfg.targets_cfg,
-            license_map_paths=cfg.license_map_path,
-            denylist_paths=cfg.denylist_path,
-            default_content_checks=cfg.default_content_checks,
-            targets=cfg.targets,
-        )
         run_ledger_root = cfg.ledger_root / cfg.checks_run_id
         ensure_dir(run_ledger_root)
-        write_json(run_ledger_root / "policy_snapshot.json", policy_snapshot)
-        results = self.classify_targets(cfg)
-        self.emit_queues(cfg.queues_root, results)
-        self.emit_summary(cfg, results)
-        self.emit_report(cfg, results)
+        collector = MetricsCollector(self.DOMAIN)
+        set_collector(collector)
+        run_timer = collector.timer("run_total_ms").start()
+        try:
+            policy_timer = collector.timer("policy_snapshot_ms").start()
+            policy_snapshot = build_policy_snapshot(
+                run_id=cfg.checks_run_id,
+                targets_path=cfg.targets_path,
+                targets_cfg=cfg.targets_cfg,
+                license_map_paths=cfg.license_map_path,
+                denylist_paths=cfg.denylist_path,
+                default_content_checks=cfg.default_content_checks,
+                targets=cfg.targets,
+            )
+            policy_timer.stop()
+            write_json(run_ledger_root / "policy_snapshot.json", policy_snapshot)
+            classify_timer = collector.timer("classification_ms").start()
+            results = self.classify_targets(cfg)
+            classify_timer.stop()
+            queues_timer = collector.timer("emit_queues_ms").start()
+            self.emit_queues(cfg.queues_root, results)
+            queues_timer.stop()
+            summary_timer = collector.timer("emit_summary_ms").start()
+            self.emit_summary(cfg, results)
+            summary_timer.stop()
+            report_timer = collector.timer("emit_report_ms").start()
+            self.emit_report(cfg, results)
+            report_timer.stop()
+            run_timer.stop()
+            metrics = self.build_metrics_payload(cfg, results, collector)
+            write_json(run_ledger_root / "metrics.json", metrics)
+        finally:
+            clear_collector()
 
     def classify_targets(self, cfg: DriverConfig) -> ClassificationResult:
         results = ClassificationResult([], [], [], [])
@@ -754,6 +779,13 @@ class BasePipelineDriver:
             results.warnings.extend(warnings)
             contexts.append(ctx)
         evidence_results = self.fetch_evidence_batch(contexts, cfg)
+        results.evidence_bytes = self._sum_evidence_bytes(evidence_results)
+        (
+            results.evidence_fetches,
+            results.evidence_fetch_ok,
+            results.evidence_fetch_errors,
+            results.evidence_fetch_skipped,
+        ) = self._count_evidence_fetches(evidence_results)
         for ctx, evidence in zip(contexts, evidence_results):
             evaluation, row = self.classify_target(ctx, cfg, evidence)
             write_json(ctx.target_manifest_dir / "evaluation.json", evaluation)
@@ -1171,6 +1203,72 @@ class BasePipelineDriver:
         if self.INCLUDE_ROUTING_DICT_IN_ROW and "routing" not in row:
             row["routing"] = ctx.routing
         return row
+
+    def _sum_evidence_bytes(self, evidence_results: list[EvidenceResult]) -> int:
+        total = 0
+        for evidence in evidence_results:
+            snapshot = evidence.snapshot or {}
+            bytes_value = snapshot.get("bytes")
+            if bytes_value is None:
+                fetch_meta = snapshot.get("fetch_meta") or {}
+                bytes_value = fetch_meta.get("bytes")
+            if bytes_value:
+                total += int(bytes_value)
+        return total
+
+    def _count_evidence_fetches(
+        self, evidence_results: list[EvidenceResult]
+    ) -> tuple[int, int, int, int]:
+        fetches = 0
+        ok = 0
+        errors = 0
+        skipped = 0
+        for evidence in evidence_results:
+            snapshot = evidence.snapshot or {}
+            status = snapshot.get("status") or "unknown"
+            if status in {"skipped", "no_url"}:
+                skipped += 1
+                continue
+            fetches += 1
+            if status == "ok":
+                ok += 1
+            else:
+                errors += 1
+        return fetches, ok, errors, skipped
+
+    def build_metrics_payload(
+        self,
+        cfg: DriverConfig,
+        results: ClassificationResult,
+        collector: MetricsCollector,
+    ) -> dict[str, Any]:
+        timings_ms = {
+            timer.name: timer.duration_ms
+            for timer in collector.timers
+            if timer.duration_ms is not None
+        }
+        targets_enabled = sum(1 for target in cfg.targets if target.get("enabled", True))
+        counts = {
+            "targets_total": len(cfg.targets),
+            "targets_enabled": targets_enabled,
+            "queued_green": len(results.green_rows),
+            "queued_yellow": len(results.yellow_rows),
+            "queued_red": len(results.red_rows),
+            "warnings": len(results.warnings),
+            "evidence_fetches": results.evidence_fetches,
+            "evidence_fetch_ok": results.evidence_fetch_ok,
+            "evidence_fetch_errors": results.evidence_fetch_errors,
+            "evidence_fetch_skipped": results.evidence_fetch_skipped,
+        }
+        return {
+            "run_id": cfg.checks_run_id,
+            "pipeline_id": self.DOMAIN,
+            "started_at_utc": collector.start_time,
+            "ended_at_utc": utc_now(),
+            "counts": counts,
+            "bytes": {"evidence_fetched": results.evidence_bytes},
+            "timings_ms": timings_ms,
+        }
 
     def emit_queues(self, queues_root: Path, results: ClassificationResult) -> None:
         emit_queues(queues_root, results)
