@@ -156,6 +156,23 @@ register_pipeline(
 
 register_pipeline(
     PipelineSpec(
+        domain="fixture",
+        name="Fixture Pipeline",
+        targets_yaml="targets_fixture.yaml",
+        routing_keys=["fixture_routing"],
+        routing_confidence_keys=["fixture_routing"],
+        default_routing={
+            "subject": "fixture",
+            "domain": "misc",
+            "category": "misc",
+            "level": 5,
+            "granularity": "target",
+        },
+    )
+)
+
+register_pipeline(
+    PipelineSpec(
         domain="cyber",
         name="Cybersecurity Pipeline",
         targets_yaml="targets_cyber.yaml",
