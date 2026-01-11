@@ -4,6 +4,7 @@ from typing import Any
 
 import re
 
+from collector_core.stability import stable_api
 from collector_core.utils import normalize_whitespace, sha256_bytes
 
 EVIDENCE_CHANGE_POLICIES = {"raw", "normalized", "either"}
@@ -22,6 +23,7 @@ _TIMESTAMP_PATTERNS = [
 ]
 
 
+@stable_api
 def normalize_evidence_text(text: str) -> str:
     cleaned = _URL_QUERYSTRING_RE.sub(r"\1", text or "")
     for pattern in _TIMESTAMP_PATTERNS:
@@ -29,6 +31,7 @@ def normalize_evidence_text(text: str) -> str:
     return normalize_whitespace(cleaned)
 
 
+@stable_api
 def normalize_evidence_change_policy(value: Any) -> str:
     policy = str(value or "").strip().lower()
     if policy in EVIDENCE_CHANGE_POLICIES:
@@ -36,6 +39,7 @@ def normalize_evidence_change_policy(value: Any) -> str:
     return "normalized"
 
 
+@stable_api
 def normalize_cosmetic_change_policy(value: Any) -> str:
     policy = str(value or "").strip().lower()
     if policy in COSMETIC_CHANGE_POLICIES:
@@ -43,6 +47,7 @@ def normalize_cosmetic_change_policy(value: Any) -> str:
     return "warn_only"
 
 
+@stable_api
 def resolve_evidence_change(
     raw_changed: bool,
     normalized_changed: bool,
@@ -61,11 +66,13 @@ def resolve_evidence_change(
     return changed
 
 
+@stable_api
 def compute_normalized_text_hash(text: str) -> str:
     normalized = normalize_evidence_text(text)
     return sha256_bytes(normalized.encode("utf-8"))
 
 
+@stable_api
 def apply_normalized_hash_fallback(
     *,
     evidence: dict[str, Any] | None,
@@ -82,7 +89,7 @@ def apply_normalized_hash_fallback(
 
 
 
-
+@stable_api
 def compute_signoff_mismatches(
     *,
     signoff_raw_sha: str | None,
@@ -109,6 +116,7 @@ def compute_signoff_mismatches(
     return raw_mismatch, normalized_mismatch, cosmetic_change
 
 
+@stable_api
 def normalize_evidence_fetch_status(
     evidence_snapshot: dict[str, Any],
 ) -> tuple[str, str | None]:

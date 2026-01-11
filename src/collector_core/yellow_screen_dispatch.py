@@ -8,13 +8,16 @@ modules when configured in PipelineSpec, otherwise uses yellow_screen_standard.
 from __future__ import annotations
 
 import importlib
+from collections.abc import Callable
 
 from collector_core.__version__ import __version__ as VERSION  # noqa: F401
 from collector_core.pipeline_spec import get_pipeline_spec
+from collector_core.stability import stable_api
 from collector_core.yellow_screen_common import default_yellow_roots
 
 
-def get_yellow_screen_main(domain: str):
+@stable_api
+def get_yellow_screen_main(domain: str) -> Callable[[], None]:
     """
     Return the main() function for the given domain's yellow screen worker.
 
@@ -47,6 +50,7 @@ def get_yellow_screen_main(domain: str):
     return _standard_main
 
 
+@stable_api
 def main_yellow_screen(domain: str) -> None:
     """
     Entry point for running yellow screen for a domain.

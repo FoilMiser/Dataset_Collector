@@ -15,6 +15,7 @@ from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.dependencies import _try_import
 from collector_core.network_utils import _with_retries
 from collector_core.secrets import REDACTED, SecretStr, redact_headers
+from collector_core.stability import stable_api
 from collector_core.utils import ensure_dir, sha256_bytes, sha256_file, utc_now, write_json
 
 from .change_detection import (
@@ -47,6 +48,7 @@ def _resolve_host_ips(hostname: str) -> list[str]:
     return sorted(ips)
 
 
+@stable_api
 def validate_evidence_url(url: str, allow_private_hosts: bool) -> tuple[bool, str | None]:
     parsed = urllib.parse.urlparse(url)
     scheme = (parsed.scheme or "").lower()
@@ -77,6 +79,7 @@ _HTML_COMMENT_RE = re.compile(r"(?s)<!--.*?-->")
 _HTML_TAG_RE = re.compile(r"(?s)<[^>]+>")
 
 
+@stable_api
 def html_to_text(text: str) -> str:
     cleaned = html.unescape(text or "")
     cleaned = _HTML_SCRIPT_STYLE_RE.sub(" ", cleaned)
@@ -85,6 +88,7 @@ def html_to_text(text: str) -> str:
     return cleaned
 
 
+@stable_api
 def extract_text_from_path(path: Path, evidence: dict[str, Any] | None = None) -> str:
     if not path.exists():
         if evidence is not None:
@@ -131,6 +135,7 @@ def extract_text_from_path(path: Path, evidence: dict[str, Any] | None = None) -
     return raw
 
 
+@stable_api
 def extract_text_for_scanning(evidence: dict[str, Any]) -> str:
     saved = str(evidence.get("saved_path") or "")
     if not saved:
@@ -138,6 +143,7 @@ def extract_text_for_scanning(evidence: dict[str, Any]) -> str:
     return extract_text_from_path(Path(saved), evidence)
 
 
+@stable_api
 def compute_file_hashes(
     path: Path, evidence: dict[str, Any] | None = None
 ) -> tuple[str | None, str | None]:
@@ -178,12 +184,14 @@ def _scrub_secret_values(value: Any) -> Any:
     return value
 
 
+@stable_api
 def redact_headers_for_manifest(headers: dict[str, str] | None) -> dict[str, Any]:
     if not headers:
         return {}
     return _scrub_secret_values(redact_headers(headers))
 
 
+@stable_api
 def find_existing_evidence(manifest_dir: Path) -> Path | None:
     for ext in EVIDENCE_EXTENSIONS:
         candidate = manifest_dir / f"license_evidence{ext}"
@@ -192,6 +200,7 @@ def find_existing_evidence(manifest_dir: Path) -> Path | None:
     return None
 
 
+@stable_api
 def cleanup_stale_evidence(manifest_dir: Path, keep: Path | None = None) -> list[Path]:
     removed: list[Path] = []
     keep_resolved = keep.resolve() if keep else None
@@ -208,6 +217,7 @@ def cleanup_stale_evidence(manifest_dir: Path, keep: Path | None = None) -> list
     return removed
 
 
+@stable_api
 def fetch_url_with_retry(
     url: str,
     *,
@@ -336,6 +346,7 @@ def fetch_url_with_retry(
     return None, f"Failed after {meta['retries']} attempts", meta
 
 
+@stable_api
 def snapshot_evidence(
     manifest_dir: Path,
     url: str,
@@ -522,6 +533,7 @@ def snapshot_evidence(
     return result
 
 
+@stable_api
 def fetch_evidence(
     *,
     ctx: "TargetContext",

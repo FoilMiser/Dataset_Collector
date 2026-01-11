@@ -7,8 +7,10 @@ from typing import Any
 from datasets import DatasetDict, load_from_disk
 
 from collector_core.merge.types import GreenInput, GreenSkip
+from collector_core.stability import stable_api
 
 
+@stable_api
 def is_hf_dataset_dir(path: Path) -> bool:
     if not path.is_dir():
         return False
@@ -16,6 +18,7 @@ def is_hf_dataset_dir(path: Path) -> bool:
     return any((path / marker).exists() for marker in markers)
 
 
+@stable_api
 def iter_hf_dataset_dirs(target_dir: Path) -> list[Path]:
     candidates: list[Path] = []
     if is_hf_dataset_dir(target_dir):
@@ -36,6 +39,7 @@ def iter_hf_dataset_dirs(target_dir: Path) -> list[Path]:
     return ordered
 
 
+@stable_api
 def iter_hf_inputs(
     dataset_dirs: Iterable[Path],
     *,

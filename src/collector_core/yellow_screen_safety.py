@@ -31,6 +31,7 @@ from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.companion_files import read_field_schemas, resolve_companion_paths
 from collector_core.config_validator import read_yaml
 from collector_core.dataset_root import ensure_data_root_allowed, resolve_dataset_root
+from collector_core.stability import stable_api
 from collector_core.utils import ensure_dir, read_jsonl, utc_now, write_json, write_jsonl
 from collector_core.yellow_screen_common import PitchConfig, resolve_pitch_config
 
@@ -47,15 +48,18 @@ ADDRESS_RE = re.compile(
 SCHEMA_KEYS = ["schema_version", "schema", "schema_id"]
 
 
+@stable_api
 def sha256_text(text: str) -> str:
     norm = re.sub(r"\s+", " ", (text or "").strip())
     return hashlib.sha256(norm.encode("utf-8")).hexdigest()
 
 
+@stable_api
 def read_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+@stable_api
 def append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
     ensure_dir(path.parent)
     mode = "at" if path.suffix != ".gz" else "ab"
@@ -69,6 +73,7 @@ def append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
                 f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
+@stable_api
 @dataclasses.dataclass
 class Roots:
     raw_root: Path
@@ -78,6 +83,7 @@ class Roots:
     pitches_root: Path
 
 
+@stable_api
 @dataclasses.dataclass
 class ScreeningConfig:
     text_fields: list[str]
@@ -89,6 +95,7 @@ class ScreeningConfig:
     max_chars: int
 
 
+@stable_api
 @dataclasses.dataclass
 class ShardingConfig:
     max_records_per_shard: int
@@ -96,8 +103,9 @@ class ShardingConfig:
     prefix: str
 
 
+@stable_api
 class Sharder:
-    def __init__(self, base_dir: Path, cfg: ShardingConfig):
+    def __init__(self, base_dir: Path, cfg: ShardingConfig) -> None:
         self.base_dir = base_dir
         self.cfg = cfg
         self.count = 0
@@ -127,10 +135,12 @@ class Sharder:
         return path
 
 
+@stable_api
 def load_targets_cfg(path: Path) -> dict[str, Any]:
     return read_yaml(path, schema_name="targets") or {}
 
 
+@stable_api
 def resolve_roots(
     cfg: dict[str, Any], dataset_root: Path | None = None, *, allow_data_root: bool = False
 ) -> Roots:
@@ -165,6 +175,7 @@ def resolve_roots(
     return roots
 
 
+@stable_api
 def merge_screening_config(cfg: dict[str, Any], target: dict[str, Any]) -> ScreeningConfig:
     g = cfg.get("globals", {}) or {}
     g_screen = g.get("screening", {}) or {}
@@ -203,6 +214,7 @@ def merge_screening_config(cfg: dict[str, Any], target: dict[str, Any]) -> Scree
     )
 
 
+@stable_api
 def sharding_cfg(cfg: dict[str, Any], prefix: str) -> ShardingConfig:
     g = cfg.get("globals", {}).get("sharding", {}) or {}
     return ShardingConfig(
@@ -212,6 +224,7 @@ def sharding_cfg(cfg: dict[str, Any], prefix: str) -> ShardingConfig:
     )
 
 
+@stable_api
 def load_field_schemas(cfg: dict[str, Any], targets_path: Path) -> dict[str, dict[str, Any]]:
     comp = cfg.get("companion_files", {}) or {}
     schema_paths = resolve_companion_paths(
@@ -220,6 +233,7 @@ def load_field_schemas(cfg: dict[str, Any], targets_path: Path) -> dict[str, dic
     return read_field_schemas(schema_paths)
 
 
+@stable_api
 def find_text(row: dict[str, Any], candidates: list[str]) -> str | None:
     for k in candidates:
         if k in row and row[k]:
@@ -230,6 +244,7 @@ def find_text(row: dict[str, Any], candidates: list[str]) -> str | None:
     return None
 
 
+@stable_api
 def extract_text(row: dict[str, Any], candidates: list[str]) -> str | None:
     if row.get("text"):
         val = row["text"]
@@ -249,6 +264,7 @@ def extract_text(row: dict[str, Any], candidates: list[str]) -> str | None:
         return str(row)
 
 
+@stable_api
 def find_license(row: dict[str, Any], candidates: list[str]) -> str | None:
     for k in candidates:
         if k in row and row[k]:
@@ -256,11 +272,13 @@ def find_license(row: dict[str, Any], candidates: list[str]) -> str | None:
     return None
 
 
+@stable_api
 def contains_deny(text: str, phrases: list[str]) -> bool:
     low = text.lower()
     return any(p in low for p in phrases)
 
 
+@stable_api
 def record_pitch(
     roots: Roots,
     pitch_counts: dict[tuple[str, str], int],
@@ -301,6 +319,7 @@ def record_pitch(
     pitch_counts[key] = pitch_counts.get(key, 0) + 1
 
 
+@stable_api
 def redact_text(text: str) -> tuple[str, list[str]]:
     redactions: list[str] = []
     if EMAIL_RE.search(text):
@@ -318,12 +337,14 @@ def redact_text(text: str) -> tuple[str, list[str]]:
     return text, redactions
 
 
+@stable_api
 def has_sensitive_markers(text: str) -> str | None:
     if COORD_RE.search(text):
         return "precise_coordinates"
     return None
 
 
+@stable_api
 def coarsen_meta(meta: dict[str, Any], redactions: list[str]) -> dict[str, Any]:
     meta = dict(meta or {})
     for key in ["location", "location_detail", "address", "latitude", "longitude", "coordinates"]:
@@ -337,6 +358,7 @@ def coarsen_meta(meta: dict[str, Any], redactions: list[str]) -> dict[str, Any]:
     return meta
 
 
+@stable_api
 def schema_key(record: dict[str, Any]) -> str | None:
     for key in SCHEMA_KEYS:
         if record.get(key):
@@ -344,6 +366,7 @@ def schema_key(record: dict[str, Any]) -> str | None:
     return None
 
 
+@stable_api
 def validate_schema(record: dict[str, Any], schemas: dict[str, Any]) -> tuple[bool, list[str]]:
     s_key = schema_key(record)
     if not s_key or s_key not in schemas:
@@ -354,6 +377,7 @@ def validate_schema(record: dict[str, Any], schemas: dict[str, Any]) -> tuple[bo
     return not missing, missing
 
 
+@stable_api
 def load_signoff(manifest_dir: Path) -> dict[str, Any] | None:
     signoff_path = manifest_dir / "review_signoff.json"
     if not signoff_path.exists():
@@ -364,6 +388,7 @@ def load_signoff(manifest_dir: Path) -> dict[str, Any] | None:
         return None
 
 
+@stable_api
 def canonical_record(
     raw: dict[str, Any],
     text: str,
@@ -394,6 +419,7 @@ def canonical_record(
     return record
 
 
+@stable_api
 def iter_raw_files(raw_dir: Path) -> Iterator[Path]:
     for ext in ("*.jsonl", "*.jsonl.gz"):
         for fp in raw_dir.glob(ext):
@@ -401,6 +427,7 @@ def iter_raw_files(raw_dir: Path) -> Iterator[Path]:
                 yield fp
 
 
+@stable_api
 def iter_hf_dataset_dirs(raw_dir: Path) -> Iterator[Path]:
     candidates = []
     for pattern in ("hf_dataset", "split_*"):
@@ -414,6 +441,7 @@ def iter_hf_dataset_dirs(raw_dir: Path) -> Iterator[Path]:
         yield path
 
 
+@stable_api
 def process_target(
     cfg: dict[str, Any],
     schemas: dict[str, Any],
@@ -692,6 +720,7 @@ def process_target(
     return manifest
 
 
+@stable_api
 def main() -> None:
     ap = argparse.ArgumentParser(description=f"Yellow Screen Worker v{VERSION}")
     ap.add_argument("--targets", required=True, help="Path to targets_safety_incident.yaml")

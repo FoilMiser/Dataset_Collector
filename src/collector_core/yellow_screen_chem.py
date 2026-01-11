@@ -31,15 +31,18 @@ from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.companion_files import read_field_schemas, resolve_companion_paths
 from collector_core.config_validator import read_yaml
 from collector_core.dataset_root import ensure_data_root_allowed, resolve_dataset_root
+from collector_core.stability import stable_api
 from collector_core.utils import ensure_dir, read_jsonl, utc_now, write_json, write_jsonl
 from collector_core.yellow_screen_common import PitchConfig, resolve_pitch_config
 
 
+@stable_api
 def sha256_text(text: str) -> str:
     norm = re.sub(r"\s+", " ", (text or "").strip())
     return hashlib.sha256(norm.encode("utf-8")).hexdigest()
 
 
+@stable_api
 def append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
     ensure_dir(path.parent)
     mode = "at" if path.suffix != ".gz" else "ab"
@@ -53,6 +56,7 @@ def append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
                 f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
+@stable_api
 def load_yaml(path: Path, schema_name: str | None = None) -> dict[str, Any]:
     return read_yaml(path, schema_name=schema_name) or {}
 
@@ -62,6 +66,7 @@ def load_yaml(path: Path, schema_name: str | None = None) -> dict[str, Any]:
 # ------------------------------
 
 
+@stable_api
 @dataclasses.dataclass
 class FieldSpec:
     name: str
@@ -71,6 +76,7 @@ class FieldSpec:
     validation: dict[str, Any] = dataclasses.field(default_factory=dict)
 
 
+@stable_api
 def load_field_schemas(paths: list[Path]) -> dict[str, dict[str, FieldSpec]]:
     schemas: dict[str, dict[str, FieldSpec]] = {}
     for schema_name, schema_def in read_field_schemas(paths).items():
@@ -87,6 +93,7 @@ def load_field_schemas(paths: list[Path]) -> dict[str, dict[str, FieldSpec]]:
     return schemas
 
 
+@stable_api
 def cast_value(value: str, field_type: str, validation: dict[str, Any]) -> Any:
     if value is None or str(value).strip() == "":
         return None
@@ -120,6 +127,7 @@ def cast_value(value: str, field_type: str, validation: dict[str, Any]) -> Any:
     return val
 
 
+@stable_api
 def validate_record(record: dict[str, Any], schema: dict[str, FieldSpec]) -> tuple[bool, list[str]]:
     errors: list[str] = []
     for name, spec in schema.items():
@@ -138,6 +146,7 @@ def validate_record(record: dict[str, Any], schema: dict[str, FieldSpec]) -> tup
 # ------------------------------
 
 
+@stable_api
 def resolve_routing(raw: dict[str, Any], queue_row: dict[str, Any]) -> dict[str, Any]:
     rt = (raw.get("routing") or raw.get("chem_routing") or raw.get("math_routing") or {}) or {}
     routing = {
@@ -153,6 +162,7 @@ def resolve_routing(raw: dict[str, Any], queue_row: dict[str, Any]) -> dict[str,
     return routing
 
 
+@stable_api
 def canonical_record(
     raw: dict[str, Any],
     text: str,
@@ -181,11 +191,13 @@ def canonical_record(
     }
 
 
+@stable_api
 def iter_raw_files(raw_dir: Path) -> Iterator[Path]:
     for ext in ("*.jsonl", "*.jsonl.gz"):
         yield from raw_dir.glob(ext)
 
 
+@stable_api
 def iter_hf_dataset_dirs(raw_dir: Path) -> Iterator[Path]:
     candidates = []
     for pattern in ("hf_dataset", "split_*"):
@@ -199,6 +211,7 @@ def iter_hf_dataset_dirs(raw_dir: Path) -> Iterator[Path]:
         yield path
 
 
+@stable_api
 def iter_text_files(raw_dir: Path) -> Iterator[Path]:
     for ext in ("*.txt", "*.txt.gz"):
         yield from raw_dir.glob(ext)
@@ -209,6 +222,7 @@ def iter_text_files(raw_dir: Path) -> Iterator[Path]:
 # ------------------------------
 
 
+@stable_api
 def iter_sdf_records_from_gz(path: Path) -> Iterator[str]:
     buffer: list[str] = []
     opener = gzip.open if path.suffix.endswith("gz") else open
@@ -227,6 +241,7 @@ def iter_sdf_records_from_gz(path: Path) -> Iterator[str]:
 TAG_RE = re.compile(r"^> *<(?P<key>[^>]+)>")
 
 
+@stable_api
 def parse_sdf_tags(record: str) -> dict[str, str]:
     lines = record.splitlines()
     tags: dict[str, str] = {}
@@ -253,6 +268,7 @@ def parse_sdf_tags(record: str) -> dict[str, str]:
 # ------------------------------
 
 
+@stable_api
 @dataclasses.dataclass
 class Roots:
     raw_root: Path
@@ -262,6 +278,7 @@ class Roots:
     pitches_root: Path
 
 
+@stable_api
 @dataclasses.dataclass
 class ScreeningConfig:
     text_fields: list[str]
@@ -273,6 +290,7 @@ class ScreeningConfig:
     max_chars: int
 
 
+@stable_api
 @dataclasses.dataclass
 class ShardingConfig:
     max_records_per_shard: int
@@ -280,8 +298,9 @@ class ShardingConfig:
     prefix: str
 
 
+@stable_api
 class Sharder:
-    def __init__(self, base_dir: Path, cfg: ShardingConfig):
+    def __init__(self, base_dir: Path, cfg: ShardingConfig) -> None:
         self.base_dir = base_dir
         self.cfg = cfg
         self.count = 0
@@ -311,6 +330,7 @@ class Sharder:
         return path
 
 
+@stable_api
 @dataclasses.dataclass
 class ScreenContext:
     cfg: dict[str, Any]
@@ -325,10 +345,12 @@ class ScreenContext:
     pitch_cfg: PitchConfig
 
 
+@stable_api
 def load_targets_cfg(path: Path) -> dict[str, Any]:
     return read_yaml(path, schema_name="targets") or {}
 
 
+@stable_api
 def load_signoff(manifest_dir: Path) -> dict[str, Any] | None:
     signoff_path = manifest_dir / "review_signoff.json"
     if not signoff_path.exists():
@@ -339,6 +361,7 @@ def load_signoff(manifest_dir: Path) -> dict[str, Any] | None:
         return None
 
 
+@stable_api
 def resolve_roots(
     cfg: dict[str, Any], dataset_root: Path | None = None, *, allow_data_root: bool = False
 ) -> Roots:
@@ -373,6 +396,7 @@ def resolve_roots(
     return roots
 
 
+@stable_api
 def merge_screening_config(cfg: dict[str, Any], target: dict[str, Any]) -> ScreeningConfig:
     g = cfg.get("globals", {}) or {}
     g_screen = g.get("screening", {}) or {}
@@ -411,6 +435,7 @@ def merge_screening_config(cfg: dict[str, Any], target: dict[str, Any]) -> Scree
     )
 
 
+@stable_api
 def sharding_cfg(cfg: dict[str, Any], prefix: str) -> ShardingConfig:
     g = cfg.get("globals", {}).get("sharding", {}) or {}
     return ShardingConfig(
@@ -420,6 +445,7 @@ def sharding_cfg(cfg: dict[str, Any], prefix: str) -> ShardingConfig:
     )
 
 
+@stable_api
 def find_text(row: dict[str, Any], candidates: list[str]) -> str | None:
     for k in candidates:
         if k in row and row[k]:
@@ -430,6 +456,7 @@ def find_text(row: dict[str, Any], candidates: list[str]) -> str | None:
     return None
 
 
+@stable_api
 def extract_text(row: dict[str, Any], candidates: list[str]) -> str | None:
     if row.get("text"):
         val = row["text"]
@@ -449,6 +476,7 @@ def extract_text(row: dict[str, Any], candidates: list[str]) -> str | None:
         return str(row)
 
 
+@stable_api
 def find_license(row: dict[str, Any], candidates: list[str]) -> str | None:
     for k in candidates:
         if k in row and row[k]:
@@ -456,11 +484,13 @@ def find_license(row: dict[str, Any], candidates: list[str]) -> str | None:
     return None
 
 
+@stable_api
 def contains_deny(text: str, phrases: list[str]) -> bool:
     low = text.lower()
     return any(p in low for p in phrases)
 
 
+@stable_api
 def log_pitch(
     ctx: ScreenContext,
     reason: str,
@@ -497,6 +527,7 @@ def log_pitch(
     ctx.pitch_counts[key] = ctx.pitch_counts.get(key, 0) + 1
 
 
+@stable_api
 def log_pass(ctx: ScreenContext, rec: dict[str, Any], shard_path: Path) -> None:
     if not ctx.execute:
         return
@@ -516,12 +547,14 @@ def log_pass(ctx: ScreenContext, rec: dict[str, Any], shard_path: Path) -> None:
     )
 
 
+@stable_api
 def flush_sharder(sharder: Sharder, shard_paths: list[str]) -> None:
     flushed = sharder.flush()
     if flushed:
         shard_paths.append(str(flushed))
 
 
+@stable_api
 def screen_jsonl_mode(ctx: ScreenContext) -> dict[str, Any]:
     target_id = ctx.queue_row["id"]
     pool_dir_base = ctx.roots.raw_root / "yellow"
@@ -621,6 +654,7 @@ def screen_jsonl_mode(ctx: ScreenContext) -> dict[str, Any]:
     }
 
 
+@stable_api
 def screen_pubchem_computed_only(ctx: ScreenContext) -> dict[str, Any]:
     target_id = ctx.queue_row["id"]
     ys_cfg = ctx.target_cfg.get("yellow_screen") or {}
@@ -699,6 +733,7 @@ def screen_pubchem_computed_only(ctx: ScreenContext) -> dict[str, Any]:
     }
 
 
+@stable_api
 def screen_pmc_oa(ctx: ScreenContext) -> dict[str, Any]:
     target_id = ctx.queue_row["id"]
     ys_cfg = ctx.target_cfg.get("yellow_screen") or {}
@@ -775,6 +810,7 @@ MODE_HANDLERS = {
 }
 
 
+@stable_api
 def process_target(ctx: ScreenContext) -> dict[str, Any]:
     g = ctx.cfg.get("globals", {}) or {}
     require_signoff = bool(g.get("require_yellow_signoff", False))
@@ -828,6 +864,7 @@ def process_target(ctx: ScreenContext) -> dict[str, Any]:
     return manifest
 
 
+@stable_api
 def main() -> None:
     ap = argparse.ArgumentParser(description=f"Yellow Screen Worker v{VERSION}")
     ap.add_argument("--targets", required=True, help="Path to targets_chem.yaml")

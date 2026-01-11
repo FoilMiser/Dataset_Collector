@@ -4,11 +4,13 @@ from pathlib import Path
 from typing import Any
 
 from collector_core.merge.types import ShardingConfig
+from collector_core.stability import stable_api
 from collector_core.utils import append_jsonl, ensure_dir
 
 
+@stable_api
 class Sharder:
-    def __init__(self, base_dir: Path, cfg: ShardingConfig):
+    def __init__(self, base_dir: Path, cfg: ShardingConfig) -> None:
         self.base_dir = base_dir
         self.cfg = cfg
         self.current: list[dict[str, Any]] = []
@@ -36,6 +38,7 @@ class Sharder:
         return path, records
 
 
+@stable_api
 def sharding_cfg(cfg: dict[str, Any]) -> ShardingConfig:
     g = cfg.get("globals", {}).get("sharding", {}) or {}
     return ShardingConfig(
@@ -45,5 +48,6 @@ def sharding_cfg(cfg: dict[str, Any]) -> ShardingConfig:
     )
 
 
+@stable_api
 def ensure_shard_dir(sharder: Sharder) -> None:
     ensure_dir(sharder.base_dir)

@@ -33,6 +33,7 @@ from collector_core.__version__ import __version__ as VERSION
 from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.config_validator import read_yaml
 from collector_core.dataset_root import ensure_data_root_allowed, resolve_dataset_root
+from collector_core.stability import stable_api
 from collector_core.utils import (
     ensure_dir,
     read_jsonl,
@@ -44,11 +45,13 @@ from collector_core.utils import (
 from collector_core.yellow_screen_common import PitchConfig, resolve_pitch_config
 
 
+@stable_api
 def sha256_text(text: str) -> str:
     norm = re.sub(r"\s+", " ", (text or "").strip())
     return hashlib.sha256(norm.encode("utf-8")).hexdigest()
 
 
+@stable_api
 def append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
     ensure_dir(path.parent)
     mode = "at" if path.suffix != ".gz" else "ab"
@@ -62,6 +65,7 @@ def append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
                 f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
+@stable_api
 @dataclasses.dataclass
 class Roots:
     raw_root: Path
@@ -71,6 +75,7 @@ class Roots:
     pitches_root: Path
 
 
+@stable_api
 @dataclasses.dataclass
 class ScreeningConfig:
     text_fields: list[str]
@@ -85,6 +90,7 @@ class ScreeningConfig:
     chunk_rows: int
 
 
+@stable_api
 @dataclasses.dataclass
 class ShardingConfig:
     max_records_per_shard: int
@@ -92,8 +98,9 @@ class ShardingConfig:
     prefix: str
 
 
+@stable_api
 class Sharder:
-    def __init__(self, base_dir: Path, cfg: ShardingConfig):
+    def __init__(self, base_dir: Path, cfg: ShardingConfig) -> None:
         self.base_dir = base_dir
         self.cfg = cfg
         self.count = 0
@@ -123,10 +130,12 @@ class Sharder:
         return path
 
 
+@stable_api
 def load_targets_cfg(path: Path) -> dict[str, Any]:
     return read_yaml(path, schema_name="targets") or {}
 
 
+@stable_api
 def load_signoff(manifest_dir: Path) -> dict[str, Any] | None:
     signoff_path = manifest_dir / "review_signoff.json"
     if not signoff_path.exists():
@@ -137,6 +146,7 @@ def load_signoff(manifest_dir: Path) -> dict[str, Any] | None:
         return None
 
 
+@stable_api
 def resolve_roots(
     cfg: dict[str, Any], dataset_root: Path | None = None, *, allow_data_root: bool = False
 ) -> Roots:
@@ -171,6 +181,7 @@ def resolve_roots(
     return roots
 
 
+@stable_api
 def merge_screening_config(cfg: dict[str, Any], target: dict[str, Any]) -> ScreeningConfig:
     g = cfg.get("globals", {}) or {}
     g_screen = g.get("screening", {}) or {}
@@ -214,6 +225,7 @@ def merge_screening_config(cfg: dict[str, Any], target: dict[str, Any]) -> Scree
     )
 
 
+@stable_api
 def sharding_cfg(cfg: dict[str, Any], prefix: str) -> ShardingConfig:
     g = cfg.get("globals", {}).get("sharding", {}) or {}
     return ShardingConfig(
@@ -223,6 +235,7 @@ def sharding_cfg(cfg: dict[str, Any], prefix: str) -> ShardingConfig:
     )
 
 
+@stable_api
 def find_text(row: dict[str, Any], candidates: list[str]) -> str | None:
     for k in candidates:
         if k in row and row[k]:
@@ -233,6 +246,7 @@ def find_text(row: dict[str, Any], candidates: list[str]) -> str | None:
     return None
 
 
+@stable_api
 def extract_text(row: dict[str, Any], candidates: list[str]) -> str | None:
     if row.get("text"):
         val = row["text"]
@@ -252,6 +266,7 @@ def extract_text(row: dict[str, Any], candidates: list[str]) -> str | None:
         return str(row)
 
 
+@stable_api
 def find_license(row: dict[str, Any], candidates: list[str]) -> str | None:
     for k in candidates:
         if k in row and row[k]:
@@ -259,11 +274,13 @@ def find_license(row: dict[str, Any], candidates: list[str]) -> str | None:
     return None
 
 
+@stable_api
 def contains_deny(text: str, phrases: list[str]) -> bool:
     low = text.lower()
     return any(p in low for p in phrases)
 
 
+@stable_api
 def record_pitch(
     roots: Roots,
     pitch_counts: dict[tuple[str, str], int],
@@ -304,6 +321,7 @@ def record_pitch(
     pitch_counts[key] = pitch_counts.get(key, 0) + 1
 
 
+@stable_api
 def canonical_record(
     raw: dict[str, Any], text: str, target_id: str, license_profile: str, license_spdx: str | None
 ) -> dict[str, Any]:
@@ -328,6 +346,7 @@ def canonical_record(
     }
 
 
+@stable_api
 def iter_raw_files(raw_dir: Path) -> Iterator[Path]:
     skip_names = {"download_manifest.json", "acquire_done.json"}
     for fp in raw_dir.rglob("*"):
@@ -335,6 +354,7 @@ def iter_raw_files(raw_dir: Path) -> Iterator[Path]:
             yield fp
 
 
+@stable_api
 def iter_hf_dataset_dirs(raw_dir: Path) -> Iterator[Path]:
     candidates = []
     for pattern in ("hf_dataset", "split_*"):
@@ -348,6 +368,7 @@ def iter_hf_dataset_dirs(raw_dir: Path) -> Iterator[Path]:
         yield path
 
 
+@stable_api
 def routing_from_queue(queue_row: dict[str, Any]) -> dict[str, Any]:
     return {
         "subject": queue_row.get("routing_subject")
@@ -363,6 +384,7 @@ def routing_from_queue(queue_row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+@stable_api
 def primary_source_url(queue_row: dict[str, Any]) -> str | None:
     download = queue_row.get("download", {}) or {}
     urls = download.get("urls") or []
@@ -393,11 +415,13 @@ MICRODATA_HINTS = [
 ]
 
 
+@stable_api
 def is_potential_microdata(columns: list[str]) -> bool:
     col_text = " ".join(columns).lower()
     return any(h in col_text for h in MICRODATA_HINTS)
 
 
+@stable_api
 def safe_read_text(path: Path) -> str | None:
     for enc in ("utf-8", "latin-1"):
         try:
@@ -407,6 +431,7 @@ def safe_read_text(path: Path) -> str | None:
     return None
 
 
+@stable_api
 def process_target(
     cfg: dict[str, Any],
     roots: Roots,
@@ -836,6 +861,7 @@ def process_target(
     return manifest
 
 
+@stable_api
 def main() -> None:
     ap = argparse.ArgumentParser(description=f"Yellow Screen Worker v{VERSION}")
     ap.add_argument("--targets", required=True, help="Path to targets_econ_stats_decision_v2.yaml")

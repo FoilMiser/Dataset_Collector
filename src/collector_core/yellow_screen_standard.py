@@ -10,6 +10,7 @@ from datasets import DatasetDict, load_from_disk
 
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.artifact_metadata import build_artifact_metadata
+from collector_core.stability import stable_api
 from collector_core.yellow_screen_common import (
     PitchConfig,
     Roots,
@@ -34,6 +35,7 @@ from collector_core.yellow_screen_common import (
 )
 
 
+@stable_api
 def load_signoff(manifest_dir: Path) -> dict[str, Any] | None:
     signoff_path = manifest_dir / "review_signoff.json"
     if not signoff_path.exists():
@@ -44,6 +46,7 @@ def load_signoff(manifest_dir: Path) -> dict[str, Any] | None:
         return None
 
 
+@stable_api
 def record_pitch(
     roots: Roots,
     pitch_counts: dict[tuple[str, str], int],
@@ -84,6 +87,7 @@ def record_pitch(
     pitch_counts[key] = pitch_counts.get(key, 0) + 1
 
 
+@stable_api
 def canonical_record(
     raw: dict[str, Any],
     text: str,
@@ -111,6 +115,7 @@ def canonical_record(
     }
 
 
+@stable_api
 def iter_raw_files(raw_dir: Path) -> list[Path]:
     files: list[Path] = []
     for ext in ("*.jsonl", "*.jsonl.gz"):
@@ -118,6 +123,7 @@ def iter_raw_files(raw_dir: Path) -> list[Path]:
     return files
 
 
+@stable_api
 def iter_hf_dataset_dirs(raw_dir: Path) -> list[Path]:
     candidates = []
     for pattern in ("hf_dataset", "split_*"):
@@ -133,6 +139,7 @@ def iter_hf_dataset_dirs(raw_dir: Path) -> list[Path]:
     return ordered
 
 
+@stable_api
 def process_target(
     cfg: dict[str, Any],
     roots: Roots,
@@ -344,6 +351,7 @@ def process_target(
     return manifest
 
 
+@stable_api
 def main(*, defaults: YellowRootDefaults) -> None:
     ap = argparse.ArgumentParser(description=f"Yellow Screen Worker v{VERSION}")
     ap.add_argument("--targets", required=True, help="Path to targets.yaml")
