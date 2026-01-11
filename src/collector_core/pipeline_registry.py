@@ -10,6 +10,7 @@ from types import ModuleType
 from typing import Any
 
 from collector_core import acquire_strategies
+from collector_core.acquire.strategies import registry as strategies_registry
 from collector_core.config_validator import read_yaml
 from collector_core.targets_paths import resolve_targets_path
 
@@ -152,43 +153,21 @@ def resolve_acquire_hooks(
                 )
         return handlers, postprocess
 
-    http_handler = overrides.get("http_handler", "multi")
-    if http_handler == "single":
-        http = acquire_strategies.handle_http_single
-    else:
-        http = acquire_strategies.handle_http_multi
-
-    handlers: dict[str, STRATEGY_HANDLER] = {
-        "http": http,
-        "ftp": acquire_strategies.handle_ftp,
-        "git": acquire_strategies.handle_git,
-        "zenodo": acquire_strategies.handle_zenodo,
-        "dataverse": acquire_strategies.handle_dataverse,
-        "huggingface_datasets": acquire_strategies.handle_hf_datasets,
-    }
-
     figshare_variant = overrides.get("figshare_variant")
-    if figshare_variant == "article":
-        handlers["figshare"] = acquire_strategies.handle_figshare_article
-    elif figshare_variant == "files":
-        handlers["figshare"] = acquire_strategies.handle_figshare_files
-
-    github_release_repo = overrides.get("github_release_repo")
-    if github_release_repo:
-        handlers["github_release"] = acquire_strategies.make_github_release_handler(
-            str(github_release_repo)
-        )
+    if figshare_variant is not None:
+        figshare_variant = str(figshare_variant)
 
     extra_handlers = overrides.get("extra_handlers") or []
-    if isinstance(extra_handlers, list):
-        extra_map = {
-            "s3_sync": acquire_strategies.handle_s3_sync,
-            "aws_requester_pays": acquire_strategies.handle_aws_requester_pays,
-            "torrent": acquire_strategies.handle_torrent,
-        }
-        for name in extra_handlers:
-            handler = extra_map.get(str(name))
-            if handler:
-                handlers[str(name)] = handler
+    if not isinstance(extra_handlers, list):
+        extra_handlers = []
+
+    handlers = strategies_registry.build_default_handlers(
+        http_handler=str(overrides.get("http_handler", "multi")),
+        figshare_variant=figshare_variant if figshare_variant in {"article", "files"} else None,
+        github_release_repo=str(overrides["github_release_repo"])
+        if overrides.get("github_release_repo")
+        else None,
+        extra_handlers=[str(name) for name in extra_handlers],
+    )
 
     return handlers, None
