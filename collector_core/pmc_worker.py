@@ -47,6 +47,7 @@ from collector_core.utils import (
     ensure_dir,
     sha256_file,
     utc_now,
+    validate_tar_archive,
     write_json,
 )
 from collector_core.utils import (
@@ -220,13 +221,14 @@ def extract_nxml(pkg_bytes: bytes) -> tuple[bytes | None, list[str]]:
     members = []
     try:
         with tarfile.open(fileobj=bio, mode="r:gz") as tf:
+            validate_tar_archive(tf)
             for m in tf.getmembers():
                 members.append(m.name)
                 if m.name.endswith(".nxml"):
                     f = tf.extractfile(m)
                     if f:
                         return f.read(), members
-    except tarfile.ReadError:
+    except (tarfile.ReadError, ValueError):
         return None, members
     return None, members
 
@@ -236,6 +238,7 @@ def extract_nxml_v2(pkg_bytes: bytes) -> tuple[bytes | None, list[str]]:
     members = []
     try:
         with tarfile.open(fileobj=bio, mode="r:gz") as tf:
+            validate_tar_archive(tf)
             for m in tf.getmembers():
                 members.append(m.name)
                 if m.name.endswith(".nxml"):

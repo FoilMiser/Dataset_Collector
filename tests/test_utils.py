@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import io
+import tarfile
+import zipfile
 from pathlib import Path
 
 from collector_core.utils import (
@@ -18,6 +21,8 @@ from collector_core.utils import (
     sha256_file,
     sha256_text,
     utc_now,
+    validate_tar_archive,
+    validate_zip_archive,
     write_json,
     write_jsonl,
 )
@@ -187,3 +192,101 @@ class TestCoerceInt:
 
     def test_invalid_no_default(self):
         assert coerce_int("invalid") is None
+
+
+class TestArchiveValidation:
+    def test_zip_rejects_traversal(self, tmp_path: Path):
+        archive = tmp_path / "bad.zip"
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr("../evil.txt", "nope")
+        with zipfile.ZipFile(archive) as zf:
+            try:
+                validate_zip_archive(zf, max_files=10, max_total_size=1024)
+            except ValueError as exc:
+                assert "unsafe path" in str(exc)
+            else:
+                raise AssertionError("Expected unsafe path rejection")
+
+    def test_zip_rejects_absolute(self, tmp_path: Path):
+        archive = tmp_path / "abs.zip"
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr("/abs.txt", "nope")
+        with zipfile.ZipFile(archive) as zf:
+            try:
+                validate_zip_archive(zf, max_files=10, max_total_size=1024)
+            except ValueError as exc:
+                assert "unsafe path" in str(exc)
+            else:
+                raise AssertionError("Expected unsafe path rejection")
+
+    def test_zip_rejects_symlink(self, tmp_path: Path):
+        archive = tmp_path / "symlink.zip"
+        info = zipfile.ZipInfo("link")
+        info.create_system = 3
+        info.external_attr = 0o120777 << 16
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr(info, "target")
+        with zipfile.ZipFile(archive) as zf:
+            try:
+                validate_zip_archive(zf, max_files=10, max_total_size=1024)
+            except ValueError as exc:
+                assert "symlink" in str(exc)
+            else:
+                raise AssertionError("Expected symlink rejection")
+
+    def test_zip_rejects_file_count(self, tmp_path: Path):
+        archive = tmp_path / "count.zip"
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr("a.txt", "a")
+            zf.writestr("b.txt", "b")
+            zf.writestr("c.txt", "c")
+        with zipfile.ZipFile(archive) as zf:
+            try:
+                validate_zip_archive(zf, max_files=2, max_total_size=1024)
+            except ValueError as exc:
+                assert "file count" in str(exc)
+            else:
+                raise AssertionError("Expected file count rejection")
+
+    def test_zip_rejects_total_size(self, tmp_path: Path):
+        archive = tmp_path / "size.zip"
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr("a.txt", "a" * 10)
+            zf.writestr("b.txt", "b" * 10)
+        with zipfile.ZipFile(archive) as zf:
+            try:
+                validate_zip_archive(zf, max_files=10, max_total_size=15)
+            except ValueError as exc:
+                assert "total size" in str(exc)
+            else:
+                raise AssertionError("Expected size rejection")
+
+    def test_tar_rejects_traversal(self, tmp_path: Path):
+        archive = tmp_path / "bad.tar"
+        with tarfile.open(archive, "w") as tf:
+            info = tarfile.TarInfo(name="../evil.txt")
+            data = io.BytesIO(b"nope")
+            info.size = len(data.getvalue())
+            tf.addfile(info, data)
+        with tarfile.open(archive, "r") as tf:
+            try:
+                validate_tar_archive(tf, max_files=10, max_total_size=1024)
+            except ValueError as exc:
+                assert "unsafe path" in str(exc)
+            else:
+                raise AssertionError("Expected unsafe path rejection")
+
+    def test_tar_rejects_symlink(self, tmp_path: Path):
+        archive = tmp_path / "symlink.tar"
+        with tarfile.open(archive, "w") as tf:
+            info = tarfile.TarInfo(name="link")
+            info.type = tarfile.SYMTYPE
+            info.linkname = "target"
+            tf.addfile(info)
+        with tarfile.open(archive, "r") as tf:
+            try:
+                validate_tar_archive(tf, max_files=10, max_total_size=1024)
+            except ValueError as exc:
+                assert "symlink" in str(exc)
+            else:
+                raise AssertionError("Expected symlink rejection")

@@ -12,10 +12,12 @@ import hashlib
 import json
 import logging
 import re
+import tarfile
 import time
 import unicodedata
+import zipfile
 from collections.abc import Iterable, Iterator
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -195,6 +197,77 @@ def safe_filename(
             s = s[:max_length]
 
     return s or "file"
+
+
+DEFAULT_MAX_ARCHIVE_FILES = 10000
+DEFAULT_MAX_ARCHIVE_BYTES = 512 * 1024 * 1024
+
+
+def _normalize_archive_name(name: str) -> str:
+    return (name or "").replace("\\", "/")
+
+
+def _is_unsafe_archive_path(name: str) -> bool:
+    normalized = _normalize_archive_name(name)
+    if not normalized:
+        return False
+    if re.match(r"^[A-Za-z]:", normalized):
+        return True
+    path = PurePosixPath(normalized)
+    return path.is_absolute() or ".." in path.parts
+
+
+def _zipinfo_is_symlink(info: zipfile.ZipInfo) -> bool:
+    mode = info.external_attr >> 16
+    return (mode & 0o170000) == 0o120000
+
+
+def validate_zip_archive(
+    zf: zipfile.ZipFile,
+    *,
+    max_files: int = DEFAULT_MAX_ARCHIVE_FILES,
+    max_total_size: int = DEFAULT_MAX_ARCHIVE_BYTES,
+) -> None:
+    total_size = 0
+    file_count = 0
+    for info in zf.infolist():
+        name = info.filename
+        if _is_unsafe_archive_path(name):
+            raise ValueError(f"unsafe path in archive: {name}")
+        if _zipinfo_is_symlink(info):
+            raise ValueError(f"symlink entry in archive: {name}")
+        if info.is_dir():
+            continue
+        file_count += 1
+        if file_count > max_files:
+            raise ValueError("archive file count exceeds limit")
+        total_size += info.file_size
+        if total_size > max_total_size:
+            raise ValueError("archive total size exceeds limit")
+
+
+def validate_tar_archive(
+    tf: tarfile.TarFile,
+    *,
+    max_files: int = DEFAULT_MAX_ARCHIVE_FILES,
+    max_total_size: int = DEFAULT_MAX_ARCHIVE_BYTES,
+) -> None:
+    total_size = 0
+    file_count = 0
+    for member in tf.getmembers():
+        name = member.name
+        if _is_unsafe_archive_path(name):
+            raise ValueError(f"unsafe path in archive: {name}")
+        if member.issym() or member.islnk():
+            raise ValueError(f"symlink entry in archive: {name}")
+        if not member.isfile():
+            continue
+        file_count += 1
+        if file_count > max_files:
+            raise ValueError("archive file count exceeds limit")
+        total_size += member.size
+        if total_size > max_total_size:
+            raise ValueError("archive total size exceeds limit")
 
 
 def contains_any(haystack: str, needles: list[str]) -> list[str]:
