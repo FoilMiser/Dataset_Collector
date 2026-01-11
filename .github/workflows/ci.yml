@@ -42,7 +42,7 @@ jobs:
           python -m pip install -r requirements.constraints.txt
       - name: Install tooling
         run: |
-          python -m pip install pytest pytest-cov pytest_httpserver ruff yamllint
+          python -m pip install pytest pytest-cov pytest_httpserver ruff yamllint mypy
       - name: Check constraints up to date
         run: |
           python -m tools.check_constraints
@@ -52,6 +52,9 @@ jobs:
       - name: Ruff format
         run: |
           ruff format --check .
+      - name: Mypy
+        run: |
+          mypy src/collector_core
       - name: Yamllint
         run: |
           yamllint .
