@@ -33,6 +33,7 @@ from collector_core.dependencies import _try_import
 from collector_core.exceptions import ConfigValidationError
 from collector_core.logging_config import add_logging_args, configure_logging
 from collector_core.network_utils import _with_retries
+from collector_core.policy_snapshot import build_policy_snapshot
 from collector_core.secrets import REDACTED, SecretStr, redact_headers
 from collector_core.utils import (
     coerce_int,
@@ -227,6 +228,7 @@ class DriverConfig:
     targets_cfg: dict[str, Any]
     license_map_path: list[Path]
     license_map: LicenseMap
+    denylist_path: list[Path]
     denylist: dict[str, Any]
     manifests_root: Path
     queues_root: Path
@@ -420,6 +422,7 @@ def load_driver_config(args: argparse.Namespace) -> DriverConfig:
         targets_cfg=targets_cfg,
         license_map_path=license_map_paths,
         license_map=license_map,
+        denylist_path=denylist_paths,
         denylist=denylist,
         manifests_root=manifests_root,
         queues_root=queues_root,
@@ -1498,6 +1501,18 @@ class BasePipelineDriver:
 
     def run(self, args: argparse.Namespace) -> None:
         cfg = load_driver_config(args)
+        policy_snapshot = build_policy_snapshot(
+            run_id=cfg.checks_run_id,
+            targets_path=cfg.targets_path,
+            targets_cfg=cfg.targets_cfg,
+            license_map_paths=cfg.license_map_path,
+            denylist_paths=cfg.denylist_path,
+            default_content_checks=cfg.default_content_checks,
+            targets=cfg.targets,
+        )
+        run_ledger_root = cfg.ledger_root / cfg.checks_run_id
+        ensure_dir(run_ledger_root)
+        write_json(run_ledger_root / "policy_snapshot.json", policy_snapshot)
         results = self.classify_targets(cfg)
         self.emit_queues(cfg.queues_root, results)
         self.emit_summary(cfg, results)

@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from collector_core.__version__ import __version__ as CORE_VERSION
 from collector_core.secrets import REDACTED
 
 
@@ -17,6 +18,7 @@ from collector_core.secrets import REDACTED
 class PipelineTestConfig:
     manifests_root: Path
     queues_root: Path
+    ledger_root: Path
     license_map_path: Path
     denylist_path: Path
 
@@ -30,6 +32,7 @@ class PipelineTestConfig:
         globals_cfg = {
             "manifests_root": str(self.manifests_root),
             "queues_root": str(self.queues_root),
+            "ledger_root": str(self.ledger_root),
             "default_license_gates": [],
             "default_content_checks": [],
         }
@@ -95,6 +98,7 @@ def minimal_config(tmp_path: Path, minimal_license_map: Path) -> PipelineTestCon
     return PipelineTestConfig(
         manifests_root=tmp_path / "_manifests",
         queues_root=tmp_path / "_queues",
+        ledger_root=tmp_path / "_ledger",
         license_map_path=minimal_license_map,
         denylist_path=denylist_path,
     )
@@ -163,6 +167,21 @@ def test_green_yellow_red_classification(
     assert {row["id"] for row in green_rows} == {"green_target"}
     assert {row["id"] for row in yellow_rows} == {"yellow_target"}
     assert {row["id"] for row in red_rows} == {"red_target"}
+
+    run_dirs = [path for path in minimal_config.ledger_root.iterdir() if path.is_dir()]
+    assert len(run_dirs) == 1
+    snapshot_path = run_dirs[0] / "policy_snapshot.json"
+    assert snapshot_path.exists()
+    snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    assert snapshot["git_sha"]
+    assert snapshot["git_sha"] != "unknown"
+    assert snapshot["core_version"] == CORE_VERSION
+    assert snapshot["license_map_hash"]
+    assert snapshot["denylist_hash"]
+    assert snapshot["schema_versions"]["targets"] == "0.9"
+    assert "0.9" in snapshot["schema_versions"]["license_map"]
+    assert "0.9" in snapshot["schema_versions"]["denylist"]
+    assert snapshot["enabled_checks"] == []
 
 
 def test_offline_snapshot_terms_forces_yellow(
