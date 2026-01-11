@@ -60,6 +60,8 @@ def create_sample_yellow_queue(path: Path) -> None:
             "denylist_hits": [],
             "priority": 1,
             "manifest_dir": "/data/test/_manifests/test-001",
+            "bucket_reason": "review_required",
+            "signals": {"review": {"required": True}},
         },
         {
             "id": "test-002",
@@ -73,6 +75,8 @@ def create_sample_yellow_queue(path: Path) -> None:
             "denylist_hits": [],
             "priority": 2,
             "manifest_dir": "/data/test/_manifests/test-002",
+            "bucket_reason": "spdx_allow",
+            "signals": {"spdx": {"bucket": "GREEN"}},
         },
     ]
     create_sample_jsonl(path, records)

@@ -33,6 +33,8 @@ def sample_queue_data() -> list[dict[str, Any]]:
             "denylist_hits": [],
             "priority": 1,
             "manifest_dir": "/data/test/_manifests/test-001",
+            "bucket_reason": "review_required",
+            "signals": {"review": {"required": True}},
         },
         {
             "id": "test-002",
@@ -46,6 +48,8 @@ def sample_queue_data() -> list[dict[str, Any]]:
             "denylist_hits": [],
             "priority": 2,
             "manifest_dir": "/data/test/_manifests/test-002",
+            "bucket_reason": "spdx_allow",
+            "signals": {"spdx": {"bucket": "GREEN"}},
         },
         {
             "id": "test-003",
@@ -59,6 +63,8 @@ def sample_queue_data() -> list[dict[str, Any]]:
             "denylist_hits": [],
             "priority": 3,
             "manifest_dir": "/data/test/_manifests/test-003",
+            "bucket_reason": "restriction_hits",
+            "signals": {"restriction_hits": ["copyleft"]},
         },
     ]
 
