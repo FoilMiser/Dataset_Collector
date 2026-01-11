@@ -62,12 +62,12 @@ If `globals.queues_root` is not set, each pipeline falls back to a default `/dat
 Use the unified CLI to list and sign off on YELLOW targets:
 
 ```
-dc-pipeline review-queue --pipeline-id <pipeline> [args]
+dc review-queue --pipeline <pipeline> [args]
 ```
 
 Examples:
-- `dc-pipeline review-queue --pipeline-id biology_pipeline_v2 list --limit 50`
-- `dc-pipeline review-queue --pipeline-id chem_pipeline_v2 approve --target <target_id> ...`
+- `dc review-queue --pipeline biology_pipeline_v2 list --limit 50`
+- `dc review-queue --pipeline chem_pipeline_v2 approve --target <target_id> ...`
 
 If you run from inside a pipeline directory, you can omit `--pipeline-id` and the CLI will infer it.
 
@@ -102,7 +102,7 @@ The workflow is consistent across all pipelines:
 5. **Merge (`dc run --stage merge`)**
    - Combines GREEN records with `screened_yellow` shards only.
    - Pitched YELLOW records never enter combined output.
-6. **Catalog (`catalog-builder`)**
+6. **Catalog (`dc catalog-builder`)**
    - Summarizes raw, screened YELLOW, combined shards, and ledgers.
 
 ## Decision flow into `screen_yellow` / `merge` / `catalog`
@@ -115,22 +115,22 @@ The workflow is consistent across all pipelines:
 
 ```bash
 # List pending YELLOW targets
-dc-pipeline review-queue --pipeline-id <pipeline> --queue <queues_root>/yellow_pipeline.jsonl list --limit 50
+dc review-queue --pipeline <pipeline> --queue <queues_root>/yellow_pipeline.jsonl list --limit 50
 
 # Approve (ALLOW)
-dc-pipeline review-queue --pipeline-id <pipeline> --queue <queues_root>/yellow_pipeline.jsonl \
+dc review-queue --pipeline <pipeline> --queue <queues_root>/yellow_pipeline.jsonl \
   approve --target <target_id> --manifest-dir <manifests_root>/<target_id> \
   --reviewer "Name" --reason "Evidence supports inclusion"
 
 # Approve with restrictions (ALLOW_WITH_RESTRICTIONS)
-dc-pipeline review-queue --pipeline-id <pipeline> --queue <queues_root>/yellow_pipeline.jsonl \
+dc review-queue --pipeline <pipeline> --queue <queues_root>/yellow_pipeline.jsonl \
   approve --target <target_id> --manifest-dir <manifests_root>/<target_id> \
   --reviewer "Name" --reason "Allowed with attribution" \
   --constraints "Must include attribution text from source" \
   --evidence-links "https://example.com/license,https://example.com/terms"
 
 # Reject (PITCH)
-dc-pipeline review-queue --pipeline-id <pipeline> --queue <queues_root>/yellow_pipeline.jsonl \
+dc review-queue --pipeline <pipeline> --queue <queues_root>/yellow_pipeline.jsonl \
   reject --target <target_id> --manifest-dir <manifests_root>/<target_id> \
   --reviewer "Name" --reason "License is incompatible"
 ```

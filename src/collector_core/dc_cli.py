@@ -10,16 +10,19 @@ from pathlib import Path
 
 # Import registry to ensure specs are registered
 import collector_core.pipeline_specs_registry  # noqa: F401
-from collector_core import merge
+from collector_core import catalog_builder, merge, review_queue
 from collector_core.acquire_strategies import RootsDefaults, run_acquire_worker
 from collector_core.pipeline_factory import run_pipeline
 from collector_core.pipeline_registry import resolve_acquire_hooks, resolve_pipeline_context
 from collector_core.pipeline_spec import list_pipelines
+from collector_core.targets_paths import list_targets_files
 from collector_core.yellow_screen_dispatch import get_yellow_screen_main
 
 STAGE_ACQUIRE = "acquire"
 STAGE_MERGE = "merge"
 STAGE_YELLOW = "yellow_screen"
+COMMAND_REVIEW_QUEUE = "review-queue"
+COMMAND_CATALOG_BUILDER = "catalog-builder"
 
 
 def _has_arg(args: list[str], name: str) -> bool:
@@ -76,6 +79,34 @@ def _parse_args() -> argparse.Namespace:
     pipeline_parser.add_argument("domain", help="Pipeline domain (e.g., chem, physics).")
     pipeline_parser.add_argument("args", nargs=argparse.REMAINDER)
 
+    review_parser = sub.add_parser(COMMAND_REVIEW_QUEUE, help="Run the YELLOW review queue helper.")
+    review_parser.add_argument(
+        "--pipeline",
+        "--pipeline-id",
+        dest="pipeline",
+        help="Pipeline id or slug (e.g. physics_pipeline_v2 or physics).",
+    )
+    review_parser.add_argument(
+        "--repo-root",
+        default=".",
+        help="Repository root containing pipeline directories (default: .).",
+    )
+    review_parser.add_argument("args", nargs=argparse.REMAINDER)
+
+    catalog_parser = sub.add_parser(COMMAND_CATALOG_BUILDER, help="Run the catalog builder.")
+    catalog_parser.add_argument(
+        "--pipeline",
+        "--pipeline-id",
+        dest="pipeline",
+        help="Pipeline id or slug (e.g. physics_pipeline_v2 or physics).",
+    )
+    catalog_parser.add_argument(
+        "--repo-root",
+        default=".",
+        help="Repository root containing pipeline directories (default: .).",
+    )
+    catalog_parser.add_argument("args", nargs=argparse.REMAINDER)
+
     return parser.parse_args()
 
 
@@ -101,6 +132,35 @@ def _resolve_acquire_label(targets_path: Path | None) -> str:
     if targets_path:
         return targets_path.name
     return "targets.yaml"
+
+
+def _resolve_default_targets(
+    args: list[str],
+    *,
+    ctx,
+) -> list[str]:
+    return _resolve_targets_arg(args, ctx.targets_path, "--targets")
+
+
+def _run_review_queue(passthrough: list[str], *, ctx) -> int:
+    passthrough = _resolve_default_targets(passthrough, ctx=ctx)
+    return _run_with_args(lambda: review_queue.main(pipeline_id=ctx.pipeline_id), passthrough)
+
+
+def _run_catalog_builder(passthrough: list[str], *, ctx, repo_root: Path) -> int:
+    if not _has_arg(passthrough, "--targets"):
+        if ctx.targets_path:
+            passthrough = ["--targets", str(ctx.targets_path), *passthrough]
+        else:
+            available = [path.name for path in list_targets_files(repo_root)]
+            if available:
+                options = ", ".join(available)
+                raise SystemExit(
+                    "Multiple targets YAML files found. "
+                    f"Pass --targets. Options: {options}"
+                )
+            raise SystemExit("Missing --targets and no default targets YAML could be found.")
+    return _run_with_args(lambda: catalog_builder.main(pipeline_id=ctx.pipeline_id), passthrough)
 
 
 def _run_acquire(slug: str, targets_path: Path | None, args: list[str], ctx) -> int:
@@ -185,23 +245,35 @@ def main() -> int:
             passthrough = passthrough[1:]
         return _run_with_args(lambda: run_pipeline(args.domain), passthrough)
 
-    # Handle run command (individual stages)
-    passthrough = list(args.args)
-    if passthrough[:1] == ["--"]:
-        passthrough = passthrough[1:]
-    passthrough = _resolve_dataset_root_arg(passthrough, args.dataset_root)
-    passthrough = _resolve_allow_data_root_arg(passthrough, args.allow_data_root)
-
-    repo_root = Path(args.repo_root).expanduser().resolve()
-    ctx = resolve_pipeline_context(pipeline_id=args.pipeline, repo_root=repo_root)
-
     if args.command == "run":
+        passthrough = list(args.args)
+        if passthrough[:1] == ["--"]:
+            passthrough = passthrough[1:]
+        passthrough = _resolve_dataset_root_arg(passthrough, args.dataset_root)
+        passthrough = _resolve_allow_data_root_arg(passthrough, args.allow_data_root)
+
+        repo_root = Path(args.repo_root).expanduser().resolve()
+        ctx = resolve_pipeline_context(pipeline_id=args.pipeline, repo_root=repo_root)
         if args.stage == STAGE_ACQUIRE:
             return _run_acquire(ctx.slug, ctx.targets_path, passthrough, ctx)
         if args.stage == STAGE_MERGE:
             return _run_merge(ctx.pipeline_id, ctx.slug, ctx.targets_path, passthrough)
         if args.stage == STAGE_YELLOW:
             return _run_yellow_screen(ctx.slug, ctx.targets_path, passthrough, ctx)
+        return 0
+
+    passthrough = list(args.args)
+    if passthrough[:1] == ["--"]:
+        passthrough = passthrough[1:]
+
+    repo_root = Path(args.repo_root).expanduser().resolve()
+    ctx = resolve_pipeline_context(pipeline_id=args.pipeline, repo_root=repo_root)
+
+    if args.command == COMMAND_REVIEW_QUEUE:
+        return _run_review_queue(passthrough, ctx=ctx)
+
+    if args.command == COMMAND_CATALOG_BUILDER:
+        return _run_catalog_builder(passthrough, ctx=ctx, repo_root=repo_root)
 
     return 0
 

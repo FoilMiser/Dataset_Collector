@@ -98,7 +98,7 @@ run_classify() {
 run_review() {
   local queue_file="$QUEUES_ROOT/yellow_pipeline.jsonl"
   echo -e "${BLUE}== Stage: review ==${NC}"
-  python -m collector_core.generic_workers --domain kg_nav review-queue -- --queue "$queue_file" --targets "$TARGETS" --limit 50 || true
+  python -m collector_core.dc_cli review-queue --pipeline kg_nav -- --queue "$queue_file" --targets "$TARGETS" --limit 50 || true
 }
 
 run_acquire() {
@@ -142,7 +142,7 @@ run_merge() {
 
 run_catalog() {
   echo -e "${BLUE}== Stage: catalog ==${NC}"
-  python -m collector_core.generic_workers --domain kg_nav catalog -- --targets "$TARGETS" --output "${CATALOGS_ROOT}/catalog.json"
+  python -m collector_core.dc_cli catalog-builder --pipeline kg_nav -- --targets "$TARGETS" --output "${CATALOGS_ROOT}/catalog.json"
 }
 
 case "$STAGE" in

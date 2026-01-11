@@ -272,7 +272,7 @@ run_classify() {{
 run_review() {{
   local queue_file="$QUEUES_ROOT/yellow_pipeline.jsonl"
   echo -e "${{BLUE}}== Stage: review ==${{NC}}"
-  python -m collector_core.generic_workers --domain {domain} review-queue -- --queue "$queue_file" --targets "$TARGETS" --limit 50 || true
+  python -m collector_core.dc_cli review-queue --pipeline {domain} -- --queue "$queue_file" --targets "$TARGETS" --limit 50 || true
 }}
 
 run_acquire() {{
@@ -316,7 +316,7 @@ run_merge() {{
 
 run_catalog() {{
   echo -e "${{BLUE}}== Stage: catalog ==${{NC}}"
-  python -m collector_core.generic_workers --domain {domain} catalog -- --targets "$TARGETS" --output "${{CATALOGS_ROOT}}/catalog.json"
+  python -m collector_core.dc_cli catalog-builder --pipeline {domain} -- --targets "$TARGETS" --output "${{CATALOGS_ROOT}}/catalog.json"
 }}
 
 case "$STAGE" in

@@ -175,8 +175,8 @@ def main() -> int:
 
 def run_deprecated_entrypoint(command: str, *, pipeline_id: str | None) -> int:
     message = (
-        f"Deprecated entrypoint: {command}. Use `dc-pipeline {command} --pipeline-id {pipeline_id}` "
-        "or `python -m collector_core.pipeline_cli`."
+        f"Deprecated entrypoint: {command}. Use `dc {command} --pipeline {pipeline_id}` "
+        "or `python -m collector_core.dc_cli`."
     )
     print(message, file=sys.stderr)
     passthrough = sys.argv[1:]
