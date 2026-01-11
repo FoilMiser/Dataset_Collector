@@ -9,53 +9,18 @@ from collections.abc import Callable
 from pathlib import Path
 
 from collector_core import catalog_builder, review_queue
-from collector_core.targets_paths import list_targets_files, resolve_targets_path
+from collector_core.pipeline_discovery import (
+    available_pipelines,
+    discover_pipeline_dir,
+    normalize_pipeline_id,
+    pick_default_targets,
+    pipeline_slug,
+    resolve_repo_root,
+)
+from collector_core.targets_paths import list_targets_files
 
 COMMAND_REVIEW_QUEUE = "review-queue"
 COMMAND_CATALOG_BUILDER = "catalog-builder"
-
-
-def _normalize_pipeline_id(pipeline_id: str | None) -> str | None:
-    if not pipeline_id:
-        return None
-    if pipeline_id.endswith("_pipeline_v2"):
-        return pipeline_id
-    return f"{pipeline_id}_pipeline_v2"
-
-
-def _resolve_repo_root(path: Path) -> Path:
-    if path.name.endswith("_pipeline_v2") and (path / "pipeline_driver.py").exists():
-        return path.parent
-    return path
-
-
-def _discover_pipeline_dir(repo_root: Path, pipeline_id: str | None) -> Path | None:
-    if pipeline_id:
-        normalized = _normalize_pipeline_id(pipeline_id)
-        if normalized:
-            candidate = repo_root / normalized
-            if candidate.is_dir():
-                return candidate
-            slug = normalized.removesuffix("_pipeline_v2")
-            for path in sorted(repo_root.glob("*_pipeline_v2")):
-                if path.name == f"{slug}_pipeline_v2":
-                    return path
-        return None
-    cwd = Path.cwd().resolve()
-    for path in (cwd, *cwd.parents):
-        if path.name.endswith("_pipeline_v2"):
-            return path
-    return None
-
-
-def _available_pipelines(repo_root: Path) -> list[str]:
-    return sorted(path.name for path in repo_root.glob("*_pipeline_v2") if path.is_dir())
-
-
-def _pick_default_targets(repo_root: Path, slug: str | None) -> Path | None:
-    if not slug:
-        return None
-    return resolve_targets_path(repo_root, slug)
 
 
 def _has_targets_arg(args: list[str]) -> bool:
@@ -93,26 +58,16 @@ def _resolve_pipeline_context(
     pipeline_id: str | None,
     repo_root: Path,
 ) -> tuple[str | None, Path | None]:
-    pipeline_dir = _discover_pipeline_dir(repo_root, pipeline_id)
+    pipeline_dir = discover_pipeline_dir(repo_root, pipeline_id)
     if pipeline_id:
-        normalized = _normalize_pipeline_id(pipeline_id)
+        normalized = normalize_pipeline_id(pipeline_id)
         if not pipeline_dir:
-            available = ", ".join(_available_pipelines(repo_root)) or "none"
+            available = ", ".join(available_pipelines(repo_root)) or "none"
             raise SystemExit(f"Unknown pipeline '{pipeline_id}'. Available: {available}")
         return normalized, pipeline_dir
     if pipeline_dir:
         return pipeline_dir.name, pipeline_dir
     return None, None
-
-
-def _pipeline_slug(pipeline_id: str | None, pipeline_dir: Path | None) -> str | None:
-    if pipeline_id:
-        normalized = _normalize_pipeline_id(pipeline_id)
-        return normalized.removesuffix("_pipeline_v2") if normalized else None
-    if pipeline_dir:
-        return pipeline_dir.name.removesuffix("_pipeline_v2")
-    return None
-
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -137,7 +92,7 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = _parse_args()
-    repo_root = _resolve_repo_root(Path(args.repo_root).expanduser().resolve())
+    repo_root = resolve_repo_root(Path(args.repo_root).expanduser().resolve())
     pipeline_id, pipeline_dir = _resolve_pipeline_context(
         pipeline_id=args.pipeline_id,
         repo_root=repo_root,
@@ -146,8 +101,8 @@ def main() -> int:
     passthrough = list(args.args)
     if passthrough[:1] == ["--"]:
         passthrough = passthrough[1:]
-    slug = _pipeline_slug(pipeline_id, pipeline_dir)
-    default_targets = _pick_default_targets(repo_root, slug)
+    slug = pipeline_slug(pipeline_id, pipeline_dir)
+    default_targets = pick_default_targets(repo_root, slug)
 
     if args.command == COMMAND_CATALOG_BUILDER:
         if not _has_targets_arg(passthrough):
