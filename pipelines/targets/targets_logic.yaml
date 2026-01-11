@@ -86,42 +86,18 @@ gates_catalog:
   near_duplicate_detection: "Run MinHash/LSH deduplication pass."
   split_aware_partition: "Partition data respecting split_group_id for leak prevention."
 
+resolver_defs: !include ../../configs/common/resolvers.yaml
+
 resolvers:
-  github:
-    mode: "release"
-    api_base: "https://api.github.com"
-    rate_limit:
-      requests_per_hour: 60
-      retry_on_403: true
-      exponential_backoff: true
-    endpoints:
-      releases: "/repos/{owner}/{repo}/releases"
-      latest: "/repos/{owner}/{repo}/releases/latest"
-      assets: "/repos/{owner}/{repo}/releases/{release_id}/assets"
-    note: "Use GITHUB_TOKEN env var for higher rate limits."
-  huggingface_datasets:
-    mode: "dataset_id"
-    note: "Use datasets.load_dataset; capture dataset card + license field."
-  git:
-    mode: "repo"
-    note: "Capture commit hash; store LICENSE + README as evidence."
-  http:
-    mode: "direct_url"
-    note: "Direct file download with resume."
+  github: *github_release
+  huggingface_datasets: *huggingface_datasets
+  git: *git_resolver
+  http: *http_resolver
   ftp:
-    mode: "base_url + globs"
+    <<: *ftp_resolver
     note: "List + filter by glob; store directory listing snapshot (planned)."
-  zenodo:
-    mode: "record_id_or_doi"
-    api: "https://zenodo.org/api/records/{record_id}"
-    outputs:
-      - "files[*].links.self"
-      - "files[*].checksum"
-    verify_checksum: true
-    checksum_algorithm: "md5"
-  dataverse:
-    mode: "persistent_id"
-    default_instance: "https://dataverse.harvard.edu"
+  zenodo: *zenodo_record
+  dataverse: *dataverse_base
 
 targets:
   - id: "synthetic_logic_problems"

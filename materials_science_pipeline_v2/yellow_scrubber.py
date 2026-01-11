@@ -19,6 +19,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from collector_core.__version__ import __version__ as VERSION
 from collector_core.yellow_scrubber_base import (
     SCHEMA_VERSION,
     TOOL_VERSION,

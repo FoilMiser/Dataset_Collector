@@ -91,62 +91,23 @@ gates_catalog:
   emit_parquet: "Output schema-validated records as Parquet files."
   split_aware_partition: "Partition data respecting split_group_id for leak prevention."
 
+resolver_defs: !include ../../configs/common/resolvers.yaml
+
 resolvers:
-  zenodo:
-    mode: "record_id_or_doi"
-    api: "https://zenodo.org/api/records/{record_id}"
-    outputs:
-      - "files[*].links.self"
-      - "files[*].checksum"
-    # v0.6: checksum verification
-    verify_checksum: true
-    checksum_algorithm: "md5"
-  figshare:
-    mode: "article_url"
-    note: "Prefer Figshare API if available; otherwise manual download from article page."
-    api_base: "https://api.figshare.com/v2"
-    # v0.9: Enhanced Figshare resolver
-    api_version: "2"
-    rate_limit:
-      requests_per_minute: 60
-      retry_on_429: true
-    endpoints:
-      article: "/articles/{article_id}"
-      files: "/articles/{article_id}/files"
-      download: "/articles/{article_id}/files/{file_id}"
-  github:
-    # v0.9: NEW GitHub release resolver
-    mode: "release"
-    api_base: "https://api.github.com"
-    rate_limit:
-      requests_per_hour: 60  # Unauthenticated limit
-      retry_on_403: true
-      exponential_backoff: true
-    endpoints:
-      releases: "/repos/{owner}/{repo}/releases"
-      latest: "/repos/{owner}/{repo}/releases/latest"
-      assets: "/repos/{owner}/{repo}/releases/{release_id}/assets"
-    note: "Use GITHUB_TOKEN environment variable for higher rate limits."
+  zenodo: *zenodo_record
+  figshare: *figshare_article
+  github: *github_release
   dataverse:
-    mode: "persistent_id"
+    <<: *dataverse_base
     note: "Use Dataverse API by persistentId; capture license from metadata."
-    default_instance: "https://dataverse.harvard.edu"
     configurable_instances:
       - "https://dataverse.harvard.edu"
       - "https://dataverse.lib.virginia.edu"
       - "https://dataverse.tdl.org"
-  huggingface_datasets:
-    mode: "dataset_id"
-    note: "Use datasets.load_dataset; capture dataset card + license field."
-  git:
-    mode: "repo"
-    note: "Capture commit hash; store LICENSE + README as evidence."
-  ftp:
-    mode: "base_url + globs"
-    note: "Use list + filter by glob; store directory listing snapshot."
-  api:
-    mode: "base_url"
-    note: "Cache responses; store query params & rate limit behavior."
+  huggingface_datasets: *huggingface_datasets
+  git: *git_resolver
+  ftp: *ftp_resolver
+  api: *api_resolver
 
 targets:
 

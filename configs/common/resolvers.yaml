@@ -1,0 +1,61 @@
+# Shared resolver definitions for targets_*.yaml files.
+# Anchors are defined here and referenced via aliases in domain targets.
+
+github: &github_release
+  mode: "release"
+  api_base: "https://api.github.com"
+  rate_limit: &github_rate_limit
+    requests_per_hour: 60
+    retry_on_403: true
+    exponential_backoff: true
+  endpoints:
+    releases: "/repos/{owner}/{repo}/releases"
+    latest: "/repos/{owner}/{repo}/releases/latest"
+    assets: "/repos/{owner}/{repo}/releases/{release_id}/assets"
+  note: "Use GITHUB_TOKEN environment variable for higher rate limits."
+
+figshare: &figshare_article
+  mode: "article_url"
+  note: "Prefer Figshare API if available; otherwise manual download from article page."
+  api_base: "https://api.figshare.com/v2"
+  api_version: "2"
+  rate_limit: &figshare_rate_limit
+    requests_per_minute: 60
+    retry_on_429: true
+  endpoints:
+    article: "/articles/{article_id}"
+    files: "/articles/{article_id}/files"
+    download: "/articles/{article_id}/files/{file_id}"
+
+zenodo: &zenodo_record
+  mode: "record_id_or_doi"
+  api: "https://zenodo.org/api/records/{record_id}"
+  outputs:
+    - "files[*].links.self"
+    - "files[*].checksum"
+  verify_checksum: true
+  checksum_algorithm: "md5"
+
+dataverse: &dataverse_base
+  mode: "persistent_id"
+  default_instance: "https://dataverse.harvard.edu"
+
+huggingface_datasets: &huggingface_datasets
+  mode: "dataset_id"
+  note: "Use datasets.load_dataset; capture dataset card + license field."
+
+git: &git_resolver
+  mode: "repo"
+  note: "Capture commit hash; store LICENSE + README as evidence."
+
+http: &http_resolver
+  mode: "direct_url"
+  note: "Direct file download with resume."
+
+ftp: &ftp_resolver
+  mode: "base_url + globs"
+  note: "List + filter by glob; store directory listing snapshot."
+
+api: &api_resolver
+  mode: "base_url"
+  note: "Cache responses; store query params & rate limit behavior."

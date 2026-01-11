@@ -68,21 +68,12 @@ gates_catalog:
   record_level_filter: "Require per-record license metadata; keep only allowlist."
   near_duplicate_detection: "Run MinHash/LSH deduplication pass."
 
+resolver_defs: !include ../../configs/common/resolvers.yaml
+
 resolvers:
-  http:
-    mode: direct_url
-    note: Direct file download with resume.
-  ftp:
-    mode: base_url + globs
-    note: List + filter by glob; store directory listing snapshot.
-  zenodo:
-    mode: record_id_or_doi
-    api: https://zenodo.org/api/records/{record_id}
-    outputs:
-      - files[*].links.self
-      - files[*].checksum
-    verify_checksum: true
-    checksum_algorithm: md5
+  http: *http_resolver
+  ftp: *ftp_resolver
+  zenodo: *zenodo_record
   figshare:
     mode: article_id
     api: https://api.figshare.com/v2/articles/{article_id}/files

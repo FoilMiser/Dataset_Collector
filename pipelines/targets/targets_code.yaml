@@ -109,13 +109,18 @@ globals:
     sample_size_for_distributions: 20000
 
 # Resolvers: informational metadata for humans; the driver currently relies on download.strategy.
+resolver_defs: !include ../../configs/common/resolvers.yaml
+
 resolvers:
   http:
+    <<: *http_resolver
     description: "Direct HTTP(S) downloads"
   git:
+    <<: *git_resolver
     description: "Clone a git repo (for small-ish sources like PEPs/specs)"
     shallow_default: true
   huggingface_datasets:
+    <<: *huggingface_datasets
     description: "Download via Hugging Face datasets (note: large sources may require streaming/sharding work)"
 
 targets:

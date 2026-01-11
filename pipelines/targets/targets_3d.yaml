@@ -85,43 +85,16 @@ gates_catalog:
   gcode_generate: "Optionally slice safe meshes into gcode with a fixed open profile; store settings."
   collect_statistics: "Emit dataset-level statistics (counts, token estimates, geometry histograms)."
 
+resolver_defs: !include ../../configs/common/resolvers.yaml
+
 resolvers:
-  zenodo:
-    mode: "record_id_or_doi"
-    api: "https://zenodo.org/api/records/{record_id}"
-    outputs: ["files[*].links.self", "files[*].checksum"]
-    verify_checksum: true
-    checksum_algorithm: "md5"
-  figshare:
-    mode: "article_url"
-    api_base: "https://api.figshare.com/v2"
-    api_version: "2"
-    rate_limit: { requests_per_minute: 60, retry_on_429: true }
-    endpoints:
-      article: "/articles/{article_id}"
-      files: "/articles/{article_id}/files"
-      download: "/articles/{article_id}/files/{file_id}"
-  github:
-    mode: "release"
-    api_base: "https://api.github.com"
-    rate_limit: { requests_per_hour: 60, retry_on_403: true, exponential_backoff: true }
-    endpoints:
-      releases: "/repos/{owner}/{repo}/releases"
-      latest: "/repos/{owner}/{repo}/releases/latest"
-      assets: "/repos/{owner}/{repo}/releases/{release_id}/assets"
-    note: "Use GITHUB_TOKEN env var for higher rate limits."
-  huggingface_datasets:
-    mode: "dataset_id"
-    note: "Use datasets.load_dataset; capture dataset card + license field."
-  git:
-    mode: "repo"
-    note: "Capture commit hash; store LICENSE + README as evidence."
-  ftp:
-    mode: "base_url + globs"
-    note: "Use list + filter by glob; store directory listing snapshot."
-  api:
-    mode: "base_url"
-    note: "Cache responses; store query params & rate limit behavior."
+  zenodo: *zenodo_record
+  figshare: *figshare_article
+  github: *github_release
+  huggingface_datasets: *huggingface_datasets
+  git: *git_resolver
+  ftp: *ftp_resolver
+  api: *api_resolver
 
   # Proposed new resolvers you’ll add in the adaptation step
   s3_public:
