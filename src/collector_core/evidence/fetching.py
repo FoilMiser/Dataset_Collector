@@ -6,10 +6,12 @@ import json
 import logging
 import re
 import socket
+import threading
 import urllib.parse
+from copy import deepcopy
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 
 import requests
 from collector_core.artifact_metadata import build_artifact_metadata
@@ -29,6 +31,45 @@ logger = logging.getLogger(__name__)
 PdfReader = _try_import("pypdf", "PdfReader")
 
 EVIDENCE_EXTENSIONS = [".html", ".pdf", ".txt", ".json"]
+
+
+class EvidenceFetchCache:
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._entries: dict[tuple[object, ...], _FetchCacheEntry] = {}
+
+    def get_or_fetch(
+        self,
+        key: tuple[object, ...],
+        fetcher: Callable[[], tuple[bytes | None, str | None, dict[str, Any]]],
+    ) -> tuple[bytes | None, str | None, dict[str, Any]]:
+        with self._lock:
+            entry = self._entries.get(key)
+            if entry is None:
+                entry = _FetchCacheEntry()
+                self._entries[key] = entry
+                should_fetch = True
+            else:
+                should_fetch = False
+        if should_fetch:
+            try:
+                entry.value = fetcher()
+            except Exception as exc:
+                entry.value = (None, "error", {"errors": [repr(exc)], "retries": 1})
+                raise
+            finally:
+                entry.event.set()
+        else:
+            entry.event.wait()
+        assert entry.value is not None
+        content, info, meta = entry.value
+        return content, info, deepcopy(meta)
+
+
+class _FetchCacheEntry:
+    def __init__(self) -> None:
+        self.event = threading.Event()
+        self.value: tuple[bytes | None, str | None, dict[str, Any]] | None = None
 
 
 def _is_blocked_ip(ip_value: str) -> bool:
@@ -347,6 +388,76 @@ def fetch_url_with_retry(
     return None, f"Failed after {meta['retries']} attempts", meta
 
 
+def _build_fetch_cache_key(
+    *,
+    url: str,
+    headers: dict[str, str] | None,
+    user_agent: str,
+    allow_private_hosts: bool,
+    max_bytes: int,
+    max_retries: int,
+    backoff_base: float,
+) -> tuple[object, ...]:
+    headers_key = tuple(sorted((headers or {}).items()))
+    return (
+        url,
+        headers_key,
+        user_agent,
+        allow_private_hosts,
+        max_bytes,
+        max_retries,
+        backoff_base,
+    )
+
+
+def _fetch_url_with_cache(
+    *,
+    url: str,
+    user_agent: str,
+    timeout_s: float | tuple[float, float] = (15.0, 60.0),
+    max_retries: int = 3,
+    backoff_base: float = 2.0,
+    headers: dict[str, str] | None = None,
+    max_bytes: int | None = None,
+    allow_private_hosts: bool = False,
+    fetch_cache: EvidenceFetchCache | None = None,
+) -> tuple[bytes | None, str | None, dict[str, Any]]:
+    if fetch_cache is None:
+        return fetch_url_with_retry(
+            url,
+            user_agent=user_agent,
+            timeout_s=timeout_s,
+            max_retries=max_retries,
+            backoff_base=backoff_base,
+            headers=headers,
+            max_bytes=max_bytes,
+            allow_private_hosts=allow_private_hosts,
+        )
+    cache_key = _build_fetch_cache_key(
+        url=url,
+        headers=headers,
+        user_agent=user_agent,
+        allow_private_hosts=allow_private_hosts,
+        max_bytes=max_bytes or 0,
+        max_retries=max_retries,
+        backoff_base=backoff_base,
+    )
+
+    def _fetch() -> tuple[bytes | None, str | None, dict[str, Any]]:
+        return fetch_url_with_retry(
+            url,
+            user_agent=user_agent,
+            timeout_s=timeout_s,
+            max_retries=max_retries,
+            backoff_base=backoff_base,
+            headers=headers,
+            max_bytes=max_bytes,
+            allow_private_hosts=allow_private_hosts,
+        )
+
+    return fetch_cache.get_or_fetch(cache_key, _fetch)
+
+
 @stable_api
 def snapshot_evidence(
     manifest_dir: Path,
@@ -360,6 +471,7 @@ def snapshot_evidence(
     headers: dict[str, str] | None = None,
     allow_private_hosts: bool = False,
     max_bytes: int = 20 * 1024 * 1024,
+    fetch_cache: EvidenceFetchCache | None = None,
 ) -> dict[str, Any]:
     result: dict[str, Any] = {
         "url": url,
@@ -389,14 +501,15 @@ def snapshot_evidence(
     if previous_normalized_digest is None and existing_path:
         _, previous_normalized_digest = compute_file_hashes(existing_path)
 
-    content, info, meta = fetch_url_with_retry(
-        url,
+    content, info, meta = _fetch_url_with_cache(
+        url=url,
         user_agent=user_agent,
         max_retries=max_retries,
         backoff_base=backoff_base,
         headers=headers,
         max_bytes=max_bytes,
         allow_private_hosts=allow_private_hosts,
+        fetch_cache=fetch_cache,
     )
     result["fetch_meta"] = meta
 
@@ -541,6 +654,7 @@ def fetch_evidence(
     cfg: "DriverConfig",
     user_agent: str,
     max_bytes: int,
+    fetch_cache: EvidenceFetchCache | None = None,
 ) -> "EvidenceResult":
     from collector_core.pipeline_driver_base import EvidenceResult
 
@@ -560,6 +674,7 @@ def fetch_evidence(
             headers=cfg.headers,
             allow_private_hosts=cfg.args.allow_private_evidence_hosts,
             max_bytes=max_bytes,
+            fetch_cache=fetch_cache,
         )
         evidence_text = extract_text_for_scanning(evidence_snapshot)
         license_change_detected = bool(evidence_snapshot.get("changed_from_previous"))
@@ -606,16 +721,28 @@ def fetch_evidence_batch(
 ) -> list["EvidenceResult"]:
     if not ctxs:
         return []
+    fetch_cache = EvidenceFetchCache()
     worker_count = max_workers or min(8, len(ctxs))
     if worker_count <= 1:
         return [
-            fetch_evidence(ctx=ctx, cfg=cfg, user_agent=user_agent, max_bytes=max_bytes)
+            fetch_evidence(
+                ctx=ctx,
+                cfg=cfg,
+                user_agent=user_agent,
+                max_bytes=max_bytes,
+                fetch_cache=fetch_cache,
+            )
             for ctx in ctxs
         ]
     with ThreadPoolExecutor(max_workers=worker_count) as executor:
         futures = [
             executor.submit(
-                fetch_evidence, ctx=ctx, cfg=cfg, user_agent=user_agent, max_bytes=max_bytes
+                fetch_evidence,
+                ctx=ctx,
+                cfg=cfg,
+                user_agent=user_agent,
+                max_bytes=max_bytes,
+                fetch_cache=fetch_cache,
             )
             for ctx in ctxs
         ]
