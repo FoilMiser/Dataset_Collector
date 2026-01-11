@@ -3,6 +3,17 @@
 This file tracks open backlog items migrated from per-pipeline `todo.txt` files.
 Please file new work as GitHub Issues (or entries here if offline) instead of adding `todo.txt` files.
 
+## Core Infrastructure
+
+### Type Annotations (P2.1.2)
+- [ ] Expand type annotations on hot paths (classification, evidence, acquire strategies, merge, yellow screening)
+- [ ] Add mypy to CI with non-strict mode for collector_core
+- [ ] Tighten mypy strictness over time as coverage improves
+
+### Archive Safety Integration
+- [ ] Integrate `archive_safety.safe_extract()` into acquire strategies that handle archives
+- [ ] Add archive safety configuration options to targets YAML schema
+
 ## 3d_modeling_pipeline_v2
 
 ### HIGH PRIORITY (Production readiness)
