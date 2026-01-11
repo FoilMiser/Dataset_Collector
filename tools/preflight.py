@@ -21,6 +21,7 @@ from tools.strategy_registry import (
     get_strategy_requirement_errors,
     get_strategy_spec,
 )
+from collector_core.targets_paths import resolve_targets_path, targets_root
 
 
 def _normalize_download(download: dict[str, Any]) -> dict[str, Any]:
@@ -231,9 +232,11 @@ def run_preflight(
             errors.append(f"Pipeline map entry missing targets_yaml for: {pipeline_name}")
             continue
 
-        targets_path = pipeline_dir / targets_yaml
-        if not targets_path.exists():
-            errors.append(f"Targets YAML missing: {targets_path}")
+        slug = pipeline_name.removesuffix("_pipeline_v2")
+        targets_path = resolve_targets_path(repo_root, slug, targets_yaml)
+        if not targets_path or not targets_path.exists():
+            expected = targets_root(repo_root) / targets_yaml
+            errors.append(f"Targets YAML missing: {expected}")
             continue
 
         acquire_worker_path = pipeline_dir / "acquire_worker.py"

@@ -62,18 +62,18 @@ Use `run_pipeline.sh` to orchestrate stages (dry-run by default):
 
 ```bash
 # Classify only (dry-run)
-./run_pipeline.sh --targets targets_agri_circular.yaml --stage classify
+./run_pipeline.sh --targets ../pipelines/targets/targets_agri_circular.yaml --stage classify
 
 # Acquire
-./run_pipeline.sh --targets targets_agri_circular.yaml --stage acquire_green --execute --workers 4
-./run_pipeline.sh --targets targets_agri_circular.yaml --stage acquire_yellow --execute --workers 4
+./run_pipeline.sh --targets ../pipelines/targets/targets_agri_circular.yaml --stage acquire_green --execute --workers 4
+./run_pipeline.sh --targets ../pipelines/targets/targets_agri_circular.yaml --stage acquire_yellow --execute --workers 4
 
 # Screen/merge
-./run_pipeline.sh --targets targets_agri_circular.yaml --stage screen_yellow --execute
-./run_pipeline.sh --targets targets_agri_circular.yaml --stage merge --execute
+./run_pipeline.sh --targets ../pipelines/targets/targets_agri_circular.yaml --stage screen_yellow --execute
+./run_pipeline.sh --targets ../pipelines/targets/targets_agri_circular.yaml --stage merge --execute
 
 # Catalog
-./run_pipeline.sh --targets targets_agri_circular.yaml --stage catalog
+./run_pipeline.sh --targets ../pipelines/targets/targets_agri_circular.yaml --stage catalog
 ```
 
 Additional helper stages:
@@ -95,4 +95,4 @@ Legacy/compatibility helpers:
 ---
 
 ## Targets + routing
-`targets_agri_circular.yaml` now points to the v2 roots and companions. Routing can be provided via `routing` or `agri_routing` blocks; default subject is `agri_circular`.
+`../pipelines/targets/targets_agri_circular.yaml` now points to the v2 roots and companions. Routing can be provided via `routing` or `agri_routing` blocks; default subject is `agri_circular`.

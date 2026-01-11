@@ -27,6 +27,7 @@ if __package__ in (None, ""):
 
 from collector_core.config_validator import read_yaml
 from collector_core.exceptions import ConfigValidationError, YamlParseError
+from collector_core.targets_paths import list_targets_files, resolve_targets_path, targets_root
 from tools.strategy_registry import (
     get_strategy_requirement_errors,
     get_strategy_spec,
@@ -55,10 +56,7 @@ def normalize_download(download: dict[str, Any]) -> dict[str, Any]:
 
 
 def iter_targets_files(root: Path) -> Iterable[Path]:
-    for pipeline_dir in sorted(root.glob("*_pipeline_v2")):
-        if not pipeline_dir.is_dir():
-            continue
-        yield from sorted(pipeline_dir.glob("targets_*.yaml"))
+    yield from list_targets_files(root)
 
 
 def iter_pipeline_drivers(pipeline_dirs: Iterable[Path]) -> Iterable[Path]:
@@ -176,13 +174,13 @@ def validate_pipeline_layout(root: Path) -> tuple[list[dict[str, Any]], list[Pat
                     }
                 )
             else:
-                targets_path = pipeline_dir / targets_yaml
-                if not targets_path.exists():
+                targets_path = resolve_targets_path(root, pipeline_name, targets_yaml)
+                if not targets_path or not targets_path.exists():
                     errors.append(
                         {
                             "type": "missing_pipeline_targets_file",
                             "pipeline": pipeline_name,
-                            "path": str(targets_path),
+                            "path": str(targets_root(root) / targets_yaml),
                         }
                     )
     else:
@@ -203,13 +201,14 @@ def validate_pipeline_layout(root: Path) -> tuple[list[dict[str, Any]], list[Pat
                             "path": str(required_path),
                         }
                     )
-            targets_files = list(pipeline_dir.glob("targets_*.yaml"))
-            if not targets_files:
+            slug = pipeline_dir.name.removesuffix("_pipeline_v2")
+            targets_path = resolve_targets_path(root, slug)
+            if not targets_path:
                 errors.append(
                     {
                         "type": "missing_pipeline_targets_file",
                         "pipeline": pipeline_dir.name,
-                        "path": str(pipeline_dir),
+                        "path": str(targets_root(root)),
                     }
                 )
 

@@ -127,18 +127,18 @@ but new usage should prefer the unified CLI.
 The legacy `run_pipeline.sh` wrapper is deprecated but still supported for existing workflows. A typical end-to-end execution sequence:
 
 ```bash
-./run_pipeline.sh --targets targets_math.yaml --stage classify --execute
-./run_pipeline.sh --targets targets_math.yaml --stage acquire_green --execute
-./run_pipeline.sh --targets targets_math.yaml --stage acquire_yellow --execute
-./run_pipeline.sh --targets targets_math.yaml --stage screen_yellow --execute
-./run_pipeline.sh --targets targets_math.yaml --stage merge --execute
-./run_pipeline.sh --targets targets_math.yaml --stage catalog --execute
+./math_pipeline_v2/run_pipeline.sh --targets pipelines/targets/targets_math.yaml --stage classify --execute
+./math_pipeline_v2/run_pipeline.sh --targets pipelines/targets/targets_math.yaml --stage acquire_green --execute
+./math_pipeline_v2/run_pipeline.sh --targets pipelines/targets/targets_math.yaml --stage acquire_yellow --execute
+./math_pipeline_v2/run_pipeline.sh --targets pipelines/targets/targets_math.yaml --stage screen_yellow --execute
+./math_pipeline_v2/run_pipeline.sh --targets pipelines/targets/targets_math.yaml --stage merge --execute
+./math_pipeline_v2/run_pipeline.sh --targets pipelines/targets/targets_math.yaml --stage catalog --execute
 ```
 
 To preview the actions without writing data, omit `--execute` (dry-run):
 
 ```bash
-./run_pipeline.sh --targets targets_math.yaml --stage classify
+./math_pipeline_v2/run_pipeline.sh --targets pipelines/targets/targets_math.yaml --stage classify
 ```
 
 ## Quickstart options
@@ -266,7 +266,14 @@ Within each `*_pipeline_v2` directory, you should expect:
   requirements.txt
   pipeline_driver.py
   acquire_worker.py
-  targets_*.yaml
+```
+
+Targets YAML files now live in a shared directory:
+
+```
+pipelines/
+  targets/
+    targets_*.yaml
 ```
 
 Shared configuration files live in `configs/common/` and are referenced from each
@@ -282,16 +289,16 @@ configs/
 ```
 
 Targets YAMLs point at companion files using relative paths, for example in
-`math_pipeline_v2/targets_math.yaml`:
+`pipelines/targets/targets_math.yaml`:
 
 ```yaml
 companion_files:
   license_map:
-    - "../configs/common/license_map.yaml"
+    - "../../configs/common/license_map.yaml"
   field_schemas:
-    - "../configs/common/field_schemas.yaml"
+    - "../../configs/common/field_schemas.yaml"
   denylist:
-    - "../configs/common/denylist.yaml"
+    - "../../configs/common/denylist.yaml"
 ```
 
 Two global configuration entries determine where queues and catalogs are stored:
@@ -304,7 +311,7 @@ across pipelines. For pipeline-specific tweaks, add a local YAML alongside your
 targets file and point to it in `companion_files` so you inherit the defaults and
 override only what you need.
 
-Update these in the pipeline’s configuration files (for example `targets_*.yaml` in each pipeline directory) to control where outputs are written.
+Update these in the pipeline’s configuration files (for example `pipelines/targets/targets_*.yaml`) to control where outputs are written.
 
 ## Prerequisites & execution notes
 

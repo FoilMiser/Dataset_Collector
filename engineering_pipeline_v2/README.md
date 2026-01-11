@@ -3,7 +3,7 @@
 A safety-first **two-pool engineering pipeline** aligned with the `math_pipeline_v2` contract. It emphasizes **license compliance, provenance tracking, and safe-by-default execution** across GREEN and YELLOW pools.
 
 What's new in v2:
-- `targets_engineering.yaml` (schema v0.8) with explicit roots + routing metadata for downstream sorting
+- `../pipelines/targets/targets_engineering.yaml` (schema v0.8) with explicit roots + routing metadata for downstream sorting
 - v2 workers: `acquire_worker.py`, `yellow_screen_worker.py`, `merge_worker.py`, `catalog_builder.py`
 - Two-pool raw layout: `raw/green` + `raw/yellow` → screened_yellow → combined → screened shards
 - Wrapper `run_pipeline.sh` with stages: classify → acquire_green → acquire_yellow → screen_yellow → merge → catalog
@@ -31,7 +31,7 @@ You can also run the Jupyter notebook, which invokes the same workflow. Use `run
 ## What This Pipeline Does
 
 ```
-targets_engineering.yaml
+../pipelines/targets/targets_engineering.yaml
         |
         v
 pipeline_driver.py  -> _queues/{green_download,yellow_pipeline,red_rejected}.jsonl
@@ -60,24 +60,24 @@ pip install -r requirements.txt
 
 ### Classify (dry-run by default)
 ```bash
-./run_pipeline.sh --targets targets_engineering.yaml --stage classify
+./run_pipeline.sh --targets ../pipelines/targets/targets_engineering.yaml --stage classify
 ```
 
 ### Review pending YELLOW items
 ```bash
-./run_pipeline.sh --targets targets_engineering.yaml --stage review
+./run_pipeline.sh --targets ../pipelines/targets/targets_engineering.yaml --stage review
 # or:
 python3 review_queue.py --queue /data/engineering/_queues/yellow_pipeline.jsonl list
 ```
 
 ### Execute end-to-end (recommended order)
 ```bash
-./run_pipeline.sh --targets targets_engineering.yaml --stage classify
-./run_pipeline.sh --targets targets_engineering.yaml --stage acquire_green --execute
-./run_pipeline.sh --targets targets_engineering.yaml --stage acquire_yellow --execute
-./run_pipeline.sh --targets targets_engineering.yaml --stage screen_yellow --execute
-./run_pipeline.sh --targets targets_engineering.yaml --stage merge --execute
-./run_pipeline.sh --targets targets_engineering.yaml --stage catalog
+./run_pipeline.sh --targets ../pipelines/targets/targets_engineering.yaml --stage classify
+./run_pipeline.sh --targets ../pipelines/targets/targets_engineering.yaml --stage acquire_green --execute
+./run_pipeline.sh --targets ../pipelines/targets/targets_engineering.yaml --stage acquire_yellow --execute
+./run_pipeline.sh --targets ../pipelines/targets/targets_engineering.yaml --stage screen_yellow --execute
+./run_pipeline.sh --targets ../pipelines/targets/targets_engineering.yaml --stage merge --execute
+./run_pipeline.sh --targets ../pipelines/targets/targets_engineering.yaml --stage catalog
 ```
 
 ---
@@ -95,7 +95,7 @@ python3 review_queue.py --queue /data/engineering/_queues/yellow_pipeline.jsonl 
 - `pmc_worker.py` - optional PMC addon (run before merge if used)
 
 ### Configuration
-- `targets_engineering.yaml` - inventory + roots/queues/routing (schema v0.8)
+- `../pipelines/targets/targets_engineering.yaml` - inventory + roots/queues/routing (schema v0.8)
 - `license_map.yaml` - SPDX normalization rules + gating policy
 - `field_schemas.yaml` - versioned schemas for extracted/normalized records
 - `denylist.yaml` - explicit denylist patterns (v0.2 with severity and provenance)

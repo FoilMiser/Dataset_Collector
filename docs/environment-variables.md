@@ -19,8 +19,8 @@ None globally. Individual pipelines may require API keys depending on enabled ta
 
 | Variable | Purpose | Notes |
 | --- | --- | --- |
-| `GITHUB_TOKEN` | Higher GitHub API rate limits for targets that pull from GitHub. | Mentioned in several `targets_*.yaml` files and used in pipeline acquire workers. |
-| `CHEMSPIDER_API_KEY` | Access to ChemSpider-backed sources. | Referenced in `chem_pipeline_v2/targets_chem.yaml`. |
+| `GITHUB_TOKEN` | Higher GitHub API rate limits for targets that pull from GitHub. | Mentioned in several `pipelines/targets/targets_*.yaml` files and used in pipeline acquire workers. |
+| `CHEMSPIDER_API_KEY` | Access to ChemSpider-backed sources. | Referenced in `pipelines/targets/targets_chem.yaml`. |
 
 ## How variables are resolved
 

@@ -24,7 +24,7 @@ Common issues and fixes when running Dataset Collector pipelines.
 
 **Likely causes**
 - `DATASET_ROOT`/`DATASET_COLLECTOR_ROOT` points to a location without write access.
-- The target list is empty or disabled in the `targets_*.yaml` file.
+- The target list is empty or disabled in the `pipelines/targets/targets_*.yaml` file.
 
 **Fix**
 - Set `DATASET_ROOT` or update the pipeline config to a writable path.
