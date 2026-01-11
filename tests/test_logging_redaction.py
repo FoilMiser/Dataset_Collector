@@ -3,7 +3,12 @@ from __future__ import annotations
 import json
 import logging
 
-from collector_core.logging_config import JsonFormatter, TextFormatter
+from collector_core.logging_config import (
+    JsonFormatter,
+    TextFormatter,
+    clear_log_context,
+    set_log_context,
+)
 from collector_core.secrets import REDACTED, SecretStr, redact_headers
 
 
@@ -46,6 +51,40 @@ def test_json_formatter_redacts_inline_tokens() -> None:
     assert "abc123" not in message
     assert "xyz456" not in message
     assert REDACTED in message
+
+
+def test_json_formatter_includes_log_context_fields() -> None:
+    formatter = JsonFormatter()
+    set_log_context(
+        run_id="run-123",
+        domain="chemistry",
+        target_id="target-7",
+        strategy="http",
+        bytes=2048,
+        duration_ms=12.5,
+        error_types=["timeout"],
+    )
+    try:
+        record = logging.LogRecord(
+            name="test",
+            level=logging.INFO,
+            pathname=__file__,
+            lineno=1,
+            msg="test message",
+            args=(),
+            exc_info=None,
+        )
+        payload = json.loads(formatter.format(record))
+        assert payload["run_id"] == "run-123"
+        assert payload["domain"] == "chemistry"
+        assert payload["target_id"] == "target-7"
+        assert payload["strategy"] == "http"
+        assert payload["bytes"] == 2048
+        assert payload["duration_ms"] == 12.5
+        assert payload["error_types"] == ["timeout"]
+        assert payload["context"]["run_id"] == "run-123"
+    finally:
+        clear_log_context()
 
 
 def test_secret_str_redacts_repr_and_str() -> None:
