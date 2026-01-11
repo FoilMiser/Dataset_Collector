@@ -18,7 +18,9 @@ except ImportError:  # pragma: no cover - optional in some environments
     Draft7Validator = None
     FormatChecker = None
 
-SCHEMA_DIR = Path(__file__).resolve().parents[1] / "schemas"
+_DEFAULT_SCHEMA_DIR = Path(__file__).resolve().parents[1] / "schemas"
+_FALLBACK_SCHEMA_DIR = Path(__file__).resolve().parents[2] / "schemas"
+SCHEMA_DIR = _DEFAULT_SCHEMA_DIR if _DEFAULT_SCHEMA_DIR.exists() else _FALLBACK_SCHEMA_DIR
 
 
 @cache

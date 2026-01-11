@@ -117,7 +117,10 @@ def run_driver(
 ) -> None:
     driver_path = Path("regcomp_pipeline_v2/pipeline_driver.py").resolve()
     env = os.environ.copy()
-    env["PYTHONPATH"] = str(Path(".").resolve())
+    repo_root = Path(".").resolve()
+    env["PYTHONPATH"] = os.pathsep.join(
+        [str(repo_root / "src"), str(repo_root), env.get("PYTHONPATH", "")]
+    ).strip(os.pathsep)
     args = [
         sys.executable,
         str(driver_path),
@@ -187,6 +190,38 @@ def test_green_yellow_red_classification(
     assert "0.9" in snapshot["schema_versions"]["license_map"]
     assert "0.9" in snapshot["schema_versions"]["denylist"]
     assert snapshot["enabled_checks"] == []
+
+
+def test_run_metrics_emitted(tmp_path: Path, minimal_config: PipelineTestConfig) -> None:
+    targets = [
+        {
+            "id": "metrics_target",
+            "name": "Metrics Dataset",
+            "license_profile": "permissive",
+            "license_evidence": {"spdx_hint": "MIT", "url": "https://example.test/terms"},
+        }
+    ]
+    targets_path = minimal_config.write_targets(tmp_path, targets)
+
+    run_driver(targets_path, minimal_config.license_map_path)
+
+    run_dirs = [path for path in minimal_config.ledger_root.iterdir() if path.is_dir()]
+    assert len(run_dirs) == 1
+    run_dir = run_dirs[0]
+    metrics_path = run_dir / "metrics.json"
+    assert metrics_path.exists()
+    metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+    assert metrics["run_id"] == run_dir.name
+    assert metrics["pipeline_id"] == "regcomp"
+    assert metrics["counts"]["targets_total"] == 1
+    assert metrics["counts"]["targets_enabled"] == 1
+    assert metrics["counts"]["queued_green"] == 1
+    assert metrics["counts"]["queued_yellow"] == 0
+    assert metrics["counts"]["queued_red"] == 0
+    assert metrics["bytes"]["evidence_fetched"] == 0
+    assert "run_total_ms" in metrics["timings_ms"]
+    assert "classification_ms" in metrics["timings_ms"]
+    assert metrics["timings_ms"]["run_total_ms"] >= 0
 
 
 def test_offline_snapshot_terms_forces_yellow(
