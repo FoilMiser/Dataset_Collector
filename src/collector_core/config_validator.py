@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from functools import cache
 from pathlib import Path
 from typing import Any
@@ -61,6 +62,7 @@ def validate_config(config: Any, schema_name: str, *, config_path: Path | None =
 
 def read_yaml(path: Path, schema_name: str | None = None) -> Any:
     text = path.read_text(encoding="utf-8")
+    text = _expand_includes(text, path.parent)
     try:
         data = yaml.safe_load(text)
     except yaml.YAMLError as exc:
@@ -73,3 +75,35 @@ def read_yaml(path: Path, schema_name: str | None = None) -> Any:
     if schema_name:
         validate_config(data, schema_name, config_path=path)
     return data
+
+
+_INCLUDE_PATTERN = re.compile(r"^(?P<indent>\s*)(?P<key>[^:#]+:\s*)!include\s+(?P<path>.+)$")
+
+
+def _expand_includes(text: str, base_dir: Path) -> str:
+    lines: list[str] = []
+    trailing_newline = text.endswith("\n")
+    for raw_line in text.splitlines():
+        match = _INCLUDE_PATTERN.match(raw_line)
+        if not match:
+            lines.append(raw_line)
+            continue
+        indent = match.group("indent")
+        key = match.group("key").rstrip()
+        raw_path = match.group("path").split("#", 1)[0].strip()
+        raw_path = raw_path.strip("'\"")
+        include_path = Path(raw_path)
+        if not include_path.is_absolute():
+            include_path = (base_dir / include_path).resolve()
+        include_text = include_path.read_text(encoding="utf-8")
+        expanded = _expand_includes(include_text, include_path.parent)
+        indented_lines = [
+            f"{indent}  {line}" if line else f"{indent}  {line}"
+            for line in expanded.splitlines()
+        ]
+        lines.append(f"{indent}{key}")
+        lines.extend(indented_lines)
+    result = "\n".join(lines)
+    if trailing_newline:
+        result += "\n"
+    return result

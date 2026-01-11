@@ -90,31 +90,14 @@ gates_catalog:
   emit_attribution_bundle: "Future work: Generate ATTRIBUTION.md + CITATIONS.bib for included sources."
   manual_legal_review: "Human review required before training."
   segregate_copyleft_pool: "Force output into copyleft pool and keep isolated."
+resolver_defs: !include ../../configs/common/resolvers.yaml
+
 resolvers:
-  github:
-    mode: release
-    api_base: https://api.github.com
-    rate_limit:
-      requests_per_hour: 60
-      retry_on_403: true
-      exponential_backoff: true
-    endpoints:
-      releases: /repos/{owner}/{repo}/releases
-      latest: /repos/{owner}/{repo}/releases/latest
-      assets: /repos/{owner}/{repo}/releases/{release_id}/assets
-    note: Use GITHUB_TOKEN env var for higher rate limits.
-  huggingface_datasets:
-    mode: dataset_id
-    note: Use datasets.load_dataset; capture dataset card + license field.
-  git:
-    mode: repo
-    note: Capture commit hash; store LICENSE + README as evidence.
-  http:
-    mode: direct_url
-    note: Direct file download with resume.
-  ftp:
-    mode: base_url + globs
-    note: List + filter by glob; store directory listing snapshot.
+  github: *github_release
+  huggingface_datasets: *huggingface_datasets
+  git: *git_resolver
+  http: *http_resolver
+  ftp: *ftp_resolver
 
 targets:
 - id: ntsb_aviation_census_zip

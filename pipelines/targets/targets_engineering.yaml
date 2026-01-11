@@ -74,16 +74,12 @@ gates_catalog:
   restriction_phrase_scan: "Scan terms/content for restriction phrases (no-LLM/no-TDM/etc.)."
   emit_training_manifest: "Future work: Manifest of included files/records + checksums + license evidence."
   emit_attribution_bundle: "Future work: Generate ATTRIBUTION.md + CITATIONS.bib for included sources."
+resolver_defs: !include ../../configs/common/resolvers.yaml
+
 resolvers:
-  huggingface_datasets:
-    mode: dataset_id
-    note: Use datasets.load_dataset; capture dataset card + license field.
-  git:
-    mode: repo
-    note: Capture commit hash; store LICENSE + README as evidence.
-  http:
-    mode: direct_url
-    note: Direct file download with resume.
+  huggingface_datasets: *huggingface_datasets
+  git: *git_resolver
+  http: *http_resolver
 targets:
 - id: commonpile_uspto_filtered
   name: "CommonPile: USPTO patents (filtered)"
