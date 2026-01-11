@@ -505,6 +505,7 @@ def resolve_effective_bucket(
     review_status: str,
     promote_to: str,
     denylist_hits: list[dict[str, Any]],
+    strict_snapshot: bool,
 ) -> str:
     eff_bucket = compute_effective_bucket(
         license_map,
@@ -516,6 +517,14 @@ def resolve_effective_bucket(
         resolved_confidence,
     )
     eff_bucket = apply_denylist_bucket(denylist_hits, eff_bucket)
+    evidence_status, _ = normalize_evidence_fetch_status(evidence.snapshot)
+    if (
+        strict_snapshot
+        and "snapshot_terms" in license_gates
+        and evidence_status != "ok"
+        and eff_bucket == "GREEN"
+    ):
+        eff_bucket = "YELLOW"
     if evidence.no_fetch_missing_evidence and eff_bucket == "GREEN":
         eff_bucket = "YELLOW"
     return apply_review_gates(
@@ -966,6 +975,22 @@ def summarize_denylist_hits(dl_hits: list[dict[str, Any]]) -> tuple[bool, bool]:
     return hard_red, force_yellow
 
 
+def normalize_evidence_fetch_status(
+    evidence_snapshot: dict[str, Any],
+) -> tuple[str, str | None]:
+    status = str(evidence_snapshot.get("status") or "unknown")
+    reason = None
+    if status == "ok":
+        return status, None
+    if status in {"error", "blocked_url", "needs_manual_evidence"}:
+        reason = str(evidence_snapshot.get("error") or status)
+    elif status in {"offline_missing", "no_url", "response_too_large", "skipped"}:
+        reason = status
+    else:
+        reason = status
+    return status, reason
+
+
 def build_bucket_signals(
     *,
     ctx: TargetContext,
@@ -982,11 +1007,14 @@ def build_bucket_signals(
     require_yellow_signoff: bool,
     action: str,
     action_checks: list[str],
+    strict_snapshot: bool,
 ) -> tuple[str, dict[str, Any]]:
     spdx_bucket_value = spdx_bucket(license_map, resolved)
     low_confidence = resolved_confidence < min_confidence
     snapshot_required = "snapshot_terms" in ctx.license_gates
-    evidence_status = evidence.snapshot.get("status")
+    evidence_status, fetch_failure_reason = normalize_evidence_fetch_status(
+        evidence.snapshot
+    )
     snapshot_missing = bool(evidence.no_fetch_missing_evidence) or (
         snapshot_required and evidence_status != "ok"
     )
@@ -1017,6 +1045,10 @@ def build_bucket_signals(
             "changed_from_previous": evidence_changed,
             "pdf_text_extraction_failed": pdf_text_failed,
             "no_fetch_missing_evidence": evidence.no_fetch_missing_evidence,
+            "fetch_failure_reason": fetch_failure_reason,
+            "strict_snapshot_failure": bool(
+                strict_snapshot and snapshot_required and evidence_status != "ok"
+            ),
         },
         "license_gates": list(ctx.license_gates),
         "restriction_hits": restriction_hits,
@@ -1096,12 +1128,13 @@ def compute_effective_bucket(
 ) -> str:
     """Compute effective bucket based on gates and scan results."""
     bucket = spdx_bucket(license_map, resolved_spdx)
+    evidence_status, _ = normalize_evidence_fetch_status(evidence_snapshot)
 
     # Confidence gate: if confidence is too low, force YELLOW
     if resolved_confidence < min_confidence and bucket == "GREEN":
         bucket = license_map.gating.get("low_confidence_bucket", "YELLOW")
 
-    if "snapshot_terms" in license_gates and evidence_snapshot.get("status") != "ok":
+    if "snapshot_terms" in license_gates and evidence_status != "ok":
         # If we require snapshot and failed, force YELLOW
         bucket = "YELLOW"
 
@@ -1507,6 +1540,12 @@ class BasePipelineDriver:
             if meta.get("size_exceeded"):
                 result["status"] = "needs_manual_evidence"
                 result["error"] = info
+            elif info == "blocked_url":
+                result["status"] = "blocked_url"
+                result["error"] = meta.get("blocked_reason") or info
+            elif info == "response_too_large":
+                result["status"] = "needs_manual_evidence"
+                result["error"] = info
             else:
                 result["status"] = "error"
                 result["error"] = info
@@ -1788,6 +1827,7 @@ class BasePipelineDriver:
             review_status,
             promote_to,
             ctx.dl_hits,
+            cfg.args.strict,
         )
         review_required = apply_yellow_signoff_requirement(
             eff_bucket,
@@ -1865,6 +1905,7 @@ class BasePipelineDriver:
             require_yellow_signoff=cfg.require_yellow_signoff,
             action=action or "ok",
             action_checks=action_checks,
+            strict_snapshot=cfg.args.strict,
         )
         row["bucket_reason"] = bucket_reason
         row["signals"] = signals

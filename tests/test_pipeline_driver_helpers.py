@@ -248,6 +248,7 @@ def test_resolve_effective_bucket_applies_no_fetch_guard() -> None:
         review_status="pending",
         promote_to="",
         denylist_hits=[],
+        strict_snapshot=False,
     )
     assert bucket == "YELLOW"
 
@@ -282,6 +283,7 @@ def test_resolve_effective_bucket_denies_hard_red() -> None:
         review_status="pending",
         promote_to="",
         denylist_hits=[{"severity": "hard_red"}],
+        strict_snapshot=False,
     )
     assert bucket == "RED"
 

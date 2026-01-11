@@ -213,12 +213,37 @@ def test_offline_snapshot_terms_forces_yellow(
     assert {row["id"] for row in yellow_rows} == {"offline_target"}
     assert yellow_rows[0]["bucket_reason"] == "snapshot_missing"
     assert yellow_rows[0]["signals"]["evidence"]["snapshot_missing"] is True
+    assert yellow_rows[0]["signals"]["evidence"]["fetch_failure_reason"] == "offline_missing"
     evaluation = json.loads(
         (minimal_config.manifests_root / "offline_target" / "evaluation.json").read_text(
             encoding="utf-8"
         )
     )
     assert evaluation["no_fetch_missing_evidence"] is True
+
+
+def test_strict_snapshot_terms_emits_reason(
+    tmp_path: Path, minimal_config: PipelineTestConfig
+) -> None:
+    targets = [
+        {
+            "id": "strict_target",
+            "name": "Strict Dataset",
+            "license_profile": "permissive",
+            "license_evidence": {"spdx_hint": "MIT", "url": "https://example.test/terms"},
+        }
+    ]
+    targets_path = minimal_config.write_targets(
+        tmp_path, targets, globals_override={"default_license_gates": ["snapshot_terms"]}
+    )
+
+    run_driver(targets_path, minimal_config.license_map_path, extra_args=["--strict"])
+
+    yellow_rows = read_jsonl(minimal_config.queues_root / "yellow_pipeline.jsonl")
+
+    assert {row["id"] for row in yellow_rows} == {"strict_target"}
+    assert yellow_rows[0]["signals"]["evidence"]["strict_snapshot_failure"] is True
+    assert yellow_rows[0]["signals"]["evidence"]["fetch_failure_reason"] == "offline_missing"
 
 
 def test_evaluation_manifest_redacts_headers(
