@@ -77,7 +77,7 @@ def iter_yellow_scrubbers(root: Path) -> Iterable[Path]:
 
 
 def iter_collector_core_versioned_modules(root: Path) -> Iterable[Path]:
-    core_dir = root / "collector_core"
+    core_dir = root / "src" / "collector_core"
     if not core_dir.is_dir():
         return
     yield from sorted(core_dir.glob("yellow_screen_*.py"))
@@ -113,7 +113,7 @@ def _load_pipeline_map(
     root: Path,
     errors: list[dict[str, Any]],
 ) -> tuple[Path, dict[str, Any]] | None:
-    pipeline_map_path = root / "tools" / "pipeline_map.yaml"
+    pipeline_map_path = root / "src" / "tools" / "pipeline_map.yaml"
     if not pipeline_map_path.exists():
         return None
     try:

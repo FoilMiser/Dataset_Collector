@@ -98,7 +98,7 @@ def render_readme(spec: PipelineSpec) -> str:
 
         Targets YAML defaults to `/data/...`; the orchestrator patches to your
         `--dest-root`. For standalone runs, pass `--dataset-root`, use
-        `tools/patch_targets.py`, or run `run_pipeline.sh` (optional wrapper).
+        `src/tools/patch_targets.py`, or run `run_pipeline.sh` (optional wrapper).
 
         ## License
 

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-export PYTHONPATH="${REPO_ROOT}"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+export PYTHONPATH="${REPO_ROOT}/src"
 
 WORKDIR="$(mktemp -d)"
 DATASET_ROOT="${WORKDIR}/dataset_root"
-FIXTURES_DIR="${REPO_ROOT}/tools/fixtures"
+FIXTURES_DIR="${REPO_ROOT}/src/tools/fixtures"
 TEMP_FIXTURES="${WORKDIR}/fixtures"
 
 cleanup() {

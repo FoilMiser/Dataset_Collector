@@ -13,7 +13,7 @@ def _write_yaml(path: Path, payload: dict) -> None:
 def _write_pipeline(repo_root: Path, name: str, targets: list[dict]) -> None:
     pipeline_dir = repo_root / name
     pipeline_dir.mkdir(parents=True)
-    core_dir = repo_root / "collector_core"
+    core_dir = repo_root / "src" / "collector_core"
     core_dir.mkdir(parents=True, exist_ok=True)
     acquire_strategies_path = core_dir / "acquire_strategies.py"
     if not acquire_strategies_path.exists():
@@ -124,5 +124,5 @@ def test_preflight_main_defaults_to_sample_pipeline_map(monkeypatch, tmp_path) -
     assert result == 0
     assert (
         captured["pipeline_map_path"]
-        == (repo_root / "tools" / "pipeline_map.sample.yaml").resolve()
+        == (repo_root / "src" / "tools" / "pipeline_map.sample.yaml").resolve()
     )
