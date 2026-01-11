@@ -45,6 +45,7 @@ dev = [
   "pytest",
   "pytest-cov",
   "ruff",
+  "mypy",
   "yamllint",
   "pytest_httpserver",
   "jupyterlab",
@@ -63,8 +64,16 @@ version = { attr = "collector_core.__version__.__version__" }
 [tool.setuptools]
 package-dir = { "" = "src" }
 
+[tool.setuptools.package-data]
+collector_core = ["py.typed"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_unused_configs = true
+ignore_missing_imports = true
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
