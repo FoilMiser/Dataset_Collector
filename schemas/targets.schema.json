@@ -150,6 +150,7 @@
           },
           "additionalProperties": true
         },
+        "run_byte_budget": { "type": "integer", "minimum": 0 },
         "default_license_gates": { "$ref": "#/definitions/license_gate_list" },
         "default_content_checks": { "$ref": "#/definitions/content_check_list" }
       },
@@ -217,7 +218,8 @@
                   "pmc_oa",
                   "usgs_pubs_warehouse"
                 ]
-              }
+              },
+              "max_bytes": { "type": "integer", "minimum": 0 }
             },
             "additionalProperties": true
           },

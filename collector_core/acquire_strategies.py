@@ -19,7 +19,9 @@ from urllib.parse import urljoin, urlparse
 
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.acquire_limits import (
+    RunByteBudget,
     build_target_limit_enforcer,
+    build_run_budget,
     cleanup_path,
     resolve_result_bytes,
 )
@@ -96,6 +98,7 @@ class AcquireContext:
     limits: Limits
     mode: RunMode
     retry: RetryConfig
+    run_budget: RunByteBudget | None = None
     allow_non_global_download_hosts: bool = False
     internal_mirror_allowlist: "InternalMirrorAllowlist" = dataclasses.field(
         default_factory=lambda: InternalMirrorAllowlist()
@@ -491,6 +494,7 @@ def handle_http_multi(
         limit_files=ctx.limits.limit_files,
         max_bytes_per_target=ctx.limits.max_bytes_per_target,
         download=download,
+        run_budget=ctx.run_budget,
     )
     urls: list[str] = []
     if download.get("url"):
@@ -580,6 +584,7 @@ def handle_http_single(
         limit_files=ctx.limits.limit_files,
         max_bytes_per_target=ctx.limits.max_bytes_per_target,
         download=download,
+        run_budget=ctx.run_budget,
     )
     url = download.get("url") or download.get("urls", [None])[0]
     if not url:
@@ -637,6 +642,7 @@ def handle_ftp(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
         limit_files=ctx.limits.limit_files,
         max_bytes_per_target=ctx.limits.max_bytes_per_target,
         download=download,
+        run_budget=ctx.run_budget,
     )
     base = download.get("base_url")
     globs = download.get("globs", ["*"])
@@ -701,6 +707,7 @@ def handle_git(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
         limit_files=ctx.limits.limit_files,
         max_bytes_per_target=ctx.limits.max_bytes_per_target,
         download=download,
+        run_budget=ctx.run_budget,
     )
     repo = (
         download.get("repo")
@@ -766,6 +773,7 @@ def handle_zenodo(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> li
         limit_files=ctx.limits.limit_files,
         max_bytes_per_target=ctx.limits.max_bytes_per_target,
         download=download,
+        run_budget=ctx.run_budget,
     )
     api_url = download.get("api") or download.get("record_url")
     record_id = download.get("record_id")
@@ -850,6 +858,7 @@ def handle_dataverse(
         limit_files=ctx.limits.limit_files,
         max_bytes_per_target=ctx.limits.max_bytes_per_target,
         download=download,
+        run_budget=ctx.run_budget,
     )
     pid = download.get("persistent_id") or download.get("pid")
     instance = download.get("instance") or "https://dataverse.harvard.edu"
@@ -923,6 +932,7 @@ def handle_figshare_article(
         limit_files=ctx.limits.limit_files,
         max_bytes_per_target=ctx.limits.max_bytes_per_target,
         download=download,
+        run_budget=ctx.run_budget,
     )
     article_id = download.get("article_id")
     if not article_id and download.get("article_url"):
@@ -1008,6 +1018,7 @@ def handle_figshare_files(
         limit_files=ctx.limits.limit_files,
         max_bytes_per_target=ctx.limits.max_bytes_per_target,
         download=download,
+        run_budget=ctx.run_budget,
     )
     article_id = download.get("article_id") or download.get("id")
     api = download.get("api") or (
@@ -1089,6 +1100,7 @@ def make_github_release_handler(user_agent: str) -> StrategyHandler:
             limit_files=ctx.limits.limit_files,
             max_bytes_per_target=ctx.limits.max_bytes_per_target,
             download=download,
+            run_budget=ctx.run_budget,
         )
         owner = download.get("owner")
         repo = download.get("repo") or download.get("repository")
@@ -1188,6 +1200,7 @@ def handle_hf_datasets(
         limit_files=ctx.limits.limit_files,
         max_bytes_per_target=ctx.limits.max_bytes_per_target,
         download=download,
+        run_budget=ctx.run_budget,
     )
     dataset_id = download.get("dataset_id")
     if not dataset_id:
@@ -1269,6 +1282,7 @@ def handle_s3_sync(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> l
         limit_files=ctx.limits.limit_files,
         max_bytes_per_target=ctx.limits.max_bytes_per_target,
         download=download,
+        run_budget=ctx.run_budget,
     )
     urls = download.get("urls") or []
     if not urls:
@@ -1315,6 +1329,7 @@ def handle_aws_requester_pays(
         limit_files=ctx.limits.limit_files,
         max_bytes_per_target=ctx.limits.max_bytes_per_target,
         download=download,
+        run_budget=ctx.run_budget,
     )
     bucket = download.get("bucket")
     key = download.get("key")
@@ -1391,6 +1406,7 @@ def handle_torrent(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> l
         limit_files=ctx.limits.limit_files,
         max_bytes_per_target=ctx.limits.max_bytes_per_target,
         download=download,
+        run_budget=ctx.run_budget,
     )
     magnet = download.get("magnet") or download.get("torrent")
     if not magnet:
@@ -1661,15 +1677,15 @@ def run_acquire_worker(
     roots = load_roots(cfg, args, defaults)
     ensure_dir(roots.logs_root)
     ensure_dir(roots.ledger_root)
-    cfg_allowlist = _normalize_internal_mirror_allowlist(
-        (cfg.get("globals", {}) or {}).get("internal_mirror_allowlist")
-    )
+    globals_cfg = cfg.get("globals", {}) or {}
+    cfg_allowlist = _normalize_internal_mirror_allowlist(globals_cfg.get("internal_mirror_allowlist"))
     arg_allowlist: list[str] = []
     for entry in args.internal_mirror_allowlist or []:
         arg_allowlist.extend(_normalize_internal_mirror_allowlist(entry))
     internal_mirror_allowlist = _build_internal_mirror_allowlist(
         sorted(set(cfg_allowlist + arg_allowlist))
     )
+    run_budget = build_run_budget(globals_cfg.get("run_byte_budget"))
 
     ctx = AcquireContext(
         roots=roots,
@@ -1683,6 +1699,7 @@ def run_acquire_worker(
             max(1, args.workers),
         ),
         retry=RetryConfig(args.retry_max, args.retry_backoff),
+        run_budget=run_budget,
         allow_non_global_download_hosts=args.allow_non_global_download_hosts,
         internal_mirror_allowlist=internal_mirror_allowlist,
         cfg=cfg,
@@ -1706,23 +1723,38 @@ def run_acquire_worker(
     if ctx.mode.workers > 1 and ctx.mode.execute:
         with ThreadPoolExecutor(max_workers=ctx.mode.workers) as ex:
             results_by_index = [None] * len(rows)
-            futures = {
-                ex.submit(run_target, ctx, args.bucket, row, strategy_handlers, postprocess): (
-                    idx,
-                    row,
-                )
-                for idx, row in enumerate(rows)
-            }
-            for fut in as_completed(futures):
-                idx, row = futures[fut]
+            futures: dict[object, tuple[int, dict[str, Any]]] = {}
+            row_iter = iter(enumerate(rows))
+
+            def submit_next() -> bool:
+                if ctx.run_budget and ctx.run_budget.exhausted():
+                    return False
                 try:
-                    res = fut.result()
-                except Exception as e:
-                    res = {"id": row.get("id"), "status": "error", "error": repr(e)}
-                results_by_index[idx] = res
+                    idx, row = next(row_iter)
+                except StopIteration:
+                    return False
+                fut = ex.submit(run_target, ctx, args.bucket, row, strategy_handlers, postprocess)
+                futures[fut] = (idx, row)
+                return True
+
+            while len(futures) < ctx.mode.workers and submit_next():
+                continue
+            while futures:
+                for fut in as_completed(futures):
+                    idx, row = futures.pop(fut)
+                    try:
+                        res = fut.result()
+                    except Exception as e:
+                        res = {"id": row.get("id"), "status": "error", "error": repr(e)}
+                    results_by_index[idx] = res
+                    while len(futures) < ctx.mode.workers and submit_next():
+                        continue
+                    break
             summary["results"] = [result for result in results_by_index if result is not None]
     else:
         for row in rows:
+            if ctx.run_budget and ctx.run_budget.exhausted():
+                break
             res = run_target(ctx, args.bucket, row, strategy_handlers, postprocess)
             summary["results"].append(res)
 
