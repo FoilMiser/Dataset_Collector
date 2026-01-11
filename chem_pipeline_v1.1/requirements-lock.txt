@@ -1,0 +1,22 @@
+# Chemistry Corpus Pipeline v1.1 - Pinned Requirements
+# Generated for reproducible builds. Update with: pip-compile requirements.txt
+#
+# Core dependencies (pinned versions)
+pyyaml==6.0.1
+requests==2.31.0
+urllib3==2.1.0
+certifi==2023.11.17
+charset-normalizer==3.3.2
+idna==3.6
+
+# Testing dependencies
+pytest==7.4.3
+pytest-cov==4.1.0
+
+# Linting dependencies
+ruff==0.1.8
+
+# Optional dependencies (uncomment as needed)
+# tiktoken==0.5.2
+# pyarrow==14.0.2
+# datasketch==1.6.4

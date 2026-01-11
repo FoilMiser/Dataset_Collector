@@ -1,0 +1,485 @@
+# targets.yaml
+# v1.1 — full inventory + dataset-specific download/extract "resolvers"
+# Requires companion: ./license_map.yaml, ./field_schemas.yaml, ./denylist.yaml
+#
+# v1.1 updates:
+#   - Schema version bumped to 1.1 for consistency
+#   - Dockerfile/docker-compose support for containerized runs
+#   - CI/CD pipeline with automated tests
+#
+# v0.9 features:
+#   - Incremental + delta-only modes with checkpointed resume
+#   - Audit logging with run IDs and cryptographic signatures
+#   - Health checks and circuit breaker retries for resolvers
+#   - MinHash/LSH deduplication and spectrum normalization enabled by default
+#   - parquet_output: optional Parquet format output
+#
+schema_version: "1.1"
+updated_utc: "2025-12-14"
+
+companion_files:
+  license_map: "./license_map.yaml"
+  field_schemas: "./field_schemas.yaml"
+  denylist: "./denylist.yaml"
+
+globals:
+  storage_root: "/data/chem"
+  staging_root: "/data/chem/_staging"
+  manifests_root: "/data/chem/_manifests"
+  queues_root: "/data/chem/_queues"
+  catalogs_root: "/data/chem/_catalogs"
+  logs_root: "/data/chem/_logs"
+
+  pools:
+    permissive: "/data/chem/pools/permissive"
+    copyleft: "/data/chem/pools/copyleft"
+    quarantine: "/data/chem/pools/quarantine"
+
+  # v0.9: Require signoff for all YELLOW items (enforces manual review)
+  require_yellow_signoff: false
+
+  # v0.9: Near-duplicate detection settings
+  near_duplicate_detection:
+    enabled: false
+    method: "minhash_lsh"  # minhash_lsh | exact_hash
+    num_perm: 128  # MinHash permutations
+    threshold: 0.8  # Jaccard similarity threshold
+    emit_duplicate_groups: true
+
+  # v0.9: Parquet output settings
+  parquet_output:
+    enabled: false
+    compression: "snappy"  # snappy | gzip | zstd
+    row_group_size: 100000
+
+  # v0.9: InChIKey/SMILES normalization settings
+  normalization:
+    enabled: false
+    rdkit_canonicalize: true
+    validate_inchikey: true
+    report_coverage: true
+
+  default_gates:
+    - "snapshot_terms"
+    - "resolve_license_spdx"
+    - "restriction_phrase_scan"
+    - "emit_training_manifest"
+    - "emit_attribution_bundle"
+
+  # v0.6: download defaults
+  download_defaults:
+    retry_max: 3
+    retry_backoff_base: 2.0
+    retry_backoff_max: 60
+    timeout_connect: 30
+    timeout_read: 300
+    verify_checksums: true
+    enable_resume: true
+    max_concurrent_workers: 4
+    user_agent: "chem-corpus-pipeline/1.1"
+
+  text_processing_defaults:
+    max_chunk_chars: 6000
+    min_chunk_chars: 500
+    drop_tables: false
+    drop_references_section: true
+    keep_citations_inline: false
+    # v0.6: new options
+    include_section_headers: true
+    include_figure_captions: true
+    include_table_captions: true
+
+  # v0.6: statistics collection
+  statistics_defaults:
+    estimate_tokens: true
+    token_model: "cl100k_base"  # tiktoken encoding name
+    collect_property_distributions: true
+    sample_size_for_distributions: 10000
+
+queues:
+  emit:
+    - id: "green_download"
+      path: "/data/chem/_queues/green_download.jsonl"
+      criteria:
+        effective_bucket: "GREEN"
+        enabled: true
+    - id: "yellow_pipeline"
+      path: "/data/chem/_queues/yellow_pipeline.jsonl"
+      criteria:
+        effective_bucket: "YELLOW"
+        enabled: true
+    - id: "red_rejected"
+      path: "/data/chem/_queues/red_rejected.jsonl"
+      criteria:
+        effective_bucket: "RED"
+        enabled: true
+
+gates_catalog:
+  snapshot_terms: "Save Terms/ToS + license page HTML/PDF + retrieval timestamp."
+  resolve_license_spdx: "Normalize license to SPDX via license_map.yaml rules; store evidence."
+  restriction_phrase_scan: "Scan terms/content for restriction phrases (no-LLM/no-TDM/etc.)."
+  record_level_filter: "Require per-record license metadata; keep only allowlist."
+  computed_only_extract: "Extract only safe computed identifiers/descriptors; drop depositor text."
+  extract_text_chunks: "Extract text into JSONL chunks using globals.text_processing_defaults unless overridden."
+  emit_training_manifest: "Manifest of included files/records + checksums + license evidence."
+  emit_attribution_bundle: "Generate ATTRIBUTION.md + CITATIONS.bib for included sources."
+  manual_legal_review: "Human review required before training."
+  segregate_copyleft_pool: "Force output into copyleft pool and keep isolated."
+  # v0.6: new gates
+  collect_statistics: "Collect dataset statistics (tokens, property distributions)."
+  validate_schema: "Validate extracted data against field_schemas.yaml."
+  # v0.9: new gates
+  near_duplicate_detection: "Run MinHash/LSH deduplication pass."
+  normalize_structures: "Canonicalize SMILES/InChIKey using RDKit."
+  emit_parquet: "Output schema-validated records as Parquet files."
+  split_aware_partition: "Partition data respecting split_group_id for leak prevention."
+
+resolvers:
+  zenodo:
+    mode: "record_id_or_doi"
+    api: "https://zenodo.org/api/records/{record_id}"
+    outputs:
+      - "files[*].links.self"
+      - "files[*].checksum"
+    # v0.6: checksum verification
+    verify_checksum: true
+    checksum_algorithm: "md5"
+  figshare:
+    mode: "article_url"
+    note: "Prefer Figshare API if available; otherwise manual download from article page."
+    api_base: "https://api.figshare.com/v2"
+    # v0.9: Enhanced Figshare resolver
+    api_version: "2"
+    rate_limit:
+      requests_per_minute: 60
+      retry_on_429: true
+    endpoints:
+      article: "/articles/{article_id}"
+      files: "/articles/{article_id}/files"
+      download: "/articles/{article_id}/files/{file_id}"
+  github:
+    # v0.9: NEW GitHub release resolver
+    mode: "release"
+    api_base: "https://api.github.com"
+    rate_limit:
+      requests_per_hour: 60  # Unauthenticated limit
+      retry_on_403: true
+      exponential_backoff: true
+    endpoints:
+      releases: "/repos/{owner}/{repo}/releases"
+      latest: "/repos/{owner}/{repo}/releases/latest"
+      assets: "/repos/{owner}/{repo}/releases/{release_id}/assets"
+    note: "Use GITHUB_TOKEN environment variable for higher rate limits."
+  dataverse:
+    mode: "persistent_id"
+    note: "Use Dataverse API by persistentId; capture license from metadata."
+    default_instance: "https://dataverse.harvard.edu"
+    configurable_instances:
+      - "https://dataverse.harvard.edu"
+      - "https://dataverse.lib.virginia.edu"
+      - "https://dataverse.tdl.org"
+  huggingface_datasets:
+    mode: "dataset_id"
+    note: "Use datasets.load_dataset; capture dataset card + license field."
+  git:
+    mode: "repo"
+    note: "Capture commit hash; store LICENSE + README as evidence."
+  ftp:
+    mode: "base_url + globs"
+    note: "Use list + filter by glob; store directory listing snapshot."
+  api:
+    mode: "base_url"
+    note: "Cache responses; store query params & rate limit behavior."
+
+targets:
+
+  - id: "synthetic_chemistry_problems"
+    name: "Your generated deterministic chemistry equations + word problems (auto-graded)"
+    enabled: true
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "Proprietary", url: "" }
+    data_type: ["synthetic", "problems", "equations", "word_problems"]
+    download:
+      strategy: "none"
+    build:
+      owner: "you"
+      output_formats: ["jsonl"]
+      required_fields:
+        - "problem_id"
+        - "domain"
+        - "difficulty"
+        - "prompt"
+        - "answer_key"
+        - "grading_fn"
+        - "units_schema"
+    gates_override:
+      add: ["emit_training_manifest"]
+
+  # A) Ontologies / IDs
+  - id: "chebi_core"
+    name: "ChEBI — ontology + structures"
+    enabled: true
+    priority: 10
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "CC-BY-4.0", url: "https://github.com/ebi-chebi/ChEBI/blob/master/LICENSE" }
+    data_type: ["ontology", "structures", "names", "ids"]
+    download:
+      strategy: "http"
+      urls: ["https://www.ebi.ac.uk/chebi/downloadsForward.do"]
+      # v0.6: per-target retry config
+      retry:
+        max_attempts: 3
+        backoff_base: 2.0
+    output:
+      pool: "permissive"
+      formats: ["owl", "tsv", "sdf", "jsonl"]
+    statistics:
+      enabled: true
+      fields_to_analyze: ["CHEBI_ID", "STAR", "FORMULA"]
+
+  - id: "wikidata_dumps"
+    name: "Wikidata dumps"
+    enabled: true
+    priority: 8
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "CC0-1.0", url: "https://www.wikidata.org/wiki/Wikidata:Licensing" }
+    data_type: ["knowledge_graph", "ids", "links"]
+    download:
+      strategy: "http"
+      urls: ["https://dumps.wikimedia.org/wikidatawiki/entities/"]
+    output:
+      pool: "permissive"
+      formats: ["jsonl", "ttl", "nt"]
+
+  # C) PubChem (raw -> derived)
+  - id: "pubchem_compound_sdf_bulk"
+    name: "PubChem Compound CURRENT-Full SDF (bulk)"
+    enabled: true
+    priority: 10
+    license_profile: "record_level"
+    license_evidence: { spdx_hint: "US-PUBLIC-DOMAIN", url: "https://pubchem.ncbi.nlm.nih.gov/docs/downloads" }
+    data_type: ["structures", "properties", "annotations"]
+    download:
+      strategy: "ftp"
+      base_url: "ftp://ftp.ncbi.nlm.nih.gov/pubchem/Compound/CURRENT-Full/SDF/"
+      include_globs: ["Compound_*_*.sdf.gz"]
+      # v0.6: integrity verification
+      integrity:
+        verify_size: true
+        compute_sha256: true
+    gates_override:
+      add: ["computed_only_extract", "validate_schema", "collect_statistics"]
+    output:
+      pool: "quarantine"
+      formats: ["sdf.gz"]
+
+  - id: "pubchem_derived_computed_only"
+    name: "Derived: PubChem computed-only JSONL (safe slice)"
+    enabled: true
+    priority: 10
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "Derived", url: "" }
+    data_type: ["structures", "computed_properties"]
+    build:
+      from: ["pubchem_compound_sdf_bulk"]
+      gate: "computed_only_extract"
+      # v0.6: reference versioned field schema
+      field_schema_version: "pubchem_computed_only_v1.0.0"
+      include_fields:
+        - "PUBCHEM_COMPOUND_CID"
+        - "PUBCHEM_CACTVS_CANONICAL_SMILES"
+        - "PUBCHEM_CACTVS_EXTENDED_SMILES"
+        - "PUBCHEM_IUPAC_INCHI"
+        - "PUBCHEM_IUPAC_INCHIKEY"
+        - "PUBCHEM_MOLECULAR_FORMULA"
+        - "PUBCHEM_MOLECULAR_WEIGHT"
+        - "PUBCHEM_EXACT_MASS"
+        - "PUBCHEM_MONOISOTOPIC_WEIGHT"
+        - "PUBCHEM_TOTAL_CHARGE"
+        - "PUBCHEM_XLOGP3"
+        - "PUBCHEM_TPSA"
+        - "PUBCHEM_HBOND_DONOR"
+        - "PUBCHEM_HBOND_ACCEPTOR"
+        - "PUBCHEM_ROTATABLE_BOND"
+        - "PUBCHEM_HEAVY_ATOM_COUNT"
+      exclude_fields:
+        - "freeform_text"
+        - "provider_specific_annotations"
+        - "synonyms_if_provenance_unclear"
+      # v0.6: CID-range sharding
+      sharding:
+        method: "cid_range"
+        range_size: 1000000
+    output:
+      pool: "permissive"
+      formats: ["jsonl.gz"]
+    statistics:
+      enabled: true
+      fields_to_analyze:
+        - "PUBCHEM_MOLECULAR_WEIGHT"
+        - "PUBCHEM_XLOGP3"
+        - "PUBCHEM_TPSA"
+        - "PUBCHEM_HEAVY_ATOM_COUNT"
+
+  # D) Bioactivity
+  - id: "chembl"
+    name: "ChEMBL (bioactivity)"
+    enabled: true
+    priority: 9
+    license_profile: "copyleft"
+    license_evidence: { spdx_hint: "CC-BY-SA-3.0", url: "https://chembl.gitbook.io/chembl-interface-documentation/frequently-asked-questions/general-questions" }
+    data_type: ["structures", "bioactivity", "targets", "assays"]
+    download:
+      strategy: "http"
+      urls: ["https://chembl.gitbook.io/chembl-interface-documentation/downloads"]
+    gates_override:
+      add: ["manual_legal_review", "segregate_copyleft_pool"]
+    output:
+      pool: "copyleft"
+      formats: ["sqlite", "tsv", "jsonl"]
+
+  # E) Quantum chemistry
+  - id: "qm7x"
+    name: "QM7-X (Zenodo)"
+    enabled: true
+    priority: 7
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "CC-BY-4.0", url: "https://zenodo.org/records/4288677" }
+    data_type: ["qm", "conformers", "forces"]
+    download:
+      strategy: "zenodo"
+      record: "4288677"
+      # v0.6: Zenodo checksum verification
+      integrity:
+        verify_zenodo_md5: true
+        compute_sha256: true
+    output:
+      pool: "permissive"
+      formats: ["tar.gz", "hdf5"]
+
+  - id: "ani1x"
+    name: "ANI-1x (Figshare)"
+    enabled: true
+    priority: 7
+    license_profile: "permissive"
+    license_evidence: { spdx_hint: "CC0-1.0", url: "https://figshare.com/articles/dataset/ANI-1x_dataset/7022546" }
+    data_type: ["qm", "conformers", "forces"]
+    download:
+      strategy: "http"
+      urls: ["https://figshare.com/articles/dataset/ANI-1x_dataset/7022546"]
+    output:
+      pool: "permissive"
+      formats: ["hdf5", "tar.gz"]
+
+  # J) Literature
+  - id: "pmc_oa_fulltext"
+    name: "PMC Open Access subset (full text)"
+    enabled: true
+    priority: 8
+    license_profile: "record_level"
+    license_evidence: { spdx_hint: "MIXED", url: "https://pmc.ncbi.nlm.nih.gov/tools/openftlist/" }
+    data_type: ["papers", "full_text", "jats_xml"]
+    download:
+      strategy: "http"
+      urls: ["https://pmc.ncbi.nlm.nih.gov/tools/openftlist/"]
+      # v0.6: caching for tarballs
+      cache:
+        enabled: true
+        cache_dir: "quarantine/pmc_oa_fulltext/_cache"
+        max_cache_size_gb: 100
+    gates_override:
+      add: ["record_level_filter", "extract_text_chunks", "collect_statistics"]
+    # v0.6: enhanced text processing for PMC
+    text_processing:
+      include_section_headers: true
+      include_figure_captions: true
+      include_table_captions: true
+      drop_references_section: true
+    output:
+      pool: "quarantine"
+      formats: ["xml", "jsonl.gz"]
+
+  - id: "wikipedia_en"
+    name: "Wikipedia EN dumps (chemistry pages)"
+    enabled: true
+    priority: 3
+    license_profile: "copyleft"
+    license_evidence: { spdx_hint: "CC-BY-SA-4.0", url: "https://en.wikipedia.org/wiki/Wikipedia:Copyrights" }
+    data_type: ["text"]
+    download:
+      strategy: "http"
+      urls: ["https://dumps.wikimedia.org/enwiki/latest/"]
+    gates_override:
+      add: ["manual_legal_review", "segregate_copyleft_pool", "extract_text_chunks"]
+    output:
+      pool: "copyleft"
+      formats: ["bz2", "jsonl.gz"]
+
+  # v0.9: NEW record-level filtering sources
+
+  - id: "mona"
+    name: "MassBank of North America (MoNA)"
+    enabled: true
+    priority: 6
+    license_profile: "record_level"
+    license_evidence: { spdx_hint: "CC-BY-4.0", url: "https://mona.fiehnlab.ucdavis.edu/documentation/license" }
+    data_type: ["spectra", "mass_spec", "structures"]
+    download:
+      strategy: "http"
+      urls: ["https://mona.fiehnlab.ucdavis.edu/rest/downloads"]
+      # MoNA provides per-record attribution
+      integrity:
+        verify_size: true
+        compute_sha256: true
+    gates_override:
+      add: ["record_level_filter", "validate_schema", "collect_statistics"]
+    # v0.9: split_group_id for related spectra
+    split_group_id: "mona_spectra_group"
+    output:
+      pool: "quarantine"
+      formats: ["json", "msp", "jsonl.gz"]
+    statistics:
+      enabled: true
+      fields_to_analyze: ["compound_class", "instrument_type", "precursor_mz"]
+
+  - id: "gnps"
+    name: "GNPS (Global Natural Products Social Molecular Networking)"
+    enabled: true
+    priority: 6
+    license_profile: "record_level"
+    license_evidence: { spdx_hint: "CC0-1.0", url: "https://gnps.ucsd.edu/ProteoSAFe/static/gnps-splash.jsp" }
+    data_type: ["spectra", "mass_spec", "natural_products"]
+    download:
+      strategy: "http"
+      urls: ["https://gnps-external.ucsd.edu/gnpslibrary"]
+      integrity:
+        verify_size: true
+        compute_sha256: true
+    gates_override:
+      add: ["record_level_filter", "validate_schema", "collect_statistics"]
+    # v0.9: split_group_id for related natural product clusters
+    split_group_id: "gnps_cluster_group"
+    output:
+      pool: "quarantine"
+      formats: ["mgf", "json", "jsonl.gz"]
+    statistics:
+      enabled: true
+      fields_to_analyze: ["compound_class", "library", "precursor_mz"]
+
+  - id: "chemspider"
+    name: "ChemSpider (RSC)"
+    enabled: false  # Requires API key
+    priority: 5
+    license_profile: "record_level"
+    license_evidence: { spdx_hint: "Custom-Restrictive", url: "https://www.chemspider.com/TermsOfUse.aspx" }
+    review_required: true
+    data_type: ["structures", "properties", "ids"]
+    download:
+      strategy: "api"
+      base_url: "https://api.rsc.org/compounds/v1"
+      api_key_env: "CHEMSPIDER_API_KEY"
+    gates_override:
+      add: ["manual_legal_review", "record_level_filter"]
+    output:
+      pool: "quarantine"
+      formats: ["json", "jsonl.gz"]

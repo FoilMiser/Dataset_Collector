@@ -1,0 +1,81 @@
+# Chemistry Corpus Pipeline v1.1 - CI Workflow
+# Runs lint checks and tests on push and pull requests.
+
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'chem_pipeline_v1.1/**'
+      - '.github/workflows/ci.yaml'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'chem_pipeline_v1.1/**'
+      - '.github/workflows/ci.yaml'
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install linting tools
+        run: pip install ruff
+
+      - name: Run ruff lint
+        run: |
+          cd chem_pipeline_v1.1
+          ruff check --select=E,F,W --ignore=E501 .
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          cd chem_pipeline_v1.1
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Run tests
+        run: |
+          cd chem_pipeline_v1.1
+          pytest tests/ -v --cov=. --cov-report=term-missing
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: chem_pipeline_v1.1/htmlcov/
+          retention-days: 7
+        if: always()
+
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          cd chem_pipeline_v1.1
+          docker build -t chem-pipeline:test .
+
+      - name: Test Docker image
+        run: |
+          docker run --rm chem-pipeline:test python -c "import yaml; import requests; print('Dependencies OK')"
