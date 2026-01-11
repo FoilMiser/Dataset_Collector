@@ -90,7 +90,7 @@ def render_readme(spec: PipelineSpec) -> str:
         python -m collector_core.dc_cli run --pipeline {spec.domain} --stage yellow_screen -- \\
           --targets ../pipelines/targets/{spec.targets_filename} --queue /data/{spec.domain}/_queues/yellow_pipeline.jsonl --execute
         python -m collector_core.dc_cli run --pipeline {spec.domain} --stage merge -- --targets ../pipelines/targets/{spec.targets_filename} --execute
-        python -m collector_core.generic_workers --domain {spec.domain} catalog -- \\
+        python -m collector_core.dc_cli catalog-builder --pipeline {spec.domain} -- \\
           --targets ../pipelines/targets/{spec.targets_filename} --output /data/{spec.domain}/_catalogs/catalog.json
         ```
 
@@ -445,7 +445,7 @@ def render_run_pipeline(spec: PipelineSpec) -> str:
         run_review() {{
           local queue_file="$QUEUES_ROOT/yellow_pipeline.jsonl"
           echo -e "${{BLUE}}== Stage: review ==${{NC}}"
-          python -m collector_core.generic_workers --domain {spec.domain} review-queue -- --queue "$queue_file" --targets "$TARGETS" --limit 50 || true
+          python -m collector_core.dc_cli review-queue --pipeline {spec.domain} -- --queue "$queue_file" --targets "$TARGETS" --limit 50 || true
         }}
 
         run_acquire() {{
@@ -490,7 +490,7 @@ def render_run_pipeline(spec: PipelineSpec) -> str:
 
         run_catalog() {{
           echo -e "${{BLUE}}== Stage: catalog ==${{NC}}"
-          python -m collector_core.generic_workers --domain {spec.domain} catalog -- --targets "$TARGETS" --output "${{CATALOGS_ROOT}}/catalog.json"
+          python -m collector_core.dc_cli catalog-builder --pipeline {spec.domain} -- --targets "$TARGETS" --output "${{CATALOGS_ROOT}}/catalog.json"
         }}
 
         case "$STAGE" in
