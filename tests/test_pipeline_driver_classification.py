@@ -167,6 +167,11 @@ def test_green_yellow_red_classification(
     assert {row["id"] for row in green_rows} == {"green_target"}
     assert {row["id"] for row in yellow_rows} == {"yellow_target"}
     assert {row["id"] for row in red_rows} == {"red_target"}
+    assert green_rows[0]["bucket_reason"] == "spdx_allow"
+    assert yellow_rows[0]["bucket_reason"] == "conditional_spdx"
+    assert red_rows[0]["bucket_reason"] == "spdx_deny"
+    for row in green_rows + yellow_rows + red_rows:
+        assert isinstance(row["signals"], dict)
 
     run_dirs = [path for path in minimal_config.ledger_root.iterdir() if path.is_dir()]
     assert len(run_dirs) == 1
@@ -206,6 +211,8 @@ def test_offline_snapshot_terms_forces_yellow(
 
     assert not green_rows
     assert {row["id"] for row in yellow_rows} == {"offline_target"}
+    assert yellow_rows[0]["bucket_reason"] == "snapshot_missing"
+    assert yellow_rows[0]["signals"]["evidence"]["snapshot_missing"] is True
     evaluation = json.loads(
         (minimal_config.manifests_root / "offline_target" / "evaluation.json").read_text(
             encoding="utf-8"
@@ -355,6 +362,10 @@ def test_denylist_overrides_bucket(tmp_path: Path, minimal_config: PipelineTestC
     assert not green_rows
     assert {row["id"] for row in yellow_rows} == {"force_yellow"}
     assert {row["id"] for row in red_rows} == {"hard_red"}
+    assert yellow_rows[0]["bucket_reason"] == "denylist_force_yellow"
+    assert yellow_rows[0]["signals"]["denylist"]["force_yellow"] is True
+    assert red_rows[0]["bucket_reason"] == "denylist_hard_red"
+    assert red_rows[0]["signals"]["denylist"]["hard_red"] is True
 
 
 def test_content_check_block_action_forces_red(
@@ -382,6 +393,8 @@ def test_content_check_block_action_forces_red(
     red_rows = read_jsonl(minimal_config.queues_root / "red_rejected.jsonl")
     assert {row["id"] for row in red_rows} == {"pii_target"}
     assert red_rows[0]["content_check_action"] == "block"
+    assert red_rows[0]["bucket_reason"] == "content_check_block"
+    assert red_rows[0]["signals"]["content_check"]["action"] == "block"
     evaluation = json.loads(
         (minimal_config.manifests_root / "pii_target" / "evaluation.json").read_text(
             encoding="utf-8"
@@ -413,6 +426,8 @@ def test_content_check_quarantine_action_forces_yellow(
     yellow_rows = read_jsonl(minimal_config.queues_root / "yellow_pipeline.jsonl")
     assert {row["id"] for row in yellow_rows} == {"dual_use_target"}
     assert yellow_rows[0]["content_check_action"] == "quarantine"
+    assert yellow_rows[0]["bucket_reason"] == "content_check_quarantine"
+    assert yellow_rows[0]["signals"]["content_check"]["action"] == "quarantine"
     evaluation = json.loads(
         (minimal_config.manifests_root / "dual_use_target" / "evaluation.json").read_text(
             encoding="utf-8"

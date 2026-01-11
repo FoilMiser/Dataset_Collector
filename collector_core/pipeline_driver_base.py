@@ -954,6 +954,137 @@ def resolve_content_check_action(
     return action, checks
 
 
+def summarize_denylist_hits(dl_hits: list[dict[str, Any]]) -> tuple[bool, bool]:
+    hard_red = False
+    force_yellow = False
+    for hit in dl_hits:
+        severity = hit.get("severity", "hard_red")
+        if severity == "hard_red":
+            hard_red = True
+        elif severity == "force_yellow":
+            force_yellow = True
+    return hard_red, force_yellow
+
+
+def build_bucket_signals(
+    *,
+    ctx: TargetContext,
+    license_map: LicenseMap,
+    evidence: EvidenceResult,
+    restriction_hits: list[str],
+    resolved: str,
+    resolved_confidence: float,
+    eff_bucket: str,
+    review_required: bool,
+    review_status: str,
+    promote_to: str,
+    min_confidence: float,
+    require_yellow_signoff: bool,
+    action: str,
+    action_checks: list[str],
+) -> tuple[str, dict[str, Any]]:
+    spdx_bucket_value = spdx_bucket(license_map, resolved)
+    low_confidence = resolved_confidence < min_confidence
+    snapshot_required = "snapshot_terms" in ctx.license_gates
+    evidence_status = evidence.snapshot.get("status")
+    snapshot_missing = bool(evidence.no_fetch_missing_evidence) or (
+        snapshot_required and evidence_status != "ok"
+    )
+    evidence_changed = bool(evidence.snapshot.get("changed_from_previous"))
+    pdf_text_failed = bool(evidence.snapshot.get("pdf_text_extraction_failed"))
+    manual_review_gate = bool(
+        "manual_legal_review" in ctx.license_gates or "manual_review" in ctx.license_gates
+    )
+    restriction_gate = bool(
+        "restriction_phrase_scan" in ctx.license_gates or "no_restrictions" in ctx.license_gates
+    )
+    restriction_present = bool(restriction_hits)
+    review_pending = review_status not in {"approved", "rejected"}
+    hard_red, force_yellow = summarize_denylist_hits(ctx.dl_hits)
+
+    signals = {
+        "spdx": {
+            "resolved": resolved,
+            "confidence": resolved_confidence,
+            "bucket": spdx_bucket_value,
+            "min_confidence": min_confidence,
+            "low_confidence": low_confidence,
+        },
+        "evidence": {
+            "status": evidence_status,
+            "snapshot_required": snapshot_required,
+            "snapshot_missing": snapshot_missing,
+            "changed_from_previous": evidence_changed,
+            "pdf_text_extraction_failed": pdf_text_failed,
+            "no_fetch_missing_evidence": evidence.no_fetch_missing_evidence,
+        },
+        "license_gates": list(ctx.license_gates),
+        "restriction_hits": restriction_hits,
+        "review": {
+            "required": review_required,
+            "status": review_status,
+            "pending": review_pending,
+            "promote_to": promote_to,
+            "require_yellow_signoff": require_yellow_signoff,
+        },
+        "denylist": {
+            "hits": ctx.dl_hits,
+            "hard_red": hard_red,
+            "force_yellow": force_yellow,
+        },
+        "content_check": {"action": action, "checks": action_checks},
+    }
+
+    bucket_reason = "policy_default"
+    if eff_bucket == "RED":
+        if action == "block":
+            bucket_reason = "content_check_block"
+        elif hard_red:
+            bucket_reason = "denylist_hard_red"
+        elif review_status == "rejected":
+            bucket_reason = "review_rejected"
+        elif spdx_bucket_value == "RED":
+            bucket_reason = "spdx_deny"
+        else:
+            bucket_reason = "policy_red"
+    elif eff_bucket == "YELLOW":
+        if action == "quarantine":
+            bucket_reason = "content_check_quarantine"
+        elif force_yellow:
+            bucket_reason = "denylist_force_yellow"
+        elif review_required and review_pending:
+            bucket_reason = "review_required"
+        elif snapshot_missing:
+            bucket_reason = "snapshot_missing"
+        elif evidence_changed:
+            bucket_reason = "evidence_changed"
+        elif restriction_gate and restriction_present:
+            bucket_reason = "restriction_hits"
+        elif pdf_text_failed:
+            bucket_reason = "text_extraction_failed"
+        elif manual_review_gate:
+            bucket_reason = "manual_review_gate"
+        elif low_confidence:
+            bucket_reason = "low_confidence"
+        elif spdx_bucket_value == "YELLOW":
+            bucket_reason = (
+                "unknown_spdx"
+                if str(resolved).strip().upper() in {"", "UNKNOWN"}
+                else "conditional_spdx"
+            )
+        else:
+            bucket_reason = "policy_yellow"
+    elif eff_bucket == "GREEN":
+        if review_status == "approved" and promote_to == "GREEN":
+            bucket_reason = "review_approved"
+        elif spdx_bucket_value == "GREEN":
+            bucket_reason = "spdx_allow"
+        else:
+            bucket_reason = "policy_green"
+
+    return bucket_reason, signals
+
+
 def compute_effective_bucket(
     license_map: LicenseMap,
     license_gates: list[str],
@@ -1719,6 +1850,24 @@ class BasePipelineDriver:
                 evaluation["queue_bucket"] = "YELLOW"
             row["output_pool"] = "quarantine"
             evaluation["output_pool"] = "quarantine"
+        bucket_reason, signals = build_bucket_signals(
+            ctx=ctx,
+            license_map=cfg.license_map,
+            evidence=evidence,
+            restriction_hits=restriction_hits,
+            resolved=resolved,
+            resolved_confidence=resolved_confidence,
+            eff_bucket=row["effective_bucket"],
+            review_required=review_required,
+            review_status=review_status,
+            promote_to=promote_to,
+            min_confidence=cfg.args.min_license_confidence,
+            require_yellow_signoff=cfg.require_yellow_signoff,
+            action=action or "ok",
+            action_checks=action_checks,
+        )
+        row["bucket_reason"] = bucket_reason
+        row["signals"] = signals
         return evaluation, row
 
     def fetch_evidence(self, ctx: TargetContext, cfg: DriverConfig) -> EvidenceResult:

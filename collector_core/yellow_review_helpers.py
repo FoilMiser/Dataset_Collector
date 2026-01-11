@@ -44,6 +44,8 @@ class QueueEntry:
     denylist_hits: list[dict[str, Any]]
     priority: Any
     manifest_dir: str
+    bucket_reason: str
+    signals: dict[str, Any]
 
     @classmethod
     def from_raw(cls, raw: dict[str, Any]) -> QueueEntry:
@@ -60,6 +62,8 @@ class QueueEntry:
             denylist_hits=list(raw.get("denylist_hits", []) or []),
             priority=raw.get("priority", None),
             manifest_dir=str(raw.get("manifest_dir", "")),
+            bucket_reason=str(raw.get("bucket_reason", "")),
+            signals=dict(raw.get("signals", {}) or {}),
         )
 
 
