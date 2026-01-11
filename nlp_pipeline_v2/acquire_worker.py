@@ -2,15 +2,8 @@
 """
 acquire_worker.py (v2.0)
 
-Replaces download_worker.py with the v2 raw layout:
-  raw/{green|yellow}/{license_pool}/{target_id}/...
-
-Reads queue rows emitted by pipeline_driver.py and downloads payloads using the
-configured strategy. Dry-run by default; pass --execute to write files. After a
-successful run it writes a per-target `acquire_done.json` under the manifests
-root.
+Thin wrapper that delegates to the spec-driven generic acquire worker.
 """
-
 from __future__ import annotations
 
 import sys
@@ -19,39 +12,31 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from collector_core.__version__ import __version__ as VERSION
-from collector_core.acquire_strategies import (
-    DEFAULT_STRATEGY_HANDLERS,
-    RootsDefaults,
-    handle_figshare_article,
-    make_github_release_handler,
-    run_acquire_worker,
+from collector_core.acquire_strategies import (  # noqa: E402
+    AcquireContext,
+    Limits,
+    RetryConfig,
+    Roots,
+    RunMode,
+    _http_download_with_resume,
 )
+from collector_core.generic_workers import main_acquire  # noqa: E402
 
-__all__ = ["main", "VERSION"]
+DOMAIN = "nlp"
 
-GITHUB_RELEASE_HANDLER = make_github_release_handler("nlp-corpus-acquire")
-
-STRATEGY_HANDLERS = {
-    **DEFAULT_STRATEGY_HANDLERS,
-    "figshare": handle_figshare_article,
-    "github_release": GITHUB_RELEASE_HANDLER,
-}
-
-DEFAULTS = RootsDefaults(
-    raw_root="/data/nlp/raw",
-    manifests_root="/data/nlp/_manifests",
-    ledger_root="/data/nlp/_ledger",
-    logs_root="/data/nlp/_logs",
-)
+__all__ = [
+    "AcquireContext",
+    "Limits",
+    "RetryConfig",
+    "Roots",
+    "RunMode",
+    "_http_download_with_resume",
+    "main",
+]
 
 
 def main() -> None:
-    run_acquire_worker(
-        defaults=DEFAULTS,
-        targets_yaml_label="targets_nlp.yaml",
-        strategy_handlers=STRATEGY_HANDLERS,
-    )
+    main_acquire(DOMAIN, repo_root=Path(__file__).resolve().parents[1])
 
 
 if __name__ == "__main__":

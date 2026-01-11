@@ -2,38 +2,27 @@
 #
 # run_pipeline.sh (v2.0)
 #
-# Wrapper script for the Metrology Corpus Pipeline v2. It follows the
-# docs/PIPELINE_V2_REWORK_PLAN.md stage order.
-#
-# Usage examples:
-#   ./run_pipeline.sh --targets targets_metrology.yaml --stage classify
-#   ./run_pipeline.sh --targets targets_metrology.yaml --stage acquire_green --execute
+# Wrapper script for the metrology pipeline using the unified dc CLI.
 #
 set -euo pipefail
 
-# Interpreter: python
-
-VERSION="2.0"
-
 RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
 TARGETS=""
-STAGE="all"
 EXECUTE=""
+STAGE="all"
 LIMIT_TARGETS=""
 LIMIT_FILES=""
 WORKERS="4"
 
 usage() {
-  cat << EOF
-Metrology Corpus Pipeline v${VERSION}
+  cat << 'EOM'
+Pipeline wrapper (v2)
 
 Required:
-  --targets FILE          Path to targets_metrology.yaml
+  --targets FILE          Path to targets YAML
 
 Options:
   --execute               Perform actions (default is dry-run/plan only)
@@ -43,7 +32,7 @@ Options:
   --limit-files N         Limit files per target during acquisition
   --workers N             Parallel workers for acquisition (default: 4)
   -h, --help              Show this help
-EOF
+EOM
 }
 
 while [[ $# -gt 0 ]]; do
@@ -60,98 +49,100 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$TARGETS" ]]; then
-  echo -e "${RED}Error: --targets is required${NC}"
+  echo -e "${RED}--targets is required${NC}"
   usage
   exit 1
 fi
+
 if [[ ! -f "$TARGETS" ]]; then
-  echo -e "${RED}Error: targets file not found: $TARGETS${NC}"
+  echo -e "${RED}targets file not found: $TARGETS${NC}"
   exit 1
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export PYTHONPATH="${SCRIPT_DIR}/..:${PYTHONPATH:-}"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+export PYTHONPATH="${REPO_ROOT}:${PYTHONPATH:-}"
 
-QUEUES_ROOT="$(python - <<'PY'
-import sys
+QUEUES_ROOT=$(python - << PY
 from pathlib import Path
 from collector_core.config_validator import read_yaml
-cfg = read_yaml(Path(sys.argv[1]), schema_name="targets") or {}
-print((cfg.get('globals', {}) or {}).get('queues_root', '/data/metrology/_queues'))
+from collector_core.pipeline_spec import get_pipeline_spec
+cfg = read_yaml(Path("${TARGETS}"), schema_name="targets") or {}
+spec = get_pipeline_spec("metrology")
+prefix = spec.prefix if spec else "metrology"
+print(cfg.get("globals", {}).get("queues_root", f"/data/{prefix}/_queues"))
 PY
-"$TARGETS")"
-
+)
+CATALOGS_ROOT=$(python - << PY
+from pathlib import Path
+from collector_core.config_validator import read_yaml
+from collector_core.pipeline_spec import get_pipeline_spec
+cfg = read_yaml(Path("${TARGETS}"), schema_name="targets") or {}
+spec = get_pipeline_spec("metrology")
+prefix = spec.prefix if spec else "metrology"
+print(cfg.get("globals", {}).get("catalogs_root", f"/data/{prefix}/_catalogs"))
+PY
+)
 LIMIT_TARGETS_ARG=""; [[ -n "$LIMIT_TARGETS" ]] && LIMIT_TARGETS_ARG="--limit-targets $LIMIT_TARGETS"
 LIMIT_FILES_ARG=""; [[ -n "$LIMIT_FILES" ]] && LIMIT_FILES_ARG="--limit-files $LIMIT_FILES"
 
-echo -e "${BLUE}Metrology Corpus Pipeline v${VERSION}${NC}"
-echo -e "Targets: ${GREEN}${TARGETS}${NC}"
-echo -e "Stage:   ${GREEN}${STAGE}${NC}"
-echo -e "Mode:    ${GREEN}$([[ -n \"$EXECUTE\" ]] && echo EXECUTE || echo DRY-RUN)${NC}"
-echo ""
-
 run_classify() {
-  echo -e "${YELLOW}[classify]${NC} Emitting queues..."
-  python "${SCRIPT_DIR}/pipeline_driver.py" --targets "$TARGETS"
-  echo -e "${GREEN}[classify] done${NC}"
+  echo -e "${BLUE}== Stage: classify ==${NC}"
+  local no_fetch=""
+  if [[ -z "$EXECUTE" ]]; then
+    no_fetch="--no-fetch"
+  fi
+  python -m collector_core.dc_cli pipeline metrology -- --targets "$TARGETS" $no_fetch
 }
 
 run_review() {
-  local queue="${QUEUES_ROOT}/yellow_pipeline.jsonl"
-  echo -e "${BLUE}[review]${NC} Showing first 50 YELLOW queue rows from ${queue}"
-  python "${SCRIPT_DIR}/review_queue.py" --queue "${queue}" list --limit 50 || true
+  local queue_file="$QUEUES_ROOT/yellow_pipeline.jsonl"
+  echo -e "${BLUE}== Stage: review ==${NC}"
+  python -m collector_core.generic_workers --domain metrology review-queue -- --queue "$queue_file" --targets "$TARGETS" --limit 50 || true
 }
 
 run_acquire() {
   local bucket="$1"
-  local queue_file=""
-  case "$bucket" in
-    green) queue_file="green_download.jsonl" ;;
-    yellow) queue_file="yellow_pipeline.jsonl" ;;
-    *) queue_file="${bucket}.jsonl" ;;
-  esac
-  local queue="${QUEUES_ROOT}/${queue_file}"
-  if [[ ! -f "$queue" ]]; then
-    echo -e "${RED}[acquire_${bucket}] queue not found: ${queue}${NC}"
+  local queue_file="$QUEUES_ROOT/${bucket}_download.jsonl"
+  if [[ "$bucket" == "yellow" ]]; then
+    queue_file="$QUEUES_ROOT/yellow_pipeline.jsonl"
+  fi
+  if [[ ! -f "$queue_file" ]]; then
+    echo -e "${RED}Queue not found: $queue_file${NC}"
     exit 1
   fi
-  echo -e "${YELLOW}[acquire_${bucket}]${NC} Processing queue ${queue}"
-  python "${SCRIPT_DIR}/acquire_worker.py" \
-    --queue "$queue" \
+  echo -e "${BLUE}== Stage: acquire_${bucket} ==${NC}"
+  python -m collector_core.dc_cli run --pipeline metrology --stage acquire -- \
+    --queue "$queue_file" \
     --targets-yaml "$TARGETS" \
     --bucket "$bucket" \
     --workers "$WORKERS" \
+    $EXECUTE \
     $LIMIT_TARGETS_ARG \
-    $LIMIT_FILES_ARG \
-    $EXECUTE
-  echo -e "${GREEN}[acquire_${bucket}] done${NC}"
+    $LIMIT_FILES_ARG
 }
 
 run_screen_yellow() {
-  local queue="${QUEUES_ROOT}/yellow_pipeline.jsonl"
-  if [[ ! -f "$queue" ]]; then
-    echo -e "${RED}[screen_yellow] queue not found: ${queue}${NC}"
+  local queue_file="$QUEUES_ROOT/yellow_pipeline.jsonl"
+  if [[ ! -f "$queue_file" ]]; then
+    echo -e "${RED}Queue not found: $queue_file${NC}"
     exit 1
   fi
-  echo -e "${YELLOW}[screen_yellow]${NC} Screening YELLOW payloads"
-  python "${SCRIPT_DIR}/yellow_screen_worker.py" \
+  echo -e "${BLUE}== Stage: screen_yellow ==${NC}"
+  python -m collector_core.dc_cli run --pipeline metrology --stage yellow_screen -- \
     --targets "$TARGETS" \
-    --queue "$queue" \
+    --queue "$queue_file" \
     $EXECUTE
-  echo -e "${GREEN}[screen_yellow] done${NC}"
 }
 
 run_merge() {
-  echo -e "${YELLOW}[merge]${NC} Combining GREEN + screened YELLOW shards"
-  python "${SCRIPT_DIR}/merge_worker.py" --targets "$TARGETS" $EXECUTE
-  echo -e "${GREEN}[merge] done${NC}"
+  echo -e "${BLUE}== Stage: merge ==${NC}"
+  python -m collector_core.dc_cli run --pipeline metrology --stage merge -- --targets "$TARGETS" $EXECUTE
 }
 
-
 run_catalog() {
-  echo -e "${YELLOW}[catalog]${NC} Building global catalog"
-  python "${SCRIPT_DIR}/catalog_builder.py" --targets "$TARGETS"
-  echo -e "${GREEN}[catalog] done${NC}"
+  echo -e "${BLUE}== Stage: catalog ==${NC}"
+  python -m collector_core.generic_workers --domain metrology catalog -- --targets "$TARGETS" --output "${CATALOGS_ROOT}/catalog.json"
 }
 
 case "$STAGE" in
@@ -170,7 +161,5 @@ case "$STAGE" in
   merge) run_merge ;;
   catalog) run_catalog ;;
   review) run_review ;;
-  *) echo -e "${RED}Unknown stage: ${STAGE}${NC}"; usage; exit 1 ;;
+  *) echo -e "${RED}Unknown stage: $STAGE${NC}"; usage; exit 1 ;;
 esac
-
-echo -e "${BLUE}Pipeline complete.${NC}"

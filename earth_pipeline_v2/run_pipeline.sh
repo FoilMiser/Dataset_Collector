@@ -1,43 +1,38 @@
 #!/usr/bin/env bash
 #
-# run_pipeline.sh (earth v2.0)
+# run_pipeline.sh (v2.0)
 #
-# Wrapper for the Earth Systems Corpus Pipeline v2 stages.
+# Wrapper script for the earth pipeline using the unified dc CLI.
 #
 set -euo pipefail
 
-# Interpreter: python
-
-VERSION="2.0"
-
 RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
 TARGETS=""
-STAGE="all"
 EXECUTE=""
+STAGE="all"
 LIMIT_TARGETS=""
 LIMIT_FILES=""
 WORKERS="4"
 
 usage() {
-  cat << EOF
-Earth Systems Corpus Pipeline v${VERSION}
+  cat << 'EOM'
+Pipeline wrapper (v2)
 
 Required:
-  --targets FILE          Path to targets_earth.yaml
+  --targets FILE          Path to targets YAML
 
 Options:
   --execute               Perform actions (default is dry-run/plan only)
-  --stage STAGE           Stage to run: all, classify, acquire_green, acquire_yellow, screen_yellow, merge, catalog, review
+  --stage STAGE           Stage to run: all, classify, acquire_green, acquire_yellow, \
+                          screen_yellow, merge, catalog, review
   --limit-targets N       Limit number of queue rows processed
   --limit-files N         Limit files per target during acquisition
   --workers N             Parallel workers for acquisition (default: 4)
   -h, --help              Show this help
-EOF
+EOM
 }
 
 while [[ $# -gt 0 ]]; do
@@ -65,12 +60,27 @@ if [[ ! -f "$TARGETS" ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export PYTHONPATH="${SCRIPT_DIR}/..:${PYTHONPATH:-}"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+export PYTHONPATH="${REPO_ROOT}:${PYTHONPATH:-}"
+
 QUEUES_ROOT=$(python - << PY
 from pathlib import Path
 from collector_core.config_validator import read_yaml
+from collector_core.pipeline_spec import get_pipeline_spec
 cfg = read_yaml(Path("${TARGETS}"), schema_name="targets") or {}
-print(cfg.get("globals", {}).get("queues_root", "/data/earth/_queues"))
+spec = get_pipeline_spec("earth")
+prefix = spec.prefix if spec else "earth"
+print(cfg.get("globals", {}).get("queues_root", f"/data/{prefix}/_queues"))
+PY
+)
+CATALOGS_ROOT=$(python - << PY
+from pathlib import Path
+from collector_core.config_validator import read_yaml
+from collector_core.pipeline_spec import get_pipeline_spec
+cfg = read_yaml(Path("${TARGETS}"), schema_name="targets") or {}
+spec = get_pipeline_spec("earth")
+prefix = spec.prefix if spec else "earth"
+print(cfg.get("globals", {}).get("catalogs_root", f"/data/{prefix}/_catalogs"))
 PY
 )
 LIMIT_TARGETS_ARG=""; [[ -n "$LIMIT_TARGETS" ]] && LIMIT_TARGETS_ARG="--limit-targets $LIMIT_TARGETS"
@@ -82,7 +92,13 @@ run_classify() {
   if [[ -z "$EXECUTE" ]]; then
     no_fetch="--no-fetch"
   fi
-  python "$SCRIPT_DIR/pipeline_driver.py" --targets "$TARGETS" $no_fetch
+  python -m collector_core.dc_cli pipeline earth -- --targets "$TARGETS" $no_fetch
+}
+
+run_review() {
+  local queue_file="$QUEUES_ROOT/yellow_pipeline.jsonl"
+  echo -e "${BLUE}== Stage: review ==${NC}"
+  python -m collector_core.generic_workers --domain earth review-queue -- --queue "$queue_file" --targets "$TARGETS" --limit 50 || true
 }
 
 run_acquire() {
@@ -96,7 +112,7 @@ run_acquire() {
     exit 1
   fi
   echo -e "${BLUE}== Stage: acquire_${bucket} ==${NC}"
-  python "$SCRIPT_DIR/acquire_worker.py" \
+  python -m collector_core.dc_cli run --pipeline earth --stage acquire -- \
     --queue "$queue_file" \
     --targets-yaml "$TARGETS" \
     --bucket "$bucket" \
@@ -113,7 +129,7 @@ run_screen_yellow() {
     exit 1
   fi
   echo -e "${BLUE}== Stage: screen_yellow ==${NC}"
-  python "$SCRIPT_DIR/yellow_screen_worker.py" \
+  python -m collector_core.dc_cli run --pipeline earth --stage yellow_screen -- \
     --targets "$TARGETS" \
     --queue "$queue_file" \
     $EXECUTE
@@ -121,19 +137,12 @@ run_screen_yellow() {
 
 run_merge() {
   echo -e "${BLUE}== Stage: merge ==${NC}"
-  python "$SCRIPT_DIR/merge_worker.py" --targets "$TARGETS" $EXECUTE
+  python -m collector_core.dc_cli run --pipeline earth --stage merge -- --targets "$TARGETS" $EXECUTE
 }
-
 
 run_catalog() {
   echo -e "${BLUE}== Stage: catalog ==${NC}"
-  python "$SCRIPT_DIR/catalog_builder.py" --targets "$TARGETS"
-}
-
-run_review() {
-  local queue_file="$QUEUES_ROOT/yellow_pipeline.jsonl"
-  echo -e "${BLUE}== Stage: review ==${NC}"
-  python "$SCRIPT_DIR/review_queue.py" --queue "$queue_file" list --limit 50 || true
+  python -m collector_core.generic_workers --domain earth catalog -- --targets "$TARGETS" --output "${CATALOGS_ROOT}/catalog.json"
 }
 
 case "$STAGE" in

@@ -1,17 +1,17 @@
 # Adding a new pipeline
 
-This cookbook outlines the minimal steps to add a new `*_pipeline_v2` directory and wire it into the orchestration tools.
+This cookbook outlines the minimal steps to add a new pipeline configuration and wire it into the orchestration tools.
 
 ## 1. Generate a scaffold
 
-Use the generator to scaffold a new pipeline directory with standard entry points,
+Use the generator to scaffold a new pipeline directory with optional entry points,
 README, and targets config:
 
 ```bash
 python tools/generate_pipeline.py --domain your_domain
 ```
 
-The scaffolded directory includes:
+The scaffolded directory can include:
 
 ```
 your_domain_pipeline_v2/
@@ -27,20 +27,22 @@ your_domain_pipeline_v2/
   requirements.txt
 ```
 
-Use existing pipelines as references for domain-specific customization.
+Only the targets YAML is required. Wrapper scripts are optional and can be regenerated
+with `tools/sync_pipeline_wrappers.py` if you want legacy entry points.
 
-## 2. Wire the unified CLI configuration
+## 2. Register the pipeline
 
-The preferred entrypoint is `dc run`, which uses `configs/pipelines.yaml` to register any
-pipeline-specific hooks (custom acquisition strategies, yellow-screen modules, etc.).
-If your new pipeline needs special behavior, add a new entry under `pipelines:` for its slug.
-Legacy `run_pipeline.sh` scripts remain for backwards compatibility but are deprecated.
+Register the pipeline in `collector_core/pipeline_specs_registry.py` with the domain,
+targets filename, and any routing defaults. The preferred entrypoint is `dc run`, which
+uses `configs/pipelines.yaml` to register pipeline-specific hooks (custom acquisition
+strategies, yellow-screen modules, etc.). If your new pipeline needs special behavior,
+add a new entry under `pipelines:` for its slug.
 
-## 3. Wire up the driver and workers
+## 3. Optional: add custom hooks
 
-- Implement a `PipelineDriver` class (or equivalent) in `pipeline_driver.py` that derives from `collector_core/pipeline_driver_base.py`.
-- Add stage logic in worker modules (for example, `acquire_worker.py` for acquisition, optional merge/catalog workers if needed).
-- Ensure outputs align to the `combined/` stage described in `docs/output_contract.md`.
+If you need custom acquisition handlers or post-processing, add a plugin module in the
+pipeline directory and reference it from `configs/pipelines.yaml`. Otherwise, the
+generic workers and `dc` CLI will handle the pipeline with no extra files.
 
 ## 4. Author the targets file
 
@@ -76,23 +78,12 @@ need pipeline-specific overrides, add a local YAML (for example
 Update the shared license map in `configs/common/license_map.yaml` (or add a pipeline-specific file
 and reference it from `targets_your_domain.yaml`) so merge stages can enforce allow/deny rules.
 
-## 6. Register the pipeline
-
-Update `tools/pipeline_map.sample.yaml` so the orchestrators and notebook can discover the new pipeline:
-
-```yaml
-pipelines:
-  your_domain_pipeline_v2:
-    dest_folder: "your_domain"
-    targets_yaml: "targets_your_domain.yaml"
-```
-
-## 7. Validate locally
+## 6. Validate locally
 
 Run a dry-run classification to validate the wiring:
 
 ```bash
-python your_domain_pipeline_v2/pipeline_driver.py --targets targets_your_domain.yaml
+python -m collector_core.dc_cli pipeline your_domain -- --targets targets_your_domain.yaml
 ```
 
 Then run with `--execute` once the dry-run succeeds.

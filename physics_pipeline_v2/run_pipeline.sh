@@ -2,21 +2,11 @@
 #
 # run_pipeline.sh (v2.0)
 #
-# Wrapper script for the Physics Corpus Pipeline v2.
-#
-# Usage examples:
-#   ./run_pipeline.sh --targets targets_physics.yaml --stage classify
-#   ./run_pipeline.sh --targets targets_physics.yaml --stage acquire_green --execute
+# Wrapper script for the physics pipeline using the unified dc CLI.
 #
 set -euo pipefail
 
-# Interpreter: python
-
-VERSION="2.0"
-
 RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
@@ -29,10 +19,10 @@ WORKERS="4"
 
 usage() {
   cat << 'EOM'
-Physics Corpus Pipeline v${VERSION}
+Pipeline wrapper (v2)
 
 Required:
-  --targets FILE          Path to targets_physics.yaml
+  --targets FILE          Path to targets YAML
 
 Options:
   --execute               Perform actions (default is dry-run/plan only)
@@ -70,19 +60,27 @@ if [[ ! -f "$TARGETS" ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export PYTHONPATH="${SCRIPT_DIR}/..:${PYTHONPATH:-}"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+export PYTHONPATH="${REPO_ROOT}:${PYTHONPATH:-}"
+
 QUEUES_ROOT=$(python - << PY
 from pathlib import Path
 from collector_core.config_validator import read_yaml
+from collector_core.pipeline_spec import get_pipeline_spec
 cfg = read_yaml(Path("${TARGETS}"), schema_name="targets") or {}
-print(cfg.get("globals", {}).get("queues_root", "/data/physics/_queues"))
+spec = get_pipeline_spec("physics")
+prefix = spec.prefix if spec else "physics"
+print(cfg.get("globals", {}).get("queues_root", f"/data/{prefix}/_queues"))
 PY
 )
 CATALOGS_ROOT=$(python - << PY
 from pathlib import Path
 from collector_core.config_validator import read_yaml
+from collector_core.pipeline_spec import get_pipeline_spec
 cfg = read_yaml(Path("${TARGETS}"), schema_name="targets") or {}
-print(cfg.get("globals", {}).get("catalogs_root", "/data/physics/_catalogs"))
+spec = get_pipeline_spec("physics")
+prefix = spec.prefix if spec else "physics"
+print(cfg.get("globals", {}).get("catalogs_root", f"/data/{prefix}/_catalogs"))
 PY
 )
 LIMIT_TARGETS_ARG=""; [[ -n "$LIMIT_TARGETS" ]] && LIMIT_TARGETS_ARG="--limit-targets $LIMIT_TARGETS"
@@ -94,13 +92,13 @@ run_classify() {
   if [[ -z "$EXECUTE" ]]; then
     no_fetch="--no-fetch"
   fi
-  python "$SCRIPT_DIR/pipeline_driver.py" --targets "$TARGETS" $no_fetch
+  python -m collector_core.dc_cli pipeline physics -- --targets "$TARGETS" $no_fetch
 }
 
 run_review() {
   local queue_file="$QUEUES_ROOT/yellow_pipeline.jsonl"
   echo -e "${BLUE}== Stage: review ==${NC}"
-  python "$SCRIPT_DIR/review_queue.py" --queue "$queue_file" list --limit 50 || true
+  python -m collector_core.generic_workers --domain physics review-queue -- --queue "$queue_file" --targets "$TARGETS" --limit 50 || true
 }
 
 run_acquire() {
@@ -114,7 +112,7 @@ run_acquire() {
     exit 1
   fi
   echo -e "${BLUE}== Stage: acquire_${bucket} ==${NC}"
-  python "$SCRIPT_DIR/acquire_worker.py" \
+  python -m collector_core.dc_cli run --pipeline physics --stage acquire -- \
     --queue "$queue_file" \
     --targets-yaml "$TARGETS" \
     --bucket "$bucket" \
@@ -131,7 +129,7 @@ run_screen_yellow() {
     exit 1
   fi
   echo -e "${BLUE}== Stage: screen_yellow ==${NC}"
-  python "$SCRIPT_DIR/yellow_screen_worker.py" \
+  python -m collector_core.dc_cli run --pipeline physics --stage yellow_screen -- \
     --targets "$TARGETS" \
     --queue "$queue_file" \
     $EXECUTE
@@ -139,13 +137,12 @@ run_screen_yellow() {
 
 run_merge() {
   echo -e "${BLUE}== Stage: merge ==${NC}"
-  python "$SCRIPT_DIR/merge_worker.py" --targets "$TARGETS" $EXECUTE
+  python -m collector_core.dc_cli run --pipeline physics --stage merge -- --targets "$TARGETS" $EXECUTE
 }
-
 
 run_catalog() {
   echo -e "${BLUE}== Stage: catalog ==${NC}"
-  python "$SCRIPT_DIR/catalog_builder.py" --targets "$TARGETS" --output "${CATALOGS_ROOT}/catalog.json"
+  python -m collector_core.generic_workers --domain physics catalog -- --targets "$TARGETS" --output "${CATALOGS_ROOT}/catalog.json"
 }
 
 case "$STAGE" in

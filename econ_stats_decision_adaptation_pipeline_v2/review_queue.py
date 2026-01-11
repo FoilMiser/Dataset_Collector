@@ -1,14 +1,25 @@
 #!/usr/bin/env python3
-"""Deprecated pipeline entry point for manual YELLOW review queue helper."""
+"""
+review_queue.py (v2.0)
 
+Thin wrapper that delegates to the spec-driven review queue helper.
+"""
+from __future__ import annotations
+
+import sys
 from pathlib import Path
 
-from collector_core.pipeline_cli import run_deprecated_entrypoint
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from collector_core.generic_workers import main_review_queue  # noqa: E402
+
+DOMAIN = "econ_stats_decision_adaptation"
+
+
+def main() -> None:
+    main_review_queue(DOMAIN)
+
 
 if __name__ == "__main__":
-    raise SystemExit(
-        run_deprecated_entrypoint(
-            "review-queue",
-            pipeline_id=Path(__file__).resolve().parent.name,
-        )
-    )
+    main()

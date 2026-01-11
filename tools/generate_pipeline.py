@@ -78,23 +78,27 @@ def render_readme(spec: PipelineSpec) -> str:
         pip install -r requirements.txt
 
         # Dry-run classify only
-        ./run_pipeline.sh --targets {spec.targets_filename} --stage classify
+        python -m collector_core.dc_cli pipeline {spec.domain} -- --targets {spec.targets_filename}
 
         # Acquire GREEN and YELLOW
-        ./run_pipeline.sh --targets {spec.targets_filename} --stage acquire_green --execute
-        ./run_pipeline.sh --targets {spec.targets_filename} --stage acquire_yellow --execute
+        python -m collector_core.dc_cli run --pipeline {spec.domain} --stage acquire -- \\
+          --targets-yaml {spec.targets_filename} --queue /data/{spec.domain}/_queues/green_download.jsonl --bucket green --execute
+        python -m collector_core.dc_cli run --pipeline {spec.domain} --stage acquire -- \\
+          --targets-yaml {spec.targets_filename} --queue /data/{spec.domain}/_queues/yellow_pipeline.jsonl --bucket yellow --execute
 
         # Screen, merge, catalog
-        ./run_pipeline.sh --targets {spec.targets_filename} --stage screen_yellow --execute
-        ./run_pipeline.sh --targets {spec.targets_filename} --stage merge --execute
-        ./run_pipeline.sh --targets {spec.targets_filename} --stage catalog
+        python -m collector_core.dc_cli run --pipeline {spec.domain} --stage yellow_screen -- \\
+          --targets {spec.targets_filename} --queue /data/{spec.domain}/_queues/yellow_pipeline.jsonl --execute
+        python -m collector_core.dc_cli run --pipeline {spec.domain} --stage merge -- --targets {spec.targets_filename} --execute
+        python -m collector_core.generic_workers --domain {spec.domain} catalog -- \\
+          --targets {spec.targets_filename} --output /data/{spec.domain}/_catalogs/catalog.json
         ```
 
         ## Directory layout
 
         Targets YAML defaults to `/data/...`; the orchestrator patches to your
-        `--dest-root`. For standalone runs, pass `--dataset-root` or use
-        `tools/patch_targets.py`.
+        `--dest-root`. For standalone runs, pass `--dataset-root`, use
+        `tools/patch_targets.py`, or run `run_pipeline.sh` (optional wrapper).
 
         ## License
 
@@ -149,7 +153,7 @@ def render_acquire_worker(spec: PipelineSpec) -> str:
         """
         acquire_worker.py (v2.0)
 
-        Thin adapter for collector_core acquisition.
+        Thin wrapper that delegates to the spec-driven generic acquire worker.
         """
 
         from __future__ import annotations
@@ -160,27 +164,28 @@ def render_acquire_worker(spec: PipelineSpec) -> str:
         sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
         from collector_core.acquire_strategies import (
-            DEFAULT_STRATEGY_HANDLERS,
-            RootsDefaults,
-            run_acquire_worker,
+            AcquireContext,
+            Limits,
+            RetryConfig,
+            Roots,
+            RunMode,
+            _http_download_with_resume,
         )
+        from collector_core.generic_workers import main_acquire
 
-        STRATEGY_HANDLERS = DEFAULT_STRATEGY_HANDLERS
-
-        DEFAULTS = RootsDefaults(
-            raw_root="/data/{spec.domain}/raw",
-            manifests_root="/data/{spec.domain}/_manifests",
-            ledger_root="/data/{spec.domain}/_ledger",
-            logs_root="/data/{spec.domain}/_logs",
-        )
+        __all__ = [
+            "AcquireContext",
+            "Limits",
+            "RetryConfig",
+            "Roots",
+            "RunMode",
+            "_http_download_with_resume",
+            "main",
+        ]
 
 
         def main() -> None:
-            run_acquire_worker(
-                defaults=DEFAULTS,
-                targets_yaml_label="{spec.targets_filename}",
-                strategy_handlers=STRATEGY_HANDLERS,
-            )
+            main_acquire("{spec.domain}", repo_root=Path(__file__).resolve().parents[1])
 
 
         if __name__ == "__main__":
@@ -239,7 +244,7 @@ def render_merge_worker(spec: PipelineSpec) -> str:
         """
         merge_worker.py (v2.0)
 
-        Thin adapter for collector_core.merge.
+        Thin wrapper that delegates to the spec-driven generic merge worker.
         """
 
         from __future__ import annotations
@@ -250,9 +255,16 @@ def render_merge_worker(spec: PipelineSpec) -> str:
         sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
         from collector_core import merge as core_merge
+        from collector_core.generic_workers import main_merge
+        from collector_core.pipeline_spec import get_pipeline_spec
 
-        PIPELINE_ID = Path(__file__).resolve().parent.name
-        DEFAULT_ROOTS = core_merge.default_merge_roots("{spec.domain}")
+        DOMAIN = "{spec.domain}"
+        SPEC = get_pipeline_spec(DOMAIN)
+        if SPEC is None:
+            raise SystemExit(f"Unknown pipeline domain: {{DOMAIN}}")
+
+        PIPELINE_ID = SPEC.pipeline_id
+        DEFAULT_ROOTS = core_merge.default_merge_roots(SPEC.prefix)
 
         read_jsonl = core_merge.read_jsonl
         write_json = core_merge.write_json
@@ -267,7 +279,7 @@ def render_merge_worker(spec: PipelineSpec) -> str:
 
 
         def main() -> None:
-            core_merge.main(pipeline_id=PIPELINE_ID, defaults=DEFAULT_ROOTS)
+            main_merge(DOMAIN)
 
 
         if __name__ == "__main__":
@@ -283,7 +295,11 @@ def render_catalog_builder() -> str:
         textwrap.dedent(
             '''
         #!/usr/bin/env python3
-        """Deprecated pipeline entry point for catalog builder."""
+        """
+        catalog_builder.py (v2.0)
+
+        Thin wrapper that delegates to the spec-driven generic catalog builder.
+        """
 
         from __future__ import annotations
 
@@ -292,15 +308,17 @@ def render_catalog_builder() -> str:
 
         sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-        from collector_core.pipeline_cli import run_deprecated_entrypoint
+        from collector_core.generic_workers import main_catalog
+
+        DOMAIN = Path(__file__).resolve().parent.name.removesuffix("_pipeline_v2")
+
+
+        def main() -> None:
+            main_catalog(DOMAIN)
+
 
         if __name__ == "__main__":
-            raise SystemExit(
-                run_deprecated_entrypoint(
-                    "catalog-builder",
-                    pipeline_id=Path(__file__).resolve().parent.name,
-                )
-            )
+            main()
         '''
         ).strip()
         + "\n"
@@ -312,7 +330,11 @@ def render_review_queue() -> str:
         textwrap.dedent(
             '''
         #!/usr/bin/env python3
-        """Deprecated pipeline entry point for manual YELLOW review queue helper."""
+        """
+        review_queue.py (v2.0)
+
+        Thin wrapper that delegates to the spec-driven review queue helper.
+        """
 
         from __future__ import annotations
 
@@ -321,15 +343,17 @@ def render_review_queue() -> str:
 
         sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-        from collector_core.pipeline_cli import run_deprecated_entrypoint
+        from collector_core.generic_workers import main_review_queue
+
+        DOMAIN = Path(__file__).resolve().parent.name.removesuffix("_pipeline_v2")
+
+
+        def main() -> None:
+            main_review_queue(DOMAIN)
+
 
         if __name__ == "__main__":
-            raise SystemExit(
-                run_deprecated_entrypoint(
-                    "review-queue",
-                    pipeline_id=Path(__file__).resolve().parent.name,
-                )
-            )
+            main()
         '''
         ).strip()
         + "\n"
@@ -344,13 +368,9 @@ def render_run_pipeline(spec: PipelineSpec) -> str:
         #
         # run_pipeline.sh (v2.0)
         #
-        # Wrapper script for the {spec.title} Corpus Pipeline v2.
+        # Wrapper script for the {spec.title} pipeline using the unified dc CLI.
         #
         set -euo pipefail
-
-        # Interpreter: python
-
-        VERSION="2.0"
 
         RED='\033[0;31m'
         BLUE='\033[0;34m'
@@ -365,7 +385,7 @@ def render_run_pipeline(spec: PipelineSpec) -> str:
 
         usage() {{
           cat << 'EOM'
-        {spec.title} Corpus Pipeline v${{VERSION}}
+        Pipeline wrapper (v2)
 
         Required:
           --targets FILE          Path to {spec.targets_filename}
@@ -406,19 +426,26 @@ def render_run_pipeline(spec: PipelineSpec) -> str:
         fi
 
         SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
-        export PYTHONPATH="${{SCRIPT_DIR}}/..:${{PYTHONPATH:-}}"
+        REPO_ROOT="$(cd "${{SCRIPT_DIR}}/.." && pwd)"
+        export PYTHONPATH="${{REPO_ROOT}}:${{PYTHONPATH:-}}"
         QUEUES_ROOT=$(python - << PY
         from pathlib import Path
         from collector_core.config_validator import read_yaml
+        from collector_core.pipeline_spec import get_pipeline_spec
         cfg = read_yaml(Path("${{TARGETS}}"), schema_name="targets") or {{}}
-        print(cfg.get("globals", {{}}).get("queues_root", "/data/{spec.domain}/_queues"))
+        spec = get_pipeline_spec("{spec.domain}")
+        prefix = spec.prefix if spec else "{spec.domain}"
+        print(cfg.get("globals", {{}}).get("queues_root", f"/data/{{prefix}}/_queues"))
         PY
         )
         CATALOGS_ROOT=$(python - << PY
         from pathlib import Path
         from collector_core.config_validator import read_yaml
+        from collector_core.pipeline_spec import get_pipeline_spec
         cfg = read_yaml(Path("${{TARGETS}}"), schema_name="targets") or {{}}
-        print(cfg.get("globals", {{}}).get("catalogs_root", "/data/{spec.domain}/_catalogs"))
+        spec = get_pipeline_spec("{spec.domain}")
+        prefix = spec.prefix if spec else "{spec.domain}"
+        print(cfg.get("globals", {{}}).get("catalogs_root", f"/data/{{prefix}}/_catalogs"))
         PY
         )
         LIMIT_TARGETS_ARG=""; [[ -n "$LIMIT_TARGETS" ]] && LIMIT_TARGETS_ARG="--limit-targets $LIMIT_TARGETS"
@@ -430,13 +457,13 @@ def render_run_pipeline(spec: PipelineSpec) -> str:
           if [[ -z "$EXECUTE" ]]; then
             no_fetch="--no-fetch"
           fi
-          python "$SCRIPT_DIR/pipeline_driver.py" --targets "$TARGETS" $no_fetch
+          python -m collector_core.dc_cli pipeline {spec.domain} -- --targets "$TARGETS" $no_fetch
         }}
 
         run_review() {{
           local queue_file="$QUEUES_ROOT/yellow_pipeline.jsonl"
           echo -e "${{BLUE}}== Stage: review ==${{NC}}"
-          python "$SCRIPT_DIR/review_queue.py" --queue "$queue_file" list --limit 50 || true
+          python -m collector_core.generic_workers --domain {spec.domain} review-queue -- --queue "$queue_file" --targets "$TARGETS" --limit 50 || true
         }}
 
         run_acquire() {{
@@ -450,7 +477,7 @@ def render_run_pipeline(spec: PipelineSpec) -> str:
             exit 1
           fi
           echo -e "${{BLUE}}== Stage: acquire_${{bucket}} ==${{NC}}"
-          python "$SCRIPT_DIR/acquire_worker.py" \
+          python -m collector_core.dc_cli run --pipeline {spec.domain} --stage acquire -- \
             --queue "$queue_file" \
             --targets-yaml "$TARGETS" \
             --bucket "$bucket" \
@@ -467,7 +494,7 @@ def render_run_pipeline(spec: PipelineSpec) -> str:
             exit 1
           fi
           echo -e "${{BLUE}}== Stage: screen_yellow ==${{NC}}"
-          python "$SCRIPT_DIR/yellow_screen_worker.py" \
+          python -m collector_core.dc_cli run --pipeline {spec.domain} --stage yellow_screen -- \
             --targets "$TARGETS" \
             --queue "$queue_file" \
             $EXECUTE
@@ -475,13 +502,13 @@ def render_run_pipeline(spec: PipelineSpec) -> str:
 
         run_merge() {{
           echo -e "${{BLUE}}== Stage: merge ==${{NC}}"
-          python "$SCRIPT_DIR/merge_worker.py" --targets "$TARGETS" $EXECUTE
+          python -m collector_core.dc_cli run --pipeline {spec.domain} --stage merge -- --targets "$TARGETS" $EXECUTE
         }}
 
 
         run_catalog() {{
           echo -e "${{BLUE}}== Stage: catalog ==${{NC}}"
-          python "$SCRIPT_DIR/catalog_builder.py" --targets "$TARGETS" --output "${{CATALOGS_ROOT}}/catalog.json"
+          python -m collector_core.generic_workers --domain {spec.domain} catalog -- --targets "$TARGETS" --output "${{CATALOGS_ROOT}}/catalog.json"
         }}
 
         case "$STAGE" in
