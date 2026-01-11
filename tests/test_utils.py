@@ -6,6 +6,7 @@ import io
 import tarfile
 import zipfile
 from pathlib import Path
+import pytest
 from collector_core.utils import (
     append_jsonl,
     coerce_int,
@@ -194,6 +195,35 @@ class TestCoerceInt:
 
 
 class TestArchiveValidation:
+    def _write_zip_fixture(self, archive: Path, kind: str) -> None:
+        with zipfile.ZipFile(archive, "w") as zf:
+            if kind == "traversal":
+                zf.writestr("../evil.txt", "nope")
+                return
+            if kind == "symlink":
+                info = zipfile.ZipInfo("link")
+                info.create_system = 3
+                info.external_attr = 0o120777 << 16
+                zf.writestr(info, "target")
+                return
+        raise AssertionError(f"Unknown zip fixture kind: {kind}")
+
+    def _write_tar_fixture(self, archive: Path, kind: str) -> None:
+        with tarfile.open(archive, "w") as tf:
+            if kind == "traversal":
+                info = tarfile.TarInfo(name="../evil.txt")
+                data = io.BytesIO(b"nope")
+                info.size = len(data.getvalue())
+                tf.addfile(info, data)
+                return
+            if kind == "symlink":
+                info = tarfile.TarInfo(name="link")
+                info.type = tarfile.SYMTYPE
+                info.linkname = "target"
+                tf.addfile(info)
+                return
+        raise AssertionError(f"Unknown tar fixture kind: {kind}")
+
     def test_zip_rejects_traversal(self, tmp_path: Path):
         archive = tmp_path / "bad.zip"
         with zipfile.ZipFile(archive, "w") as zf:
@@ -260,6 +290,24 @@ class TestArchiveValidation:
             else:
                 raise AssertionError("Expected size rejection")
 
+    @pytest.mark.parametrize(
+        ("fixture_name", "expected"),
+        [
+            ("malicious_traversal.zip", "unsafe path"),
+            ("malicious_symlink.zip", "symlink"),
+        ],
+    )
+    def test_zip_fixtures_rejected(
+        self, tmp_path: Path, fixture_name: str, expected: str
+    ) -> None:
+        archive = tmp_path / fixture_name
+        kind = "traversal" if "traversal" in fixture_name else "symlink"
+        self._write_zip_fixture(archive, kind)
+        with zipfile.ZipFile(archive) as zf:
+            with pytest.raises(ValueError) as exc:
+                validate_zip_archive(zf, max_files=10, max_total_size=1024)
+        assert expected in str(exc.value)
+
     def test_tar_rejects_traversal(self, tmp_path: Path):
         archive = tmp_path / "bad.tar"
         with tarfile.open(archive, "w") as tf:
@@ -289,3 +337,21 @@ class TestArchiveValidation:
                 assert "symlink" in str(exc)
             else:
                 raise AssertionError("Expected symlink rejection")
+
+    @pytest.mark.parametrize(
+        ("fixture_name", "expected"),
+        [
+            ("malicious_traversal.tar", "unsafe path"),
+            ("malicious_symlink.tar", "symlink"),
+        ],
+    )
+    def test_tar_fixtures_rejected(
+        self, tmp_path: Path, fixture_name: str, expected: str
+    ) -> None:
+        archive = tmp_path / fixture_name
+        kind = "traversal" if "traversal" in fixture_name else "symlink"
+        self._write_tar_fixture(archive, kind)
+        with tarfile.open(archive, "r") as tf:
+            with pytest.raises(ValueError) as exc:
+                validate_tar_archive(tf, max_files=10, max_total_size=1024)
+        assert expected in str(exc.value)
