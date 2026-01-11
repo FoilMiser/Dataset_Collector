@@ -81,9 +81,9 @@ def iter_collector_core_versioned_modules(root: Path) -> Iterable[Path]:
     if not core_dir.is_dir():
         return
     yield from sorted(core_dir.glob("yellow_screen_*.py"))
-    merge = core_dir / "merge.py"
-    if merge.exists():
-        yield merge
+    merge_pkg = core_dir / "merge" / "__init__.py"
+    if merge_pkg.exists():
+        yield merge_pkg
     pipeline_version = core_dir / "pipeline_version.py"
     if pipeline_version.exists():
         yield pipeline_version

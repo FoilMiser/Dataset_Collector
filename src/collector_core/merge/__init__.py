@@ -2,188 +2,46 @@ from __future__ import annotations
 
 import argparse
 import cProfile
-import dataclasses
 import gzip
 import importlib.util
 import json
 import pstats
-import sqlite3
 import tracemalloc
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
-from datasets import DatasetDict, load_from_disk
-
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.config_validator import read_yaml
 from collector_core.dataset_root import ensure_data_root_allowed, resolve_dataset_root
-from collector_core.output_contract import normalize_output_record, validate_output_contract
-from collector_core.utils import (
-    append_jsonl,
-    ensure_dir,
-    read_jsonl,
-    sha256_text,
-    utc_now,
-    write_json,
+from collector_core.merge.contract import (
+    canonicalize_row,
+    normalize_record,
+    resolve_canonicalize_config,
 )
+from collector_core.merge.dedupe import (
+    build_dedupe_index,
+    build_dedupe_update,
+    merge_provenance_update,
+    merge_update_payload,
+)
+from collector_core.merge.hf import iter_hf_dataset_dirs, iter_hf_inputs
+from collector_core.merge.shard import Sharder, ensure_shard_dir, sharding_cfg
+from collector_core.merge.types import (
+    GreenInput,
+    GreenSkip,
+    MergeRuntimeConfig,
+    MergeState,
+    RootDefaults,
+    Roots,
+)
+from collector_core.utils import append_jsonl, ensure_dir, read_jsonl, utc_now, write_json
 
 if importlib.util.find_spec("tqdm"):
     from tqdm import tqdm as tqdm_progress
 else:  # pragma: no cover - optional dependency
     tqdm_progress = None
-
-
-@dataclasses.dataclass(frozen=True)
-class RootDefaults:
-    raw_root: str
-    screened_root: str
-    combined_root: str
-    ledger_root: str
-
-
-@dataclasses.dataclass
-class Roots:
-    raw_root: Path
-    screened_root: Path
-    combined_root: Path
-    ledger_root: Path
-
-
-@dataclasses.dataclass
-class ShardingConfig:
-    max_records_per_shard: int
-    compression: str
-    prefix: str
-
-
-@dataclasses.dataclass
-class GreenInput:
-    raw: dict[str, Any]
-    target_id: str
-    pool: str
-    source_path: Path
-    source_kind: str
-
-
-@dataclasses.dataclass
-class GreenSkip:
-    target_id: str
-    pool: str
-    source_path: Path
-    source_kind: str
-    reason: str
-    detail: dict[str, Any] | None = None
-
-
-@dataclasses.dataclass
-class MergeState:
-    summary: dict[str, Any]
-    dedupe: DedupeIndex | PartitionedDedupeIndex
-    shard_cfg: ShardingConfig
-    pool_sharders: dict[str, Sharder]
-    target_meta: dict[str, dict[str, Any]]
-    pipeline_id: str
-    execute: bool
-    progress: bool
-    progress_interval: int
-    inflight_records: dict[str, dict[str, Any]]
-    shard_index: dict[str, str]
-    pending_updates: dict[str, dict[str, Any]]
-    max_source_urls: int
-    max_duplicates: int
-
-
-@dataclasses.dataclass
-class MergeRuntimeConfig:
-    progress: bool = False
-    progress_interval: int = 10000
-    trace_memory: bool = False
-    profile: bool = False
-    profile_path: Path | None = None
-    profile_sort: str = "tottime"
-    dedupe_partitions: int = 1
-
-
-class Sharder:
-    def __init__(self, base_dir: Path, cfg: ShardingConfig):
-        self.base_dir = base_dir
-        self.cfg = cfg
-        self.current: list[dict[str, Any]] = []
-        self.shard_idx = 0
-
-    def _path(self) -> Path:
-        suffix = "jsonl.gz" if self.cfg.compression == "gzip" else "jsonl"
-        return self.base_dir / f"{self.cfg.prefix}_{self.shard_idx:05d}.{suffix}"
-
-    def add(self, row: dict[str, Any]) -> tuple[Path | None, list[dict[str, Any]]]:
-        self.current.append(row)
-        if len(self.current) >= self.cfg.max_records_per_shard:
-            path, flushed = self.flush()
-            self.shard_idx += 1
-            return path, flushed
-        return None, []
-
-    def flush(self) -> tuple[Path | None, list[dict[str, Any]]]:
-        if not self.current:
-            return None, []
-        path = self._path()
-        records = self.current
-        append_jsonl(path, records)
-        self.current = []
-        return path, records
-
-
-class DedupeIndex:
-    def __init__(self, path: Path) -> None:
-        self.path = path
-        ensure_dir(path.parent)
-        if path.exists():
-            path.unlink()
-        self.conn = sqlite3.connect(str(path))
-        self.conn.execute("PRAGMA journal_mode=WAL;")
-        self.conn.execute("PRAGMA synchronous=OFF;")
-        self.conn.execute("CREATE TABLE IF NOT EXISTS seen (content_sha256 TEXT PRIMARY KEY)")
-
-    def add_if_new(self, content_hash: str) -> bool:
-        cursor = self.conn.execute(
-            "INSERT OR IGNORE INTO seen (content_sha256) VALUES (?)",
-            (content_hash,),
-        )
-        return cursor.rowcount == 1
-
-    def close(self) -> None:
-        self.conn.commit()
-        self.conn.close()
-
-
-class PartitionedDedupeIndex:
-    def __init__(self, path: Path, partitions: int) -> None:
-        if partitions < 2:
-            raise ValueError("PartitionedDedupeIndex requires at least 2 partitions.")
-        self.partitions = partitions
-        self.paths = [self._partition_path(path, idx) for idx in range(partitions)]
-        self.indices = [DedupeIndex(part_path) for part_path in self.paths]
-
-    @staticmethod
-    def _partition_path(path: Path, idx: int) -> Path:
-        suffix = path.suffix or ".sqlite"
-        stem = path.stem
-        return path.with_name(f"{stem}_part{idx:03d}{suffix}")
-
-    def _partition_index(self, content_hash: str) -> int:
-        if not content_hash:
-            return 0
-        return int(content_hash[:8], 16) % self.partitions
-
-    def add_if_new(self, content_hash: str) -> bool:
-        idx = self._partition_index(content_hash)
-        return self.indices[idx].add_if_new(content_hash)
-
-    def close(self) -> None:
-        for index in self.indices:
-            index.close()
 
 
 LICENSE_POOL_MAP = {
@@ -208,95 +66,6 @@ def default_merge_roots(prefix: str) -> RootDefaults:
 
 DEFAULT_MAX_SOURCE_URLS = 10
 DEFAULT_MAX_DUPLICATES = 20
-
-
-def merge_distinct_urls(
-    existing: Iterable[str],
-    incoming: Iterable[str],
-    limit: int,
-) -> list[str]:
-    merged: list[str] = []
-    seen: set[str] = set()
-    for url in list(existing) + list(incoming):
-        if not url:
-            continue
-        if url in seen:
-            continue
-        merged.append(url)
-        seen.add(url)
-        if len(merged) >= limit:
-            break
-    return merged
-
-
-def build_dedupe_update(
-    record: dict[str, Any],
-    *,
-    source_kind: str,
-    source_path: Path | None,
-) -> dict[str, Any]:
-    entry: dict[str, Any] = {
-        "content_sha256": record.get("content_sha256"),
-        "source_urls": record.get("source_urls", []),
-        "source": record.get("source", {}),
-        "source_kind": source_kind,
-        "seen_at_utc": utc_now(),
-    }
-    if source_path is not None:
-        entry["source_path"] = str(source_path)
-    return {
-        "source_urls": record.get("source_urls", []),
-        "duplicates": [entry],
-    }
-
-
-def merge_update_payload(
-    base: dict[str, Any],
-    update: dict[str, Any],
-    *,
-    max_source_urls: int,
-    max_duplicates: int,
-) -> dict[str, Any]:
-    merged_urls = merge_distinct_urls(
-        base.get("source_urls", []),
-        update.get("source_urls", []),
-        max_source_urls,
-    )
-    duplicates = list(base.get("duplicates", []))
-    for entry in update.get("duplicates", []):
-        if entry not in duplicates:
-            duplicates.append(entry)
-    if len(duplicates) > max_duplicates:
-        duplicates = duplicates[-max_duplicates:]
-    return {
-        "source_urls": merged_urls,
-        "duplicates": duplicates,
-    }
-
-
-def merge_provenance_update(
-    record: dict[str, Any],
-    update: dict[str, Any],
-    *,
-    max_source_urls: int,
-    max_duplicates: int,
-) -> None:
-    record["source_urls"] = merge_distinct_urls(
-        record.get("source_urls", []),
-        update.get("source_urls", []),
-        max_source_urls,
-    )
-    provenance = record.get("provenance") or {}
-    duplicates = list(provenance.get("duplicates", []))
-    for entry in update.get("duplicates", []):
-        if entry not in duplicates:
-            duplicates.append(entry)
-    if len(duplicates) > max_duplicates:
-        duplicates = duplicates[-max_duplicates:]
-    if duplicates:
-        provenance["duplicates"] = duplicates
-        record["provenance"] = provenance
-    record["timestamp_updated"] = utc_now()
 
 
 def resolve_roots(
@@ -328,15 +97,6 @@ def resolve_roots(
         allow_data_root,
     )
     return roots
-
-
-def sharding_cfg(cfg: dict[str, Any]) -> ShardingConfig:
-    g = cfg.get("globals", {}).get("sharding", {}) or {}
-    return ShardingConfig(
-        max_records_per_shard=int(g.get("max_records_per_shard", 50000)),
-        compression=str(g.get("compression", "gzip")),
-        prefix="combined",
-    )
 
 
 def resolve_merge_runtime(
@@ -387,126 +147,6 @@ def resolve_merge_runtime(
     )
 
 
-def resolve_canonicalize_config(
-    cfg: dict[str, Any], target_cfg: dict[str, Any] | None
-) -> tuple[list[str], int | None]:
-    g = cfg.get("globals", {}) or {}
-    g_canon = g.get("canonicalize", {}) or {}
-    g_screen = g.get("screening", {}) or {}
-    t_screen = (target_cfg.get("yellow_screen", {}) or {}) if target_cfg else {}
-    t_canon = (target_cfg.get("canonicalize", {}) or {}) if target_cfg else {}
-    candidates = list(
-        t_canon.get("text_field_candidates")
-        or t_screen.get("text_field_candidates")
-        or g_canon.get("text_field_candidates")
-        or g_screen.get("text_field_candidates")
-        or ["text"]
-    )
-    max_chars_value = t_canon.get(
-        "max_chars",
-        t_screen.get("max_chars", g_canon.get("max_chars", g_screen.get("max_chars"))),
-    )
-    max_chars = int(max_chars_value) if max_chars_value is not None else None
-    return candidates, max_chars
-
-
-def coerce_text(value: Any) -> str:
-    if isinstance(value, (list, tuple)):
-        return "\n".join(map(str, value))
-    return str(value)
-
-
-def extract_text(row: dict[str, Any], candidates: list[str]) -> str | None:
-    if "text" in row and row["text"]:
-        return coerce_text(row["text"])
-    for key in candidates:
-        if key == "text":
-            continue
-        if key in row and row[key]:
-            return coerce_text(row[key])
-    string_fields = [v for v in row.values() if isinstance(v, str) and v]
-    if string_fields:
-        return "\n".join(string_fields)
-    try:
-        return json.dumps(row, ensure_ascii=False)
-    except Exception:
-        return str(row)
-
-
-def resolve_routing(raw: dict[str, Any]) -> dict[str, Any]:
-    if raw.get("routing") or raw.get("route"):
-        return raw.get("routing") or raw.get("route") or {}
-    routing_keys = sorted(k for k in raw.keys() if k.endswith("_routing"))
-    for key in routing_keys:
-        if raw.get(key):
-            return raw.get(key) or {}
-    return {}
-
-
-def canonicalize_row(
-    raw: dict[str, Any],
-    target_id: str,
-    pool: str,
-    candidates: list[str],
-    max_chars: int | None,
-    target_meta: dict[str, Any] | None,
-    *,
-    pipeline_id: str,
-) -> tuple[dict[str, Any] | None, str | None]:
-    if not isinstance(raw, dict):
-        return None, "unsupported_row_type"
-    text = extract_text(raw, candidates)
-    if not text:
-        return None, "missing_text"
-    if max_chars is not None and max_chars > 0 and len(text) > max_chars:
-        text = text[:max_chars]
-    record = dict(raw)
-    record.setdefault("text", text)
-    record_id = str(
-        record.get("record_id") or record.get("id") or sha256_text(f"{target_id}:{text}")
-    )
-    record.setdefault("record_id", record_id)
-    meta = target_meta or {}
-    record = normalize_output_record(
-        record,
-        target_id=target_id,
-        pool=pool,
-        pipeline=pipeline_id,
-        dataset_id=meta.get("dataset_id"),
-        config=meta.get("config"),
-        now=utc_now(),
-    )
-    validate_output_contract(record, f"green/{target_id}")
-    return record, None
-
-
-def is_hf_dataset_dir(path: Path) -> bool:
-    if not path.is_dir():
-        return False
-    markers = ("dataset_info.json", "state.json", "dataset_dict.json")
-    return any((path / marker).exists() for marker in markers)
-
-
-def iter_hf_dataset_dirs(target_dir: Path) -> list[Path]:
-    candidates: list[Path] = []
-    if is_hf_dataset_dir(target_dir):
-        candidates.append(target_dir)
-    for marker in ("dataset_info.json", "state.json", "dataset_dict.json"):
-        for fp in target_dir.rglob(marker):
-            candidates.append(fp.parent)
-    for pattern in ("hf_dataset", "split_*"):
-        candidates.extend([p for p in target_dir.rglob(pattern) if p.is_dir()])
-    seen: set[Path] = set()
-    ordered: list[Path] = []
-    for path in sorted(candidates):
-        resolved = path.resolve()
-        if resolved in seen:
-            continue
-        seen.add(resolved)
-        ordered.append(path)
-    return ordered
-
-
 def iter_green_records(roots: Roots) -> Iterator[GreenInput | GreenSkip]:
     base = roots.raw_root / "green"
     for pool_dir in sorted(base.iterdir()) if base.exists() else []:
@@ -527,31 +167,8 @@ def iter_green_records(roots: Roots) -> Iterator[GreenInput | GreenSkip]:
 
             hf_dirs = iter_hf_dataset_dirs(target_dir)
             hf_dir_set = {p.resolve() for p in hf_dirs}
-            for ds_path in hf_dirs:
-                try:
-                    dataset_obj = load_from_disk(str(ds_path))
-                except Exception as exc:
-                    yield GreenSkip(
-                        target_id,
-                        pool_dir.name,
-                        ds_path,
-                        "hf_dataset",
-                        "hf_load_failed",
-                        detail={"error": str(exc)},
-                    )
-                    continue
-                if isinstance(dataset_obj, DatasetDict):
-                    for split_name in sorted(dataset_obj.keys()):
-                        dataset = dataset_obj[split_name]
-                        for raw in dataset:
-                            row = dict(raw)
-                            row.setdefault("split", split_name)
-                            yield GreenInput(row, target_id, pool_dir.name, ds_path, "hf_dataset")
-                else:
-                    for raw in dataset_obj:
-                        row = dict(raw)
-                        row.setdefault("split", "train")
-                        yield GreenInput(row, target_id, pool_dir.name, ds_path, "hf_dataset")
+            for item in iter_hf_inputs(hf_dirs, target_id=target_id, pool=pool_dir.name):
+                yield item
 
             for fp in sorted([p for p in target_dir.rglob("*") if p.is_file()]):
                 resolved = fp.resolve()
@@ -686,7 +303,7 @@ def get_sharder(pool: str, roots: Roots, state: MergeState) -> Sharder:
     if pool not in state.pool_sharders:
         sharder = Sharder(roots.combined_root / pool / "shards", state.shard_cfg)
         state.pool_sharders[pool] = sharder
-        ensure_dir(sharder.base_dir)
+        ensure_shard_dir(sharder)
     return state.pool_sharders[pool]
 
 
@@ -723,17 +340,14 @@ def handle_record(
 ) -> None:
     resolved_target = target_id or (rec.get("source", {}) or {}).get("target_id") or "unknown"
     pool_value = pool_hint or rec.get("pool") or route_pool(rec)
-    meta = state.target_meta.get(resolved_target, {})
-    record = normalize_output_record(
+    record = normalize_record(
         rec,
         target_id=resolved_target,
         pool=pool_value,
-        pipeline=state.pipeline_id,
-        dataset_id=meta.get("dataset_id"),
-        config=meta.get("config"),
-        now=utc_now(),
+        pipeline_id=state.pipeline_id,
+        target_meta=state.target_meta.get(resolved_target, {}),
+        context=f"{source_kind}/{resolved_target}",
     )
-    validate_output_contract(record, f"{source_kind}/{resolved_target}")
     content_hash = record["content_sha256"]
     if not state.dedupe.add_if_new(content_hash):
         state.summary["deduped"] += 1
@@ -910,13 +524,6 @@ def apply_pending_updates(roots: Roots, state: MergeState) -> None:
                     )
                 dst.write(json.dumps(record, ensure_ascii=False) + "\n")
         temp_path.replace(path)
-
-
-def build_dedupe_index(roots: Roots, partitions: int) -> DedupeIndex | PartitionedDedupeIndex:
-    base_path = roots.ledger_root / "combined_dedupe.sqlite"
-    if partitions > 1:
-        return PartitionedDedupeIndex(base_path, partitions)
-    return DedupeIndex(base_path)
 
 
 def write_profile_stats(profile: cProfile.Profile, path: Path, sort: str) -> tuple[Path, Path]:
