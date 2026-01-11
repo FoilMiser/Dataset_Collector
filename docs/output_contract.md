@@ -60,6 +60,10 @@ index size while retaining deterministic behavior.
 - Canonical YELLOW ledgers:
   - `_ledger/yellow_passed.jsonl`
   - `_ledger/yellow_pitched.jsonl`
+- Merge ledgers and summaries:
+  - `_ledger/combined_index.jsonl`
+  - `_ledger/merge_summary.json`
+  - `_ledger/combined_dedupe.sqlite` (and optional `_ledger/combined_dedupe_partNNN.sqlite`)
 - Pitched samples (capped per run) live in `_pitches/yellow_pitch.jsonl`.
 - `_pitches/` stores potential sources and metadata for future runs.
 - `_manifests/` contains per-stage manifests and patched targets YAMLs.

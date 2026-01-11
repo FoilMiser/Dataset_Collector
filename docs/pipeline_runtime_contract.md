@@ -26,6 +26,18 @@ All runtime stages resolve output roots in the same order:
 4. **Targets YAML** (`globals.*`).
 5. **Built-in defaults**.
 
+### `dc run` dataset root usage
+
+Use `--dataset-root` to pin all outputs to a single per-domain folder. If you want the
+CLI defaults under `/data/<pipeline>`, pass `--allow-data-root` to confirm that location
+is acceptable.
+
+Example:
+
+```bash
+dc run --pipeline physics --stage merge --dataset-root /data/Natural/physics -- --targets pipelines/targets/targets_physics.yaml --execute
+```
+
 ## Targets YAML globals
 
 These `globals` keys tune runtime defaults without changing CLI usage:

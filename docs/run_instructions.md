@@ -4,23 +4,38 @@ This guide summarizes the minimal, single-command run, the expected output folde
 to do a clean-room rerun (what to delete vs. keep). It also calls out the Jupyter notebook
 option for running the full suite.
 
-## Single-command run (all pipelines)
+## Minimal `dc` run (per pipeline)
+
+Use the unified CLI (`dc`) to classify, acquire, screen, merge, and catalog. Repeat the
+sequence for each pipeline you want to run.
 
 ### Windows (PowerShell)
 
 ```powershell
-python tools\build_natural_corpus.py --dest-root "E:\AI-Research\datasets\Natural" --pipelines all --execute
+dc pipeline math -- --targets pipelines/targets/targets_math.yaml --dataset-root "E:\AI-Research\datasets\Natural\math" --stage classify
+dc run --pipeline math --stage acquire --dataset-root "E:\AI-Research\datasets\Natural\math" -- --queue "E:\AI-Research\datasets\Natural\math\_queues\green_pipeline.jsonl" --bucket green --targets-yaml pipelines/targets/targets_math.yaml --execute
+dc run --pipeline math --stage acquire --dataset-root "E:\AI-Research\datasets\Natural\math" -- --queue "E:\AI-Research\datasets\Natural\math\_queues\yellow_pipeline.jsonl" --bucket yellow --targets-yaml pipelines/targets/targets_math.yaml --execute
+dc review-queue --pipeline math --queue "E:\AI-Research\datasets\Natural\math\_queues\yellow_pipeline.jsonl" list --limit 50
+dc run --pipeline math --stage yellow_screen --dataset-root "E:\AI-Research\datasets\Natural\math" -- --queue "E:\AI-Research\datasets\Natural\math\_queues\yellow_pipeline.jsonl" --targets pipelines/targets/targets_math.yaml --execute
+dc run --pipeline math --stage merge --dataset-root "E:\AI-Research\datasets\Natural\math" -- --targets pipelines/targets/targets_math.yaml --execute
+dc catalog-builder --pipeline math -- --targets pipelines/targets/targets_math.yaml --output "E:\AI-Research\datasets\Natural\math\_catalogs\catalog.json"
 ```
 
 ### macOS/Linux (bash)
 
 ```bash
-python tools/build_natural_corpus.py --dest-root "/data/Natural" --pipelines all --execute
+dc pipeline math -- --targets pipelines/targets/targets_math.yaml --dataset-root /data/Natural/math --stage classify
+dc run --pipeline math --stage acquire --dataset-root /data/Natural/math -- --queue /data/Natural/math/_queues/green_pipeline.jsonl --bucket green --targets-yaml pipelines/targets/targets_math.yaml --execute
+dc run --pipeline math --stage acquire --dataset-root /data/Natural/math -- --queue /data/Natural/math/_queues/yellow_pipeline.jsonl --bucket yellow --targets-yaml pipelines/targets/targets_math.yaml --execute
+dc review-queue --pipeline math --queue /data/Natural/math/_queues/yellow_pipeline.jsonl list --limit 50
+dc run --pipeline math --stage yellow_screen --dataset-root /data/Natural/math -- --queue /data/Natural/math/_queues/yellow_pipeline.jsonl --targets pipelines/targets/targets_math.yaml --execute
+dc run --pipeline math --stage merge --dataset-root /data/Natural/math -- --targets pipelines/targets/targets_math.yaml --execute
+dc catalog-builder --pipeline math -- --targets pipelines/targets/targets_math.yaml --output /data/Natural/math/_catalogs/catalog.json
 ```
 
-This is the shortest “one-liner” to run every pipeline sequentially. It writes one
-pipeline folder per domain under the destination root. For a notebook-driven run,
-open `dataset_collector_run_all_pipelines.ipynb` and execute the cells in order.
+This is the shortest repeatable sequence to run a single pipeline using the unified CLI.
+For a notebook-driven run across all pipelines, open
+`dataset_collector_run_all_pipelines.ipynb` and execute the cells in order.
 
 ## Minimal from-scratch sequence
 
@@ -36,7 +51,8 @@ pip install -e .
 pip install -r math_pipeline_v2\requirements.txt
 # repeat for other pipeline extras as needed
 
-python tools\build_natural_corpus.py --dest-root "E:\AI-Research\datasets\Natural" --pipelines all --execute
+dc pipeline math -- --targets pipelines/targets/targets_math.yaml --dataset-root "E:\AI-Research\datasets\Natural\math" --stage classify
+dc run --pipeline math --stage acquire --dataset-root "E:\AI-Research\datasets\Natural\math" -- --queue "E:\AI-Research\datasets\Natural\math\_queues\green_pipeline.jsonl" --bucket green --targets-yaml pipelines/targets/targets_math.yaml --execute
 ```
 
 ### Notebook (JupyterLab)
@@ -103,8 +119,7 @@ root folder under the destination root.
 
 Keep the following so you can rerun quickly:
 
-- Your repo checkout (including `tools/build_natural_corpus.py` and
-  `dataset_collector_run_all_pipelines.ipynb`).
+- Your repo checkout (including `dataset_collector_run_all_pipelines.ipynb`).
 - Virtual environment(s) and installed dependencies.
 - Your local pipeline map or target YAMLs (for example, a copy of
   `tools/pipeline_map.sample.yaml` you customized).

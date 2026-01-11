@@ -44,6 +44,8 @@ Each YELLOW target MUST have a manifest directory and review signoff artifacts. 
    - `*_ledger/yellow_passed.jsonl`
    - `*_ledger/yellow_pitched.jsonl`
    - These provide audit trails for screening decisions.
+   - Ledgers live under `<dataset_root>/_ledger/` when you pass `--dataset-root` or set
+     `DATASET_ROOT` / `DATASET_COLLECTOR_ROOT`.
 
 ## Where review queues live
 
