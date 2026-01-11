@@ -332,6 +332,103 @@ def test_fetch_evidence_batch_preserves_order(monkeypatch: pytest.MonkeyPatch) -
     assert [result.snapshot["tid"] for result in results] == ["first", "second", "third"]
 
 
+def test_fetch_evidence_batch_dedupes_duplicate_urls(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[str] = []
+
+    def fake_fetch(
+        url: str,
+        *,
+        user_agent: str,
+        timeout_s: float | tuple[float, float] = (15.0, 60.0),
+        max_retries: int = 3,
+        backoff_base: float = 2.0,
+        headers: dict[str, str] | None = None,
+        max_bytes: int | None = None,
+        allow_private_hosts: bool = False,
+    ) -> tuple[bytes | None, str | None, dict[str, object]]:
+        calls.append(url)
+        return b"ok", "text/plain", {"retries": 0, "errors": [], "final_url": url}
+
+    monkeypatch.setattr(evidence_fetching, "fetch_url_with_retry", fake_fetch)
+
+    ctxs = [
+        SimpleNamespace(
+            tid="one",
+            evidence_url="https://example.test/terms",
+            target_manifest_dir=tmp_path / "one",
+            license_gates=["snapshot_terms"],
+        ),
+        SimpleNamespace(
+            tid="two",
+            evidence_url="https://example.test/terms",
+            target_manifest_dir=tmp_path / "two",
+            license_gates=["snapshot_terms"],
+        ),
+    ]
+    cfg = SimpleNamespace(
+        args=SimpleNamespace(no_fetch=False, allow_private_evidence_hosts=False),
+        license_map=SimpleNamespace(
+            evidence_change_policy="normalized",
+            cosmetic_change_policy="warn_only",
+        ),
+        retry_max=1,
+        retry_backoff=0.1,
+        headers={"Authorization": "token"},
+    )
+
+    evidence_fetching.fetch_evidence_batch(
+        ctxs=ctxs,
+        cfg=cfg,
+        user_agent="ua",
+        max_bytes=1024,
+        max_workers=2,
+    )
+
+    assert calls == ["https://example.test/terms"]
+
+
+def test_snapshot_evidence_cache_keys_include_headers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[dict[str, str] | None] = []
+
+    def fake_fetch(
+        url: str,
+        *,
+        user_agent: str,
+        timeout_s: float | tuple[float, float] = (15.0, 60.0),
+        max_retries: int = 3,
+        backoff_base: float = 2.0,
+        headers: dict[str, str] | None = None,
+        max_bytes: int | None = None,
+        allow_private_hosts: bool = False,
+    ) -> tuple[bytes | None, str | None, dict[str, object]]:
+        calls.append(headers)
+        return b"ok", "text/plain", {"retries": 0, "errors": [], "final_url": url}
+
+    monkeypatch.setattr(evidence_fetching, "fetch_url_with_retry", fake_fetch)
+
+    cache = evidence_fetching.EvidenceFetchCache()
+    evidence_fetching.snapshot_evidence(
+        tmp_path / "first",
+        "https://example.test/terms",
+        user_agent="ua",
+        headers={"Authorization": "token"},
+        fetch_cache=cache,
+    )
+    evidence_fetching.snapshot_evidence(
+        tmp_path / "second",
+        "https://example.test/terms",
+        user_agent="ua",
+        headers={"Authorization": "different"},
+        fetch_cache=cache,
+    )
+
+    assert calls == [{"Authorization": "token"}, {"Authorization": "different"}]
+
+
 def test_fetch_evidence_batch_matches_sequential(monkeypatch: pytest.MonkeyPatch) -> None:
     ctxs = [
         SimpleNamespace(tid="alpha"),
