@@ -53,6 +53,54 @@ def test_json_formatter_redacts_inline_tokens() -> None:
     assert REDACTED in message
 
 
+def test_json_formatter_redacts_known_secrets() -> None:
+    formatter = JsonFormatter()
+    secret_block = (
+        "-----BEGIN PRIVATE KEY-----\n"
+        "MIIBVgIBADANBgkqhkiG9w0BAQEFAASCAT8wggE7AgEAAkEAsnEXAMPLE\n"
+        "-----END PRIVATE KEY-----"
+    )
+    record = logging.LogRecord(
+        name="test",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg=(
+            "password=hunter2 refresh_token=r1-abcdef "
+            "slack=xoxb-1234567890-abcdefg "
+            "google=AIzaSyDUMMYKEY1234567890abcdefgHIJKL "
+            f"key={secret_block}"
+        ),
+        args=(),
+        exc_info=None,
+    )
+    payload = json.loads(formatter.format(record))
+    message = payload["message"]
+    assert "hunter2" not in message
+    assert "r1-abcdef" not in message
+    assert "xoxb-1234567890-abcdefg" not in message
+    assert "AIzaSyDUMMYKEY1234567890abcdefgHIJKL" not in message
+    assert "BEGIN PRIVATE KEY" not in message
+    assert REDACTED in message
+
+
+def test_text_formatter_redacts_sensitive_keys_in_structures() -> None:
+    formatter = TextFormatter()
+    record = logging.LogRecord(
+        name="test",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg="Payload: %s",
+        args=({"password": "topsecret", "user": "demo"},),
+        exc_info=None,
+    )
+    output = formatter.format(record)
+    assert "topsecret" not in output
+    assert "demo" in output
+    assert REDACTED in output
+
+
 def test_json_formatter_includes_log_context_fields() -> None:
     formatter = JsonFormatter()
     set_log_context(

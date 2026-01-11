@@ -12,10 +12,18 @@ _SENSITIVE_KEY_NORMALIZED = {
     "xapikey",
     "accesstoken",
     "token",
+    "password",
+    "passwd",
+    "secret",
+    "clientsecret",
+    "refreshtoken",
+    "awssecretaccesskey",
 }
 
 _KEY_VALUE_RE = re.compile(
-    r"(?i)(authorization|x-api-key|api[-_]?key|access[-_]?token|token)(\s*[:=]\s*)"
+    r"(?i)(authorization|x-api-key|api[-_]?key|access[-_]?token|refresh[-_]?token|token|"
+    r"password|passwd|secret|client[_-]?secret|aws[_-]?secret[_-]?access[_-]?key)"
+    r"(\s*[:=]\s*)"
     r"(\"[^\"]*\"|'[^']*'|Bearer\s+[^,\s]+|[^,\s]+)"
 )
 _BEARER_RE = re.compile(r"(?i)Bearer\s+[^\s,\"']+")
@@ -23,6 +31,11 @@ _TOKEN_PATTERNS = [
     re.compile(r"gh[pousr]_[A-Za-z0-9_]{30,}"),
     re.compile(r"AKIA[0-9A-Z]{16}"),
     re.compile(r"eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9._-]{10,}\.[a-zA-Z0-9._-]{10,}"),
+    re.compile(r"xox[baprs]-[0-9A-Za-z-]{10,}"),
+    re.compile(r"AIzaSy[0-9A-Za-z-_]{30,}"),
+    re.compile(
+        r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]+?-----END [A-Z ]*PRIVATE KEY-----"
+    ),
 ]
 
 
