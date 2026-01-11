@@ -2,22 +2,11 @@
 #
 # run_pipeline.sh (v2.0)
 #
-# Wrapper script for the Biology Corpus Pipeline v2. It follows the
-# BIOLOGY_PIPELINE_V2_ADAPTATION_PLAN.md stage order.
-#
-# Usage examples:
-#   ./run_pipeline.sh --targets targets_biology.yaml --stage classify
-#   ./run_pipeline.sh --targets targets_biology.yaml --stage acquire_green --execute
+# Wrapper script for the biology pipeline using the unified dc CLI.
 #
 set -euo pipefail
 
-# Interpreter: python
-
-VERSION="2.0"
-
 RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
@@ -29,11 +18,11 @@ LIMIT_FILES=""
 WORKERS="4"
 
 usage() {
-  cat << 'EOF'
-Biology Corpus Pipeline v${VERSION}
+  cat << 'EOM'
+Pipeline wrapper (v2)
 
 Required:
-  --targets FILE          Path to targets_biology.yaml
+  --targets FILE          Path to targets YAML
 
 Options:
   --execute               Perform actions (default is dry-run/plan only)
@@ -43,128 +32,134 @@ Options:
   --limit-files N         Limit files per target during acquisition
   --workers N             Parallel workers for acquisition (default: 4)
   -h, --help              Show this help
-EOF
+EOM
 }
 
-# Read a value from the targets YAML using python
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export PYTHONPATH="${SCRIPT_DIR}/..:${PYTHONPATH:-}"
-
-get_yaml_value() {
-  local key="$1"
-  python - << PY
-from pathlib import Path
-from collector_core.config_validator import read_yaml
-path = Path("${TARGETS}").expanduser()
-cfg = read_yaml(path, schema_name="targets") or {}
-value = cfg
-for part in "${key}".split('.'):
-    value = value.get(part, {}) if isinstance(value, dict) else {}
-print(value if value else "")
-PY
-}
-
-queues_root() { get_yaml_value "globals.queues_root"; }
-catalogs_root() { get_yaml_value "globals.catalogs_root"; }
-
-# Parse arguments
 while [[ $# -gt 0 ]]; do
-  case $1 in
-    --targets)
-      TARGETS="$2"; shift 2;;
-    --execute)
-      EXECUTE="--execute"; shift;;
-    --stage)
-      STAGE="$2"; shift 2;;
-    --limit-targets)
-      LIMIT_TARGETS="$2"; shift 2;;
-    --limit-files)
-      LIMIT_FILES="$2"; shift 2;;
-    --workers)
-      WORKERS="$2"; shift 2;;
-    -h|--help)
-      usage; exit 0;;
-    *)
-      echo -e "${RED}Unknown argument: $1${NC}"; usage; exit 1;;
+  case "$1" in
+    --targets) TARGETS="$2"; shift 2 ;;
+    --stage) STAGE="$2"; shift 2 ;;
+    --execute) EXECUTE="--execute"; shift ;;
+    --limit-targets) LIMIT_TARGETS="$2"; shift 2 ;;
+    --limit-files) LIMIT_FILES="$2"; shift 2 ;;
+    --workers) WORKERS="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo -e "${RED}Unknown option: $1${NC}"; usage; exit 1 ;;
   esac
 done
 
-if [[ -z "${TARGETS}" ]]; then
+if [[ -z "$TARGETS" ]]; then
   echo -e "${RED}--targets is required${NC}"
   usage
   exit 1
 fi
-if [[ ! -f "${TARGETS}" ]]; then
-  echo -e "${RED}targets file not found: ${TARGETS}${NC}"
+
+if [[ ! -f "$TARGETS" ]]; then
+  echo -e "${RED}targets file not found: $TARGETS${NC}"
   exit 1
 fi
 
-QUEUES_ROOT="$(queues_root)"
-CATALOGS_ROOT="$(catalogs_root)"
-GREEN_QUEUE="${QUEUES_ROOT:-/data/bio/_queues}/green_download.jsonl"
-YELLOW_QUEUE="${QUEUES_ROOT:-/data/bio/_queues}/yellow_pipeline.jsonl"
-CATALOG_OUT="${CATALOGS_ROOT:-/data/bio/_catalogs}/catalog.json"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+export PYTHONPATH="${REPO_ROOT}:${PYTHONPATH:-}"
+
+QUEUES_ROOT=$(python - << PY
+from pathlib import Path
+from collector_core.config_validator import read_yaml
+from collector_core.pipeline_spec import get_pipeline_spec
+cfg = read_yaml(Path("${TARGETS}"), schema_name="targets") or {}
+spec = get_pipeline_spec("biology")
+prefix = spec.prefix if spec else "biology"
+print(cfg.get("globals", {}).get("queues_root", f"/data/{prefix}/_queues"))
+PY
+)
+CATALOGS_ROOT=$(python - << PY
+from pathlib import Path
+from collector_core.config_validator import read_yaml
+from collector_core.pipeline_spec import get_pipeline_spec
+cfg = read_yaml(Path("${TARGETS}"), schema_name="targets") or {}
+spec = get_pipeline_spec("biology")
+prefix = spec.prefix if spec else "biology"
+print(cfg.get("globals", {}).get("catalogs_root", f"/data/{prefix}/_catalogs"))
+PY
+)
 LIMIT_TARGETS_ARG=""; [[ -n "$LIMIT_TARGETS" ]] && LIMIT_TARGETS_ARG="--limit-targets $LIMIT_TARGETS"
 LIMIT_FILES_ARG=""; [[ -n "$LIMIT_FILES" ]] && LIMIT_FILES_ARG="--limit-files $LIMIT_FILES"
 
 run_classify() {
-  echo -e "${BLUE}[*] Classify targets${NC}"
-  python pipeline_driver.py --targets "${TARGETS}"
-  echo -e "${GREEN}[✓] Queues written to ${QUEUES_ROOT:-/data/bio/_queues}${NC}"
-}
-
-run_acquire_green() {
-  echo -e "${BLUE}[*] Acquire GREEN targets${NC}"
-  python acquire_worker.py --queue "${GREEN_QUEUE}" --targets-yaml "${TARGETS}" --bucket green ${LIMIT_TARGETS_ARG} ${LIMIT_FILES_ARG} --workers "${WORKERS}" ${EXECUTE}
-}
-
-run_acquire_yellow() {
-  echo -e "${BLUE}[*] Acquire YELLOW targets${NC}"
-  python acquire_worker.py --queue "${YELLOW_QUEUE}" --targets-yaml "${TARGETS}" --bucket yellow ${LIMIT_TARGETS_ARG} ${LIMIT_FILES_ARG} --workers "${WORKERS}" ${EXECUTE}
-}
-
-run_screen_yellow() {
-  echo -e "${BLUE}[*] Screen YELLOW targets${NC}"
-  python yellow_screen_worker.py --targets "${TARGETS}" --queue "${YELLOW_QUEUE}" ${EXECUTE}
-}
-
-run_merge() {
-  echo -e "${BLUE}[*] Merge GREEN + screened YELLOW${NC}"
-  python merge_worker.py --targets "${TARGETS}" ${EXECUTE}
-}
-
-
-run_catalog() {
-  echo -e "${BLUE}[*] Build catalog${NC}"
-  mkdir -p "$(dirname "${CATALOG_OUT}")"
-  python catalog_builder.py --targets "${TARGETS}" --output "${CATALOG_OUT}"
-  echo -e "${GREEN}[✓] Catalog written to ${CATALOG_OUT}${NC}"
+  echo -e "${BLUE}== Stage: classify ==${NC}"
+  local no_fetch=""
+  if [[ -z "$EXECUTE" ]]; then
+    no_fetch="--no-fetch"
+  fi
+  python -m collector_core.dc_cli pipeline biology -- --targets "$TARGETS" $no_fetch
 }
 
 run_review() {
-  echo -e "${BLUE}[*] Review YELLOW queue${NC}"
-  python review_queue.py --queue "${YELLOW_QUEUE}" list --limit 50 || true
+  local queue_file="$QUEUES_ROOT/yellow_pipeline.jsonl"
+  echo -e "${BLUE}== Stage: review ==${NC}"
+  python -m collector_core.generic_workers --domain biology review-queue -- --queue "$queue_file" --targets "$TARGETS" --limit 50 || true
 }
 
-case "${STAGE}" in
+run_acquire() {
+  local bucket="$1"
+  local queue_file="$QUEUES_ROOT/${bucket}_download.jsonl"
+  if [[ "$bucket" == "yellow" ]]; then
+    queue_file="$QUEUES_ROOT/yellow_pipeline.jsonl"
+  fi
+  if [[ ! -f "$queue_file" ]]; then
+    echo -e "${RED}Queue not found: $queue_file${NC}"
+    exit 1
+  fi
+  echo -e "${BLUE}== Stage: acquire_${bucket} ==${NC}"
+  python -m collector_core.dc_cli run --pipeline biology --stage acquire -- \
+    --queue "$queue_file" \
+    --targets-yaml "$TARGETS" \
+    --bucket "$bucket" \
+    --workers "$WORKERS" \
+    $EXECUTE \
+    $LIMIT_TARGETS_ARG \
+    $LIMIT_FILES_ARG
+}
+
+run_screen_yellow() {
+  local queue_file="$QUEUES_ROOT/yellow_pipeline.jsonl"
+  if [[ ! -f "$queue_file" ]]; then
+    echo -e "${RED}Queue not found: $queue_file${NC}"
+    exit 1
+  fi
+  echo -e "${BLUE}== Stage: screen_yellow ==${NC}"
+  python -m collector_core.dc_cli run --pipeline biology --stage yellow_screen -- \
+    --targets "$TARGETS" \
+    --queue "$queue_file" \
+    $EXECUTE
+}
+
+run_merge() {
+  echo -e "${BLUE}== Stage: merge ==${NC}"
+  python -m collector_core.dc_cli run --pipeline biology --stage merge -- --targets "$TARGETS" $EXECUTE
+}
+
+run_catalog() {
+  echo -e "${BLUE}== Stage: catalog ==${NC}"
+  python -m collector_core.generic_workers --domain biology catalog -- --targets "$TARGETS" --output "${CATALOGS_ROOT}/catalog.json"
+}
+
+case "$STAGE" in
   all)
     run_classify
-    run_acquire_green
-    run_acquire_yellow
+    run_acquire green
+    run_acquire yellow
     run_screen_yellow
     run_merge
     run_catalog
     ;;
   classify) run_classify ;;
-  acquire_green) run_acquire_green ;;
-  acquire_yellow) run_acquire_yellow ;;
+  acquire_green) run_acquire green ;;
+  acquire_yellow) run_acquire yellow ;;
   screen_yellow) run_screen_yellow ;;
   merge) run_merge ;;
   catalog) run_catalog ;;
   review) run_review ;;
-  *)
-    echo -e "${RED}Unknown stage: ${STAGE}${NC}"
-    usage
-    exit 1
-    ;;
- esac
+  *) echo -e "${RED}Unknown stage: $STAGE${NC}"; usage; exit 1 ;;
+esac

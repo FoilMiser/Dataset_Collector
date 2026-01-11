@@ -1,7 +1,7 @@
 pipelines:
   3d_modeling:
     acquire:
-      plugin_module: acquire_worker.py
+      plugin_module: acquire_plugin.py
       postprocess: modeling_postprocess
   chem:
     acquire:
@@ -10,7 +10,7 @@ pipelines:
     yellow_screen: chem
   code:
     acquire:
-      plugin_module: acquire_worker.py
+      plugin_module: acquire_plugin.py
       postprocess: code_postprocess
   econ_stats_decision_adaptation:
     yellow_screen: econ
@@ -24,7 +24,7 @@ pipelines:
     yellow_screen: kg_nav
   metrology:
     acquire:
-      plugin_module: acquire_worker.py
+      plugin_module: acquire_plugin.py
       postprocess: metrology_postprocess
       wrap_handlers: apply_artifacts_dir
   nlp:
