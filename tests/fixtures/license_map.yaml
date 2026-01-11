@@ -1,0 +1,19 @@
+schema_version: "0.9"
+updated_utc: "2024-01-01T00:00:00Z"
+spdx:
+  allow:
+    - MIT
+  deny_prefixes:
+    - GPL
+normalization:
+  rules:
+    - match_any:
+        - MIT License
+      spdx: MIT
+restriction_scan:
+  phrases: []
+profiles:
+  permissive:
+    spdx_hint: MIT
+  deny:
+    spdx_hint: GPL-3.0
