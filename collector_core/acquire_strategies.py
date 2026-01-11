@@ -15,7 +15,7 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.acquire_limits import (
@@ -97,8 +97,56 @@ class AcquireContext:
     mode: RunMode
     retry: RetryConfig
     allow_non_global_download_hosts: bool = False
+    internal_mirror_allowlist: "InternalMirrorAllowlist" = dataclasses.field(
+        default_factory=lambda: InternalMirrorAllowlist()
+    )
     cfg: dict[str, Any] | None = None
     checks_run_id: str = ""
+
+
+@dataclasses.dataclass(frozen=True)
+class InternalMirrorAllowlist:
+    hosts: frozenset[str] = frozenset()
+    networks: tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...] = ()
+
+    def allows_host(self, hostname: str) -> bool:
+        normalized = hostname.lower().rstrip(".")
+        for host in self.hosts:
+            if host.startswith("."):
+                if normalized.endswith(host):
+                    return True
+            elif normalized == host:
+                return True
+        return False
+
+    def allows_ip(self, ip_value: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+        return any(ip_value in network for network in self.networks)
+
+
+def _normalize_internal_mirror_allowlist(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [item.strip() for item in value.split(",") if item.strip()]
+    if isinstance(value, (list, tuple, set)):
+        return [str(item).strip() for item in value if str(item).strip()]
+    return [str(value).strip()]
+
+
+def _build_internal_mirror_allowlist(values: list[str]) -> InternalMirrorAllowlist:
+    hosts: set[str] = set()
+    networks: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
+    for entry in values:
+        text = entry.strip()
+        if not text:
+            continue
+        try:
+            network = ipaddress.ip_network(text, strict=False)
+        except ValueError:
+            hosts.add(text.lower().rstrip("."))
+        else:
+            networks.append(network)
+    return InternalMirrorAllowlist(hosts=frozenset(hosts), networks=tuple(networks))
 
 
 def _read_jsonl_list(path: Path) -> list[dict[str, Any]]:
@@ -141,7 +189,11 @@ def _resolve_host_ips(hostname: str) -> list[str]:
     return sorted(ips)
 
 
-def validate_download_url(url: str, allow_non_global_hosts: bool) -> tuple[bool, str | None]:
+def validate_download_url(
+    url: str,
+    allow_non_global_hosts: bool,
+    internal_mirror_allowlist: InternalMirrorAllowlist | None = None,
+) -> tuple[bool, str | None]:
     parsed = urlparse(url)
     scheme = (parsed.scheme or "").lower()
     if scheme not in {"http", "https"}:
@@ -150,7 +202,10 @@ def validate_download_url(url: str, allow_non_global_hosts: bool) -> tuple[bool,
         return False, "missing_hostname"
     if allow_non_global_hosts:
         return True, None
+    allowlist = internal_mirror_allowlist or InternalMirrorAllowlist()
     hostname = parsed.hostname
+    if allowlist.allows_host(hostname):
+        return True, None
     try:
         ip_value = ipaddress.ip_address(hostname)
     except ValueError:
@@ -159,21 +214,34 @@ def validate_download_url(url: str, allow_non_global_hosts: bool) -> tuple[bool,
             return False, "unresolvable_hostname"
         for ip_str in ips:
             ip_value = ipaddress.ip_address(ip_str)
-            if not ip_value.is_global:
-                return False, f"blocked_ip:{ip_str}:{_non_global_ip_reason(ip_value)}"
+            if ip_value.is_global:
+                continue
+            if allowlist.allows_ip(ip_value):
+                continue
+            return False, f"blocked_ip:{ip_str}:{_non_global_ip_reason(ip_value)}"
         return True, None
-    if not ip_value.is_global:
+    if not ip_value.is_global and not allowlist.allows_ip(ip_value):
         return False, f"blocked_ip:{ip_value}:{_non_global_ip_reason(ip_value)}"
     return True, None
 
 
 def _validate_redirect_chain(
-    response: requests.Response, allow_non_global_hosts: bool
+    response: requests.Response,
+    allow_non_global_hosts: bool,
+    internal_mirror_allowlist: InternalMirrorAllowlist,
 ) -> tuple[bool, str | None, str | None]:
-    for resp in response.history + [response]:
-        allowed, reason = validate_download_url(resp.url, allow_non_global_hosts)
+    redirect_urls: list[str] = []
+    for resp in response.history:
+        location = (resp.headers or {}).get("Location")
+        if location:
+            redirect_urls.append(urljoin(resp.url, location))
+    redirect_urls.append(response.url)
+    for redirect_url in redirect_urls:
+        allowed, reason = validate_download_url(
+            redirect_url, allow_non_global_hosts, internal_mirror_allowlist
+        )
         if not allowed:
-            return False, reason, resp.url
+            return False, reason, redirect_url
     return True, None, None
 
 
@@ -295,7 +363,9 @@ def _http_download_with_resume(
             ),
         )
 
-    allowed, reason = validate_download_url(url, ctx.allow_non_global_download_hosts)
+    allowed, reason = validate_download_url(
+        url, ctx.allow_non_global_download_hosts, ctx.internal_mirror_allowlist
+    )
     if not allowed:
         return {
             "status": "error",
@@ -319,7 +389,7 @@ def _http_download_with_resume(
             with requests.get(url, stream=True, headers=headers, timeout=(15, 300)) as r:
                 r.raise_for_status()
                 allowed, reason, blocked = _validate_redirect_chain(
-                    r, ctx.allow_non_global_download_hosts
+                    r, ctx.allow_non_global_download_hosts, ctx.internal_mirror_allowlist
                 )
                 if not allowed:
                     blocked_reason = reason
@@ -339,7 +409,9 @@ def _http_download_with_resume(
                             with requests.get(url, stream=True, timeout=(15, 300)) as fresh:
                                 fresh.raise_for_status()
                                 allowed, reason, blocked = _validate_redirect_chain(
-                                    fresh, ctx.allow_non_global_download_hosts
+                                    fresh,
+                                    ctx.allow_non_global_download_hosts,
+                                    ctx.internal_mirror_allowlist,
                                 )
                                 if not allowed:
                                     blocked_reason = reason
@@ -1558,6 +1630,15 @@ def run_acquire_worker(
         help="Allow downloads from non-global IPs (private/loopback/link-local/multicast/reserved/unspecified).",
     )
     ap.add_argument(
+        "--internal-mirror-allowlist",
+        action="append",
+        default=None,
+        help=(
+            "Allow internal mirrors by hostname or IP/CIDR (repeatable or comma-separated). "
+            "Use sparingly to permit private mirrors."
+        ),
+    )
+    ap.add_argument(
         "--resume",
         action=argparse.BooleanOptionalAction,
         default=True,
@@ -1580,6 +1661,15 @@ def run_acquire_worker(
     roots = load_roots(cfg, args, defaults)
     ensure_dir(roots.logs_root)
     ensure_dir(roots.ledger_root)
+    cfg_allowlist = _normalize_internal_mirror_allowlist(
+        (cfg.get("globals", {}) or {}).get("internal_mirror_allowlist")
+    )
+    arg_allowlist: list[str] = []
+    for entry in args.internal_mirror_allowlist or []:
+        arg_allowlist.extend(_normalize_internal_mirror_allowlist(entry))
+    internal_mirror_allowlist = _build_internal_mirror_allowlist(
+        sorted(set(cfg_allowlist + arg_allowlist))
+    )
 
     ctx = AcquireContext(
         roots=roots,
@@ -1594,6 +1684,7 @@ def run_acquire_worker(
         ),
         retry=RetryConfig(args.retry_max, args.retry_backoff),
         allow_non_global_download_hosts=args.allow_non_global_download_hosts,
+        internal_mirror_allowlist=internal_mirror_allowlist,
         cfg=cfg,
         checks_run_id=generate_run_id("acquire"),
     )
