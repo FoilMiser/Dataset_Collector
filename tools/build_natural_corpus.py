@@ -7,11 +7,6 @@ from collections.abc import Iterable, Sequence
 from datetime import datetime
 from pathlib import Path, PurePath, PureWindowsPath
 
-if __package__ in (None, ""):
-    repo_root = Path(__file__).resolve().parents[1]
-    if str(repo_root) not in sys.path:
-        sys.path.insert(0, str(repo_root))
-
 from collector_core.config_validator import read_yaml
 from collector_core.targets_paths import resolve_targets_path, targets_root
 from tools.init_layout import init_layout

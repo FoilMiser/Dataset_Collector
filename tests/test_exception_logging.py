@@ -6,11 +6,10 @@ Ensures best-effort behavior while making failures observable.
 """
 
 from __future__ import annotations
+from pathlib import Path
 
 import json
 import logging
-from pathlib import Path
-
 import pytest
 
 from collector_core.pipeline_driver_base import read_review_signoff

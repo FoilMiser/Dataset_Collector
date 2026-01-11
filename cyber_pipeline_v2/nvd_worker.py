@@ -6,13 +6,11 @@ JSON.gz feed and flattens it into a JSONL stream suitable for the catalog.
 """
 
 from __future__ import annotations
+from pathlib import Path
 
 import gzip
 import json
 from collections.abc import Iterable
-from pathlib import Path
-
-
 def load_feed(path: Path) -> dict:
     with gzip.open(path, "rt", encoding="utf-8") as f:
         return json.load(f)

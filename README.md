@@ -72,6 +72,7 @@ requirements/constraints files exist to support deterministic CI installs.
 ```bash
 pip install -r requirements.constraints.txt
 pip install -r requirements-dev.constraints.txt
+pip install -e .
 pip install -r math_pipeline_v2/requirements.txt
 # repeat for other pipeline extras as needed
 ```

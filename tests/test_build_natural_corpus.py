@@ -1,7 +1,5 @@
 from __future__ import annotations
-
 from pathlib import Path
-
 import yaml
 
 from tools import build_natural_corpus

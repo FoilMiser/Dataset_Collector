@@ -32,6 +32,7 @@ Use this when you are starting on a fresh machine or want the most explicit sequ
 py -3.11 -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.constraints.txt
+pip install -e .
 pip install -r math_pipeline_v2\requirements.txt
 # repeat for other pipeline extras as needed
 

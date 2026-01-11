@@ -4,16 +4,10 @@ import argparse
 import ast
 import json
 import shutil
-import sys
 import traceback
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
-
-if __package__ in (None, ""):
-    repo_root = Path(__file__).resolve().parents[1]
-    if str(repo_root) not in sys.path:
-        sys.path.insert(0, str(repo_root))
 
 from collector_core.config_validator import read_yaml
 from tools.strategy_registry import (

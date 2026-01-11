@@ -1,7 +1,7 @@
 from __future__ import annotations
+from pathlib import Path
 
 import uuid
-from pathlib import Path
 from typing import Any
 
 from collector_core.artifact_metadata import build_artifact_metadata

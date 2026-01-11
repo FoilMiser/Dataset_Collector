@@ -18,10 +18,6 @@ import sys
 from pathlib import Path
 from typing import NamedTuple
 
-# Add parent to path for collector_core imports
-REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO_ROOT))
-
 import collector_core.pipeline_specs_registry  # noqa: E402,F401
 from collector_core.pipeline_spec import get_pipeline_spec, list_pipelines  # noqa: E402
 
@@ -41,13 +37,7 @@ pipeline_driver.py (v2.0)
 Thin wrapper that delegates to the spec-driven pipeline factory.
 """
 from __future__ import annotations
-
-import sys
 from pathlib import Path
-
-if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
 from collector_core.pipeline_factory import get_pipeline_driver  # noqa: E402
 
 DOMAIN = "{domain}"
@@ -64,13 +54,7 @@ acquire_worker.py (v2.0)
 Thin wrapper that delegates to the spec-driven generic acquire worker.
 """
 from __future__ import annotations
-
-import sys
 from pathlib import Path
-
-if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
 from collector_core.acquire_strategies import (  # noqa: E402
     AcquireContext,
     Limits,
@@ -110,13 +94,7 @@ merge_worker.py (v2.0)
 Thin wrapper that delegates to the spec-driven generic merge worker.
 """
 from __future__ import annotations
-
-import sys
 from pathlib import Path
-
-if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
 from collector_core import merge as core_merge  # noqa: E402
 from collector_core.generic_workers import main_merge  # noqa: E402
 from collector_core.pipeline_spec import get_pipeline_spec  # noqa: E402
@@ -157,13 +135,7 @@ catalog_builder.py (v2.0)
 Thin wrapper that delegates to the spec-driven generic catalog builder.
 """
 from __future__ import annotations
-
-import sys
 from pathlib import Path
-
-if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
 from collector_core.generic_workers import main_catalog  # noqa: E402
 
 DOMAIN = "{domain}"
@@ -185,13 +157,7 @@ review_queue.py (v2.0)
 Thin wrapper that delegates to the spec-driven review queue helper.
 """
 from __future__ import annotations
-
-import sys
 from pathlib import Path
-
-if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
 from collector_core.generic_workers import main_review_queue  # noqa: E402
 
 DOMAIN = "{domain}"
@@ -381,13 +347,7 @@ yellow_scrubber.py (v2.0)
 Thin wrapper that delegates to the spec-driven yellow review helper.
 """
 from __future__ import annotations
-
-import sys
 from pathlib import Path
-
-if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
 from collector_core.pipeline_spec import get_pipeline_spec  # noqa: E402
 from collector_core.yellow_review_helpers import make_main  # noqa: E402
 
@@ -407,13 +367,7 @@ yellow_screen_worker.py (v2.0)
 Thin wrapper that delegates to the spec-driven yellow screen dispatch.
 """
 from __future__ import annotations
-
-import sys
 from pathlib import Path
-
-if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
 from collector_core.yellow_screen_dispatch import main_yellow_screen  # noqa: E402
 
 DOMAIN = "{domain}"

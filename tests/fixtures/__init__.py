@@ -9,6 +9,7 @@ from typing import Any
 
 def create_minimal_targets_yaml(path: Path, domain: str = "test") -> None:
     """Create a minimal valid targets YAML for testing."""
+
     content = f"""# Test targets for {domain} pipeline
 globals:
   raw_root: "{path.parent}/raw"

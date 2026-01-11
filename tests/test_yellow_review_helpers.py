@@ -20,6 +20,7 @@ from collector_core.yellow_review_helpers import (
 @pytest.fixture
 def sample_queue_data() -> list[dict[str, Any]]:
     """Sample queue data for testing."""
+
     return [
         {
             "id": "test-001",
