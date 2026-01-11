@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import dataclasses
 import json
-import os
 from pathlib import Path
 from typing import Any
 
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.config_validator import read_yaml
+from collector_core.dataset_root import resolve_dataset_root
 from collector_core.utils import (
     write_jsonl,
 )
@@ -103,13 +103,6 @@ def default_yellow_roots(prefix: str) -> YellowRootDefaults:
 
 def load_targets_cfg(path: Path) -> dict[str, Any]:
     return read_yaml(path, schema_name="targets") or {}
-
-
-def resolve_dataset_root(explicit: str | None = None) -> Path | None:
-    value = explicit or os.getenv("DATASET_ROOT") or os.getenv("DATASET_COLLECTOR_ROOT")
-    if not value:
-        return None
-    return Path(value).expanduser().resolve()
 
 
 def resolve_roots(
