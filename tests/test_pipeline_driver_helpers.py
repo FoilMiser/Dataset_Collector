@@ -204,6 +204,98 @@ def test_fetch_url_with_retry_blocks_private_redirect(monkeypatch: pytest.Monkey
     assert meta["blocked_url"] == "http://127.0.0.1/private"
 
 
+def test_fetch_url_with_retry_blocks_private_redirect_ip(monkeypatch: pytest.MonkeyPatch) -> None:
+    driver = BasePipelineDriver()
+
+    class RedirectResponse:
+        def __init__(self, url: str, location: str) -> None:
+            self.url = url
+            self.headers = {"Location": location}
+
+    class DummyResponse:
+        def __init__(self, url: str, history: list[RedirectResponse]) -> None:
+            self.url = url
+            self.headers = {"Content-Type": "text/plain"}
+            self.status_code = 200
+            self.history = history
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def iter_content(self, chunk_size: int = 1024) -> list[bytes]:
+            return [b"ok"]
+
+        def __enter__(self) -> DummyResponse:
+            return self
+
+        def __exit__(self, exc_type: object, exc: object, tb: object) -> bool:
+            return False
+
+    redirect = RedirectResponse("https://example.test/start", "http://10.0.0.5/private")
+    response = DummyResponse("https://example.test/final", [redirect])
+
+    def fake_getaddrinfo(host: str, *args: object, **kwargs: object) -> list[tuple[object, ...]]:
+        if host == "example.test":
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))]
+        return []
+
+    monkeypatch.setattr(evidence_fetching.socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr(evidence_fetching.requests, "get", lambda *args, **kwargs: response)
+
+    content, info, meta = driver.fetch_url_with_retry("https://example.test/start")
+    assert content is None
+    assert info == "blocked_url"
+    assert meta["blocked_url"] == "http://10.0.0.5/private"
+
+
+def test_fetch_url_with_retry_blocks_private_redirect_hostname(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    driver = BasePipelineDriver()
+
+    class RedirectResponse:
+        def __init__(self, url: str, location: str) -> None:
+            self.url = url
+            self.headers = {"Location": location}
+
+    class DummyResponse:
+        def __init__(self, url: str, history: list[RedirectResponse]) -> None:
+            self.url = url
+            self.headers = {"Content-Type": "text/plain"}
+            self.status_code = 200
+            self.history = history
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def iter_content(self, chunk_size: int = 1024) -> list[bytes]:
+            return [b"ok"]
+
+        def __enter__(self) -> DummyResponse:
+            return self
+
+        def __exit__(self, exc_type: object, exc: object, tb: object) -> bool:
+            return False
+
+    redirect = RedirectResponse("https://example.test/start", "http://internal.test/private")
+    response = DummyResponse("https://example.test/final", [redirect])
+
+    def fake_getaddrinfo(host: str, *args: object, **kwargs: object) -> list[tuple[object, ...]]:
+        if host == "example.test":
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))]
+        if host == "internal.test":
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.168.1.20", 0))]
+        return []
+
+    monkeypatch.setattr(evidence_fetching.socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr(evidence_fetching.requests, "get", lambda *args, **kwargs: response)
+
+    content, info, meta = driver.fetch_url_with_retry("https://example.test/start")
+    assert content is None
+    assert info == "blocked_url"
+    assert meta["blocked_url"] == "http://internal.test/private"
+
+
 def test_resolve_retry_config_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     args = SimpleNamespace(retry_max=None, retry_backoff=None, max_retries=None)
     monkeypatch.setenv("PIPELINE_RETRY_MAX", "5")
