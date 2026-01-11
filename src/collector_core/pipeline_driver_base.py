@@ -2,23 +2,27 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
-import html
-import ipaddress
 import json
 import logging
 import os
-import re
-import socket
-import urllib.parse
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
-import requests
-
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.artifact_metadata import build_artifact_metadata
+from collector_core.checks.actions import (
+    normalize_content_check_actions,
+    resolve_content_check_action,
+)
 from collector_core.checks.runner import generate_run_id, run_checks_for_target
+from collector_core.classification.logic import (
+    apply_yellow_signoff_requirement,
+    build_bucket_signals,
+    resolve_effective_bucket,
+    resolve_output_pool,
+    resolve_spdx_with_confidence,
+)
 from collector_core.companion_files import read_license_maps, resolve_companion_paths
 from collector_core.config_validator import read_yaml
 
@@ -29,27 +33,32 @@ from collector_core.denylist_matcher import (
     load_denylist,
 )
 from collector_core.dataset_root import resolve_dataset_root
-from collector_core.dependencies import _try_import
 from collector_core.exceptions import ConfigValidationError
 from collector_core.logging_config import add_logging_args, configure_logging
-from collector_core.network_utils import _with_retries
 from collector_core.policy_snapshot import build_policy_snapshot
-from collector_core.secrets import REDACTED, SecretStr, redact_headers
+from collector_core.queue.emission import emit_queues
 from collector_core.utils import (
     coerce_int,
     contains_any,
     ensure_dir,
-    lower,
-    normalize_whitespace,
-    sha256_bytes,
-    sha256_file,
     utc_now,
     write_json,
-    write_jsonl,
+)
+
+from collector_core.evidence.change_detection import (
+    compute_signoff_mismatches,
+    normalize_cosmetic_change_policy,
+    normalize_evidence_change_policy,
+    resolve_evidence_change,
+)
+from collector_core.evidence.fetching import (
+    fetch_evidence,
+    fetch_url_with_retry,
+    redact_headers_for_manifest,
+    snapshot_evidence,
 )
 
 logger = logging.getLogger(__name__)
-PdfReader = _try_import("pypdf", "PdfReader")
 
 SUPPORTED_LICENSE_GATES = {
     "manual_legal_review",
@@ -97,112 +106,6 @@ SUPPORTED_CONTENT_CHECKS = {
     "validate_schema",
     "weapon_trademark_filter",
 }
-EVIDENCE_CHANGE_POLICIES = {"raw", "normalized", "either"}
-COSMETIC_CHANGE_POLICIES = {"warn_only", "treat_as_changed"}
-EVIDENCE_EXTENSIONS = [".html", ".pdf", ".txt", ".json"]
-
-
-def _is_blocked_ip(ip_value: str) -> bool:
-    ip = ipaddress.ip_address(ip_value)
-    return ip.is_private or ip.is_loopback or ip.is_link_local
-
-
-def _resolve_host_ips(hostname: str) -> list[str]:
-    ips: set[str] = set()
-    try:
-        addrinfo = socket.getaddrinfo(hostname, None)
-    except socket.gaierror:
-        return []
-    for item in addrinfo:
-        sockaddr = item[4]
-        if sockaddr:
-            ips.add(sockaddr[0])
-    return sorted(ips)
-
-
-def validate_evidence_url(url: str, allow_private_hosts: bool) -> tuple[bool, str | None]:
-    parsed = urllib.parse.urlparse(url)
-    scheme = (parsed.scheme or "").lower()
-    if scheme not in {"http", "https"}:
-        return False, f"unsupported_scheme:{scheme or 'missing'}"
-    if not parsed.hostname:
-        return False, "missing_hostname"
-    if allow_private_hosts:
-        return True, None
-    hostname = parsed.hostname
-    try:
-        ip_value = ipaddress.ip_address(hostname)
-    except ValueError:
-        ips = _resolve_host_ips(hostname)
-        if not ips:
-            return False, "unresolvable_hostname"
-        for ip_value in ips:
-            if _is_blocked_ip(ip_value):
-                return False, f"blocked_ip:{ip_value}"
-        return True, None
-    if _is_blocked_ip(str(ip_value)):
-        return False, f"blocked_ip:{ip_value}"
-    return True, None
-
-
-_HTML_SCRIPT_STYLE_RE = re.compile(r"(?is)<(script|style)[^>]*>.*?</\1>")
-_HTML_COMMENT_RE = re.compile(r"(?s)<!--.*?-->")
-_HTML_TAG_RE = re.compile(r"(?s)<[^>]+>")
-_URL_QUERYSTRING_RE = re.compile(r"(https?://[^\s?#]+)\?[^\s#]+")
-_TIMESTAMP_PATTERNS = [
-    re.compile(r"\b\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\b"),
-    re.compile(r"\b\d{4}-\d{2}-\d{2}\b"),
-    re.compile(r"\b\d{1,2}/\d{1,2}/\d{4}\b"),
-    re.compile(r"\b\d{2}:\d{2}:\d{2}\b"),
-    re.compile(r"\b\d{2}:\d{2}\b"),
-]
-
-
-def html_to_text(text: str) -> str:
-    cleaned = html.unescape(text or "")
-    cleaned = _HTML_SCRIPT_STYLE_RE.sub(" ", cleaned)
-    cleaned = _HTML_COMMENT_RE.sub(" ", cleaned)
-    cleaned = _HTML_TAG_RE.sub(" ", cleaned)
-    return cleaned
-
-
-def normalize_evidence_text(text: str) -> str:
-    cleaned = _URL_QUERYSTRING_RE.sub(r"\1", text or "")
-    for pattern in _TIMESTAMP_PATTERNS:
-        cleaned = pattern.sub(" ", cleaned)
-    return normalize_whitespace(cleaned)
-
-
-def normalize_evidence_change_policy(value: Any) -> str:
-    policy = str(value or "").strip().lower()
-    if policy in EVIDENCE_CHANGE_POLICIES:
-        return policy
-    return "normalized"
-
-
-def normalize_cosmetic_change_policy(value: Any) -> str:
-    policy = str(value or "").strip().lower()
-    if policy in COSMETIC_CHANGE_POLICIES:
-        return policy
-    return "warn_only"
-
-
-def resolve_evidence_change(
-    raw_changed: bool,
-    normalized_changed: bool,
-    cosmetic_change: bool,
-    evidence_policy: str,
-    cosmetic_policy: str,
-) -> bool:
-    if evidence_policy == "raw":
-        changed = raw_changed
-    elif evidence_policy == "either":
-        changed = raw_changed or normalized_changed
-    else:
-        changed = normalized_changed
-    if cosmetic_change and cosmetic_policy == "treat_as_changed":
-        return True
-    return changed
 
 
 @dataclasses.dataclass
@@ -340,24 +243,6 @@ def build_evidence_headers(raw_headers: list[str]) -> dict[str, str]:
     return headers
 
 
-def _scrub_secret_values(value: Any) -> Any:
-    if isinstance(value, SecretStr):
-        return REDACTED
-    if isinstance(value, dict):
-        return {key: _scrub_secret_values(val) for key, val in value.items()}
-    if isinstance(value, list):
-        return [_scrub_secret_values(item) for item in value]
-    if isinstance(value, tuple):
-        return tuple(_scrub_secret_values(item) for item in value)
-    return value
-
-
-def redact_headers_for_manifest(headers: dict[str, str] | None) -> dict[str, Any]:
-    if not headers:
-        return {}
-    return _scrub_secret_values(redact_headers(headers))
-
-
 def resolve_output_roots(
     args: argparse.Namespace, globals_cfg: dict[str, Any]
 ) -> tuple[Path, Path, Path]:
@@ -434,141 +319,6 @@ def load_driver_config(args: argparse.Namespace) -> DriverConfig:
         checks_run_id=generate_run_id("classification"),
         content_check_actions=content_check_actions,
     )
-
-
-def find_existing_evidence(manifest_dir: Path) -> Path | None:
-    for ext in EVIDENCE_EXTENSIONS:
-        candidate = manifest_dir / f"license_evidence{ext}"
-        if candidate.exists():
-            return candidate
-    return None
-
-
-def cleanup_stale_evidence(manifest_dir: Path, keep: Path | None = None) -> list[Path]:
-    removed: list[Path] = []
-    keep_resolved = keep.resolve() if keep else None
-    for path in manifest_dir.glob("license_evidence*"):
-        if path.name == "license_evidence_meta.json":
-            continue
-        if path.name.startswith("license_evidence.prev_"):
-            continue
-        if keep_resolved and path.resolve() == keep_resolved:
-            continue
-        if path.is_file():
-            path.unlink()
-            removed.append(path)
-    return removed
-
-
-def apply_denylist_bucket(dl_hits: list[dict[str, Any]], eff_bucket: str) -> str:
-    for hit in dl_hits:
-        severity = hit.get("severity", "hard_red")
-        if severity == "hard_red":
-            return "RED"
-        if severity == "force_yellow":
-            eff_bucket = "YELLOW"
-    return eff_bucket
-
-
-def apply_review_gates(
-    eff_bucket: str,
-    review_required: bool,
-    review_status: str,
-    promote_to: str,
-    restriction_hits: list[str],
-) -> str:
-    if review_status == "rejected":
-        return "RED"
-    if review_required and eff_bucket != "RED" and review_status != "approved":
-        if eff_bucket == "GREEN":
-            return "YELLOW"
-        return eff_bucket
-    if (
-        review_status == "approved"
-        and promote_to == "GREEN"
-        and not restriction_hits
-        and eff_bucket != "RED"
-    ):
-        return "GREEN"
-    return eff_bucket
-
-
-def resolve_effective_bucket(
-    license_map: LicenseMap,
-    license_gates: list[str],
-    evidence: EvidenceResult,
-    spdx: str,
-    restriction_hits: list[str],
-    min_confidence: float,
-    resolved_confidence: float,
-    review_required: bool,
-    review_status: str,
-    promote_to: str,
-    denylist_hits: list[dict[str, Any]],
-    strict_snapshot: bool,
-) -> str:
-    eff_bucket = compute_effective_bucket(
-        license_map,
-        license_gates,
-        spdx,
-        restriction_hits,
-        evidence.snapshot,
-        min_confidence,
-        resolved_confidence,
-    )
-    eff_bucket = apply_denylist_bucket(denylist_hits, eff_bucket)
-    evidence_status, _ = normalize_evidence_fetch_status(evidence.snapshot)
-    if (
-        strict_snapshot
-        and "snapshot_terms" in license_gates
-        and evidence_status != "ok"
-        and eff_bucket == "GREEN"
-    ):
-        eff_bucket = "YELLOW"
-    if evidence.no_fetch_missing_evidence and eff_bucket == "GREEN":
-        eff_bucket = "YELLOW"
-    return apply_review_gates(
-        eff_bucket, review_required, review_status, promote_to, restriction_hits
-    )
-
-
-def apply_yellow_signoff_requirement(
-    eff_bucket: str,
-    review_status: str,
-    review_required: bool,
-    require_yellow_signoff: bool,
-) -> bool:
-    if (
-        require_yellow_signoff
-        and eff_bucket == "YELLOW"
-        and review_status not in {"approved", "rejected"}
-    ):
-        return True
-    return review_required
-
-
-def resolve_output_pool(profile: str, eff_bucket: str, target: dict[str, Any]) -> str:
-    out_pool = (target.get("output", {}) or {}).get("pool")
-    if out_pool:
-        return out_pool
-    if profile == "copyleft":
-        return "copyleft"
-    if eff_bucket == "GREEN":
-        return "permissive"
-    return "quarantine"
-
-
-def sort_queue_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    def sort_key(row: dict[str, Any]) -> tuple[int, str]:
-        p = row.get("priority", None)
-        try:
-            pi = int(p) if p is not None else -999999
-        except Exception:
-            logger.debug("Failed to parse priority %r for row %s", p, row.get("id", ""))
-            pi = -999999
-        return (-pi, str(row.get("id", "")))
-
-    return sorted(rows, key=sort_key)
 
 
 def build_target_identity(
@@ -694,206 +444,6 @@ def read_review_signoff(manifest_dir: Path) -> dict[str, Any]:
         return {}
 
 
-def resolve_spdx_with_confidence(
-    license_map: LicenseMap, evidence_text: str, spdx_hint: str
-) -> tuple[str, float, str]:
-    """Resolve SPDX with a lightweight confidence score and rationale."""
-
-    hint = normalize_whitespace(str(spdx_hint or ""))
-    if hint and hint.upper() not in {"MIXED", "UNKNOWN", "DERIVED"}:
-        return hint, 0.95, "explicit SPDX hint"
-
-    blob = normalize_whitespace(f"{hint} {evidence_text}")
-    blob_l = lower(blob)
-
-    def _find_rule_match(needle: str) -> tuple[int, int] | None:
-        if not needle:
-            return None
-        if len(needle) <= 4 and re.fullmatch(r"[A-Za-z0-9]+", needle):
-            pattern = re.compile(rf"\b{re.escape(needle)}\b", re.IGNORECASE)
-            match = pattern.search(blob)
-            if match:
-                return match.start(), match.end()
-            return None
-        idx = blob_l.find(lower(needle))
-        if idx == -1:
-            return None
-        return idx, idx + len(needle)
-
-    def _excerpt(start: int, end: int, context: int = 40) -> str:
-        before = max(0, start - context)
-        after = min(len(blob), end + context)
-        return blob[before:after].strip()
-
-    for rule in license_map.normalization_rules:
-        needles = [x for x in (rule.get("match_any") or []) if x]
-        matched_needle = None
-        match_span = None
-        for needle in needles:
-            match_span = _find_rule_match(str(needle))
-            if match_span:
-                matched_needle = str(needle)
-                break
-        if matched_needle and match_span:
-            confidence = min(0.9, 0.6 + 0.05 * len(needles))
-            spdx = str(rule.get("spdx", "UNKNOWN")) or "UNKNOWN"
-            snippet = _excerpt(*match_span)
-            reason = (
-                "normalized via rule match: "
-                f"spdx={spdx} needle='{matched_needle}' excerpt='{snippet}'"
-            )
-            return spdx, confidence, reason
-
-    if hint.upper() == "DERIVED":
-        return "Derived", 0.6, "derived content flag"
-
-    return "UNKNOWN", 0.2, "no confident match"
-
-
-def spdx_bucket(license_map: LicenseMap, spdx: str) -> str:
-    s = str(spdx or "").strip()
-    if not s or s.upper() == "UNKNOWN":
-        return license_map.gating.get("unknown_spdx_bucket", "YELLOW")
-
-    for pref in license_map.deny_prefixes:
-        if s.startswith(pref):
-            return license_map.gating.get("deny_spdx_bucket", "RED")
-
-    if s in license_map.allow:
-        return "GREEN"
-    if s in license_map.conditional:
-        return license_map.gating.get("conditional_spdx_bucket", "YELLOW")
-
-    return license_map.gating.get("unknown_spdx_bucket", "YELLOW")
-
-
-def extract_text_from_path(path: Path, evidence: dict[str, Any] | None = None) -> str:
-    if not path.exists():
-        if evidence is not None:
-            evidence["text_extraction_failed"] = True
-        return ""
-    if path.suffix.lower() == ".pdf":
-        if evidence is not None:
-            evidence["pdf_text_extraction_failed"] = False
-            evidence["text_extraction_failed"] = False
-        if PdfReader is None:
-            if evidence is not None:
-                evidence["pdf_text_extraction_failed"] = True
-                evidence["text_extraction_failed"] = True
-            return ""
-        try:
-            reader = PdfReader(str(path))
-            pages = []
-            for page in list(reader.pages)[:5]:
-                text = page.extract_text() or ""
-                if text:
-                    pages.append(text)
-            extracted = "\n\n".join(pages).strip()
-            if not extracted and evidence is not None:
-                evidence["pdf_text_extraction_failed"] = True
-                evidence["text_extraction_failed"] = True
-            return extracted
-        except Exception:
-            logger.warning("Failed to extract text from PDF: %s", path, exc_info=True)
-            if evidence is not None:
-                evidence["pdf_text_extraction_failed"] = True
-                evidence["text_extraction_failed"] = True
-            return ""
-    try:
-        raw = path.read_text(encoding="utf-8", errors="ignore")
-    except Exception:
-        logger.warning("Failed to read text from file: %s", path, exc_info=True)
-        if evidence is not None:
-            evidence["text_extraction_failed"] = True
-        return ""
-    if evidence is not None:
-        evidence["text_extraction_failed"] = False
-    if path.suffix.lower() in {".html", ".htm"}:
-        return html_to_text(raw)
-    return raw
-
-
-def extract_text_for_scanning(evidence: dict[str, Any]) -> str:
-    saved = str(evidence.get("saved_path") or "")
-    if not saved:
-        return ""
-    return extract_text_from_path(Path(saved), evidence)
-
-
-def compute_normalized_text_hash(text: str) -> str:
-    normalized = normalize_evidence_text(text)
-    return sha256_bytes(normalized.encode("utf-8"))
-
-
-def apply_normalized_hash_fallback(
-    *,
-    evidence: dict[str, Any] | None,
-    raw_hash: str | None,
-    extraction_failed: bool,
-    normalized_hash: str | None,
-) -> str | None:
-    if extraction_failed and raw_hash:
-        if evidence is not None:
-            evidence["normalized_hash_fallback"] = "raw_bytes"
-            evidence["text_extraction_failed"] = True
-        return raw_hash
-    return normalized_hash
-
-
-def compute_file_hashes(
-    path: Path, evidence: dict[str, Any] | None = None
-) -> tuple[str | None, str | None]:
-    raw_hash = sha256_file(path)
-    extracted = extract_text_from_path(path, evidence)
-    extraction_failed = bool(
-        evidence
-        and (evidence.get("text_extraction_failed") or evidence.get("pdf_text_extraction_failed"))
-    )
-    if (
-        not extraction_failed
-        and evidence is None
-        and path.suffix.lower() == ".pdf"
-        and PdfReader is None
-    ):
-        extraction_failed = True
-    normalized_hash = None
-    if not extraction_failed:
-        normalized_hash = compute_normalized_text_hash(extracted)
-    normalized_hash = apply_normalized_hash_fallback(
-        evidence=evidence,
-        raw_hash=raw_hash,
-        extraction_failed=extraction_failed,
-        normalized_hash=normalized_hash,
-    )
-    return raw_hash, normalized_hash
-
-
-def compute_signoff_mismatches(
-    *,
-    signoff_raw_sha: str | None,
-    signoff_normalized_sha: str | None,
-    current_raw_sha: str | None,
-    current_normalized_sha: str | None,
-    text_extraction_failed: bool,
-) -> tuple[bool, bool, bool]:
-    raw_mismatch = bool(signoff_raw_sha and current_raw_sha and signoff_raw_sha != current_raw_sha)
-    normalized_mismatch = bool(
-        signoff_normalized_sha
-        and current_normalized_sha
-        and signoff_normalized_sha != current_normalized_sha
-    )
-    if text_extraction_failed and raw_mismatch:
-        normalized_mismatch = True
-    cosmetic_change = bool(
-        raw_mismatch
-        and not normalized_mismatch
-        and signoff_normalized_sha
-        and current_normalized_sha
-        and not text_extraction_failed
-    )
-    return raw_mismatch, normalized_mismatch, cosmetic_change
-
-
 def merge_override(default_values: list[str], overrides: dict[str, Any]) -> list[str]:
     """Merge default values with overrides from target config."""
     merged = list(default_values)
@@ -928,234 +478,6 @@ def canonicalize_checks(checks: list[str]) -> list[str]:
         if check not in canonicalized:
             canonicalized.append(check)
     return canonicalized
-
-
-def normalize_content_check_actions(
-    actions: dict[str, Any] | None,
-) -> dict[str, str]:
-    if not isinstance(actions, dict):
-        return {}
-    normalized: dict[str, str] = {}
-    for key, value in actions.items():
-        key_name = str(key).strip()
-        value_name = str(value).strip().lower()
-        if key_name and value_name:
-            normalized[key_name] = value_name
-    return normalized
-
-
-def resolve_content_check_action(
-    results: list[dict[str, Any]],
-) -> tuple[str | None, list[str]]:
-    action: str | None = None
-    checks: list[str] = []
-    for result in results:
-        status = str(result.get("status", "") or "").lower()
-        if status not in {"block", "quarantine"}:
-            continue
-        if status == "block":
-            action = "block"
-        elif action != "block":
-            action = "quarantine"
-        check_name = str(result.get("check", "") or "").strip()
-        if check_name:
-            checks.append(check_name)
-    return action, checks
-
-
-def summarize_denylist_hits(dl_hits: list[dict[str, Any]]) -> tuple[bool, bool]:
-    hard_red = False
-    force_yellow = False
-    for hit in dl_hits:
-        severity = hit.get("severity", "hard_red")
-        if severity == "hard_red":
-            hard_red = True
-        elif severity == "force_yellow":
-            force_yellow = True
-    return hard_red, force_yellow
-
-
-def normalize_evidence_fetch_status(
-    evidence_snapshot: dict[str, Any],
-) -> tuple[str, str | None]:
-    status = str(evidence_snapshot.get("status") or "unknown")
-    reason = None
-    if status == "ok":
-        return status, None
-    if status in {"error", "blocked_url", "needs_manual_evidence"}:
-        reason = str(evidence_snapshot.get("error") or status)
-    elif status in {"offline_missing", "no_url", "response_too_large", "skipped"}:
-        reason = status
-    else:
-        reason = status
-    return status, reason
-
-
-def build_bucket_signals(
-    *,
-    ctx: TargetContext,
-    license_map: LicenseMap,
-    evidence: EvidenceResult,
-    restriction_hits: list[str],
-    resolved: str,
-    resolved_confidence: float,
-    eff_bucket: str,
-    review_required: bool,
-    review_status: str,
-    promote_to: str,
-    min_confidence: float,
-    require_yellow_signoff: bool,
-    action: str,
-    action_checks: list[str],
-    strict_snapshot: bool,
-) -> tuple[str, dict[str, Any]]:
-    spdx_bucket_value = spdx_bucket(license_map, resolved)
-    low_confidence = resolved_confidence < min_confidence
-    snapshot_required = "snapshot_terms" in ctx.license_gates
-    evidence_status, fetch_failure_reason = normalize_evidence_fetch_status(
-        evidence.snapshot
-    )
-    snapshot_missing = bool(evidence.no_fetch_missing_evidence) or (
-        snapshot_required and evidence_status != "ok"
-    )
-    evidence_changed = bool(evidence.snapshot.get("changed_from_previous"))
-    pdf_text_failed = bool(evidence.snapshot.get("pdf_text_extraction_failed"))
-    manual_review_gate = bool(
-        "manual_legal_review" in ctx.license_gates or "manual_review" in ctx.license_gates
-    )
-    restriction_gate = bool(
-        "restriction_phrase_scan" in ctx.license_gates or "no_restrictions" in ctx.license_gates
-    )
-    restriction_present = bool(restriction_hits)
-    review_pending = review_status not in {"approved", "rejected"}
-    hard_red, force_yellow = summarize_denylist_hits(ctx.dl_hits)
-
-    signals = {
-        "spdx": {
-            "resolved": resolved,
-            "confidence": resolved_confidence,
-            "bucket": spdx_bucket_value,
-            "min_confidence": min_confidence,
-            "low_confidence": low_confidence,
-        },
-        "evidence": {
-            "status": evidence_status,
-            "snapshot_required": snapshot_required,
-            "snapshot_missing": snapshot_missing,
-            "changed_from_previous": evidence_changed,
-            "pdf_text_extraction_failed": pdf_text_failed,
-            "no_fetch_missing_evidence": evidence.no_fetch_missing_evidence,
-            "fetch_failure_reason": fetch_failure_reason,
-            "strict_snapshot_failure": bool(
-                strict_snapshot and snapshot_required and evidence_status != "ok"
-            ),
-        },
-        "license_gates": list(ctx.license_gates),
-        "restriction_hits": restriction_hits,
-        "review": {
-            "required": review_required,
-            "status": review_status,
-            "pending": review_pending,
-            "promote_to": promote_to,
-            "require_yellow_signoff": require_yellow_signoff,
-        },
-        "denylist": {
-            "hits": ctx.dl_hits,
-            "hard_red": hard_red,
-            "force_yellow": force_yellow,
-        },
-        "content_check": {"action": action, "checks": action_checks},
-    }
-
-    bucket_reason = "policy_default"
-    if eff_bucket == "RED":
-        if action == "block":
-            bucket_reason = "content_check_block"
-        elif hard_red:
-            bucket_reason = "denylist_hard_red"
-        elif review_status == "rejected":
-            bucket_reason = "review_rejected"
-        elif spdx_bucket_value == "RED":
-            bucket_reason = "spdx_deny"
-        else:
-            bucket_reason = "policy_red"
-    elif eff_bucket == "YELLOW":
-        if action == "quarantine":
-            bucket_reason = "content_check_quarantine"
-        elif force_yellow:
-            bucket_reason = "denylist_force_yellow"
-        elif review_required and review_pending:
-            bucket_reason = "review_required"
-        elif snapshot_missing:
-            bucket_reason = "snapshot_missing"
-        elif evidence_changed:
-            bucket_reason = "evidence_changed"
-        elif restriction_gate and restriction_present:
-            bucket_reason = "restriction_hits"
-        elif pdf_text_failed:
-            bucket_reason = "text_extraction_failed"
-        elif manual_review_gate:
-            bucket_reason = "manual_review_gate"
-        elif low_confidence:
-            bucket_reason = "low_confidence"
-        elif spdx_bucket_value == "YELLOW":
-            bucket_reason = (
-                "unknown_spdx"
-                if str(resolved).strip().upper() in {"", "UNKNOWN"}
-                else "conditional_spdx"
-            )
-        else:
-            bucket_reason = "policy_yellow"
-    elif eff_bucket == "GREEN":
-        if review_status == "approved" and promote_to == "GREEN":
-            bucket_reason = "review_approved"
-        elif spdx_bucket_value == "GREEN":
-            bucket_reason = "spdx_allow"
-        else:
-            bucket_reason = "policy_green"
-
-    return bucket_reason, signals
-
-
-def compute_effective_bucket(
-    license_map: LicenseMap,
-    license_gates: list[str],
-    resolved_spdx: str,
-    restriction_hits: list[str],
-    evidence_snapshot: dict[str, Any],
-    min_confidence: float,
-    resolved_confidence: float,
-) -> str:
-    """Compute effective bucket based on gates and scan results."""
-    bucket = spdx_bucket(license_map, resolved_spdx)
-    evidence_status, _ = normalize_evidence_fetch_status(evidence_snapshot)
-
-    # Confidence gate: if confidence is too low, force YELLOW
-    if resolved_confidence < min_confidence and bucket == "GREEN":
-        bucket = license_map.gating.get("low_confidence_bucket", "YELLOW")
-
-    if "snapshot_terms" in license_gates and evidence_status != "ok":
-        # If we require snapshot and failed, force YELLOW
-        bucket = "YELLOW"
-
-    if evidence_snapshot.get("changed_from_previous"):
-        bucket = "YELLOW"
-
-    if (
-        "restriction_phrase_scan" in license_gates or "no_restrictions" in license_gates
-    ) and restriction_hits:
-        bucket = "YELLOW"
-    if (
-        "restriction_phrase_scan" in license_gates or "no_restrictions" in license_gates
-    ) and evidence_snapshot.get(
-        "pdf_text_extraction_failed"
-    ):
-        bucket = "YELLOW"
-
-    if "manual_legal_review" in license_gates or "manual_review" in license_gates:
-        bucket = "YELLOW"
-
-    return bucket
 
 
 def generate_dry_run_report(
@@ -1368,121 +690,16 @@ class BasePipelineDriver:
         max_bytes: int | None = None,
         allow_private_hosts: bool = False,
     ) -> tuple[bytes | None, str | None, dict[str, Any]]:
-        """Fetch URL with retry and exponential backoff."""
-        meta: dict[str, Any] = {
-            "retries": 0,
-            "errors": [],
-            "timeout": timeout_s,
-            "max_bytes": max_bytes,
-        }
-        allowed, reason = validate_evidence_url(url, allow_private_hosts)
-        if not allowed:
-            meta["blocked_url"] = url
-            meta["blocked_reason"] = reason
-            return None, "blocked_url", meta
-
-        def _record_retry(attempt: int, exc: Exception) -> None:
-            meta["retries"] = attempt
-            meta["errors"].append({"attempt": attempt, "error": repr(exc)})
-
-        def _fetch_once() -> tuple[bytes, str]:
-            with requests.get(
-                url,
-                timeout=timeout_s,
-                headers={"User-Agent": f"{self.USER_AGENT}/{VERSION}", **(headers or {})},
-                stream=True,
-            ) as r:
-                r.raise_for_status()
-                ctype = r.headers.get("Content-Type", "")
-                final_url = r.url
-                meta["final_status"] = r.status_code
-                meta["final_url"] = final_url
-                meta["content_type"] = ctype
-                redirect_urls: list[str] = []
-                for resp in r.history:
-                    location = resp.headers.get("Location")
-                    if not location:
-                        continue
-                    redirect_urls.append(urllib.parse.urljoin(resp.url, location))
-                redirect_urls.append(final_url)
-                for redirect_url in redirect_urls:
-                    allowed, reason = validate_evidence_url(redirect_url, allow_private_hosts)
-                    if not allowed:
-                        meta["blocked_url"] = redirect_url
-                        meta["blocked_reason"] = reason
-                        logger.warning(
-                            "Evidence fetch blocked: url=%s blocked_url=%s reason=%s",
-                            url,
-                            redirect_url,
-                            reason,
-                        )
-                        raise RuntimeError("blocked_url")
-                content_length = r.headers.get("Content-Length")
-                if max_bytes and content_length:
-                    try:
-                        if int(content_length) > max_bytes:
-                            meta["size_exceeded"] = True
-                            meta["bytes"] = int(content_length)
-                            logger.warning(
-                                "Evidence fetch aborted: url=%s final_url=%s content_type=%s bytes=%s limit=%s",
-                                url,
-                                final_url,
-                                ctype,
-                                content_length,
-                                max_bytes,
-                            )
-                            raise RuntimeError("response_too_large")
-                    except ValueError:
-                        pass
-
-                chunks: list[bytes] = []
-                total = 0
-                for chunk in r.iter_content(chunk_size=1024 * 1024):
-                    if not chunk:
-                        continue
-                    total += len(chunk)
-                    if max_bytes and total > max_bytes:
-                        meta["size_exceeded"] = True
-                        meta["bytes"] = total
-                        logger.warning(
-                            "Evidence fetch aborted: url=%s final_url=%s content_type=%s bytes=%s limit=%s",
-                            url,
-                            final_url,
-                            ctype,
-                            total,
-                            max_bytes,
-                        )
-                        raise RuntimeError("response_too_large")
-                    chunks.append(chunk)
-                content = b"".join(chunks)
-                meta["bytes"] = total
-                logger.info(
-                    "Evidence fetched: url=%s final_url=%s content_type=%s bytes=%s",
-                    url,
-                    final_url,
-                    ctype,
-                    total,
-                )
-                return content, ctype
-
-        try:
-            content, ctype = _with_retries(
-                _fetch_once,
-                max_attempts=max_retries,
-                backoff_base=backoff_base,
-                backoff_max=60.0,
-                on_retry=_record_retry,
-            )
-            return content, ctype, meta
-        except Exception as e:
-            meta["errors"].append({"attempt": meta["retries"] + 1, "error": repr(e)})
-            meta["retries"] = max(meta["retries"], 1)
-            if str(e) == "blocked_url":
-                return None, "blocked_url", meta
-            if str(e) == "response_too_large":
-                return None, "response_too_large", meta
-
-        return None, f"Failed after {meta['retries']} attempts", meta
+        return fetch_url_with_retry(
+            url,
+            user_agent=f"{self.USER_AGENT}/{VERSION}",
+            timeout_s=timeout_s,
+            max_retries=max_retries,
+            backoff_base=backoff_base,
+            headers=headers,
+            max_bytes=max_bytes,
+            allow_private_hosts=allow_private_hosts,
+        )
 
     def snapshot_evidence(
         self,
@@ -1496,178 +713,18 @@ class BasePipelineDriver:
         headers: dict[str, str] | None = None,
         allow_private_hosts: bool = False,
     ) -> dict[str, Any]:
-        result: dict[str, Any] = {
-            "url": url,
-            "fetched_at_utc": utc_now(),
-            "status": "skipped",
-            "headers_used": redact_headers_for_manifest(headers),
-        }
-        if not url:
-            result["status"] = "no_url"
-            return result
-
-        previous_digest = None
-        previous_normalized_digest = None
-        existing_path = None
-        existing_meta: dict[str, Any] = {}
-        existing_path = find_existing_evidence(manifest_dir)
-        if existing_path:
-            previous_digest = sha256_file(existing_path)
-        meta_path = manifest_dir / "license_evidence_meta.json"
-        if meta_path.exists():
-            try:
-                existing_meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            except Exception:
-                logger.warning(
-                    "Failed to read existing evidence meta from %s", meta_path, exc_info=True
-                )
-                existing_meta = {}
-        previous_normalized_digest = existing_meta.get("sha256_normalized_text")
-        if previous_normalized_digest is None and existing_path:
-            _, previous_normalized_digest = compute_file_hashes(existing_path)
-
-        content, info, meta = self.fetch_url_with_retry(
+        return snapshot_evidence(
+            manifest_dir,
             url,
+            user_agent=f"{self.USER_AGENT}/{VERSION}",
+            evidence_change_policy=evidence_change_policy,
+            cosmetic_change_policy=cosmetic_change_policy,
             max_retries=max_retries,
             backoff_base=backoff_base,
             headers=headers,
-            max_bytes=self.EVIDENCE_MAX_BYTES,
             allow_private_hosts=allow_private_hosts,
+            max_bytes=self.EVIDENCE_MAX_BYTES,
         )
-        result["fetch_meta"] = meta
-
-        if content is None:
-            if meta.get("size_exceeded"):
-                result["status"] = "needs_manual_evidence"
-                result["error"] = info
-            elif info == "blocked_url":
-                result["status"] = "blocked_url"
-                result["error"] = meta.get("blocked_reason") or info
-            elif info == "response_too_large":
-                result["status"] = "needs_manual_evidence"
-                result["error"] = info
-            else:
-                result["status"] = "error"
-                result["error"] = info
-            return result
-
-        ctype = info or ""
-        if meta.get("final_url"):
-            result["final_url"] = meta.get("final_url")
-        digest = sha256_bytes(content)
-        result.update(
-            {
-                "status": "ok",
-                "content_type": ctype,
-                "sha256": digest,
-                "sha256_raw_bytes": digest,
-                "bytes": len(content),
-                "previous_sha256": previous_digest,
-                "previous_sha256_raw_bytes": previous_digest,
-                "previous_sha256_normalized_text": previous_normalized_digest,
-                "previous_path": str(existing_path) if existing_path else None,
-            }
-        )
-
-        ext = ".html"
-        if "pdf" in ctype.lower():
-            ext = ".pdf"
-        elif "json" in ctype.lower():
-            ext = ".json"
-        elif "text/plain" in ctype.lower():
-            ext = ".txt"
-
-        ensure_dir(manifest_dir)
-        out_path = manifest_dir / f"license_evidence{ext}"
-        temp_path = manifest_dir / f"license_evidence{ext}.part"
-        cleanup_stale_evidence(manifest_dir, keep=existing_path)
-        raw_changed_from_previous = bool(previous_digest and previous_digest != digest)
-        history: list[dict[str, Any]] = []
-        if isinstance(existing_meta.get("history"), list):
-            history = list(existing_meta.get("history", []))
-        previous_entry = None
-        previous_renamed_path = None
-        if raw_changed_from_previous and existing_path and previous_digest:
-            prev_ext = existing_path.suffix
-            prev_prefix = f"license_evidence.prev_{previous_digest[:8]}"
-            prev_path = manifest_dir / f"{prev_prefix}{prev_ext}"
-            counter = 1
-            while prev_path.exists():
-                prev_path = manifest_dir / f"{prev_prefix}_{counter}{prev_ext}"
-                counter += 1
-            existing_path.rename(prev_path)
-            previous_renamed_path = prev_path
-            previous_entry = {
-                "sha256": previous_digest,
-                "sha256_raw_bytes": previous_digest,
-                "sha256_normalized_text": previous_normalized_digest,
-                "filename": prev_path.name,
-                "fetched_at_utc": existing_meta.get("fetched_at_utc"),
-            }
-            history.append(previous_entry)
-        temp_path.write_bytes(content)
-        temp_path.replace(out_path)
-        saved_digest = sha256_file(out_path)
-        result["saved_path"] = str(out_path)
-        if not saved_digest or saved_digest != digest:
-            result["status"] = "error"
-            result["error"] = "Evidence file write verification failed."
-        normalized_text = extract_text_for_scanning(result)
-        extraction_failed = bool(
-            result.get("text_extraction_failed") or result.get("pdf_text_extraction_failed")
-        )
-        normalized_digest = None
-        if not extraction_failed:
-            normalized_digest = compute_normalized_text_hash(normalized_text)
-        normalized_digest = apply_normalized_hash_fallback(
-            evidence=result,
-            raw_hash=digest,
-            extraction_failed=extraction_failed,
-            normalized_hash=normalized_digest,
-        )
-        normalized_changed_from_previous = bool(
-            previous_normalized_digest
-            and normalized_digest
-            and previous_normalized_digest != normalized_digest
-        )
-        cosmetic_change = bool(
-            raw_changed_from_previous
-            and not normalized_changed_from_previous
-            and normalized_digest
-            and previous_normalized_digest
-        )
-        changed_from_previous = resolve_evidence_change(
-            raw_changed_from_previous,
-            normalized_changed_from_previous,
-            cosmetic_change,
-            evidence_change_policy,
-            cosmetic_change_policy,
-        )
-        result.update(
-            {
-                "sha256_normalized_text": normalized_digest,
-                "raw_changed_from_previous": raw_changed_from_previous,
-                "normalized_changed_from_previous": normalized_changed_from_previous,
-                "cosmetic_change": cosmetic_change,
-                "changed_from_previous": changed_from_previous,
-            }
-        )
-        if previous_renamed_path:
-            result["previous_renamed_path"] = str(previous_renamed_path)
-        result["history"] = history
-        if result["changed_from_previous"]:
-            result["evidence_files_verified"] = bool(
-                (previous_renamed_path and previous_renamed_path.exists())
-                and out_path.exists()
-                and saved_digest == digest
-            )
-            if not result["evidence_files_verified"]:
-                result["status"] = "error"
-                result["error"] = "Evidence file rename/write verification failed."
-
-        result.update(build_artifact_metadata(written_at_utc=result.get("fetched_at_utc")))
-        write_json(manifest_dir / "license_evidence_meta.json", result)
-        return result
 
     def run(self, args: argparse.Namespace) -> None:
         cfg = load_driver_config(args)
@@ -1912,52 +969,11 @@ class BasePipelineDriver:
         return evaluation, row
 
     def fetch_evidence(self, ctx: TargetContext, cfg: DriverConfig) -> EvidenceResult:
-        evidence_snapshot = {"status": "skipped", "url": ctx.evidence_url}
-        evidence_text = ""
-        license_change_detected = False
-        no_fetch_missing_evidence = False
-        if "snapshot_terms" in ctx.license_gates and not cfg.args.no_fetch:
-            evidence_snapshot = self.snapshot_evidence(
-                ctx.target_manifest_dir,
-                ctx.evidence_url,
-                evidence_change_policy=cfg.license_map.evidence_change_policy,
-                cosmetic_change_policy=cfg.license_map.cosmetic_change_policy,
-                max_retries=cfg.retry_max,
-                backoff_base=cfg.retry_backoff,
-                headers=cfg.headers,
-                allow_private_hosts=cfg.args.allow_private_evidence_hosts,
-            )
-            evidence_text = extract_text_for_scanning(evidence_snapshot)
-            license_change_detected = bool(evidence_snapshot.get("changed_from_previous"))
-        elif "snapshot_terms" in ctx.license_gates and cfg.args.no_fetch:
-            existing_evidence_path = find_existing_evidence(ctx.target_manifest_dir)
-            if existing_evidence_path:
-                evidence_snapshot = {
-                    "status": "ok",
-                    "url": ctx.evidence_url,
-                    "saved_path": str(existing_evidence_path),
-                    "fetched_at_utc": utc_now(),
-                    "offline_mode": True,
-                }
-                raw_hash, normalized_hash = compute_file_hashes(
-                    existing_evidence_path, evidence_snapshot
-                )
-                evidence_snapshot.update(
-                    {
-                        "sha256": raw_hash,
-                        "sha256_raw_bytes": raw_hash,
-                        "sha256_normalized_text": normalized_hash,
-                    }
-                )
-                evidence_text = extract_text_for_scanning(evidence_snapshot)
-            else:
-                evidence_snapshot = {"status": "offline_missing", "url": ctx.evidence_url}
-                no_fetch_missing_evidence = True
-        return EvidenceResult(
-            snapshot=evidence_snapshot,
-            text=evidence_text,
-            license_change_detected=license_change_detected,
-            no_fetch_missing_evidence=no_fetch_missing_evidence,
+        return fetch_evidence(
+            ctx=ctx,
+            cfg=cfg,
+            user_agent=f"{self.USER_AGENT}/{VERSION}",
+            max_bytes=self.EVIDENCE_MAX_BYTES,
         )
 
     def build_evaluation(
@@ -2141,12 +1157,7 @@ class BasePipelineDriver:
         return row
 
     def emit_queues(self, queues_root: Path, results: ClassificationResult) -> None:
-        results.green_rows = sort_queue_rows(results.green_rows)
-        results.yellow_rows = sort_queue_rows(results.yellow_rows)
-        results.red_rows = sort_queue_rows(results.red_rows)
-        write_jsonl(queues_root / "green_download.jsonl", results.green_rows)
-        write_jsonl(queues_root / "yellow_pipeline.jsonl", results.yellow_rows)
-        write_jsonl(queues_root / "red_rejected.jsonl", results.red_rows)
+        emit_queues(queues_root, results)
 
     def emit_summary(self, cfg: DriverConfig, results: ClassificationResult) -> None:
         failed_targets = [

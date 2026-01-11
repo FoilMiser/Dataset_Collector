@@ -7,24 +7,28 @@ from types import SimpleNamespace
 import pytest
 
 import collector_core.pipeline_driver_base as pipeline_driver_base
+from collector_core.classification.logic import (
+    apply_denylist_bucket,
+    apply_yellow_signoff_requirement,
+    resolve_effective_bucket,
+)
+from collector_core.evidence import fetching as evidence_fetching
+from collector_core.evidence.change_detection import (
+    compute_signoff_mismatches,
+    resolve_evidence_change,
+)
+from collector_core.evidence.fetching import compute_file_hashes, redact_headers_for_manifest
+from collector_core.queue.emission import sort_queue_rows
 from collector_core.pipeline_driver_base import (
     BasePipelineDriver,
     EvidenceResult,
     LicenseMap,
-    apply_denylist_bucket,
-    apply_yellow_signoff_requirement,
     build_denylist_haystack,
     build_evidence_headers,
     build_target_identity,
-    compute_file_hashes,
-    compute_signoff_mismatches,
     denylist_hits,
     extract_download_urls,
-    redact_headers_for_manifest,
-    resolve_effective_bucket,
-    resolve_evidence_change,
     resolve_retry_config,
-    sort_queue_rows,
 )
 from collector_core.secrets import REDACTED
 
@@ -51,6 +55,8 @@ def test_snapshot_evidence_manifest_redacts_headers(
 
     def fake_fetch(
         url: str,
+        *,
+        user_agent: str,
         timeout_s: float | tuple[float, float] = (15.0, 60.0),
         max_retries: int = 3,
         backoff_base: float = 2.0,
@@ -60,7 +66,7 @@ def test_snapshot_evidence_manifest_redacts_headers(
     ) -> tuple[bytes | None, str | None, dict[str, object]]:
         return b"ok", "text/plain", {"retries": 0, "errors": [], "final_url": url}
 
-    monkeypatch.setattr(driver, "fetch_url_with_retry", fake_fetch)
+    monkeypatch.setattr(evidence_fetching, "fetch_url_with_retry", fake_fetch)
 
     manifest_dir = tmp_path / "manifest"
     driver.snapshot_evidence(manifest_dir, "https://example.test/terms", headers=headers)
@@ -76,6 +82,8 @@ def test_snapshot_evidence_write_mismatch_marks_error(
 
     def fake_fetch(
         url: str,
+        *,
+        user_agent: str,
         timeout_s: float | tuple[float, float] = (15.0, 60.0),
         max_retries: int = 3,
         backoff_base: float = 2.0,
@@ -92,7 +100,7 @@ def test_snapshot_evidence_write_mismatch_marks_error(
             return original_write_bytes(self, data[:1])
         return original_write_bytes(self, data)
 
-    monkeypatch.setattr(driver, "fetch_url_with_retry", fake_fetch)
+    monkeypatch.setattr(evidence_fetching, "fetch_url_with_retry", fake_fetch)
     monkeypatch.setattr(Path, "write_bytes", partial_write)
 
     manifest_dir = tmp_path / "manifest"
@@ -108,6 +116,8 @@ def test_snapshot_evidence_removes_stale_siblings(
 
     def fake_fetch(
         url: str,
+        *,
+        user_agent: str,
         timeout_s: float | tuple[float, float] = (15.0, 60.0),
         max_retries: int = 3,
         backoff_base: float = 2.0,
@@ -117,7 +127,7 @@ def test_snapshot_evidence_removes_stale_siblings(
     ) -> tuple[bytes | None, str | None, dict[str, object]]:
         return b"%PDF-1.4\nbody", "application/pdf", {"retries": 0, "errors": [], "final_url": url}
 
-    monkeypatch.setattr(driver, "fetch_url_with_retry", fake_fetch)
+    monkeypatch.setattr(evidence_fetching, "fetch_url_with_retry", fake_fetch)
 
     manifest_dir = tmp_path / "manifest"
     manifest_dir.mkdir()
@@ -141,7 +151,7 @@ def test_fetch_url_with_retry_blocks_loopback(monkeypatch: pytest.MonkeyPatch) -
     def unexpected_get(*args: object, **kwargs: object) -> None:
         raise AssertionError("requests.get should not be called for blocked URLs")
 
-    monkeypatch.setattr(pipeline_driver_base.requests, "get", unexpected_get)
+    monkeypatch.setattr(evidence_fetching.requests, "get", unexpected_get)
 
     content, info, meta = driver.fetch_url_with_retry("http://127.0.0.1/terms")
     assert content is None
@@ -185,8 +195,8 @@ def test_fetch_url_with_retry_blocks_private_redirect(monkeypatch: pytest.Monkey
             return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))]
         return []
 
-    monkeypatch.setattr(pipeline_driver_base.socket, "getaddrinfo", fake_getaddrinfo)
-    monkeypatch.setattr(pipeline_driver_base.requests, "get", lambda *args, **kwargs: response)
+    monkeypatch.setattr(evidence_fetching.socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr(evidence_fetching.requests, "get", lambda *args, **kwargs: response)
 
     content, info, meta = driver.fetch_url_with_retry("https://example.test/start")
     assert content is None
@@ -374,7 +384,7 @@ def test_text_extraction_failure_fallback_and_evidence_change_policies(
 ) -> None:
     pdf_path = tmp_path / "evidence.pdf"
     pdf_path.write_bytes(b"%PDF-1.4\nexample")
-    monkeypatch.setattr(pipeline_driver_base, "PdfReader", None)
+    monkeypatch.setattr(evidence_fetching, "PdfReader", None)
 
     evidence: dict[str, object] = {}
     raw_hash, normalized_hash = compute_file_hashes(pdf_path, evidence)

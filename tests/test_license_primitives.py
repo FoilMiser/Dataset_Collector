@@ -6,19 +6,17 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-from collector_core.pipeline_driver_base import (  # noqa: E402
-    contains_any,
-    denylist_hits,
-    load_license_map,
-    resolve_spdx_with_confidence,
-    spdx_bucket,
-)
+from collector_core import config_validator  # noqa: E402
+from collector_core.classification.logic import resolve_spdx_with_confidence, spdx_bucket  # noqa: E402
+from collector_core.pipeline_driver_base import denylist_hits, load_license_map  # noqa: E402
+from collector_core.utils import contains_any  # noqa: E402
 
-LICENSE_MAP_PATH = REPO_ROOT / "regcomp_pipeline_v2" / "license_map.yaml"
+LICENSE_MAP_PATH = REPO_ROOT / "configs" / "common" / "license_map.yaml"
 
 
 @pytest.fixture(scope="module")
 def license_map():
+    config_validator.SCHEMA_DIR = REPO_ROOT / "schemas"
     return load_license_map(LICENSE_MAP_PATH)
 
 
