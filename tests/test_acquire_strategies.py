@@ -116,6 +116,7 @@ def make_ctx(
     verify_zenodo_md5: bool = False,
     max_attempts: int = 1,
     max_bytes_per_target: int | None = None,
+    run_byte_budget: int | None = None,
 ) -> aw.AcquireContext:
     roots = aw.Roots(
         raw_root=tmp_path / "raw",
@@ -135,7 +136,8 @@ def make_ctx(
         workers=1,
     )
     retry = aw.RetryConfig(max_attempts=max_attempts, backoff_base=0.0, backoff_max=0.0)
-    return aw.AcquireContext(roots=roots, limits=limits, mode=mode, retry=retry)
+    run_budget = aw.build_run_budget(run_byte_budget)
+    return aw.AcquireContext(roots=roots, limits=limits, mode=mode, retry=retry, run_budget=run_budget)
 
 
 def test_http_download_retries_and_sha256(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -405,6 +407,77 @@ def test_http_multi_respects_max_bytes_per_target(
     assert results[1]["status"] == "error"
     assert results[1]["error"] == "limit_exceeded"
     assert results[1]["limit_type"] == "bytes_per_target"
+
+
+def test_http_multi_respects_download_max_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fake_download(
+        ctx: aw.AcquireContext,
+        url: str,
+        out_path: Path,
+        expected_size: int | None = None,
+        expected_sha256=None,
+    ):
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_bytes(b"x" * 10)
+        return {"status": "ok", "path": str(out_path), "content_length": 10}
+
+    monkeypatch.setattr(aw, "_http_download_with_resume", fake_download)
+
+    ctx = make_ctx(tmp_path)
+    row = {
+        "id": "http-max-bytes",
+        "download": {
+            "strategy": "http",
+            "url": "https://example.com/a",
+            "filename": "a.bin",
+            "max_bytes": 5,
+        },
+    }
+    out_dir = tmp_path / "http"
+    results = aw.handle_http(ctx, row, out_dir)
+
+    assert results[0]["status"] == "error"
+    assert results[0]["error"] == "limit_exceeded"
+    assert results[0]["limit_type"] == "bytes_per_target"
+    assert results[0]["limit"] == 5
+    assert results[0]["observed"] == 10
+
+
+def test_http_multi_respects_run_byte_budget(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fake_download(
+        ctx: aw.AcquireContext,
+        url: str,
+        out_path: Path,
+        expected_size: int | None = None,
+        expected_sha256=None,
+    ):
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_bytes(b"x" * 10)
+        return {"status": "ok", "path": str(out_path), "content_length": 10}
+
+    monkeypatch.setattr(aw, "_http_download_with_resume", fake_download)
+
+    ctx = make_ctx(tmp_path, run_byte_budget=5)
+    row = {
+        "id": "http-run-budget",
+        "download": {
+            "strategy": "http",
+            "url": "https://example.com/a",
+            "filename": "a.bin",
+        },
+    }
+    out_dir = tmp_path / "http"
+    results = aw.handle_http(ctx, row, out_dir)
+
+    assert results[0]["status"] == "error"
+    assert results[0]["error"] == "limit_exceeded"
+    assert results[0]["limit_type"] == "run_byte_budget"
+    assert results[0]["limit"] == 5
+    assert results[0]["observed"] == 10
 
 
 def test_git_clone_post_check_respects_max_bytes_per_target(
