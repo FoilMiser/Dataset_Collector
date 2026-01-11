@@ -13,10 +13,15 @@ from __future__ import annotations
 import json
 from collections.abc import Generator
 from pathlib import Path
+import sys
 from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
+
+SRC_ROOT = Path(__file__).resolve().parents[1] / "src"
+if SRC_ROOT.is_dir():
+    sys.path.insert(0, str(SRC_ROOT))
 
 
 # =============================================================================

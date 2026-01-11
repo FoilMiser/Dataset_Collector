@@ -60,6 +60,12 @@ dc = "collector_core.dc_cli:main"
 [tool.setuptools.dynamic]
 version = { attr = "collector_core.__version__.__version__" }
 
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [build-system]
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"

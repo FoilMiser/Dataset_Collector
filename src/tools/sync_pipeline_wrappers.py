@@ -6,9 +6,9 @@ One-command regeneration of all thin wrappers for pipeline directories.
 Can also run in lint mode (--check) for CI to verify wrappers are up-to-date.
 
 Usage:
-    python tools/sync_pipeline_wrappers.py          # Regenerate all wrappers
-    python tools/sync_pipeline_wrappers.py --check  # Check without writing (CI mode)
-    python tools/sync_pipeline_wrappers.py --dry-run # Show what would be written
+    python -m tools.sync_pipeline_wrappers          # Regenerate all wrappers
+    python -m tools.sync_pipeline_wrappers --check  # Check without writing (CI mode)
+    python -m tools.sync_pipeline_wrappers --dry-run # Show what would be written
 """
 
 from __future__ import annotations
@@ -526,7 +526,7 @@ def main() -> int:
         )
         if has_problems:
             print(
-                "\nWrapper sync check failed. Run 'python tools/sync_pipeline_wrappers.py' to fix."
+                "\nWrapper sync check failed. Run 'python -m tools.sync_pipeline_wrappers' to fix."
             )
             return 1
 

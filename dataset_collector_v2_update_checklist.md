@@ -24,7 +24,7 @@ Conventions:
   - Done when: there is no configuration field that implies a check that the code does not run.
 
 - [ ] Add a check registry that executes content checks and records results
-  - Create collector_core/checks/ with a registry + base interface.
+  - Create src/collector_core/checks/ with a registry + base interface.
   - Each check outputs a structured record under _ledger/ (per target).
   - Done when: a run can be audited by reading ledger artifacts only.
 
@@ -84,7 +84,7 @@ Conventions:
 
 - [ ] Delete per-pipeline wrappers that only set DOMAIN or forward to core
   - Targets: catalog_builder.py, review_queue.py, acquire_worker.py, merge_worker.py, run_pipeline.sh, thin pipeline_driver wrappers.
-  - Replace with: dc CLI + PipelineSpec registry + collector_core/generic_workers.py.
+  - Replace with: dc CLI + PipelineSpec registry + src/collector_core/generic_workers.py.
   - Done when: adding a new pipeline requires only YAML + a registry entry (no new Python wrapper files).
 
 - [ ] Optional repo layout cleanup
@@ -224,4 +224,3 @@ Conventions:
 2. Provide a migration script to rewrite targets YAMLs.
 3. Update schemas to allow both, then later remove the old field.
 4. Remove deprecated wrappers and scripts after dc CLI coverage is complete.
-

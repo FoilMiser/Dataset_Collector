@@ -54,7 +54,7 @@ def iter_companion_files(root: Path) -> Iterable[tuple[Path, str]]:
 
 
 def iter_pipeline_maps(root: Path) -> Iterable[Path]:
-    tools_dir = root / "tools"
+    tools_dir = root / "src" / "tools"
     if not tools_dir.is_dir():
         return
     yield from sorted(tools_dir.glob("pipeline_map*.yaml"))

@@ -44,7 +44,7 @@ RUNTIME_CACHE_FILE_NAMES = {
 
 
 def _remove_runtime_artifacts(repo_root: Path) -> None:
-    runtime_cache = repo_root / "tools" / "__pycache__"
+    runtime_cache = repo_root / "src" / "tools" / "__pycache__"
     if runtime_cache.exists():
         shutil.rmtree(runtime_cache, ignore_errors=True)
 

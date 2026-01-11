@@ -51,7 +51,7 @@ def _validate_pipeline_map_destination(dest_root: str | None, pipeline_map_path:
     if not dest_root or dest_root == PIPELINE_MAP_PLACEHOLDER:
         raise SystemExit(
             "Pipeline map destination_root is not configured. "
-            "Set destination_root in tools/pipeline_map.local.yaml or pass --dest-root."
+            "Set destination_root in src/tools/pipeline_map.local.yaml or pass --dest-root."
             f" (Current map: {pipeline_map_path})"
         )
 
@@ -167,7 +167,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     ap.add_argument("--repo-root", default=".", help="Repository root containing pipelines")
     ap.add_argument(
         "--pipeline-map",
-        default="tools/pipeline_map.sample.yaml",
+        default="src/tools/pipeline_map.sample.yaml",
         help="Pipeline map YAML",
     )
     ap.add_argument("--dest-root", default=None, help="Destination root for Natural corpus")

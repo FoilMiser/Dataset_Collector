@@ -49,7 +49,7 @@ Targets and catalog entries may specify a `license_profile` value. Supported val
 ## Known Limitations
 
 - **Yellow-screen boundaries**: The `acquire_yellow` and `screen_yellow` stages only apply to targets explicitly marked as YELLOW in pipeline target YAMLs. Anything not labeled YELLOW is outside the yellow-screen workflow, and no automatic promotion to GREEN occurs without human review.
-- **Excluded sources**: RED-labeled sources are excluded by design and are not collected or merged. Some targets may be disabled in `targets_*.yaml` or omitted from `tools/pipeline_map.sample.yaml`, which means they are intentionally not part of the run.
+- **Excluded sources**: RED-labeled sources are excluded by design and are not collected or merged. Some targets may be disabled in `targets_*.yaml` or omitted from `src/tools/pipeline_map.sample.yaml`, which means they are intentionally not part of the run.
 - **Non-goals**: This repository does not perform data cleaning, deduplication across domains, or final dataset curation beyond the per-pipeline merge step. It also does not guarantee license compatibility checks outside the configured `license_map.yaml` entries.
 - **Corpus constraints**: Outputs are constrained to the `combined/` stage described in `docs/output_contract.md`; there is no final, unified post-processing stage here. Downstream consumers should expect per-pipeline catalogs and manifests with varying completeness based on enabled targets and available credentials.
 - **Rate limiting configuration**: `targets_*.yaml` files can include `resolvers: ... rate_limit: ...` blocks (e.g., for GitHub API) which are now consumed by the acquisition handlers for GitHub and Figshare. The schema validates rate_limit blocks with keys: `requests_per_minute`, `requests_per_hour`, `requests_per_second`, `burst`, and retry options (`retry_on_429`, `retry_on_403`).
@@ -167,7 +167,7 @@ set up dependencies using [Reproducible installs](#reproducible-installs-recomme
 then call the Windows-native orchestrator directly from a notebook cell:
 
 ```powershell
-python tools\build_natural_corpus.py --dest-root "E:\AI-Research\datasets\Natural" --pipelines all --stages classify,acquire_green,acquire_yellow --execute
+python src\tools\build_natural_corpus.py --dest-root "E:\AI-Research\datasets\Natural" --pipelines all --stages classify,acquire_green,acquire_yellow --execute
 ```
 
 To preview the actions without writing data, omit `--execute` (dry-run).
@@ -186,7 +186,7 @@ Use the Windows-first orchestrator to run all pipelines sequentially and emit th
 Natural corpus layout under a single destination root. This is an optional alternative to the JupyterLab notebook flow.
 
 ```powershell
-python tools\build_natural_corpus.py --dest-root "E:\AI-Research\datasets\Natural" --pipelines all --execute
+python src\tools\build_natural_corpus.py --dest-root "E:\AI-Research\datasets\Natural" --pipelines all --execute
 ```
 
 To preview the actions without writing data, omit `--execute` (dry-run). See
@@ -203,7 +203,7 @@ Some targets depend on external tools. Install them as needed:
 
 ## Architecture: Spec-driven pipelines
 
-All 18 domain pipelines are now configured via `collector_core/pipeline_specs_registry.py`.
+All 18 domain pipelines are now configured via `src/collector_core/pipeline_specs_registry.py`.
 Each `PipelineSpec` defines:
 
 - **domain**: The unique domain identifier (e.g., `physics`, `chem`, `math`)
@@ -248,13 +248,13 @@ if __name__ == "__main__":
 To regenerate all thin wrappers from the registry:
 
 ```bash
-python tools/sync_pipeline_wrappers.py
+python src/tools/sync_pipeline_wrappers.py
 ```
 
 To check wrappers are up-to-date (CI mode):
 
 ```bash
-python tools/sync_pipeline_wrappers.py --check
+python src/tools/sync_pipeline_wrappers.py --check
 ```
 
 ## Expected directory structure & configurable paths
@@ -340,7 +340,7 @@ python -m tools.preflight --pipelines chem_pipeline_v2 biology_pipeline_v2
 To point at a custom pipeline map location:
 
 ```bash
-python -m tools.preflight --pipeline-map tools/pipeline_map.sample.yaml
+python -m tools.preflight --pipeline-map src/tools/pipeline_map.sample.yaml
 ```
 
 To emit warnings for disabled targets:
@@ -349,20 +349,20 @@ To emit warnings for disabled targets:
 python -m tools.preflight --warn-disabled
 ```
 
-For local runs, copy `tools/pipeline_map.sample.yaml` to something like `tools/pipeline_map.local.yaml`, set `destination_root` to your dataset folder, and pass it via `--pipeline-map` (or use `--dest-root` when running `tools/build_natural_corpus.py`). This keeps user-specific paths out of version control.
+For local runs, copy `src/tools/pipeline_map.sample.yaml` to something like `src/tools/pipeline_map.local.yaml`, set `destination_root` to your dataset folder, and pass it via `--pipeline-map` (or use `--dest-root` when running `src/tools/build_natural_corpus.py`). This keeps user-specific paths out of version control.
 
 ## Repo validation
 
 Validate all enabled targets across pipeline configs and emit a JSON summary:
 
 ```bash
-python -m tools.validate_repo --output tools/validate_report.json
+python -m tools.validate_repo --output src/tools/validate_report.json
 ```
 
 Fail the run if warnings are present:
 
 ```bash
-python -m tools.validate_repo --strict --output tools/validate_report.json
+python -m tools.validate_repo --strict --output src/tools/validate_report.json
 ```
 
 ## Cleaning local artifacts
@@ -370,7 +370,7 @@ python -m tools.validate_repo --strict --output tools/validate_report.json
 If you ran pipelines inside the repo and need to reset the tree:
 
 ```bash
-python tools/clean_repo_tree.py --yes
+python src/tools/clean_repo_tree.py --yes
 ```
 
 ## Adding a new target safely
