@@ -83,7 +83,7 @@ Conventions:
 ### P1.1 Remove per-pipeline wrapper duplication
 
 - [ ] Delete per-pipeline wrappers that only set DOMAIN or forward to core
-  - Targets: catalog_builder.py, review_queue.py, acquire_worker.py, merge_worker.py, run_pipeline.sh, thin pipeline_driver wrappers.
+  - Targets: catalog_builder.py, review_queue.py, acquire_worker.py, merge_worker.py, legacy/run_pipeline.sh, thin pipeline_driver wrappers.
   - Replace with: dc CLI + PipelineSpec registry + src/collector_core/generic_workers.py.
   - Done when: adding a new pipeline requires only YAML + a registry entry (no new Python wrapper files).
 
@@ -129,7 +129,7 @@ Conventions:
   - Done when: docs, notebook, and CI all use dc.
 
 - [ ] Remove deprecated scripts (or isolate under legacy/)
-  - Specifically remove run_pipeline.sh clones across pipelines.
+  - Specifically remove run_pipeline.sh clones across pipelines (now under legacy/).
   - Done when: there are no maintained-but-deprecated runners.
 
 ### P1.5 Reduce duplication in pipeline discovery

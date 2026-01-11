@@ -149,7 +149,7 @@ python -m collector_core.dc_cli run --pipeline chem --stage acquire
 
 - Existing `pipeline_driver.py` files continue to work
 - The `safe_name` alias is provided in `acquire_strategies.py`
-- `run_pipeline.sh` scripts are deprecated but functional
+- Legacy `run_pipeline.sh` scripts have moved under each pipeline's `legacy/` directory; prefer `dc pipeline`/`dc run`
 
 ## Breaking Changes
 

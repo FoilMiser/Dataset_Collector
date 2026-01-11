@@ -171,7 +171,7 @@ if __name__ == "__main__":
     main()
 '''
 
-# Template for run_pipeline.sh
+# Template for legacy/run_pipeline.sh
 RUN_PIPELINE_TEMPLATE = """#!/usr/bin/env bash
 #
 # run_pipeline.sh (v2.0)
@@ -396,7 +396,7 @@ TEMPLATES = [
         max_lines_for_overwrite=30,
     ),
     WrapperTemplate("yellow_screen_worker.py", YELLOW_SCREEN_WORKER_TEMPLATE, skip_if_large=False),
-    WrapperTemplate("run_pipeline.sh", RUN_PIPELINE_TEMPLATE, skip_if_large=False),
+    WrapperTemplate("legacy/run_pipeline.sh", RUN_PIPELINE_TEMPLATE, skip_if_large=False),
 ]
 
 
@@ -442,6 +442,7 @@ def sync_domain(domain: str, check_only: bool = False, dry_run: bool = False) ->
 
     for template in TEMPLATES:
         file_path = pipeline_dir / template.filename
+        file_path.parent.mkdir(parents=True, exist_ok=True)
         expected_content = generate_wrapper(domain, template)
 
         if should_skip_file(file_path, template):

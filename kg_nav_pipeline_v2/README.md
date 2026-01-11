@@ -24,7 +24,7 @@ For Windows + Conda, prefer the repo-wide orchestrator:
 python tools/build_natural_corpus.py --repo-root . --dest-root "E:/AI-Research/datasets/Natural" --mode full --execute
 ```
 
-You can also run the Jupyter notebook, which invokes the same workflow. Use `run_pipeline.sh` only if you have Git Bash/WSL on Windows or are on macOS/Linux.
+You can also run the Jupyter notebook, which invokes the same workflow. For direct CLI runs, use `dc` (prefer `dc pipeline` for classification and `dc run` for worker stages).
 
 ## Directory layout
 
@@ -63,7 +63,7 @@ Sharding is controlled by `globals.sharding` (max records per shard, compression
 | Merge | `merge_worker.py` | Combines canonical GREEN + screened YELLOW shards with content hash dedupe and a combined ledger. |
 | Catalog | `catalog_builder.py` | Summarizes counts, bytes, per-stage shard info, manifests, and ledgers. |
 
-`run_pipeline.sh` orchestrates these stages (`--stage classify|acquire_green|acquire_yellow|screen_yellow|merge|catalog`).
+Use `dc pipeline` for classification, `dc run` for acquire/merge/yellow_screen, and `dc catalog-builder` for catalog outputs.
 
 ---
 
@@ -73,16 +73,16 @@ Sharding is controlled by `globals.sharding` (max records per shard, compression
 pip install -r requirements.txt
 
 # Dry-run classify only
-./run_pipeline.sh --targets ../pipelines/targets/targets_kg_nav.yaml --stage classify
+dc pipeline kg_nav -- --targets ../pipelines/targets/targets_kg_nav.yaml --stage classify --no-fetch
 
 # Acquire GREEN and YELLOW (execute downloads)
-./run_pipeline.sh --targets ../pipelines/targets/targets_kg_nav.yaml --stage acquire_green --execute
-./run_pipeline.sh --targets ../pipelines/targets/targets_kg_nav.yaml --stage acquire_yellow --execute
+dc run --pipeline kg_nav --stage acquire --allow-data-root -- --queue /data/kg_nav/_queues/green_pipeline.jsonl --bucket green --targets-yaml ../pipelines/targets/targets_kg_nav.yaml --execute
+dc run --pipeline kg_nav --stage acquire --allow-data-root -- --queue /data/kg_nav/_queues/yellow_pipeline.jsonl --bucket yellow --targets-yaml ../pipelines/targets/targets_kg_nav.yaml --execute
 
 # Screen, merge, catalog
-./run_pipeline.sh --targets ../pipelines/targets/targets_kg_nav.yaml --stage screen_yellow --execute
-./run_pipeline.sh --targets ../pipelines/targets/targets_kg_nav.yaml --stage merge --execute
-./run_pipeline.sh --targets ../pipelines/targets/targets_kg_nav.yaml --stage catalog
+dc run --pipeline kg_nav --stage yellow_screen --allow-data-root -- --queue /data/kg_nav/_queues/yellow_pipeline.jsonl --targets ../pipelines/targets/targets_kg_nav.yaml --execute
+dc run --pipeline kg_nav --stage merge --allow-data-root -- --targets ../pipelines/targets/targets_kg_nav.yaml --execute
+dc catalog-builder --pipeline kg_nav --allow-data-root -- --targets ../pipelines/targets/targets_kg_nav.yaml --output /data/kg_nav/_catalogs/catalog.json
 ```
 
 ### Notes

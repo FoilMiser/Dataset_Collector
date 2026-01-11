@@ -98,7 +98,7 @@ def render_readme(spec: PipelineSpec) -> str:
 
         Targets YAML defaults to `/data/...`; the orchestrator patches to your
         `--dest-root`. For standalone runs, pass `--dataset-root`, use
-        `src/tools/patch_targets.py`, or run `run_pipeline.sh` (optional wrapper).
+        `src/tools/patch_targets.py`, or run `legacy/run_pipeline.sh` (optional wrapper).
 
         ## License
 
@@ -667,6 +667,7 @@ def render_requirements() -> str:
 def write_file(path: Path, content: str, force: bool) -> None:
     if path.exists() and not force:
         raise FileExistsError(f"Refusing to overwrite existing file: {path}")
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
 
 
@@ -681,7 +682,7 @@ def generate_pipeline(spec: PipelineSpec, repo_root: Path, force: bool) -> Path:
     write_file(pipeline_dir / "merge_worker.py", render_merge_worker(spec), force)
     write_file(pipeline_dir / "catalog_builder.py", render_catalog_builder(), force)
     write_file(pipeline_dir / "review_queue.py", render_review_queue(), force)
-    write_file(pipeline_dir / "run_pipeline.sh", render_run_pipeline(spec), force)
+    write_file(pipeline_dir / "legacy" / "run_pipeline.sh", render_run_pipeline(spec), force)
     targets_dir = repo_root / "pipelines" / "targets"
     targets_dir.mkdir(parents=True, exist_ok=True)
     write_file(targets_dir / spec.targets_filename, render_targets_yaml(spec), force)

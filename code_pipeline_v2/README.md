@@ -26,7 +26,7 @@ For Windows + Conda, prefer the repo-wide orchestrator:
 python tools/build_natural_corpus.py --repo-root . --dest-root "E:/AI-Research/datasets/Natural" --mode full --execute
 ```
 
-You can also run the Jupyter notebook, which invokes the same workflow. Use `run_pipeline.sh` only if you have Git Bash/WSL on Windows or are on macOS/Linux.
+You can also run the Jupyter notebook, which invokes the same workflow. For direct CLI runs, use `dc` (prefer `dc pipeline` for classification and `dc run` for worker stages).
 
 ---
 
@@ -66,7 +66,7 @@ Sharding is controlled by `globals.sharding` (max records per shard, compression
 | Merge | `merge_worker.py` | Combines canonical GREEN + screened YELLOW shards with deduplication and a combined ledger. |
 | Catalog | `catalog_builder.py` | Summarizes counts, bytes, language coverage, manifests, and ledgers across stages. |
 
-`run_pipeline.sh` orchestrates these stages with `--stage classify|acquire_green|acquire_yellow|screen_yellow|merge|catalog`.
+Use `dc pipeline` for classification, `dc run` for acquire/merge/yellow_screen, and `dc catalog-builder` for catalog outputs.
 
 ---
 
@@ -76,16 +76,16 @@ Sharding is controlled by `globals.sharding` (max records per shard, compression
 pip install -r requirements.txt
 
 # Dry-run classify only
-./run_pipeline.sh --targets ../pipelines/targets/targets_code.yaml --stage classify
+dc pipeline code -- --targets ../pipelines/targets/targets_code.yaml --stage classify --no-fetch
 
-# Acquire GREEN and YELLOW (execute downloads + code extraction)
-./run_pipeline.sh --targets ../pipelines/targets/targets_code.yaml --stage acquire_green --execute
-./run_pipeline.sh --targets ../pipelines/targets/targets_code.yaml --stage acquire_yellow --execute
+# Acquire GREEN and YELLOW (execute downloads)
+dc run --pipeline code --stage acquire --allow-data-root -- --queue /data/code/_queues/green_pipeline.jsonl --bucket green --targets-yaml ../pipelines/targets/targets_code.yaml --execute
+dc run --pipeline code --stage acquire --allow-data-root -- --queue /data/code/_queues/yellow_pipeline.jsonl --bucket yellow --targets-yaml ../pipelines/targets/targets_code.yaml --execute
 
 # Screen, merge, catalog
-./run_pipeline.sh --targets ../pipelines/targets/targets_code.yaml --stage screen_yellow --execute
-./run_pipeline.sh --targets ../pipelines/targets/targets_code.yaml --stage merge --execute
-./run_pipeline.sh --targets ../pipelines/targets/targets_code.yaml --stage catalog
+dc run --pipeline code --stage yellow_screen --allow-data-root -- --queue /data/code/_queues/yellow_pipeline.jsonl --targets ../pipelines/targets/targets_code.yaml --execute
+dc run --pipeline code --stage merge --allow-data-root -- --targets ../pipelines/targets/targets_code.yaml --execute
+dc catalog-builder --pipeline code --allow-data-root -- --targets ../pipelines/targets/targets_code.yaml --output /data/code/_catalogs/catalog.json
 ```
 
 ### Notes
