@@ -12,7 +12,13 @@ from typing import Any
 from collector_core import acquire_strategies
 from collector_core.acquire.strategies import registry as strategies_registry
 from collector_core.config_validator import read_yaml
-from collector_core.targets_paths import resolve_targets_path
+from collector_core.pipeline_discovery import (
+    available_pipelines,
+    discover_pipeline_dir,
+    normalize_pipeline_id,
+    pick_default_targets,
+    resolve_repo_root,
+)
 
 STRATEGY_HANDLER = Callable[
     [acquire_strategies.AcquireContext, dict[str, Any], Path], list[dict[str, Any]]
@@ -32,47 +38,6 @@ class PipelineContext:
     overrides: dict[str, Any]
 
 
-def _normalize_pipeline_id(pipeline_id: str | None) -> str | None:
-    if not pipeline_id:
-        return None
-    if pipeline_id.endswith("_pipeline_v2"):
-        return pipeline_id
-    return f"{pipeline_id}_pipeline_v2"
-
-
-def _resolve_repo_root(path: Path) -> Path:
-    if path.name.endswith("_pipeline_v2") and (path / "pipeline_driver.py").exists():
-        return path.parent
-    return path
-
-
-def _discover_pipeline_dir(repo_root: Path, pipeline_id: str | None) -> Path | None:
-    if pipeline_id:
-        normalized = _normalize_pipeline_id(pipeline_id)
-        if normalized:
-            candidate = repo_root / normalized
-            if candidate.is_dir():
-                return candidate
-            slug = normalized.removesuffix("_pipeline_v2")
-            for path in sorted(repo_root.glob("*_pipeline_v2")):
-                if path.name == f"{slug}_pipeline_v2":
-                    return path
-        return None
-    cwd = Path.cwd().resolve()
-    for path in (cwd, *cwd.parents):
-        if path.name.endswith("_pipeline_v2"):
-            return path
-    return None
-
-
-def _available_pipelines(repo_root: Path) -> list[str]:
-    return sorted(path.name for path in repo_root.glob("*_pipeline_v2") if path.is_dir())
-
-
-def _pick_default_targets(repo_root: Path, slug: str) -> Path | None:
-    return resolve_targets_path(repo_root, slug)
-
-
 def _load_overrides(repo_root: Path) -> dict[str, Any]:
     config_path = repo_root / "configs" / "pipelines.yaml"
     if not config_path.exists():
@@ -85,12 +50,12 @@ def _load_overrides(repo_root: Path) -> dict[str, Any]:
 
 
 def resolve_pipeline_context(*, pipeline_id: str | None, repo_root: Path) -> PipelineContext:
-    repo_root = _resolve_repo_root(repo_root)
-    pipeline_dir = _discover_pipeline_dir(repo_root, pipeline_id)
+    repo_root = resolve_repo_root(repo_root)
+    pipeline_dir = discover_pipeline_dir(repo_root, pipeline_id)
     if pipeline_id:
-        normalized = _normalize_pipeline_id(pipeline_id)
+        normalized = normalize_pipeline_id(pipeline_id)
         if not pipeline_dir or not normalized:
-            available = ", ".join(_available_pipelines(repo_root)) or "none"
+            available = ", ".join(available_pipelines(repo_root)) or "none"
             raise SystemExit(f"Unknown pipeline '{pipeline_id}'. Available: {available}")
         slug = normalized.removesuffix("_pipeline_v2")
     else:
@@ -102,7 +67,7 @@ def resolve_pipeline_context(*, pipeline_id: str | None, repo_root: Path) -> Pip
         slug = normalized.removesuffix("_pipeline_v2")
 
     overrides = _load_overrides(repo_root).get(slug, {})
-    targets_path = _pick_default_targets(repo_root, slug)
+    targets_path = pick_default_targets(repo_root, slug)
     return PipelineContext(
         pipeline_id=normalized,
         slug=slug,
