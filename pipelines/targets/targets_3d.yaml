@@ -114,6 +114,10 @@ targets:
     priority: 10
     license_profile: "permissive"
     license_evidence: { spdx_hint: "Proprietary", url: "" }
+    source_urls:
+      - "internal://synthetic_cad_printing_problems"
+    evidence_urls:
+      - "internal://synthetic_cad_printing_problems"
     data_type: ["synthetic", "instruction", "cad", "3d_printing"]
     download: { strategy: "none" }
     build:
@@ -148,6 +152,10 @@ targets:
     priority: 10
     license_profile: "permissive"
     license_evidence: { spdx_hint: "CC0-1.0", url: "https://www.si.edu/openaccess" }
+    source_urls:
+      - "https://www.si.edu/openaccess"
+    evidence_urls:
+      - "https://www.si.edu/openaccess"
     data_type: ["3d_models", "cultural_heritage", "metadata"]
     download:
       strategy: "s3_public"
@@ -182,6 +190,11 @@ targets:
     priority: 9
     license_profile: "permissive"
     license_evidence: { spdx_hint: "CC0-1.0", url: "https://www.blender.org/education/" }
+    source_urls:
+      - "https://www.blender.org/education/"
+    evidence_urls:
+      - "https://www.blender.org/education/"
+    dataset_tag: "default_branch"
     data_type: ["tutorial_text", "lessons", "3d_modeling"]
     download:
       strategy: "git"
@@ -210,6 +223,10 @@ targets:
     priority: 9
     license_profile: "record_level"
     license_evidence: { spdx_hint: "Mixed", url: "https://huggingface.co/datasets/Thingi10K/Thingi10K" }
+    source_urls:
+      - "https://huggingface.co/datasets/Thingi10K/Thingi10K"
+    evidence_urls:
+      - "https://huggingface.co/datasets/Thingi10K/Thingi10K"
     data_type: ["3d_printing", "meshes", "metadata"]
     download:
       strategy: "http"
@@ -254,6 +271,10 @@ targets:
     priority: 9
     license_profile: "permissive"
     license_evidence: { spdx_hint: "Derived", url: "" }
+    source_urls:
+      - "internal://thingi10k_safe_cc0_ccby"
+    evidence_urls:
+      - "internal://thingi10k_safe_cc0_ccby"
     data_type: ["3d_printing", "meshes", "metadata", "derived"]
     build:
       from: ["thingi10k_raw"]
@@ -285,6 +306,10 @@ targets:
     priority: 8
     license_profile: "record_level"
     license_evidence: { spdx_hint: "Mixed", url: "https://www.niaid.nih.gov/research/nih-3d-print-exchange" }
+    source_urls:
+      - "https://www.niaid.nih.gov/research/nih-3d-print-exchange"
+    evidence_urls:
+      - "https://www.niaid.nih.gov/research/nih-3d-print-exchange"
     data_type: ["3d_printing", "biomedical", "meshes", "metadata"]
     download:
       strategy: "api"
@@ -316,6 +341,11 @@ targets:
     priority: 7
     license_profile: "copyleft"
     license_evidence: { spdx_hint: "CC-BY-SA-4.0", url: "https://docs.blender.org/manual/en/latest/about/license.html" }
+    source_urls:
+      - "https://docs.blender.org/manual/en/latest/about/license.html"
+    evidence_urls:
+      - "https://docs.blender.org/manual/en/latest/about/license.html"
+    dataset_tag: "default_branch"
     data_type: ["documentation", "tutorial_text", "3d_modeling"]
     download:
       strategy: "git"
@@ -343,6 +373,11 @@ targets:
     priority: 6
     license_profile: "copyleft"
     license_evidence: { spdx_hint: "AGPL-3.0-only", url: "https://github.com/Ultimaker/CuraEngine" }
+    source_urls:
+      - "https://github.com/Ultimaker/CuraEngine"
+    evidence_urls:
+      - "https://github.com/Ultimaker/CuraEngine"
+    dataset_tag: "default_branch"
     data_type: ["code", "documentation", "3d_printing", "slicing"]
     download:
       strategy: "git"
@@ -370,6 +405,11 @@ targets:
     priority: 6
     license_profile: "permissive"
     license_evidence: { spdx_hint: "CC0-1.0", url: "https://github.com/Ultimaker/fdm_materials" }
+    source_urls:
+      - "https://github.com/Ultimaker/fdm_materials"
+    evidence_urls:
+      - "https://github.com/Ultimaker/fdm_materials"
+    dataset_tag: "default_branch"
     data_type: ["materials", "3d_printing", "profiles"]
     download:
       strategy: "git"
@@ -396,6 +436,11 @@ targets:
     priority: 5
     license_profile: "record_level"
     license_evidence: { spdx_hint: "ODC-By-1.0", url: "https://huggingface.co/datasets/allenai/objaverse" }
+    source_urls:
+      - "https://huggingface.co/datasets/allenai/objaverse"
+    evidence_urls:
+      - "https://huggingface.co/datasets/allenai/objaverse"
+    dataset_version: "main"
     data_type: ["3d_models", "meshes", "metadata"]
     download:
       strategy: "huggingface_datasets"
@@ -431,6 +476,10 @@ targets:
     priority: 5
     license_profile: "permissive"
     license_evidence: { spdx_hint: "Derived", url: "" }
+    source_urls:
+      - "internal://objaverse_safe_cc0_ccby"
+    evidence_urls:
+      - "internal://objaverse_safe_cc0_ccby"
     data_type: ["3d_models", "meshes", "metadata", "derived"]
     build:
       from: ["objaverse"]
@@ -458,6 +507,10 @@ targets:
     priority: 5
     license_profile: "permissive"
     license_evidence: { spdx_hint: "CC-BY-4.0", url: "https://research.google/blog/scanned-objects-by-google-research-a-dataset-of-3d-scanned-common-household-items/" }
+    source_urls:
+      - "https://research.google/blog/scanned-objects-by-google-research-a-dataset-of-3d-scanned-common-household-items/"
+    evidence_urls:
+      - "https://research.google/blog/scanned-objects-by-google-research-a-dataset-of-3d-scanned-common-household-items/"
     data_type: ["3d_models", "meshes", "textures", "metadata"]
     download:
       strategy: "web_crawl"

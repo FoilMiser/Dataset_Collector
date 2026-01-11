@@ -108,6 +108,10 @@ targets:
   license_evidence:
     spdx_hint: US-PUBLIC-DOMAIN
     url: https://www.ntsb.gov/safety/data/Pages/Data_Stats.aspx
+  source_urls:
+    - "https://www.ntsb.gov/safety/data/Pages/Data_Stats.aspx"
+  evidence_urls:
+    - "https://www.ntsb.gov/safety/data/Pages/Data_Stats.aspx"
   data_type:
   - events
   - aviation
@@ -140,6 +144,10 @@ targets:
   license_evidence:
     spdx_hint: US-PUBLIC-DOMAIN
     url: https://www.phmsa.dot.gov/data-and-statistics/pipeline/source-data
+  source_urls:
+    - "https://www.phmsa.dot.gov/data-and-statistics/pipeline/source-data"
+  evidence_urls:
+    - "https://www.phmsa.dot.gov/data-and-statistics/pipeline/source-data"
   data_type:
   - events
   - pipeline
@@ -174,6 +182,10 @@ targets:
   license_evidence:
     spdx_hint: US-PUBLIC-DOMAIN
     url: https://catalog.data.gov/dataset/msha-accident-injuries-data-set
+  source_urls:
+    - "https://catalog.data.gov/dataset/msha-accident-injuries-data-set"
+  evidence_urls:
+    - "https://catalog.data.gov/dataset/msha-accident-injuries-data-set"
   data_type:
   - events
   - mining
@@ -203,6 +215,10 @@ targets:
   license_evidence:
     spdx_hint: US-PUBLIC-DOMAIN
     url: https://www.msha.gov/data-and-reports/fatality-reports/search
+  source_urls:
+    - "https://www.msha.gov/data-and-reports/fatality-reports/search"
+  evidence_urls:
+    - "https://www.msha.gov/data-and-reports/fatality-reports/search"
   data_type:
   - reports
   - mining
@@ -237,6 +253,10 @@ targets:
   license_evidence:
     spdx_hint: US-PUBLIC-DOMAIN
     url: https://data.transportation.gov/Railroads/Highway-Rail-Grade-Crossing-Incident-Data-Form-57-/7wn6-i5b9
+  source_urls:
+    - "https://data.transportation.gov/Railroads/Highway-Rail-Grade-Crossing-Incident-Data-Form-57-/7wn6-i5b9"
+  evidence_urls:
+    - "https://data.transportation.gov/Railroads/Highway-Rail-Grade-Crossing-Incident-Data-Form-57-/7wn6-i5b9"
   data_type:
   - events
   - rail
@@ -266,6 +286,10 @@ targets:
   license_evidence:
     spdx_hint: US-PUBLIC-DOMAIN
     url: https://data.transportation.gov/Railroads/Rail-Equipment-Accident-Incident-Data-Form-54-/85tf-25kj
+  source_urls:
+    - "https://data.transportation.gov/Railroads/Rail-Equipment-Accident-Incident-Data-Form-54-/85tf-25kj"
+  evidence_urls:
+    - "https://data.transportation.gov/Railroads/Rail-Equipment-Accident-Incident-Data-Form-54-/85tf-25kj"
   data_type:
   - events
   - rail
@@ -295,6 +319,10 @@ targets:
   license_evidence:
     spdx_hint: US-PUBLIC-DOMAIN
     url: https://incidentnews.noaa.gov/raw/index
+  source_urls:
+    - "https://incidentnews.noaa.gov/raw/index"
+  evidence_urls:
+    - "https://incidentnews.noaa.gov/raw/index"
   data_type:
   - events
   - spills
@@ -324,6 +352,10 @@ targets:
   license_evidence:
     spdx_hint: US-PUBLIC-DOMAIN
     url: 'https://www.asias.faa.gov/apex/f?p=100:93::NO:::'
+  source_urls:
+    - "https://www.asias.faa.gov/apex/f?p=100:93::NO:::"
+  evidence_urls:
+    - "https://www.asias.faa.gov/apex/f?p=100:93::NO:::"
   data_type:
   - events
   - aviation
@@ -353,6 +385,10 @@ targets:
   license_evidence:
     spdx_hint: US-PUBLIC-DOMAIN
     url: https://data.nasa.gov/dataset/nasa-engineering-network-lessons-learned
+  source_urls:
+    - "https://data.nasa.gov/dataset/nasa-engineering-network-lessons-learned"
+  evidence_urls:
+    - "https://data.nasa.gov/dataset/nasa-engineering-network-lessons-learned"
   data_type:
   - lessons_learned
   - aerospace
@@ -386,6 +422,10 @@ targets:
   license_evidence:
     spdx_hint: US-PUBLIC-DOMAIN
     url: https://www.nhtsa.gov/research-data/fatality-analysis-reporting-system-fars
+  source_urls:
+    - "https://www.nhtsa.gov/research-data/fatality-analysis-reporting-system-fars"
+  evidence_urls:
+    - "https://www.nhtsa.gov/research-data/fatality-analysis-reporting-system-fars"
   data_type:
   - events
   - road_safety
@@ -425,6 +465,10 @@ targets:
   license_evidence:
     spdx_hint: MIXED
     url: https://enforcedata.dol.gov/views/data_catalogs.php
+  source_urls:
+    - "https://enforcedata.dol.gov/views/data_catalogs.php"
+  evidence_urls:
+    - "https://enforcedata.dol.gov/views/data_catalogs.php"
   data_type:
   - workplace_safety
   - inspections
@@ -465,6 +509,10 @@ targets:
   license_evidence:
     spdx_hint: MIXED
     url: https://www.csb.gov/investigations/completed-investigations/
+  source_urls:
+    - "https://www.csb.gov/investigations/completed-investigations/"
+  evidence_urls:
+    - "https://www.csb.gov/investigations/completed-investigations/"
   data_type:
   - reports
   - process_safety
@@ -508,6 +556,10 @@ targets:
   license_evidence:
     spdx_hint: OGL-3.0
     url: https://www.gov.uk/aaib-reports
+  source_urls:
+    - "https://www.gov.uk/aaib-reports"
+  evidence_urls:
+    - "https://www.gov.uk/aaib-reports"
   data_type:
   - reports
   - aviation
@@ -542,6 +594,10 @@ targets:
   license_evidence:
     spdx_hint: OGL-3.0
     url: https://www.gov.uk/raib-reports
+  source_urls:
+    - "https://www.gov.uk/raib-reports"
+  evidence_urls:
+    - "https://www.gov.uk/raib-reports"
   data_type:
   - reports
   - rail
@@ -568,6 +624,10 @@ targets:
   license_evidence:
     spdx_hint: OGL-3.0
     url: https://www.gov.uk/maib-reports
+  source_urls:
+    - "https://www.gov.uk/maib-reports"
+  evidence_urls:
+    - "https://www.gov.uk/maib-reports"
   data_type:
   - reports
   - maritime
@@ -602,6 +662,10 @@ targets:
   license_evidence:
     spdx_hint: MIXED
     url: https://www.ntsb.gov/Pages/Open.aspx
+  source_urls:
+    - "https://www.ntsb.gov/Pages/Open.aspx"
+  evidence_urls:
+    - "https://www.ntsb.gov/Pages/Open.aspx"
   data_type:
   - reports
   - transport
@@ -635,6 +699,10 @@ targets:
   license_evidence:
     spdx_hint: MIXED
     url: https://asrs.arc.nasa.gov/search/database.html
+  source_urls:
+    - "https://asrs.arc.nasa.gov/search/database.html"
+  evidence_urls:
+    - "https://asrs.arc.nasa.gov/search/database.html"
   data_type:
   - reports
   - aviation
@@ -659,6 +727,11 @@ targets:
   license_evidence:
     spdx_hint: MIXED
     url: https://huggingface.co/datasets/common-pile/regulations_filtered
+  source_urls:
+    - "https://huggingface.co/datasets/common-pile/regulations_filtered"
+  evidence_urls:
+    - "https://huggingface.co/datasets/common-pile/regulations_filtered"
+  dataset_version: "main"
   data_type:
   - regulation
   - compliance
@@ -709,6 +782,11 @@ targets:
   license_evidence:
     spdx_hint: MIXED
     url: https://huggingface.co/datasets/common-pile/usgpo_filtered
+  source_urls:
+    - "https://huggingface.co/datasets/common-pile/usgpo_filtered"
+  evidence_urls:
+    - "https://huggingface.co/datasets/common-pile/usgpo_filtered"
+  dataset_version: "main"
   data_type:
   - government_reports
   - safety_policy
@@ -742,6 +820,10 @@ targets:
   license_evidence:
     spdx_hint: UNKNOWN
     url: https://emars.jrc.ec.europa.eu/
+  source_urls:
+    - "https://emars.jrc.ec.europa.eu/"
+  evidence_urls:
+    - "https://emars.jrc.ec.europa.eu/"
   data_type:
   - process_safety
   - seveso
@@ -765,6 +847,10 @@ targets:
   license_evidence:
     spdx_hint: UNKNOWN
     url: https://www.aria.developpement-durable.gouv.fr/the-barpi/the-aria-database/?lang=en
+  source_urls:
+    - "https://www.aria.developpement-durable.gouv.fr/the-barpi/the-aria-database/?lang=en"
+  evidence_urls:
+    - "https://www.aria.developpement-durable.gouv.fr/the-barpi/the-aria-database/?lang=en"
   data_type:
   - process_safety
   - industrial_accidents
@@ -789,6 +875,10 @@ targets:
   license_evidence:
     spdx_hint: US-PUBLIC-DOMAIN
     url: https://www.fda.gov/medical-devices/medical-device-reporting-mdr/how-access-maude-data
+  source_urls:
+    - "https://www.fda.gov/medical-devices/medical-device-reporting-mdr/how-access-maude-data"
+  evidence_urls:
+    - "https://www.fda.gov/medical-devices/medical-device-reporting-mdr/how-access-maude-data"
   data_type:
   - medical_device_safety
   - adverse_events
@@ -821,6 +911,10 @@ targets:
   license_evidence:
     spdx_hint: Proprietary
     url: ''
+  source_urls:
+    - "internal://iso_iec_standards"
+  evidence_urls:
+    - "internal://iso_iec_standards"
   data_type:
   - standards
   - functional_safety
@@ -847,6 +941,10 @@ targets:
   license_evidence:
     spdx_hint: Proprietary
     url: ''
+  source_urls:
+    - "internal://nfpa_codes"
+  evidence_urls:
+    - "internal://nfpa_codes"
   data_type:
   - standards
   - electrical_safety
@@ -873,6 +971,10 @@ targets:
   license_evidence:
     spdx_hint: Proprietary
     url: ''
+  source_urls:
+    - "internal://commercial_accident_databases"
+  evidence_urls:
+    - "internal://commercial_accident_databases"
   data_type:
   - commercial_db
   - restricted
@@ -898,6 +1000,10 @@ targets:
   license_evidence:
     spdx_hint: Proprietary
     url: ''
+  source_urls:
+    - "internal://news_archives"
+  evidence_urls:
+    - "internal://news_archives"
   data_type:
   - news
   - copyrighted
@@ -923,6 +1029,10 @@ targets:
   license_evidence:
     spdx_hint: Restricted
     url: ''
+  source_urls:
+    - "internal://confidential_corporate_logs"
+  evidence_urls:
+    - "internal://confidential_corporate_logs"
   data_type:
   - confidential
   - pii
@@ -950,6 +1060,10 @@ targets:
   license_evidence:
     spdx_hint: US-PUBLIC-DOMAIN
     url: https://www.fema.gov/about/openfema/data-sets/fema-usfa-nfirs-annual-data
+  source_urls:
+    - "https://www.fema.gov/about/openfema/data-sets/fema-usfa-nfirs-annual-data"
+  evidence_urls:
+    - "https://www.fema.gov/about/openfema/data-sets/fema-usfa-nfirs-annual-data"
   data_type:
   - tabular
   - incident_events
@@ -979,6 +1093,10 @@ targets:
   license_evidence:
     spdx_hint: CC-BY-4.0
     url: https://www.atsb.gov.au/aviation-investigation-reports
+  source_urls:
+    - "https://www.atsb.gov.au/aviation-investigation-reports"
+  evidence_urls:
+    - "https://www.atsb.gov.au/aviation-investigation-reports"
   data_type:
   - reports
   - incident_investigation
@@ -1008,6 +1126,10 @@ targets:
   license_evidence:
     spdx_hint: CC-BY-4.0
     url: https://www.atsb.gov.au/avdata/naod
+  source_urls:
+    - "https://www.atsb.gov.au/avdata/naod"
+  evidence_urls:
+    - "https://www.atsb.gov.au/avdata/naod"
   data_type:
   - tabular
   - incident_events
@@ -1035,6 +1157,10 @@ targets:
   license_evidence:
     spdx_hint: US-PUBLIC-DOMAIN
     url: https://doe417.pnnl.gov/
+  source_urls:
+    - "https://doe417.pnnl.gov/"
+  evidence_urls:
+    - "https://doe417.pnnl.gov/"
   data_type:
   - tabular
   - incident_events
@@ -1063,6 +1189,10 @@ targets:
   license_evidence:
     spdx_hint: US-PUBLIC-DOMAIN
     url: https://www.eia.gov/electricity/data/disturbance/disturb_events_archive.html
+  source_urls:
+    - "https://www.eia.gov/electricity/data/disturbance/disturb_events_archive.html"
+  evidence_urls:
+    - "https://www.eia.gov/electricity/data/disturbance/disturb_events_archive.html"
   data_type:
   - reports
   - incident_events
@@ -1090,6 +1220,10 @@ targets:
   license_evidence:
     spdx_hint: MIXED
     url: https://www.nist.gov/el/disaster-and-failure-studies-repository
+  source_urls:
+    - "https://www.nist.gov/el/disaster-and-failure-studies-repository"
+  evidence_urls:
+    - "https://www.nist.gov/el/disaster-and-failure-studies-repository"
   data_type:
   - reports
   - multimodal
@@ -1118,6 +1252,10 @@ targets:
   license_evidence:
     spdx_hint: US-PUBLIC-DOMAIN
     url: https://www.usfa.fema.gov/statistics/data-sets/
+  source_urls:
+    - "https://www.usfa.fema.gov/statistics/data-sets/"
+  evidence_urls:
+    - "https://www.usfa.fema.gov/statistics/data-sets/"
   data_type:
   - catalog
   - fire_safety
@@ -1145,6 +1283,10 @@ targets:
   license_evidence:
     spdx_hint: MIXED
     url: https://catalog.data.gov/dataset/event-correlated-outage-dataset-in-america
+  source_urls:
+    - "https://catalog.data.gov/dataset/event-correlated-outage-dataset-in-america"
+  evidence_urls:
+    - "https://catalog.data.gov/dataset/event-correlated-outage-dataset-in-america"
   data_type:
   - tabular
   - incident_events
@@ -1173,6 +1315,10 @@ targets:
   license_evidence:
     spdx_hint: MIXED
     url: https://catalog.data.gov/dataset/national-fire-incident-reporting-system-nfirs
+  source_urls:
+    - "https://catalog.data.gov/dataset/national-fire-incident-reporting-system-nfirs"
+  evidence_urls:
+    - "https://catalog.data.gov/dataset/national-fire-incident-reporting-system-nfirs"
   data_type:
   - catalog
   - fire_safety
@@ -1199,6 +1345,10 @@ targets:
   license_evidence:
     spdx_hint: Proprietary
     url: ''
+  source_urls:
+    - "internal://nfpa_codes_standards"
+  evidence_urls:
+    - "internal://nfpa_codes_standards"
   data_type:
   - standards
   - copyrighted
@@ -1223,6 +1373,10 @@ targets:
   license_evidence:
     spdx_hint: Proprietary
     url: ''
+  source_urls:
+    - "internal://astm_standards_safety"
+  evidence_urls:
+    - "internal://astm_standards_safety"
   data_type:
   - standards
   - copyrighted
@@ -1247,6 +1401,10 @@ targets:
   license_evidence:
     spdx_hint: Proprietary
     url: ''
+  source_urls:
+    - "internal://sae_aerospace_standards"
+  evidence_urls:
+    - "internal://sae_aerospace_standards"
   data_type:
   - standards
   - copyrighted
@@ -1271,6 +1429,10 @@ targets:
   license_evidence:
     spdx_hint: Proprietary
     url: ''
+  source_urls:
+    - "internal://asme_boiler_pressure_code"
+  evidence_urls:
+    - "internal://asme_boiler_pressure_code"
   data_type:
   - standards
   - copyrighted

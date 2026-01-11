@@ -85,6 +85,10 @@ targets:
     license_evidence:
       spdx_hint: CC0-1.0
       url: https://opendata.cern.ch/docs/terms-of-use
+    source_urls:
+      - "https://opendata.cern.ch/docs/terms-of-use"
+    evidence_urls:
+      - "https://opendata.cern.ch/docs/terms-of-use"
     data_type: [experimental_data, documentation, metadata]
     download:
       strategy: http
@@ -112,6 +116,10 @@ targets:
     license_evidence:
       spdx_hint: CC0-1.0
       url: https://www.hepdata.net/terms
+    source_urls:
+      - "https://www.hepdata.net/terms"
+    evidence_urls:
+      - "https://www.hepdata.net/terms"
     data_type: [experimental_data, tables, metadata]
     download:
       strategy: http
@@ -141,6 +149,10 @@ targets:
     license_evidence:
       spdx_hint: CC-BY-4.0
       url: https://gwosc.org/about/license/
+    source_urls:
+      - "https://gwosc.org/about/license/"
+    evidence_urls:
+      - "https://gwosc.org/about/license/"
     data_type: [time_series, event_catalog, experimental_data]
     download:
       strategy: http
@@ -168,6 +180,10 @@ targets:
     license_evidence:
       spdx_hint: PUBLIC-DOMAIN
       url: https://oceanservice.noaa.gov/about/faq.html
+    source_urls:
+      - "https://oceanservice.noaa.gov/about/faq.html"
+    evidence_urls:
+      - "https://oceanservice.noaa.gov/about/faq.html"
     data_type: [geoscience_data, time_series, gridded_data, metadata]
     download:
       strategy: http
@@ -195,6 +211,10 @@ targets:
     license_evidence:
       spdx_hint: PUBLIC-DOMAIN
       url: https://www.weather.gov/disclaimer
+    source_urls:
+      - "https://www.weather.gov/disclaimer"
+    evidence_urls:
+      - "https://www.weather.gov/disclaimer"
     data_type: [time_series, geoscience_data, metadata]
     download:
       strategy: http
@@ -222,6 +242,10 @@ targets:
     license_evidence:
       spdx_hint: PUBLIC-DOMAIN
       url: https://www.usgs.gov/faqs/are-usgs-reportspublications-copyrighted
+    source_urls:
+      - "https://www.usgs.gov/faqs/are-usgs-reportspublications-copyrighted"
+    evidence_urls:
+      - "https://www.usgs.gov/faqs/are-usgs-reportspublications-copyrighted"
     data_type: [geoscience_data, maps, metadata]
     download:
       strategy: http
@@ -249,6 +273,10 @@ targets:
     license_evidence:
       spdx_hint: PUBLIC-DOMAIN
       url: https://sti.nasa.gov/disclaimers/
+    source_urls:
+      - "https://sti.nasa.gov/disclaimers/"
+    evidence_urls:
+      - "https://sti.nasa.gov/disclaimers/"
     data_type: [documentation, metadata, datasets]
     download:
       strategy: http
@@ -277,6 +305,10 @@ targets:
     license_evidence:
       spdx_hint: CC-BY-4.0
       url: https://archive.eso.org/cms/eso-data-access-policy.html
+    source_urls:
+      - "https://archive.eso.org/cms/eso-data-access-policy.html"
+    evidence_urls:
+      - "https://archive.eso.org/cms/eso-data-access-policy.html"
     data_type: [observational_data, metadata]
     download:
       strategy: http
@@ -304,6 +336,10 @@ targets:
     license_evidence:
       spdx_hint: PUBLIC-DOMAIN
       url: https://www.sdss4.org/collaboration/
+    source_urls:
+      - "https://www.sdss4.org/collaboration/"
+    evidence_urls:
+      - "https://www.sdss4.org/collaboration/"
     data_type: [observational_data, catalogs, images]
     download:
       strategy: http
@@ -331,6 +367,10 @@ targets:
     license_evidence:
       spdx_hint: CC-BY-4.0
       url: https://next-gen.materialsproject.org/about/terms
+    source_urls:
+      - "https://next-gen.materialsproject.org/about/terms"
+    evidence_urls:
+      - "https://next-gen.materialsproject.org/about/terms"
     data_type: [materials_data, computed_properties, metadata]
     download:
       strategy: http
@@ -358,6 +398,10 @@ targets:
     license_evidence:
       spdx_hint: CC-BY-4.0
       url: https://nomad-lab.eu/nomad-lab/terms.html
+    source_urls:
+      - "https://nomad-lab.eu/nomad-lab/terms.html"
+    evidence_urls:
+      - "https://nomad-lab.eu/nomad-lab/terms.html"
     data_type: [materials_data, computed_properties, metadata]
     download:
       strategy: http
@@ -385,6 +429,10 @@ targets:
     license_evidence:
       spdx_hint: CC-BY-4.0
       url: https://oqmd.org/
+    source_urls:
+      - "https://oqmd.org/"
+    evidence_urls:
+      - "https://oqmd.org/"
     data_type: [materials_data, computed_properties, metadata]
     download:
       strategy: http
@@ -412,6 +460,10 @@ targets:
     license_evidence:
       spdx_hint: CC-BY-4.0
       url: https://opencatalystproject.org/
+    source_urls:
+      - "https://opencatalystproject.org/"
+    evidence_urls:
+      - "https://opencatalystproject.org/"
     data_type: [materials_data, ml_dataset, computed_properties]
     download:
       strategy: http
@@ -439,6 +491,10 @@ targets:
     license_evidence:
       spdx_hint: LGPL-3.0-or-later
       url: https://icecube.wisc.edu/data-releases/2021/12/hese-7-5-year-data/
+    source_urls:
+      - "https://icecube.wisc.edu/data-releases/2021/12/hese-7-5-year-data/"
+    evidence_urls:
+      - "https://icecube.wisc.edu/data-releases/2021/12/hese-7-5-year-data/"
     data_type: [event_catalog, experimental_data, time_series]
     download:
       strategy: http
@@ -466,6 +522,10 @@ targets:
     license_evidence:
       spdx_hint: RECORD-LEVEL
       url: https://info.arxiv.org/help/bulk_data.html
+    source_urls:
+      - "https://info.arxiv.org/help/bulk_data.html"
+    evidence_urls:
+      - "https://info.arxiv.org/help/bulk_data.html"
     data_type: [literature_metadata]
     download:
       strategy: http
@@ -493,6 +553,10 @@ targets:
     license_evidence:
       spdx_hint: RECORD-LEVEL
       url: https://archive.stsci.edu/publishing/data-use
+    source_urls:
+      - "https://archive.stsci.edu/publishing/data-use"
+    evidence_urls:
+      - "https://archive.stsci.edu/publishing/data-use"
     data_type: [observational_data, metadata]
     download:
       strategy: http
@@ -520,6 +584,10 @@ targets:
     license_evidence:
       spdx_hint: RECORD-LEVEL
       url: https://openkim.org/kim-licensing-v2/
+    source_urls:
+      - "https://openkim.org/kim-licensing-v2/"
+    evidence_urls:
+      - "https://openkim.org/kim-licensing-v2/"
     data_type: [materials_models, metadata]
     download:
       strategy: http
@@ -547,6 +615,10 @@ targets:
     license_evidence:
       spdx_hint: RESTRICTED-TERMS
       url: https://help.inspirehep.net/knowledge-base/terms-of-use/
+    source_urls:
+      - "https://help.inspirehep.net/knowledge-base/terms-of-use/"
+    evidence_urls:
+      - "https://help.inspirehep.net/knowledge-base/terms-of-use/"
     data_type: [literature_metadata]
     download:
       strategy: http
@@ -574,6 +646,10 @@ targets:
     license_evidence:
       spdx_hint: CC-BY-NC-3.0-IGO
       url: https://www.cosmos.esa.int/web/gaia-users/license
+    source_urls:
+      - "https://www.cosmos.esa.int/web/gaia-users/license"
+    evidence_urls:
+      - "https://www.cosmos.esa.int/web/gaia-users/license"
     data_type: [catalogs, observational_data, metadata]
     download:
       strategy: http
@@ -601,6 +677,10 @@ targets:
     license_evidence:
       spdx_hint: REQUIRES-AGREEMENT
       url: https://www.re3data.org/repository/r3d100011061
+    source_urls:
+      - "https://www.re3data.org/repository/r3d100011061"
+    evidence_urls:
+      - "https://www.re3data.org/repository/r3d100011061"
     data_type: [simulation_data, fluid_dynamics]
     download:
       strategy: http

@@ -137,6 +137,10 @@ targets:
       spdx_hint: "Proprietary"
       url: "internal://synthetic"
       notes: "You own/generated this content; keep generator logs as provenance."
+    source_urls:
+      - "internal://synthetic"
+    evidence_urls:
+      - "internal://synthetic"
     data_type: ["code","instruction","unit_tests","solutions"]
     download:
       strategy: "none"
@@ -152,6 +156,11 @@ targets:
     license_evidence:
       spdx_hint: "MIT"
       url: "https://huggingface.co/datasets/openai/openai_humaneval"
+    source_urls:
+      - "https://huggingface.co/datasets/openai/openai_humaneval"
+    evidence_urls:
+      - "https://huggingface.co/datasets/openai/openai_humaneval"
+    dataset_version: "main"
     data_type: ["code","unit_tests","instructions"]
     download:
       strategy: "huggingface_datasets"
@@ -169,6 +178,11 @@ targets:
       spdx_hint: "CC0-1.0"
       url: "https://peps.python.org/pep-0001/"
       notes: "PEP 1 states PEP documents are public domain or CC0-1.0 (whichever more permissive)."
+    source_urls:
+      - "https://peps.python.org/pep-0001/"
+    evidence_urls:
+      - "https://peps.python.org/pep-0001/"
+    dataset_tag: "default_branch"
     data_type: ["documentation","spec","code_examples"]
     download:
       strategy: "git"
@@ -184,6 +198,11 @@ targets:
     license_evidence:
       spdx_hint: "Apache-2.0"
       url: "https://huggingface.co/datasets/evalplus/mbppplus"
+    source_urls:
+      - "https://huggingface.co/datasets/evalplus/mbppplus"
+    evidence_urls:
+      - "https://huggingface.co/datasets/evalplus/mbppplus"
+    dataset_version: "main"
     data_type: ["code","unit_tests","instructions"]
     download:
       strategy: "huggingface_datasets"
@@ -205,6 +224,10 @@ targets:
       spdx_hint: "CDLA-Permissive-2.0"
       url: "https://developer.ibm.com/technologies/artificial-intelligence/data/project-codenet/"
       notes: "May require click-through/registration; enable once you have a programmatic download path."
+    source_urls:
+      - "https://developer.ibm.com/technologies/artificial-intelligence/data/project-codenet/"
+    evidence_urls:
+      - "https://developer.ibm.com/technologies/artificial-intelligence/data/project-codenet/"
     data_type: ["code","unit_tests","problem_statements"]
     download:
       strategy: "http"
@@ -220,6 +243,11 @@ targets:
       spdx_hint: "MIXED"
       url: "https://huggingface.co/datasets/common-pile/github_archive"
       notes: "Common Pile applies license filtering; still treat as record-level and keep provenance."
+    source_urls:
+      - "https://huggingface.co/datasets/common-pile/github_archive"
+    evidence_urls:
+      - "https://huggingface.co/datasets/common-pile/github_archive"
+    dataset_version: "main"
     data_type: ["qa","discussion","documentation"]
     download:
       strategy: "huggingface_datasets"
@@ -236,6 +264,11 @@ targets:
     license_evidence:
       spdx_hint: "MIXED"
       url: "https://huggingface.co/datasets/common-pile/stackv2_edu_filtered"
+    source_urls:
+      - "https://huggingface.co/datasets/common-pile/stackv2_edu_filtered"
+    evidence_urls:
+      - "https://huggingface.co/datasets/common-pile/stackv2_edu_filtered"
+    dataset_version: "main"
     data_type: ["code"]
     download:
       strategy: "huggingface_datasets"
@@ -253,6 +286,11 @@ targets:
       spdx_hint: "MIXED"
       url: "https://huggingface.co/datasets/bigcode/the-stack"
       notes: "Must follow original licenses & keep attribution/provenance."
+    source_urls:
+      - "https://huggingface.co/datasets/bigcode/the-stack"
+    evidence_urls:
+      - "https://huggingface.co/datasets/bigcode/the-stack"
+    dataset_version: "main"
     data_type: ["code"]
     download:
       strategy: "huggingface_datasets"
@@ -270,6 +308,11 @@ targets:
       spdx_hint: "MIXED"
       url: "https://huggingface.co/datasets/bigcode/the-stack-v2/tree/main"
       notes: "Bulk download requires agreement; treat as YELLOW until compliance + infra are in place."
+    source_urls:
+      - "https://huggingface.co/datasets/bigcode/the-stack-v2/tree/main"
+    evidence_urls:
+      - "https://huggingface.co/datasets/bigcode/the-stack-v2/tree/main"
+    dataset_version: "main"
     data_type: ["code"]
     download:
       strategy: "huggingface_datasets"
@@ -287,6 +330,11 @@ targets:
       spdx_hint: "MIXED"
       url: "https://github.com/github/CodeSearchNet"
       notes: "License data exists but is not always attached per example; add license join before GREEN."
+    source_urls:
+      - "https://github.com/github/CodeSearchNet"
+    evidence_urls:
+      - "https://github.com/github/CodeSearchNet"
+    dataset_version: "main"
     data_type: ["code","documentation"]
     download:
       strategy: "huggingface_datasets"
@@ -305,6 +353,11 @@ targets:
       spdx_hint: "C-UDA-1.0"
       url: "https://github.com/microsoft/CodeXGLUE"
       notes: "C-UDA is a computational-use agreement; treat as YELLOW pending legal review for training."
+    source_urls:
+      - "https://github.com/microsoft/CodeXGLUE"
+    evidence_urls:
+      - "https://github.com/microsoft/CodeXGLUE"
+    dataset_tag: "default_branch"
     data_type: ["code","documentation","qa"]
     download:
       strategy: "git"
@@ -321,6 +374,11 @@ targets:
       spdx_hint: "CC-BY-SA-4.0"
       url: "https://huggingface.co/datasets/xlangai/DS-1000"
       notes: "CC-BY-SA is share-alike; only ingest if you can satisfy attribution + SA obligations."
+    source_urls:
+      - "https://huggingface.co/datasets/xlangai/DS-1000"
+    evidence_urls:
+      - "https://huggingface.co/datasets/xlangai/DS-1000"
+    dataset_version: "main"
     data_type: ["code","instructions","unit_tests"]
     download:
       strategy: "huggingface_datasets"

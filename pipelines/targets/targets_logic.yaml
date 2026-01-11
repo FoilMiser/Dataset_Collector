@@ -108,6 +108,10 @@ targets:
     license_evidence:
       spdx_hint: "MIT"
       url: ""
+    source_urls:
+      - "internal://synthetic_logic_problems"
+    evidence_urls:
+      - "internal://synthetic_logic_problems"
     notes: "Set this to the SPDX you grant yourself (e.g., MIT or CC0) so it classifies as GREEN."
     data_type: ["synthetic", "logic", "problems", "curriculum"]
     download:
@@ -138,6 +142,11 @@ targets:
     license_evidence:
       spdx_hint: "UNKNOWN"
       url: "https://raw.githubusercontent.com/leanprover-community/mathlib4/master/LICENSE"
+    source_urls:
+      - "https://raw.githubusercontent.com/leanprover-community/mathlib4/master/LICENSE"
+    evidence_urls:
+      - "https://raw.githubusercontent.com/leanprover-community/mathlib4/master/LICENSE"
+    dataset_tag: "default_branch"
     data_type: ["formal_proofs", "lean", "theorems", "tactics"]
     download:
       strategy: "git"
@@ -161,6 +170,11 @@ targets:
     license_evidence:
       spdx_hint: "UNKNOWN"
       url: "https://raw.githubusercontent.com/metamath/set.mm/master/LICENSE"
+    source_urls:
+      - "https://raw.githubusercontent.com/metamath/set.mm/master/LICENSE"
+    evidence_urls:
+      - "https://raw.githubusercontent.com/metamath/set.mm/master/LICENSE"
+    dataset_tag: "default_branch"
     data_type: ["formal_proofs", "metamath", "theorems", "proofs"]
     download:
       strategy: "git"
@@ -184,6 +198,11 @@ targets:
     license_evidence:
       spdx_hint: "UNKNOWN"
       url: "https://raw.githubusercontent.com/OpenLogicProject/OpenLogic/master/LICENSE"
+    source_urls:
+      - "https://raw.githubusercontent.com/OpenLogicProject/OpenLogic/master/LICENSE"
+    evidence_urls:
+      - "https://raw.githubusercontent.com/OpenLogicProject/OpenLogic/master/LICENSE"
+    dataset_tag: "default_branch"
     data_type: ["textbooks", "logic", "explanations", "latex"]
     download:
       strategy: "git"
@@ -209,6 +228,11 @@ targets:
     license_evidence:
       spdx_hint: "UNKNOWN"
       url: ""
+    source_urls:
+      - "internal://forallx_calgarystyle"
+    evidence_urls:
+      - "internal://forallx_calgarystyle"
+    dataset_tag: "default_branch"
     data_type: ["textbooks", "logic", "exercises"]
     download:
       strategy: "git"
@@ -233,6 +257,11 @@ targets:
     license_evidence:
       spdx_hint: "MIXED"
       url: "https://smt-lib.org"
+    source_urls:
+      - "https://smt-lib.org"
+    evidence_urls:
+      - "https://smt-lib.org"
+    dataset_tag: "default_branch"
     data_type: ["benchmarks", "smt", "smt2"]
     download:
       strategy: "git"
@@ -258,6 +287,11 @@ targets:
     license_evidence:
       spdx_hint: "UNKNOWN"
       url: "https://raw.githubusercontent.com/SMT-LIB/SMT-LIB-2/master/LICENSE"
+    source_urls:
+      - "https://raw.githubusercontent.com/SMT-LIB/SMT-LIB-2/master/LICENSE"
+    evidence_urls:
+      - "https://raw.githubusercontent.com/SMT-LIB/SMT-LIB-2/master/LICENSE"
+    dataset_tag: "default_branch"
     data_type: ["specs", "smt", "documentation"]
     download:
       strategy: "git"
@@ -281,6 +315,10 @@ targets:
     license_evidence:
       spdx_hint: "UNKNOWN"
       url: ""
+    source_urls:
+      - "internal://sat_competition_benchmarks"
+    evidence_urls:
+      - "internal://sat_competition_benchmarks"
     data_type: ["benchmarks", "sat", "dimacs"]
     download:
       strategy: "http"
@@ -304,6 +342,11 @@ targets:
     license_evidence:
       spdx_hint: "UNKNOWN"
       url: ""
+    source_urls:
+      - "internal://rule_taker"
+    evidence_urls:
+      - "internal://rule_taker"
+    dataset_version: "main"
     data_type: ["nl_reasoning", "rules", "entailment"]
     download:
       strategy: "huggingface_datasets"
@@ -329,6 +372,11 @@ targets:
     license_evidence:
       spdx_hint: "UNKNOWN"
       url: ""
+    source_urls:
+      - "internal://proofwriter"
+    evidence_urls:
+      - "internal://proofwriter"
+    dataset_version: "main"
     data_type: ["nl_reasoning", "rules", "proof_chains"]
     download:
       strategy: "huggingface_datasets"
@@ -354,6 +402,11 @@ targets:
     license_evidence:
       spdx_hint: "UNKNOWN"
       url: ""
+    source_urls:
+      - "internal://folio"
+    evidence_urls:
+      - "internal://folio"
+    dataset_version: "main"
     data_type: ["nl_reasoning", "fol", "entailment"]
     download:
       strategy: "huggingface_datasets"
@@ -382,6 +435,10 @@ targets:
     license_evidence:
       spdx_hint: "MIXED"
       url: ""
+    source_urls:
+      - "internal://commonpile_logic_slice"
+    evidence_urls:
+      - "internal://commonpile_logic_slice"
     data_type: ["commonpile", "nl_text", "logic"]
     download:
       strategy: "none"
@@ -422,6 +479,10 @@ targets:
     license_evidence:
       spdx_hint: "UNKNOWN"
       url: "https://en.wikipedia.org/wiki/Wikipedia:Copyrights"
+    source_urls:
+      - "https://en.wikipedia.org/wiki/Wikipedia:Copyrights"
+    evidence_urls:
+      - "https://en.wikipedia.org/wiki/Wikipedia:Copyrights"
     data_type: ["text", "encyclopedia", "logic"]
     download:
       strategy: "http"
@@ -449,6 +510,10 @@ targets:
     license_evidence:
       spdx_hint: "UNKNOWN"
       url: ""
+    source_urls:
+      - "internal://stackexchange_logic"
+    evidence_urls:
+      - "internal://stackexchange_logic"
     data_type: ["qna", "logic", "proofs"]
     download:
       strategy: "http"
@@ -476,6 +541,10 @@ targets:
     license_evidence:
       spdx_hint: "Custom-Restrictive"
       url: ""
+    source_urls:
+      - "internal://tptp_problem_library"
+    evidence_urls:
+      - "internal://tptp_problem_library"
     data_type: ["benchmarks", "atp"]
     download:
       strategy: "http"
@@ -498,6 +567,10 @@ targets:
     license_evidence:
       spdx_hint: "All-Rights-Reserved"
       url: "https://plato.stanford.edu"
+    source_urls:
+      - "https://plato.stanford.edu"
+    evidence_urls:
+      - "https://plato.stanford.edu"
     data_type: ["reference", "philosophy", "logic"]
     download:
       strategy: "none"

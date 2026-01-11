@@ -24,6 +24,10 @@ targets:
     license_evidence:
       spdx_hint: MIT
       url: "https://example.com/license"
+    source_urls:
+      - "https://example.com/license"
+    evidence_urls:
+      - "https://example.com/license"
     download:
       strategy: none
 
@@ -34,5 +38,9 @@ targets:
     license_evidence:
       spdx_hint: GPL-3.0
       url: "https://example.com/license"
+    source_urls:
+      - "https://example.com/license"
+    evidence_urls:
+      - "https://example.com/license"
     download:
       strategy: none
