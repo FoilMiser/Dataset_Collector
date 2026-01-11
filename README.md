@@ -62,6 +62,19 @@ Targets and catalog entries may specify a `license_profile` value. Supported val
 - [Adding a new pipeline](docs/adding-new-pipeline.md)
 - [Run instructions](docs/run_instructions.md)
 
+## Install (CLI)
+
+Install the shared base dependencies first, then add pipeline-specific extras as needed.
+The `dc` CLI is provided by the editable install.
+
+```bash
+pip install -r requirements.constraints.txt
+pip install -r requirements-dev.constraints.txt
+pip install -e .
+pip install -r math_pipeline_v2/requirements.txt
+# repeat for other pipeline extras as needed
+```
+
 ## Reproducible installs (recommended)
 
 Use the base + extras flow: install the shared base constraints once, then layer in the
@@ -102,6 +115,19 @@ For the shortest single-command run, expected output folders, log/manifest/ledge
 and clean-room rerun steps (what to delete vs. keep), see
 `docs/run_instructions.md`.
 
+## Dataset roots and ledger artifacts
+
+All pipeline stages write into a per-domain dataset root. You can set it explicitly with
+`--dataset-root` or with `DATASET_ROOT` / `DATASET_COLLECTOR_ROOT`, and the CLI will
+derive standard subfolders (`raw/`, `combined/`, `_ledger/`, `_logs/`, etc.). Defaults
+fall back to `/data/<pipeline>` unless you pass `--allow-data-root` to confirm that
+path is acceptable. See `docs/pipeline_runtime_contract.md` and `docs/output_contract.md`
+for the full layout and precedence rules.
+
+Ledger artifacts live in `<dataset_root>/_ledger/` and provide the audit trail for
+screening and merging, including `yellow_passed.jsonl`, `yellow_pitched.jsonl`,
+`combined_index.jsonl`, and merge summaries.
+
 ## Unified CLI (`dc run`)
 
 Use the unified CLI to run a single stage for any pipeline:
@@ -128,12 +154,13 @@ prefer the unified CLI.
 An end-to-end execution sequence with the unified CLI:
 
 ```bash
-dc pipeline math -- --targets pipelines/targets/targets_math.yaml --stage classify
-dc run --pipeline math --stage acquire --allow-data-root -- --queue /data/math/_queues/green_pipeline.jsonl --bucket green --targets-yaml pipelines/targets/targets_math.yaml --execute
-dc run --pipeline math --stage acquire --allow-data-root -- --queue /data/math/_queues/yellow_pipeline.jsonl --bucket yellow --targets-yaml pipelines/targets/targets_math.yaml --execute
-dc run --pipeline math --stage yellow_screen --allow-data-root -- --queue /data/math/_queues/yellow_pipeline.jsonl --targets pipelines/targets/targets_math.yaml --execute
-dc run --pipeline math --stage merge --allow-data-root -- --targets pipelines/targets/targets_math.yaml --execute
-dc catalog-builder --pipeline math --allow-data-root -- --targets pipelines/targets/targets_math.yaml --output /data/math/_catalogs/catalog.json
+dc pipeline math -- --targets pipelines/targets/targets_math.yaml --dataset-root /data/Natural/math --stage classify
+dc run --pipeline math --stage acquire --dataset-root /data/Natural/math -- --queue /data/Natural/math/_queues/green_pipeline.jsonl --bucket green --targets-yaml pipelines/targets/targets_math.yaml --execute
+dc run --pipeline math --stage acquire --dataset-root /data/Natural/math -- --queue /data/Natural/math/_queues/yellow_pipeline.jsonl --bucket yellow --targets-yaml pipelines/targets/targets_math.yaml --execute
+dc review-queue --pipeline math --queue /data/Natural/math/_queues/yellow_pipeline.jsonl list --limit 50
+dc run --pipeline math --stage yellow_screen --dataset-root /data/Natural/math -- --queue /data/Natural/math/_queues/yellow_pipeline.jsonl --targets pipelines/targets/targets_math.yaml --execute
+dc run --pipeline math --stage merge --dataset-root /data/Natural/math -- --targets pipelines/targets/targets_math.yaml --execute
+dc catalog-builder --pipeline math -- --targets pipelines/targets/targets_math.yaml --output /data/Natural/math/_catalogs/catalog.json
 ```
 
 To preview the actions without writing data, add `--no-fetch` during classification and omit `--execute` (dry-run):
@@ -142,34 +169,21 @@ To preview the actions without writing data, add `--no-fetch` during classificat
 dc pipeline math -- --targets pipelines/targets/targets_math.yaml --stage classify --no-fetch
 ```
 
-## Quickstart options
+## Contributor quickstart checklist
+
+- [ ] Install base + pipeline requirements and confirm `dc --help` runs.
+- [ ] Choose a per-domain dataset root (or set `DATASET_ROOT`) and ensure it is writable.
+- [ ] Run `dc pipeline <domain> -- --stage classify` to emit queues and manifests.
+- [ ] Run `dc run --pipeline <domain> --stage acquire` for green and yellow queues.
+- [ ] Review YELLOW targets with `dc review-queue` and record signoffs.
+- [ ] Run `dc run --pipeline <domain> --stage yellow_screen`.
+- [ ] Run `dc run --pipeline <domain> --stage merge` followed by `dc catalog-builder`.
+- [ ] Check `_ledger/` and `_logs/` under the dataset root for audit artifacts.
 
 ### Jupyter (Windows-first, bash optional)
 
 The notebook runs on Windows-first Python. For shell-based stage runs, use `dc` commands
-in Bash cells when you have WSL or another shell with `bash` available; otherwise use the
-Windows-native orchestrator below.
-
-### CLI wrapper (run all pipelines)
-
-If you prefer a minimal CLI entrypoint instead of the notebook, use the thin wrapper
-around the Windows-first orchestrator:
-
-```bash
-python run_all.py --dest-root "E:/AI-Research/datasets/Natural" --execute
-```
-
-### Windows-first Jupyter (Natural corpus)
-
-If you prefer to run a smaller subset of stages from Jupyter on Windows, first
-set up dependencies using [Reproducible installs](#reproducible-installs-recommended),
-then call the Windows-native orchestrator directly from a notebook cell:
-
-```powershell
-python src\tools\build_natural_corpus.py --dest-root "E:\AI-Research\datasets\Natural" --pipelines all --stages classify,acquire_green,acquire_yellow --execute
-```
-
-To preview the actions without writing data, omit `--execute` (dry-run).
+in Bash cells when you have WSL or another shell with `bash` available.
 
 #### Prereqs (Windows)
 
@@ -181,15 +195,8 @@ Install the following tools if you plan to use targets that rely on them:
 
 ### Windows Quickstart (Natural corpus, optional)
 
-Use the Windows-first orchestrator to run all pipelines sequentially and emit the
-Natural corpus layout under a single destination root. This is an optional alternative to the JupyterLab notebook flow.
-
-```powershell
-python src\tools\build_natural_corpus.py --dest-root "E:\AI-Research\datasets\Natural" --pipelines all --execute
-```
-
-To preview the actions without writing data, omit `--execute` (dry-run). See
-`docs/output_contract.md` for the expected on-disk layout.
+For a Windows-first, all-pipelines run, use the JupyterLab notebook and execute the
+cells in order. See `docs/output_contract.md` for the expected on-disk layout.
 
 ## Toolchain (external tools)
 
@@ -348,7 +355,7 @@ To emit warnings for disabled targets:
 python -m tools.preflight --warn-disabled
 ```
 
-For local runs, copy `src/tools/pipeline_map.sample.yaml` to something like `src/tools/pipeline_map.local.yaml`, set `destination_root` to your dataset folder, and pass it via `--pipeline-map` (or use `--dest-root` when running `src/tools/build_natural_corpus.py`). This keeps user-specific paths out of version control.
+For local runs, copy `src/tools/pipeline_map.sample.yaml` to something like `src/tools/pipeline_map.local.yaml`, set `destination_root` to your dataset folder, and pass it via `--pipeline-map` when running tooling. For pipeline execution, prefer `dc pipeline`/`dc run` with `--dataset-root` or `DATASET_ROOT`. This keeps user-specific paths out of version control.
 
 ## Repo validation
 
