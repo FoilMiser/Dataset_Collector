@@ -5,6 +5,7 @@ import dataclasses
 import hashlib
 import ipaddress
 import json
+import logging
 import os
 import socket
 import subprocess
@@ -30,6 +31,7 @@ from collector_core.checks.runner import generate_run_id, run_checks_for_target
 from collector_core.config_validator import read_yaml
 from collector_core.dataset_root import ensure_data_root_allowed, resolve_dataset_root
 from collector_core.dependencies import _try_import, requires
+from collector_core.logging_config import LogContext, add_logging_args, configure_logging
 from collector_core.network_utils import _with_retries
 from collector_core.rate_limit import get_resolver_rate_limiter
 from collector_core.stability import stable_api
@@ -45,6 +47,8 @@ safe_name = safe_filename
 
 requests = _try_import("requests")
 FTP = _try_import("ftplib", "FTP")
+
+logger = logging.getLogger(__name__)
 
 
 StrategyHandler = Callable[["AcquireContext", dict[str, Any], Path], list[dict[str, Any]]]
@@ -1513,6 +1517,19 @@ def write_done_marker(
     write_json(marker, payload)
 
 
+def _sum_result_bytes(results: list[dict[str, Any]], out_dir: Path) -> int | None:
+    total = 0
+    found = False
+    for result in results:
+        path_value = result.get("path")
+        path = Path(path_value) if path_value else out_dir
+        size = resolve_result_bytes(result, path)
+        if size is not None:
+            total += size
+            found = True
+    return total if found else None
+
+
 @stable_api
 def run_target(
     ctx: AcquireContext,
@@ -1527,7 +1544,11 @@ def run_target(
     if not isinstance(content_checks, list):
         content_checks = [str(content_checks)]
     strat = (row.get("download", {}) or {}).get("strategy", "none")
+    domain = row.get("routing_domain") or (row.get("routing") or {}).get("domain") or row.get(
+        "domain"
+    )
     out_dir = resolve_output_dir(ctx, bucket, pool, tid)
+    start_time = time.monotonic()
     manifest = {
         "id": tid,
         "name": row.get("name", tid),
@@ -1539,64 +1560,91 @@ def run_target(
         "results": [],
     }
 
+    error_types: list[str] = []
     handler = strategy_handlers.get(strat)
-    if not handler or strat in {"none", ""}:
-        manifest["results"] = [{"status": "noop", "reason": f"unsupported: {strat}"}]
-    else:
-        try:
-            manifest["results"] = handler(ctx, row, out_dir)
-            if not manifest["results"]:
-                manifest["results"] = [
-                    {"status": "failed", "reason": "handler_returned_no_results"}
-                ]
-        except Exception as e:
-            manifest["results"] = [{"status": "error", "error": repr(e)}]
-
-    post_processors: dict[str, Any] | None = None
-    if postprocess:
-        post_processors = postprocess(ctx, row, out_dir, bucket, manifest)
-        if post_processors:
-            manifest["post_processors"] = post_processors
-
-    manifest["finished_at_utc"] = utc_now()
-    git_info: dict[str, Any] | None = None
-    for result in manifest["results"]:
-        if result.get("git_commit"):
-            git_info = {"git_commit": result["git_commit"]}
-            if result.get("git_revision"):
-                git_info["git_revision"] = result["git_revision"]
-            break
-    if git_info:
-        manifest.update(git_info)
-    manifest.update(
-        build_artifact_metadata(
-            written_at_utc=manifest["finished_at_utc"],
-            git_commit=git_info.get("git_commit") if git_info else None,
-        )
-    )
-    write_json(out_dir / "download_manifest.json", manifest)
-
-    status = (
-        "ok"
-        if any(r.get("status") == "ok" for r in manifest["results"])
-        else manifest["results"][0].get("status", "error")
-    )
-    if post_processors:
-        for proc in post_processors.values():
-            if isinstance(proc, dict) and proc.get("status") not in {"ok", "noop"}:
-                status = proc.get("status", status)
-    if ctx.mode.execute:
-        write_done_marker(ctx, tid, bucket, status, git_info)
-    run_checks_for_target(
-        content_checks=content_checks,
-        ledger_root=ctx.roots.ledger_root,
+    with LogContext(
         run_id=ctx.checks_run_id,
+        domain=domain,
         target_id=tid,
-        stage="acquire",
-        row=row,
-        extra={"bucket": bucket, "status": status},
-    )
-    return {"id": tid, "status": status, "bucket": bucket, "license_pool": pool, "strategy": strat}
+        strategy=strat,
+    ):
+        logger.info("Acquire target started.")
+        if not handler or strat in {"none", ""}:
+            manifest["results"] = [{"status": "noop", "reason": f"unsupported: {strat}"}]
+        else:
+            try:
+                manifest["results"] = handler(ctx, row, out_dir)
+                if not manifest["results"]:
+                    manifest["results"] = [
+                        {"status": "failed", "reason": "handler_returned_no_results"}
+                    ]
+            except Exception as e:
+                error_types.append(type(e).__name__)
+                manifest["results"] = [{"status": "error", "error": repr(e)}]
+
+        post_processors: dict[str, Any] | None = None
+        if postprocess:
+            post_processors = postprocess(ctx, row, out_dir, bucket, manifest)
+            if post_processors:
+                manifest["post_processors"] = post_processors
+
+        manifest["finished_at_utc"] = utc_now()
+        git_info: dict[str, Any] | None = None
+        for result in manifest["results"]:
+            if result.get("git_commit"):
+                git_info = {"git_commit": result["git_commit"]}
+                if result.get("git_revision"):
+                    git_info["git_revision"] = result["git_revision"]
+                break
+        if git_info:
+            manifest.update(git_info)
+        manifest.update(
+            build_artifact_metadata(
+                written_at_utc=manifest["finished_at_utc"],
+                git_commit=git_info.get("git_commit") if git_info else None,
+            )
+        )
+        write_json(out_dir / "download_manifest.json", manifest)
+
+        status = (
+            "ok"
+            if any(r.get("status") == "ok" for r in manifest["results"])
+            else manifest["results"][0].get("status", "error")
+        )
+        if post_processors:
+            for proc in post_processors.values():
+                if isinstance(proc, dict) and proc.get("status") not in {"ok", "noop"}:
+                    status = proc.get("status", status)
+        if ctx.mode.execute:
+            write_done_marker(ctx, tid, bucket, status, git_info)
+        run_checks_for_target(
+            content_checks=content_checks,
+            ledger_root=ctx.roots.ledger_root,
+            run_id=ctx.checks_run_id,
+            target_id=tid,
+            stage="acquire",
+            row=row,
+            extra={"bucket": bucket, "status": status},
+        )
+        for result in manifest["results"]:
+            err = result.get("error") or result.get("reason")
+            if err:
+                error_types.append(str(err))
+        error_types = sorted(set(error_types))
+        duration_ms = (time.monotonic() - start_time) * 1000
+        bytes_total = _sum_result_bytes(manifest["results"], out_dir)
+        with LogContext(bytes=bytes_total, duration_ms=duration_ms, error_types=error_types):
+            if status not in {"ok", "noop"}:
+                logger.warning("Acquire target finished with errors.")
+            else:
+                logger.info("Acquire target finished.")
+        return {
+            "id": tid,
+            "status": status,
+            "bucket": bucket,
+            "license_pool": pool,
+            "strategy": strat,
+        }
 
 
 @stable_api
@@ -1701,7 +1749,9 @@ def run_acquire_worker(
     ap.add_argument("--retry-max", type=int, default=3)
     ap.add_argument("--retry-backoff", type=float, default=2.0)
     ap.add_argument("--strict", "--fail-on-error", dest="strict", action="store_true")
+    add_logging_args(ap)
     args = ap.parse_args()
+    configure_logging(level=args.log_level, fmt=args.log_format)
 
     queue_path = Path(args.queue).expanduser().resolve()
     rows = _read_jsonl_list(queue_path)

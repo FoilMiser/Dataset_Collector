@@ -93,7 +93,10 @@ class JsonFormatter(logging.Formatter):
         # Include structured context
         context = get_log_context()
         if context:
-            payload["context"] = redact_structure(context)
+            redacted_context = redact_structure(context)
+            payload["context"] = redacted_context
+            for key, value in redacted_context.items():
+                payload.setdefault(key, value)
 
         if record.exc_info:
             payload["exc_info"] = redact_string(self.formatException(record.exc_info))
