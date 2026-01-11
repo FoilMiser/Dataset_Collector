@@ -26,6 +26,7 @@ from collector_core.acquire_limits import (
 from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.checks.runner import generate_run_id, run_checks_for_target
 from collector_core.config_validator import read_yaml
+from collector_core.dataset_root import resolve_dataset_root
 from collector_core.dependencies import _try_import, requires
 from collector_core.network_utils import _with_retries
 from collector_core.rate_limit import get_resolver_rate_limiter
@@ -1489,6 +1490,14 @@ def load_config(targets_path: Path | None) -> dict[str, Any]:
 def load_roots(
     cfg: dict[str, Any], overrides: argparse.Namespace, defaults: RootsDefaults
 ) -> Roots:
+    dataset_root = resolve_dataset_root(overrides.dataset_root)
+    if dataset_root:
+        defaults = RootsDefaults(
+            raw_root=str(dataset_root / "raw"),
+            manifests_root=str(dataset_root / "_manifests"),
+            ledger_root=str(dataset_root / "_ledger"),
+            logs_root=str(dataset_root / "_logs"),
+        )
     g = cfg.get("globals", {}) or {}
     raw_root = Path(overrides.raw_root or g.get("raw_root", defaults.raw_root))
     manifests_root = Path(
@@ -1516,6 +1525,11 @@ def run_acquire_worker(
     ap.add_argument("--targets-yaml", default=None, help=f"Path to {targets_yaml_label} for roots")
     ap.add_argument(
         "--bucket", required=True, choices=["green", "yellow"], help="Bucket being processed"
+    )
+    ap.add_argument(
+        "--dataset-root",
+        default=None,
+        help="Override dataset root (raw/_manifests/_ledger/_logs)",
     )
     ap.add_argument("--raw-root", default=None, help="Override raw root")
     ap.add_argument("--manifests-root", default=None, help="Override manifests root")

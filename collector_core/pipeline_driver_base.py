@@ -28,6 +28,7 @@ from collector_core.denylist_matcher import (
     denylist_hits,
     load_denylist,
 )
+from collector_core.dataset_root import resolve_dataset_root
 from collector_core.dependencies import _try_import
 from collector_core.exceptions import ConfigValidationError
 from collector_core.logging_config import add_logging_args, configure_logging
@@ -98,13 +99,6 @@ SUPPORTED_CONTENT_CHECKS = {
 EVIDENCE_CHANGE_POLICIES = {"raw", "normalized", "either"}
 COSMETIC_CHANGE_POLICIES = {"warn_only", "treat_as_changed"}
 EVIDENCE_EXTENSIONS = [".html", ".pdf", ".txt", ".json"]
-
-
-def resolve_dataset_root(explicit: str | None) -> Path | None:
-    value = explicit or os.getenv("DATASET_ROOT") or os.getenv("DATASET_COLLECTOR_ROOT")
-    if not value:
-        return None
-    return Path(value).expanduser().resolve()
 
 
 def _is_blocked_ip(ip_value: str) -> bool:

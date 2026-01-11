@@ -6,7 +6,6 @@ import dataclasses
 import gzip
 import importlib.util
 import json
-import os
 import pstats
 import sqlite3
 import tracemalloc
@@ -19,6 +18,7 @@ from datasets import DatasetDict, load_from_disk
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.config_validator import read_yaml
+from collector_core.dataset_root import resolve_dataset_root
 from collector_core.output_contract import normalize_output_record, validate_output_contract
 from collector_core.utils import (
     append_jsonl,
@@ -297,13 +297,6 @@ def merge_provenance_update(
         provenance["duplicates"] = duplicates
         record["provenance"] = provenance
     record["timestamp_updated"] = utc_now()
-
-
-def resolve_dataset_root(explicit: str | None = None) -> Path | None:
-    value = explicit or os.getenv("DATASET_ROOT") or os.getenv("DATASET_COLLECTOR_ROOT")
-    if not value:
-        return None
-    return Path(value).expanduser().resolve()
 
 
 def resolve_roots(
