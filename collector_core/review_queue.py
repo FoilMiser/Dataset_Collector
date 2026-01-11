@@ -46,6 +46,7 @@ from typing import Any
 
 from collector_core.__version__ import __version__ as TOOL_VERSION
 from collector_core.config_validator import read_yaml
+from collector_core.dataset_root import ensure_data_root_allowed
 from collector_core.logging_config import add_logging_args, configure_logging
 from collector_core.utils import read_jsonl_list as read_jsonl
 from collector_core.utils import utc_now, write_json
@@ -235,6 +236,7 @@ def cmd_set(args: argparse.Namespace, status: str) -> int:
         return 2
 
     mdir = Path(row.get("manifest_dir", ""))
+    ensure_data_root_allowed([mdir], bool(getattr(args, "allow_data_root", False)))
     if not mdir.exists():
         logger.error("Manifest dir does not exist: %s", mdir)
         return 2
@@ -312,6 +314,7 @@ def cmd_export(args: argparse.Namespace) -> int:
         return 0
 
     out_path = Path(args.output)
+    ensure_data_root_allowed([out_path], bool(getattr(args, "allow_data_root", False)))
     fmt = args.format.lower()
 
     if fmt == "json":
@@ -347,6 +350,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--targets",
         default=None,
         help="Optional targets YAML to derive queue defaults",
+    )
+    ap.add_argument(
+        "--allow-data-root",
+        action="store_true",
+        help="Allow /data defaults for queue/output paths (default: disabled).",
     )
     add_logging_args(ap)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -417,6 +425,7 @@ def main(*, pipeline_id: str | None = None) -> int:
 
     pipeline_slug = pipeline_slug_from_id(pipeline_id) or derive_pipeline_slug_from_cfg(cfg)
     args.queue = args.queue or resolve_default_queue(pipeline_slug, cfg)
+    ensure_data_root_allowed([Path(args.queue)], args.allow_data_root)
 
     if args.cmd == "list":
         return cmd_list(args)

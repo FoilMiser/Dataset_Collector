@@ -18,7 +18,7 @@ from datasets import DatasetDict, load_from_disk
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.config_validator import read_yaml
-from collector_core.dataset_root import resolve_dataset_root
+from collector_core.dataset_root import ensure_data_root_allowed, resolve_dataset_root
 from collector_core.output_contract import normalize_output_record, validate_output_contract
 from collector_core.utils import (
     append_jsonl,
@@ -300,7 +300,11 @@ def merge_provenance_update(
 
 
 def resolve_roots(
-    cfg: dict[str, Any], defaults: RootDefaults, dataset_root: Path | None = None
+    cfg: dict[str, Any],
+    defaults: RootDefaults,
+    dataset_root: Path | None = None,
+    *,
+    allow_data_root: bool = False,
 ) -> Roots:
     dataset_root = dataset_root or resolve_dataset_root()
     if dataset_root:
@@ -311,7 +315,7 @@ def resolve_roots(
             ledger_root=str(dataset_root / "_ledger"),
         )
     g = cfg.get("globals", {}) or {}
-    return Roots(
+    roots = Roots(
         raw_root=Path(g.get("raw_root", defaults.raw_root)).expanduser().resolve(),
         screened_root=Path(g.get("screened_yellow_root", defaults.screened_root))
         .expanduser()
@@ -319,6 +323,11 @@ def resolve_roots(
         combined_root=Path(g.get("combined_root", defaults.combined_root)).expanduser().resolve(),
         ledger_root=Path(g.get("ledger_root", defaults.ledger_root)).expanduser().resolve(),
     )
+    ensure_data_root_allowed(
+        [roots.raw_root, roots.screened_root, roots.combined_root, roots.ledger_root],
+        allow_data_root,
+    )
+    return roots
 
 
 def sharding_cfg(cfg: dict[str, Any]) -> ShardingConfig:
@@ -998,6 +1007,11 @@ def main(*, pipeline_id: str, defaults: RootDefaults) -> None:
     ap.add_argument(
         "--dataset-root", default=None, help="Override dataset root (raw/screened/combined/_ledger)"
     )
+    ap.add_argument(
+        "--allow-data-root",
+        action="store_true",
+        help="Allow /data defaults for outputs (default: disabled).",
+    )
     ap.add_argument("--progress", action="store_true", help="Show merge progress")
     ap.add_argument(
         "--progress-interval",
@@ -1028,7 +1042,12 @@ def main(*, pipeline_id: str, defaults: RootDefaults) -> None:
     args = ap.parse_args()
 
     cfg = read_yaml(Path(args.targets), schema_name="targets") or {}
-    roots = resolve_roots(cfg, defaults, dataset_root=resolve_dataset_root(args.dataset_root))
+    roots = resolve_roots(
+        cfg,
+        defaults,
+        dataset_root=resolve_dataset_root(args.dataset_root),
+        allow_data_root=args.allow_data_root,
+    )
     runtime = resolve_merge_runtime(
         cfg,
         progress=args.progress,

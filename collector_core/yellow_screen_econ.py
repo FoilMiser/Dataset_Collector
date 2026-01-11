@@ -32,12 +32,9 @@ from datasets import DatasetDict, load_from_disk
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.config_validator import read_yaml
+from collector_core.dataset_root import ensure_data_root_allowed, resolve_dataset_root
 from collector_core.utils import ensure_dir, read_jsonl, utc_now, write_json, write_jsonl
-from collector_core.yellow_screen_common import (
-    PitchConfig,
-    resolve_dataset_root,
-    resolve_pitch_config,
-)
+from collector_core.yellow_screen_common import PitchConfig, resolve_pitch_config
 
 
 def sha256_text(text: str) -> str:
@@ -133,7 +130,9 @@ def load_signoff(manifest_dir: Path) -> dict[str, Any] | None:
         return None
 
 
-def resolve_roots(cfg: dict[str, Any], dataset_root: Path | None = None) -> Roots:
+def resolve_roots(
+    cfg: dict[str, Any], dataset_root: Path | None = None, *, allow_data_root: bool = False
+) -> Roots:
     dataset_root = dataset_root or resolve_dataset_root()
     default_raw = dataset_root / "raw" if dataset_root else Path("/data/econ/raw")
     default_screened = (
@@ -145,13 +144,24 @@ def resolve_roots(cfg: dict[str, Any], dataset_root: Path | None = None) -> Root
     default_ledger = dataset_root / "_ledger" if dataset_root else Path("/data/econ/_ledger")
     default_pitches = dataset_root / "_pitches" if dataset_root else Path("/data/econ/_pitches")
     g = cfg.get("globals", {}) or {}
-    return Roots(
+    roots = Roots(
         raw_root=Path(g.get("raw_root", default_raw)).expanduser().resolve(),
         screened_root=Path(g.get("screened_yellow_root", default_screened)).expanduser().resolve(),
         manifests_root=Path(g.get("manifests_root", default_manifests)).expanduser().resolve(),
         ledger_root=Path(g.get("ledger_root", default_ledger)).expanduser().resolve(),
         pitches_root=Path(g.get("pitches_root", default_pitches)).expanduser().resolve(),
     )
+    ensure_data_root_allowed(
+        [
+            roots.raw_root,
+            roots.screened_root,
+            roots.manifests_root,
+            roots.ledger_root,
+            roots.pitches_root,
+        ],
+        allow_data_root,
+    )
+    return roots
 
 
 def merge_screening_config(cfg: dict[str, Any], target: dict[str, Any]) -> ScreeningConfig:
@@ -829,6 +839,11 @@ def main() -> None:
         help="Override dataset root (raw/screened/_ledger/_pitches/_manifests)",
     )
     ap.add_argument(
+        "--allow-data-root",
+        action="store_true",
+        help="Allow /data defaults for outputs (default: disabled).",
+    )
+    ap.add_argument(
         "--pitch-sample-limit",
         type=int,
         default=None,
@@ -845,7 +860,11 @@ def main() -> None:
     targets_path = Path(args.targets).expanduser().resolve()
     cfg = load_targets_cfg(targets_path)
     pitch_cfg = resolve_pitch_config(cfg, args.pitch_sample_limit, args.pitch_text_limit)
-    roots = resolve_roots(cfg, dataset_root=resolve_dataset_root(args.dataset_root))
+    roots = resolve_roots(
+        cfg,
+        dataset_root=resolve_dataset_root(args.dataset_root),
+        allow_data_root=args.allow_data_root,
+    )
     ensure_dir(roots.screened_root)
     ensure_dir(roots.ledger_root)
     ensure_dir(roots.pitches_root)

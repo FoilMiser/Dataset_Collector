@@ -7,7 +7,7 @@ from typing import Any
 
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.config_validator import read_yaml
-from collector_core.dataset_root import resolve_dataset_root
+from collector_core.dataset_root import ensure_data_root_allowed, resolve_dataset_root
 from collector_core.utils import (
     write_jsonl,
 )
@@ -106,7 +106,11 @@ def load_targets_cfg(path: Path) -> dict[str, Any]:
 
 
 def resolve_roots(
-    cfg: dict[str, Any], defaults: YellowRootDefaults, dataset_root: Path | None = None
+    cfg: dict[str, Any],
+    defaults: YellowRootDefaults,
+    dataset_root: Path | None = None,
+    *,
+    allow_data_root: bool = False,
 ) -> Roots:
     dataset_root = dataset_root or resolve_dataset_root()
     if dataset_root:
@@ -118,7 +122,7 @@ def resolve_roots(
             pitches_root=str(dataset_root / "_pitches"),
         )
     g = cfg.get("globals", {}) or {}
-    return Roots(
+    roots = Roots(
         raw_root=Path(g.get("raw_root", defaults.raw_root)).expanduser().resolve(),
         screened_root=Path(g.get("screened_yellow_root", defaults.screened_root))
         .expanduser()
@@ -129,6 +133,17 @@ def resolve_roots(
         ledger_root=Path(g.get("ledger_root", defaults.ledger_root)).expanduser().resolve(),
         pitches_root=Path(g.get("pitches_root", defaults.pitches_root)).expanduser().resolve(),
     )
+    ensure_data_root_allowed(
+        [
+            roots.raw_root,
+            roots.screened_root,
+            roots.manifests_root,
+            roots.ledger_root,
+            roots.pitches_root,
+        ],
+        allow_data_root,
+    )
+    return roots
 
 
 def merge_screening_config(cfg: dict[str, Any], target: dict[str, Any]) -> ScreeningConfig:

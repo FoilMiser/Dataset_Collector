@@ -355,6 +355,11 @@ def main(*, defaults: YellowRootDefaults) -> None:
         help="Override dataset root (raw/screened/_ledger/_pitches/_manifests)",
     )
     ap.add_argument(
+        "--allow-data-root",
+        action="store_true",
+        help="Allow /data defaults for outputs (default: disabled).",
+    )
+    ap.add_argument(
         "--pitch-sample-limit",
         type=int,
         default=None,
@@ -371,7 +376,12 @@ def main(*, defaults: YellowRootDefaults) -> None:
     targets_path = Path(args.targets).expanduser().resolve()
     cfg = load_targets_cfg(targets_path)
     pitch_cfg = resolve_pitch_config(cfg, args.pitch_sample_limit, args.pitch_text_limit)
-    roots = resolve_roots(cfg, defaults, dataset_root=resolve_dataset_root(args.dataset_root))
+    roots = resolve_roots(
+        cfg,
+        defaults,
+        dataset_root=resolve_dataset_root(args.dataset_root),
+        allow_data_root=args.allow_data_root,
+    )
     ensure_dir(roots.screened_root)
     ensure_dir(roots.ledger_root)
     ensure_dir(roots.pitches_root)

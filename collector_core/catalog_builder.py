@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from collector_core.__version__ import __version__ as PIPELINE_VERSION
 from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.config_validator import read_yaml
+from collector_core.dataset_root import ensure_data_root_allowed
 from collector_core.utils import ensure_dir, utc_now
 
 
@@ -201,7 +202,9 @@ def default_root(pipeline_slug: str | None, suffix: str) -> Path:
     return Path(f"/data/{suffix}")
 
 
-def build_catalog(cfg: dict[str, Any], pipeline_slug: str | None = None) -> dict[str, Any]:
+def build_catalog(
+    cfg: dict[str, Any], pipeline_slug: str | None = None, *, allow_data_root: bool = False
+) -> dict[str, Any]:
     g = cfg.get("globals", {}) or {}
     raw_root = Path(g.get("raw_root", default_root(pipeline_slug, "raw")))
     screened_root = Path(
@@ -210,6 +213,10 @@ def build_catalog(cfg: dict[str, Any], pipeline_slug: str | None = None) -> dict
     combined_root = Path(g.get("combined_root", default_root(pipeline_slug, "combined")))
     ledger_root = Path(g.get("ledger_root", default_root(pipeline_slug, "_ledger")))
     queues_root = Path(g.get("queues_root", default_root(pipeline_slug, "_queues")))
+    ensure_data_root_allowed(
+        [raw_root, screened_root, combined_root, ledger_root, queues_root],
+        allow_data_root,
+    )
     top_n = int(g.get("catalog_top_n", 10))
 
     generated_at = utc_now()
@@ -243,11 +250,16 @@ def main(*, pipeline_id: str | None = None) -> None:
     ap = argparse.ArgumentParser(description=f"Catalog Builder v{PIPELINE_VERSION}")
     ap.add_argument("--targets", required=True, help="targets YAML")
     ap.add_argument("--output", required=True, help="Output JSON path")
+    ap.add_argument(
+        "--allow-data-root",
+        action="store_true",
+        help="Allow /data defaults for inputs (default: disabled).",
+    )
     args = ap.parse_args()
 
     cfg = read_yaml(Path(args.targets), schema_name="targets") or {}
     pipeline_slug = pipeline_slug_from_id(pipeline_id) or derive_pipeline_slug_from_cfg(cfg)
-    catalog = build_catalog(cfg, pipeline_slug=pipeline_slug)
+    catalog = build_catalog(cfg, pipeline_slug=pipeline_slug, allow_data_root=args.allow_data_root)
     out_path = Path(args.output).expanduser().resolve()
     ensure_dir(out_path.parent)
     tmp_path = Path(f"{out_path}.tmp")

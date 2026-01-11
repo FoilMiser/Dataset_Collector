@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from collector_core import merge, yellow_screen_common
 from collector_core.acquire_strategies import RootsDefaults, load_roots
 
@@ -22,6 +24,7 @@ def test_dataset_root_applies_across_stages(tmp_path, monkeypatch) -> None:
         manifests_root=None,
         ledger_root=None,
         logs_root=None,
+        allow_data_root=False,
     )
     acquire_roots = load_roots({}, overrides, acquire_defaults)
 
@@ -50,3 +53,36 @@ def test_dataset_root_applies_across_stages(tmp_path, monkeypatch) -> None:
     assert yellow_roots.manifests_root == expected_manifests
     assert yellow_roots.ledger_root == expected_ledger
     assert yellow_roots.pitches_root == dataset_root / "_pitches"
+
+
+def test_defaults_require_allow_data_root(monkeypatch) -> None:
+    monkeypatch.delenv("DATASET_ROOT", raising=False)
+    monkeypatch.delenv("DATASET_COLLECTOR_ROOT", raising=False)
+
+    defaults = RootsDefaults(
+        raw_root="/data/example/raw",
+        manifests_root="/data/example/_manifests",
+        ledger_root="/data/example/_ledger",
+        logs_root="/data/example/_logs",
+    )
+    overrides = SimpleNamespace(
+        dataset_root=None,
+        raw_root=None,
+        manifests_root=None,
+        ledger_root=None,
+        logs_root=None,
+        allow_data_root=False,
+    )
+
+    with pytest.raises(ValueError, match="allow-data-root"):
+        load_roots({}, overrides, defaults)
+
+    with pytest.raises(ValueError, match="allow-data-root"):
+        merge.resolve_roots({}, merge.default_merge_roots("example"))
+
+    with pytest.raises(ValueError, match="allow-data-root"):
+        yellow_screen_common.resolve_roots({}, yellow_screen_common.default_yellow_roots("example"))
+
+    overrides.allow_data_root = True
+    roots = load_roots({}, overrides, defaults)
+    assert roots.raw_root.as_posix().startswith("/data/")
