@@ -15,13 +15,13 @@ All tests are local (no network calls).
 
 from __future__ import annotations
 
-from collector_core.pipeline_driver_base import (
+from collector_core.evidence.change_detection import (
     compute_normalized_text_hash,
     compute_signoff_mismatches,
-    html_to_text,
     normalize_evidence_text,
     resolve_evidence_change,
 )
+from collector_core.evidence.fetching import html_to_text
 from collector_core.utils import contains_any
 
 # =============================================================================
