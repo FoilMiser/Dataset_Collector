@@ -53,6 +53,7 @@ from collector_core.evidence.change_detection import (
 )
 from collector_core.evidence.fetching import (
     fetch_evidence,
+    fetch_evidence_batch,
     fetch_url_with_retry,
     redact_headers_for_manifest,
     snapshot_evidence,
@@ -747,10 +748,14 @@ class BasePipelineDriver:
 
     def classify_targets(self, cfg: DriverConfig) -> ClassificationResult:
         results = ClassificationResult([], [], [], [])
+        contexts: list[TargetContext] = []
         for target in cfg.targets:
             ctx, warnings = self.prepare_target_context(target, cfg)
             results.warnings.extend(warnings)
-            evaluation, row = self.classify_target(ctx, cfg)
+            contexts.append(ctx)
+        evidence_results = self.fetch_evidence_batch(contexts, cfg)
+        for ctx, evidence in zip(contexts, evidence_results):
+            evaluation, row = self.classify_target(ctx, cfg, evidence)
             write_json(ctx.target_manifest_dir / "evaluation.json", evaluation)
             if not ctx.enabled:
                 continue
@@ -836,9 +841,10 @@ class BasePipelineDriver:
         return ctx, warnings
 
     def classify_target(
-        self, ctx: TargetContext, cfg: DriverConfig
+        self, ctx: TargetContext, cfg: DriverConfig, evidence: EvidenceResult | None = None
     ) -> tuple[dict[str, Any], dict[str, Any]]:
-        evidence = self.fetch_evidence(ctx, cfg)
+        if evidence is None:
+            evidence = self.fetch_evidence(ctx, cfg)
         review_status = ctx.review_status
         promote_to = ctx.promote_to
         review_required = ctx.review_required
@@ -971,6 +977,16 @@ class BasePipelineDriver:
     def fetch_evidence(self, ctx: TargetContext, cfg: DriverConfig) -> EvidenceResult:
         return fetch_evidence(
             ctx=ctx,
+            cfg=cfg,
+            user_agent=f"{self.USER_AGENT}/{VERSION}",
+            max_bytes=self.EVIDENCE_MAX_BYTES,
+        )
+
+    def fetch_evidence_batch(
+        self, ctxs: list[TargetContext], cfg: DriverConfig
+    ) -> list[EvidenceResult]:
+        return fetch_evidence_batch(
+            ctxs=ctxs,
             cfg=cfg,
             user_agent=f"{self.USER_AGENT}/{VERSION}",
             max_bytes=self.EVIDENCE_MAX_BYTES,

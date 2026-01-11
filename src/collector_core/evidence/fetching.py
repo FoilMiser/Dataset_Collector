@@ -7,8 +7,9 @@ import logging
 import re
 import socket
 import urllib.parse
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 import requests
 from collector_core.artifact_metadata import build_artifact_metadata
@@ -592,6 +593,33 @@ def fetch_evidence(
         license_change_detected=license_change_detected,
         no_fetch_missing_evidence=no_fetch_missing_evidence,
     )
+
+
+@stable_api
+def fetch_evidence_batch(
+    *,
+    ctxs: Sequence["TargetContext"],
+    cfg: "DriverConfig",
+    user_agent: str,
+    max_bytes: int,
+    max_workers: int | None = None,
+) -> list["EvidenceResult"]:
+    if not ctxs:
+        return []
+    worker_count = max_workers or min(8, len(ctxs))
+    if worker_count <= 1:
+        return [
+            fetch_evidence(ctx=ctx, cfg=cfg, user_agent=user_agent, max_bytes=max_bytes)
+            for ctx in ctxs
+        ]
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        futures = [
+            executor.submit(
+                fetch_evidence, ctx=ctx, cfg=cfg, user_agent=user_agent, max_bytes=max_bytes
+            )
+            for ctx in ctxs
+        ]
+        return [future.result() for future in futures]
 
 
 if False:  # pragma: no cover - type checking

@@ -1,5 +1,6 @@
 from __future__ import annotations
 from pathlib import Path
+from time import sleep
 
 import socket
 from types import SimpleNamespace
@@ -294,6 +295,82 @@ def test_fetch_url_with_retry_blocks_private_redirect_hostname(
     assert content is None
     assert info == "blocked_url"
     assert meta["blocked_url"] == "http://internal.test/private"
+
+
+def test_fetch_evidence_batch_preserves_order(monkeypatch: pytest.MonkeyPatch) -> None:
+    ctxs = [
+        SimpleNamespace(tid="first"),
+        SimpleNamespace(tid="second"),
+        SimpleNamespace(tid="third"),
+    ]
+
+    def fake_fetch(
+        *,
+        ctx: SimpleNamespace,
+        cfg: SimpleNamespace,
+        user_agent: str,
+        max_bytes: int,
+    ) -> EvidenceResult:
+        if ctx.tid == "second":
+            sleep(0.02)
+        return EvidenceResult(
+            snapshot={"tid": ctx.tid},
+            text=ctx.tid,
+            license_change_detected=False,
+            no_fetch_missing_evidence=False,
+        )
+
+    monkeypatch.setattr(evidence_fetching, "fetch_evidence", fake_fetch)
+
+    results = evidence_fetching.fetch_evidence_batch(
+        ctxs=ctxs,
+        cfg=SimpleNamespace(),
+        user_agent="ua",
+        max_bytes=1024,
+        max_workers=3,
+    )
+    assert [result.snapshot["tid"] for result in results] == ["first", "second", "third"]
+
+
+def test_fetch_evidence_batch_matches_sequential(monkeypatch: pytest.MonkeyPatch) -> None:
+    ctxs = [
+        SimpleNamespace(tid="alpha"),
+        SimpleNamespace(tid="beta"),
+    ]
+
+    def fake_fetch(
+        *,
+        ctx: SimpleNamespace,
+        cfg: SimpleNamespace,
+        user_agent: str,
+        max_bytes: int,
+    ) -> EvidenceResult:
+        return EvidenceResult(
+            snapshot={"tid": ctx.tid},
+            text=ctx.tid,
+            license_change_detected=False,
+            no_fetch_missing_evidence=False,
+        )
+
+    monkeypatch.setattr(evidence_fetching, "fetch_evidence", fake_fetch)
+
+    sequential = evidence_fetching.fetch_evidence_batch(
+        ctxs=ctxs,
+        cfg=SimpleNamespace(),
+        user_agent="ua",
+        max_bytes=1024,
+        max_workers=1,
+    )
+    concurrent = evidence_fetching.fetch_evidence_batch(
+        ctxs=ctxs,
+        cfg=SimpleNamespace(),
+        user_agent="ua",
+        max_bytes=1024,
+        max_workers=2,
+    )
+    assert [result.snapshot for result in sequential] == [
+        result.snapshot for result in concurrent
+    ]
 
 
 def test_resolve_retry_config_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
