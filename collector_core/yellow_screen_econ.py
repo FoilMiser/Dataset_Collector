@@ -33,7 +33,14 @@ from collector_core.__version__ import __version__ as VERSION
 from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.config_validator import read_yaml
 from collector_core.dataset_root import ensure_data_root_allowed, resolve_dataset_root
-from collector_core.utils import ensure_dir, read_jsonl, utc_now, write_json, write_jsonl
+from collector_core.utils import (
+    ensure_dir,
+    read_jsonl,
+    utc_now,
+    validate_zip_archive,
+    write_json,
+    write_jsonl,
+)
 from collector_core.yellow_screen_common import PitchConfig, resolve_pitch_config
 
 
@@ -702,6 +709,7 @@ def process_target(
             elif handler_suffix == ".zip":
                 try:
                     with zipfile.ZipFile(file_path) as zf:
+                        validate_zip_archive(zf)
                         for info in zf.infolist():
                             if info.is_dir():
                                 continue
