@@ -26,7 +26,7 @@ For Windows + Conda, prefer the repo-wide orchestrator:
 python tools/build_natural_corpus.py --repo-root . --dest-root "E:/AI-Research/datasets/Natural" --mode full --execute
 ```
 
-You can also run the Jupyter notebook, which invokes the same workflow. Use `run_pipeline.sh` only if you have Git Bash/WSL on Windows or are on macOS/Linux.
+You can also run the Jupyter notebook, which invokes the same workflow. For direct CLI runs, use `dc` (prefer `dc pipeline` for classification and `dc run` for worker stages).
 
 ---
 
@@ -58,27 +58,44 @@ License pools remain `permissive`, `copyleft`, and `quarantine`.
 ---
 
 ## Stage commands
-Use `run_pipeline.sh` to orchestrate stages (dry-run by default):
+Use `dc pipeline` plus `dc run` to orchestrate stages (dry-run by default):
 
 ```bash
 # Classify only (dry-run)
-./run_pipeline.sh --targets ../pipelines/targets/targets_agri_circular.yaml --stage classify
+dc pipeline agri_circular -- --targets ../pipelines/targets/targets_agri_circular.yaml --stage classify --no-fetch
 
 # Acquire
-./run_pipeline.sh --targets ../pipelines/targets/targets_agri_circular.yaml --stage acquire_green --execute --workers 4
-./run_pipeline.sh --targets ../pipelines/targets/targets_agri_circular.yaml --stage acquire_yellow --execute --workers 4
+dc run --pipeline agri_circular --stage acquire --allow-data-root -- \
+  --queue /data/agri_circular/_queues/green_pipeline.jsonl \
+  --bucket green \
+  --targets-yaml ../pipelines/targets/targets_agri_circular.yaml \
+  --workers 4 \
+  --execute
+dc run --pipeline agri_circular --stage acquire --allow-data-root -- \
+  --queue /data/agri_circular/_queues/yellow_pipeline.jsonl \
+  --bucket yellow \
+  --targets-yaml ../pipelines/targets/targets_agri_circular.yaml \
+  --workers 4 \
+  --execute
 
 # Screen/merge
-./run_pipeline.sh --targets ../pipelines/targets/targets_agri_circular.yaml --stage screen_yellow --execute
-./run_pipeline.sh --targets ../pipelines/targets/targets_agri_circular.yaml --stage merge --execute
+dc run --pipeline agri_circular --stage yellow_screen --allow-data-root -- \
+  --queue /data/agri_circular/_queues/yellow_pipeline.jsonl \
+  --targets ../pipelines/targets/targets_agri_circular.yaml \
+  --execute
+dc run --pipeline agri_circular --stage merge --allow-data-root -- \
+  --targets ../pipelines/targets/targets_agri_circular.yaml \
+  --execute
 
 # Catalog
-./run_pipeline.sh --targets ../pipelines/targets/targets_agri_circular.yaml --stage catalog
+dc catalog-builder --pipeline agri_circular --allow-data-root -- \
+  --targets ../pipelines/targets/targets_agri_circular.yaml \
+  --output /data/agri_circular/_catalogs/catalog_v2.json
 ```
 
 Additional helper stages:
-- `--stage review` → list pending YELLOW items for manual signoff.
-- `--stage all` → run classify → acquire → screen_yellow → merge → catalog.
+- `dc review-queue --pipeline agri_circular` → list pending YELLOW items for manual signoff.
+- Manual order: classify → acquire → screen_yellow → merge → catalog.
 
 ---
 

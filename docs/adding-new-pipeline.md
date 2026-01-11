@@ -16,7 +16,7 @@ The scaffolded directory can include:
 ```
 your_domain_pipeline_v2/
   README.md
-  run_pipeline.sh  # deprecated legacy wrapper
+  legacy/run_pipeline.sh  # deprecated legacy wrapper
   pipeline_driver.py
   acquire_worker.py
   yellow_screen_worker.py
@@ -32,8 +32,8 @@ Targets YAMLs are created in the shared directory:
 pipelines/targets/targets_your_domain.yaml
 ```
 
-Only the targets YAML is required. Wrapper scripts are optional and can be regenerated
-with `tools/sync_pipeline_wrappers.py` if you want legacy entry points.
+Only the targets YAML is required. Legacy wrapper scripts are optional and can be regenerated
+with `tools/sync_pipeline_wrappers.py` if you want historical entry points.
 
 ## 2. Register the pipeline
 

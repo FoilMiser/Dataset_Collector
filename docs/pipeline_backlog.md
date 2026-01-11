@@ -161,7 +161,7 @@ Please file new work as GitHub Issues (or entries here if offline) instead of ad
 - [ ] Populate denylist patterns for restricted scholarly providers
 - [ ] Add gating for ORCID/PII-sensitive fields beyond simple key scrubbing
 - [ ] Lint + minimal unit tests for heuristics and path layout
-- [ ] Example run_pipeline.sh workflow on tiny fixtures (dry-run + execute)
+- [ ] Example `dc` workflow on tiny fixtures (dry-run + execute)
 
 ## logic_pipeline_v2
 

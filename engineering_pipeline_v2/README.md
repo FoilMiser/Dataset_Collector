@@ -6,7 +6,7 @@ What's new in v2:
 - `../pipelines/targets/targets_engineering.yaml` (schema v0.8) with explicit roots + routing metadata for downstream sorting
 - v2 workers: `acquire_worker.py`, `yellow_screen_worker.py`, `merge_worker.py`, `catalog_builder.py`
 - Two-pool raw layout: `raw/green` + `raw/yellow` → screened_yellow → combined → screened shards
-- Wrapper `run_pipeline.sh` with stages: classify → acquire_green → acquire_yellow → screen_yellow → merge → catalog
+- Unified CLI via `dc pipeline` (classification) and `dc run` (worker stages)
 
 > Not legal advice. This tool helps you *track* licenses and restrictions; you are responsible for compliance.
 
@@ -24,7 +24,7 @@ For Windows + Conda, prefer the repo-wide orchestrator:
 python tools/build_natural_corpus.py --repo-root . --dest-root "E:/AI-Research/datasets/Natural" --mode full --execute
 ```
 
-You can also run the Jupyter notebook, which invokes the same workflow. Use `run_pipeline.sh` only if you have Git Bash/WSL on Windows or are on macOS/Linux.
+You can also run the Jupyter notebook, which invokes the same workflow. For direct CLI runs, use `dc` (prefer `dc pipeline` for classification and `dc run` for worker stages).
 
 ---
 
@@ -60,24 +60,39 @@ pip install -r requirements.txt
 
 ### Classify (dry-run by default)
 ```bash
-./run_pipeline.sh --targets ../pipelines/targets/targets_engineering.yaml --stage classify
+dc pipeline engineering -- --targets ../pipelines/targets/targets_engineering.yaml --stage classify --no-fetch
 ```
 
 ### Review pending YELLOW items
 ```bash
-./run_pipeline.sh --targets ../pipelines/targets/targets_engineering.yaml --stage review
+dc review-queue --pipeline engineering -- --queue /data/engineering/_queues/yellow_pipeline.jsonl --targets ../pipelines/targets/targets_engineering.yaml list
 # or:
 python3 review_queue.py --queue /data/engineering/_queues/yellow_pipeline.jsonl list
 ```
 
 ### Execute end-to-end (recommended order)
 ```bash
-./run_pipeline.sh --targets ../pipelines/targets/targets_engineering.yaml --stage classify
-./run_pipeline.sh --targets ../pipelines/targets/targets_engineering.yaml --stage acquire_green --execute
-./run_pipeline.sh --targets ../pipelines/targets/targets_engineering.yaml --stage acquire_yellow --execute
-./run_pipeline.sh --targets ../pipelines/targets/targets_engineering.yaml --stage screen_yellow --execute
-./run_pipeline.sh --targets ../pipelines/targets/targets_engineering.yaml --stage merge --execute
-./run_pipeline.sh --targets ../pipelines/targets/targets_engineering.yaml --stage catalog
+dc pipeline engineering -- --targets ../pipelines/targets/targets_engineering.yaml --stage classify
+dc run --pipeline engineering --stage acquire --allow-data-root -- \
+  --queue /data/engineering/_queues/green_pipeline.jsonl \
+  --bucket green \
+  --targets-yaml ../pipelines/targets/targets_engineering.yaml \
+  --execute
+dc run --pipeline engineering --stage acquire --allow-data-root -- \
+  --queue /data/engineering/_queues/yellow_pipeline.jsonl \
+  --bucket yellow \
+  --targets-yaml ../pipelines/targets/targets_engineering.yaml \
+  --execute
+dc run --pipeline engineering --stage yellow_screen --allow-data-root -- \
+  --queue /data/engineering/_queues/yellow_pipeline.jsonl \
+  --targets ../pipelines/targets/targets_engineering.yaml \
+  --execute
+dc run --pipeline engineering --stage merge --allow-data-root -- \
+  --targets ../pipelines/targets/targets_engineering.yaml \
+  --execute
+dc catalog-builder --pipeline engineering --allow-data-root -- \
+  --targets ../pipelines/targets/targets_engineering.yaml \
+  --output /data/engineering/_catalogs/global_catalog.json
 ```
 
 ---
@@ -90,7 +105,7 @@ python3 review_queue.py --queue /data/engineering/_queues/yellow_pipeline.jsonl 
 - `yellow_screen_worker.py` - canonicalize YELLOW payloads into screened JSONL shards + ledgers
 - `merge_worker.py` - merge GREEN + screened YELLOW into combined shards
 - `catalog_builder.py` - summarize raw/screened/combined outputs
-- `run_pipeline.sh` - convenience wrapper for the v2 stage order
+- `legacy/run_pipeline.sh` - deprecated wrapper for the v2 stage order
 - `yellow_scrubber.py` - legacy helper for bespoke YELLOW transforms (optional)
 - `pmc_worker.py` - optional PMC addon (run before merge if used)
 

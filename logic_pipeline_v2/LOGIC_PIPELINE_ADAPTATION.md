@@ -10,6 +10,6 @@ Key references:
 - Raw/processed layout now matches `/data/logic/{raw,screened_yellow,combined,screened}` with per-pool shards and ledgers.
 - `pipeline_driver.py` emits routing fields (nested + flattened) for downstream sorting and uses `logic` as the default subject.
 - `acquire_worker.py`, `yellow_screen_worker.py`, and `merge_worker.py` mirror math v2 behavior, writing manifests and ledgers in `_manifests` and `_ledger`.
-- Queues and run orchestration mirror math v2 (`run_pipeline.sh`).
+- Queues and run orchestration mirror math v2 (use `dc pipeline` for classify and `dc run` for worker stages).
 
-Use `./run_pipeline.sh --targets ../pipelines/targets/targets_logic.yaml --stage classify` to dry-run the new queue emission, then progress through the stages with `--execute` as needed.
+Use `dc pipeline logic -- --targets ../pipelines/targets/targets_logic.yaml --stage classify --no-fetch` to dry-run the new queue emission, then progress through the stages with `dc run` and `--execute` as needed.

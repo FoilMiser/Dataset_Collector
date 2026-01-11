@@ -1,6 +1,6 @@
 # Architecture
 
-The Dataset Collector is organized around a shared pipeline contract with domain-specific implementations. The preferred entrypoint is the unified `dc run` CLI, which delegates to the Python driver and stage-specific workers to write outputs to the canonical layout. Legacy `run_pipeline.sh` scripts remain for backwards compatibility but are deprecated.
+The Dataset Collector is organized around a shared pipeline contract with domain-specific implementations. The preferred entrypoint is the unified `dc run` CLI, which delegates to the Python driver and stage-specific workers to write outputs to the canonical layout. Legacy `run_pipeline.sh` scripts have been moved under `legacy/` for backwards compatibility but are deprecated.
 
 ## Pipeline flow
 
@@ -59,7 +59,7 @@ Consolidated helpers for YELLOW bucket planning and manual review prep:
 - **`dc run`**: Standardized CLI entrypoint; forwards stage and targets arguments into the driver.
 - **`dc --list-pipelines`**: List all registered pipeline domains.
 - **`dc pipeline <domain>`**: Run a full pipeline driver for a domain.
-- **`run_pipeline.sh`** (deprecated): Legacy wrapper that forwards stage and targets arguments into the driver.
+- **`legacy/run_pipeline.sh`** (deprecated): Legacy wrapper that forwards stage and targets arguments into the driver.
 - **`pipeline_driver.py`**: Orchestrates stage execution, logging, retries, and output locations.
 - **Worker modules**: Implement stage logic (classification, acquisition, screening, merge, catalog).
 - **Outputs**: Stage outputs land under the configured dataset root and the `combined/` stage defined in `docs/output_contract.md`.

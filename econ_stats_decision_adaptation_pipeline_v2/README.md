@@ -24,7 +24,7 @@ For Windows + Conda, prefer the repo-wide orchestrator:
 python tools/build_natural_corpus.py --repo-root . --dest-root "E:/AI-Research/datasets/Natural" --mode full --execute
 ```
 
-You can also run the Jupyter notebook, which invokes the same workflow. Use `run_pipeline.sh` only if you have Git Bash/WSL on Windows or are on macOS/Linux.
+You can also run the Jupyter notebook, which invokes the same workflow. For direct CLI runs, use `dc` (prefer `dc pipeline` for classification and `dc run` for worker stages).
 
 ---
 
@@ -64,7 +64,7 @@ Sharding is controlled by `globals.sharding` (max records per shard, compression
 | Merge | `merge_worker.py` | Combines canonical GREEN + screened YELLOW shards with deduplication and a combined ledger. |
 | Catalog | `catalog_builder.py` | Summarizes counts, bytes, manifests, and ledgers across stages. |
 
-`run_pipeline.sh` orchestrates these stages with sensible defaults (`--stage classify|acquire_green|acquire_yellow|screen_yellow|merge|catalog`).
+Use `dc pipeline` for classification, `dc run` for acquire/merge/yellow_screen, and `dc catalog-builder` for catalog outputs.
 
 ---
 
@@ -74,16 +74,16 @@ Sharding is controlled by `globals.sharding` (max records per shard, compression
 pip install -r requirements.txt
 
 # Dry-run classify only
-./run_pipeline.sh --targets ../pipelines/targets/targets_econ_stats_decision_v2.yaml --stage classify
+dc pipeline econ_stats_decision_adaptation -- --targets ../pipelines/targets/targets_econ_stats_decision_v2.yaml --stage classify --no-fetch
 
 # Acquire GREEN and YELLOW (execute downloads)
-./run_pipeline.sh --targets ../pipelines/targets/targets_econ_stats_decision_v2.yaml --stage acquire_green --execute
-./run_pipeline.sh --targets ../pipelines/targets/targets_econ_stats_decision_v2.yaml --stage acquire_yellow --execute
+dc run --pipeline econ_stats_decision_adaptation --stage acquire --allow-data-root -- --queue /data/econ_stats_decision_adaptation/_queues/green_pipeline.jsonl --bucket green --targets-yaml ../pipelines/targets/targets_econ_stats_decision_v2.yaml --execute
+dc run --pipeline econ_stats_decision_adaptation --stage acquire --allow-data-root -- --queue /data/econ_stats_decision_adaptation/_queues/yellow_pipeline.jsonl --bucket yellow --targets-yaml ../pipelines/targets/targets_econ_stats_decision_v2.yaml --execute
 
 # Screen, merge, catalog
-./run_pipeline.sh --targets ../pipelines/targets/targets_econ_stats_decision_v2.yaml --stage screen_yellow --execute
-./run_pipeline.sh --targets ../pipelines/targets/targets_econ_stats_decision_v2.yaml --stage merge --execute
-./run_pipeline.sh --targets ../pipelines/targets/targets_econ_stats_decision_v2.yaml --stage catalog
+dc run --pipeline econ_stats_decision_adaptation --stage yellow_screen --allow-data-root -- --queue /data/econ_stats_decision_adaptation/_queues/yellow_pipeline.jsonl --targets ../pipelines/targets/targets_econ_stats_decision_v2.yaml --execute
+dc run --pipeline econ_stats_decision_adaptation --stage merge --allow-data-root -- --targets ../pipelines/targets/targets_econ_stats_decision_v2.yaml --execute
+dc catalog-builder --pipeline econ_stats_decision_adaptation --allow-data-root -- --targets ../pipelines/targets/targets_econ_stats_decision_v2.yaml --output /data/econ_stats_decision_adaptation/_catalogs/catalog.json
 ```
 
 ### Notes

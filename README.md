@@ -119,37 +119,36 @@ point to optional plugin hooks for specialized acquisition or yellow-screen logi
 Available stages are `acquire`, `merge`, and `yellow_screen`.
 
 ### Deprecated pipeline scripts
-The per-pipeline worker scripts (`acquire_worker.py`, `merge_worker.py`, `yellow_screen_worker.py`) and the
-`run_pipeline.sh` wrappers are deprecated in favor of `dc run`. They remain in place for backwards compatibility,
-but new usage should prefer the unified CLI.
+The per-pipeline worker scripts (`acquire_worker.py`, `merge_worker.py`, `yellow_screen_worker.py`) are deprecated in
+favor of `dc run`. Legacy `run_pipeline.sh` wrappers have moved under `legacy/` for reference, but new usage should
+prefer the unified CLI.
 
-## Example sequential execution flow (legacy wrapper)
+## Example sequential execution flow (dc CLI)
 
-The legacy `run_pipeline.sh` wrapper is deprecated but still supported for existing workflows. A typical end-to-end execution sequence:
+An end-to-end execution sequence with the unified CLI:
 
 ```bash
-./math_pipeline_v2/run_pipeline.sh --targets pipelines/targets/targets_math.yaml --stage classify --execute
-./math_pipeline_v2/run_pipeline.sh --targets pipelines/targets/targets_math.yaml --stage acquire_green --execute
-./math_pipeline_v2/run_pipeline.sh --targets pipelines/targets/targets_math.yaml --stage acquire_yellow --execute
-./math_pipeline_v2/run_pipeline.sh --targets pipelines/targets/targets_math.yaml --stage screen_yellow --execute
-./math_pipeline_v2/run_pipeline.sh --targets pipelines/targets/targets_math.yaml --stage merge --execute
-./math_pipeline_v2/run_pipeline.sh --targets pipelines/targets/targets_math.yaml --stage catalog --execute
+dc pipeline math -- --targets pipelines/targets/targets_math.yaml --stage classify
+dc run --pipeline math --stage acquire --allow-data-root -- --queue /data/math/_queues/green_pipeline.jsonl --bucket green --targets-yaml pipelines/targets/targets_math.yaml --execute
+dc run --pipeline math --stage acquire --allow-data-root -- --queue /data/math/_queues/yellow_pipeline.jsonl --bucket yellow --targets-yaml pipelines/targets/targets_math.yaml --execute
+dc run --pipeline math --stage yellow_screen --allow-data-root -- --queue /data/math/_queues/yellow_pipeline.jsonl --targets pipelines/targets/targets_math.yaml --execute
+dc run --pipeline math --stage merge --allow-data-root -- --targets pipelines/targets/targets_math.yaml --execute
+dc catalog-builder --pipeline math --allow-data-root -- --targets pipelines/targets/targets_math.yaml --output /data/math/_catalogs/catalog.json
 ```
 
-To preview the actions without writing data, omit `--execute` (dry-run):
+To preview the actions without writing data, add `--no-fetch` during classification and omit `--execute` (dry-run):
 
 ```bash
-./math_pipeline_v2/run_pipeline.sh --targets pipelines/targets/targets_math.yaml --stage classify
+dc pipeline math -- --targets pipelines/targets/targets_math.yaml --stage classify --no-fetch
 ```
 
 ## Quickstart options
 
 ### Jupyter (Windows-first, bash optional)
 
-The notebook runs on Windows-first Python. If you are still using the legacy
-`run_pipeline.sh` wrappers (deprecated), use `bash run_pipeline.sh ...` cells when
-you have WSL or another shell with `bash` available; otherwise use the Windows-native
-orchestrator below.
+The notebook runs on Windows-first Python. For shell-based stage runs, use `dc` commands
+in Bash cells when you have WSL or another shell with `bash` available; otherwise use the
+Windows-native orchestrator below.
 
 ### CLI wrapper (run all pipelines)
 
@@ -263,7 +262,7 @@ Within each `*_pipeline_v2` directory, you should expect:
 
 ```
 *_pipeline_v2/
-  run_pipeline.sh  # deprecated legacy wrapper
+  legacy/run_pipeline.sh  # deprecated legacy wrapper
   requirements.txt
   pipeline_driver.py
   acquire_worker.py
