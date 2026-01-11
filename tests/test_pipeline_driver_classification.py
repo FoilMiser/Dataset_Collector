@@ -338,6 +338,70 @@ def test_denylist_overrides_bucket(tmp_path: Path, minimal_config: PipelineTestC
     assert {row["id"] for row in red_rows} == {"hard_red"}
 
 
+def test_content_check_block_action_forces_red(
+    tmp_path: Path, minimal_config: PipelineTestConfig
+) -> None:
+    targets = [
+        {
+            "id": "pii_target",
+            "name": "Contact me at test@example.com",
+            "license_profile": "permissive",
+            "license_evidence": {"spdx_hint": "MIT", "url": "https://example.test/terms"},
+        }
+    ]
+    targets_path = minimal_config.write_targets(
+        tmp_path,
+        targets,
+        globals_override={
+            "default_content_checks": ["pii_scan"],
+            "content_check_actions": {"pii_scan": "block"},
+        },
+    )
+
+    run_driver(targets_path, minimal_config.license_map_path)
+
+    red_rows = read_jsonl(minimal_config.queues_root / "red_rejected.jsonl")
+    assert {row["id"] for row in red_rows} == {"pii_target"}
+    assert red_rows[0]["content_check_action"] == "block"
+    evaluation = json.loads(
+        (minimal_config.manifests_root / "pii_target" / "evaluation.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert evaluation["content_check_action"] == "block"
+
+
+def test_content_check_quarantine_action_forces_yellow(
+    tmp_path: Path, minimal_config: PipelineTestConfig
+) -> None:
+    targets = [
+        {
+            "id": "dual_use_target",
+            "name": "Instructions for improvised explosive devices",
+            "license_profile": "permissive",
+            "license_evidence": {"spdx_hint": "MIT", "url": "https://example.test/terms"},
+            "content_check_actions": {"dual_use_scan": "quarantine"},
+        }
+    ]
+    targets_path = minimal_config.write_targets(
+        tmp_path,
+        targets,
+        globals_override={"default_content_checks": ["dual_use_scan"]},
+    )
+
+    run_driver(targets_path, minimal_config.license_map_path)
+
+    yellow_rows = read_jsonl(minimal_config.queues_root / "yellow_pipeline.jsonl")
+    assert {row["id"] for row in yellow_rows} == {"dual_use_target"}
+    assert yellow_rows[0]["content_check_action"] == "quarantine"
+    evaluation = json.loads(
+        (minimal_config.manifests_root / "dual_use_target" / "evaluation.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert evaluation["content_check_action"] == "quarantine"
+
+
 @pytest.mark.parametrize(
     "spdx_hint, extra_args, expected_bucket",
     [
