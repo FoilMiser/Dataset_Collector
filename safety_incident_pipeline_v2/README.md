@@ -32,7 +32,7 @@ Targets YAML defaults to `/data/...`; the orchestrator patches to your `--dest-r
 For standalone runs, pass `--dataset-root` or use `tools/patch_targets.py`.
 
 
-The recommended roots live in `targets_safety_incident.yaml -> globals`:
+The recommended roots live in `../pipelines/targets/targets_safety_incident.yaml -> globals`:
 
 ```
 /data/safety/
@@ -72,16 +72,16 @@ Sharding is controlled by `globals.sharding` (max records per shard, compression
 pip install -r requirements.txt
 
 # Dry-run classify only
-./run_pipeline.sh --targets targets_safety_incident.yaml --stage classify
+./run_pipeline.sh --targets ../pipelines/targets/targets_safety_incident.yaml --stage classify
 
 # Acquire GREEN and YELLOW (execute downloads)
-./run_pipeline.sh --targets targets_safety_incident.yaml --stage acquire_green --execute
-./run_pipeline.sh --targets targets_safety_incident.yaml --stage acquire_yellow --execute
+./run_pipeline.sh --targets ../pipelines/targets/targets_safety_incident.yaml --stage acquire_green --execute
+./run_pipeline.sh --targets ../pipelines/targets/targets_safety_incident.yaml --stage acquire_yellow --execute
 
 # Screen, merge, catalog
-./run_pipeline.sh --targets targets_safety_incident.yaml --stage screen_yellow --execute
-./run_pipeline.sh --targets targets_safety_incident.yaml --stage merge --execute
-./run_pipeline.sh --targets targets_safety_incident.yaml --stage catalog
+./run_pipeline.sh --targets ../pipelines/targets/targets_safety_incident.yaml --stage screen_yellow --execute
+./run_pipeline.sh --targets ../pipelines/targets/targets_safety_incident.yaml --stage merge --execute
+./run_pipeline.sh --targets ../pipelines/targets/targets_safety_incident.yaml --stage catalog
 ```
 
 ### Notes

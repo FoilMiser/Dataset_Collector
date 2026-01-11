@@ -9,6 +9,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from collector_core import catalog_builder, review_queue
+from collector_core.targets_paths import list_targets_files, resolve_targets_path
 
 COMMAND_REVIEW_QUEUE = "review-queue"
 COMMAND_CATALOG_BUILDER = "catalog-builder"
@@ -51,13 +52,10 @@ def _available_pipelines(repo_root: Path) -> list[str]:
     return sorted(path.name for path in repo_root.glob("*_pipeline_v2") if path.is_dir())
 
 
-def _pick_default_targets(pipeline_dir: Path | None) -> Path | None:
-    if not pipeline_dir:
+def _pick_default_targets(repo_root: Path, slug: str | None) -> Path | None:
+    if not slug:
         return None
-    targets = sorted(pipeline_dir.glob("targets_*.yaml"))
-    if len(targets) == 1:
-        return targets[0]
-    return None
+    return resolve_targets_path(repo_root, slug)
 
 
 def _has_targets_arg(args: list[str]) -> bool:
@@ -107,6 +105,15 @@ def _resolve_pipeline_context(
     return None, None
 
 
+def _pipeline_slug(pipeline_id: str | None, pipeline_dir: Path | None) -> str | None:
+    if pipeline_id:
+        normalized = _normalize_pipeline_id(pipeline_id)
+        return normalized.removesuffix("_pipeline_v2") if normalized else None
+    if pipeline_dir:
+        return pipeline_dir.name.removesuffix("_pipeline_v2")
+    return None
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Unified CLI for Dataset Collector pipeline helpers.",
@@ -139,7 +146,8 @@ def main() -> int:
     passthrough = list(args.args)
     if passthrough[:1] == ["--"]:
         passthrough = passthrough[1:]
-    default_targets = _pick_default_targets(pipeline_dir)
+    slug = _pipeline_slug(pipeline_id, pipeline_dir)
+    default_targets = _pick_default_targets(repo_root, slug)
 
     if args.command == COMMAND_CATALOG_BUILDER:
         if not _has_targets_arg(passthrough):
@@ -147,12 +155,11 @@ def main() -> int:
                 passthrough = ["--targets", str(default_targets), *passthrough]
             else:
                 available = []
-                if pipeline_dir:
-                    available = sorted(p.name for p in pipeline_dir.glob("targets_*.yaml"))
+                available = [path.name for path in list_targets_files(repo_root)]
                 if available:
                     options = ", ".join(available)
                     raise SystemExit(
-                        f"Multiple targets YAML files found in {pipeline_dir}. "
+                        "Multiple targets YAML files found. "
                         f"Pass --targets. Options: {options}"
                     )
                 raise SystemExit("Missing --targets and no default targets YAML could be found.")

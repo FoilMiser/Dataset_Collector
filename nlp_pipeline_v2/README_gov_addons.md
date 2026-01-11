@@ -4,7 +4,7 @@ These add-ons help you ingest English government/open-data sources *without* tur
 pipeline into a bespoke crawler.
 
 ## Files
-- `ckan_worker.py`: resolves CKAN packages into a `targets_nlp.yaml` fragment (or a download queue JSONL)
+- `ckan_worker.py`: resolves CKAN packages into a `../pipelines/targets/targets_nlp.yaml` fragment (or a download queue JSONL)
 - `sitemap_worker.py`: expands a sitemap.xml into chunked targets (HTTP URL lists)
 - `license_map_v0_3.yaml`: optional add-on (not included here) that adds SPDX IDs + normalization for UK/Canada gov licenses
 

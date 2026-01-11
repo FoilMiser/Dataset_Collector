@@ -7,7 +7,7 @@ then specialized to Physics. For the authoritative plan and checklist, see:
 
 Key deltas from math v2:
 
-- `targets_physics.yaml` contains the physics/astro/materials inventory.
+- `../pipelines/targets/targets_physics.yaml` contains the physics/astro/materials inventory.
 - `pipeline_driver.py` accepts `physics_routing` and defaults routing subject to `physics` for downstream sorting.
 - Default roots point to `/data/physics/...`.
 

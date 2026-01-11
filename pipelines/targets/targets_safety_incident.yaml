@@ -2,11 +2,11 @@ schema_version: '0.9'
 updated_utc: "2025-12-30"
 companion_files:
   license_map:
-    - "../configs/common/license_map.yaml"
+    - "../../configs/common/license_map.yaml"
   field_schemas:
-    - "../configs/common/field_schemas.yaml"
+    - "../../configs/common/field_schemas.yaml"
   denylist:
-    - "../configs/common/denylist.yaml"
+    - "../../configs/common/denylist.yaml"
 
 globals:
   raw_root: /data/safety/raw

@@ -47,11 +47,11 @@ globals:
   default_content_checks: []
 companion_files:
   license_map:
-    - "../configs/common/license_map.yaml"
+    - "../../configs/common/license_map.yaml"
   field_schemas:
-    - "../configs/common/field_schemas.yaml"
+    - "../../configs/common/field_schemas.yaml"
   denylist:
-    - "../configs/common/denylist.yaml"
+    - "../../configs/common/denylist.yaml"
 
 queues:
   emit:

@@ -23,8 +23,13 @@ your_domain_pipeline_v2/
   merge_worker.py
   catalog_builder.py
   review_queue.py
-  targets_your_domain.yaml
   requirements.txt
+```
+
+Targets YAMLs are created in the shared directory:
+
+```
+pipelines/targets/targets_your_domain.yaml
 ```
 
 Only the targets YAML is required. Wrapper scripts are optional and can be regenerated
@@ -46,7 +51,7 @@ generic workers and `dc` CLI will handle the pipeline with no extra files.
 
 ## 4. Author the targets file
 
-Define targets in `targets_your_domain.yaml`, including:
+Define targets in `pipelines/targets/targets_your_domain.yaml`, including:
 
 - `download` configuration (`strategy`, URLs, auth options).
 - `safety_bucket` values (GREEN/YELLOW/RED).
@@ -61,29 +66,30 @@ relative paths, for example:
 ```yaml
 companion_files:
   license_map:
-    - "../configs/common/license_map.yaml"
+    - "../../configs/common/license_map.yaml"
   field_schemas:
-    - "../configs/common/field_schemas.yaml"
+    - "../../configs/common/field_schemas.yaml"
   denylist:
-    - "../configs/common/denylist.yaml"
+    - "../../configs/common/denylist.yaml"
 ```
 
 Use the shared files as-is when you want to inherit the repo defaults. When you
 need pipeline-specific overrides, add a local YAML (for example
 `your_domain_pipeline_v2/license_map.yaml`) and reference it under
-`companion_files` so only that pipeline changes.
+`companion_files` (for example `../../your_domain_pipeline_v2/license_map.yaml`)
+so only that pipeline changes.
 
 ## 5. Configure licensing
 
 Update the shared license map in `configs/common/license_map.yaml` (or add a pipeline-specific file
-and reference it from `targets_your_domain.yaml`) so merge stages can enforce allow/deny rules.
+and reference it from `pipelines/targets/targets_your_domain.yaml`) so merge stages can enforce allow/deny rules.
 
 ## 6. Validate locally
 
 Run a dry-run classification to validate the wiring:
 
 ```bash
-python -m collector_core.dc_cli pipeline your_domain -- --targets targets_your_domain.yaml
+python -m collector_core.dc_cli pipeline your_domain -- --targets pipelines/targets/targets_your_domain.yaml
 ```
 
 Then run with `--execute` once the dry-run succeeds.

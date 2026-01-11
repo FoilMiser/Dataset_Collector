@@ -13,13 +13,11 @@ if __package__ in (None, ""):
 
 from collector_core.config_validator import Draft7Validator, read_yaml
 from collector_core.exceptions import ConfigValidationError, YamlParseError
+from collector_core.targets_paths import list_targets_files
 
 
 def iter_targets_files(root: Path) -> Iterable[Path]:
-    for pipeline_dir in sorted(root.glob("*_pipeline_v2")):
-        if not pipeline_dir.is_dir():
-            continue
-        yield from sorted(pipeline_dir.glob("targets_*.yaml"))
+    yield from list_targets_files(root)
 
 
 def _resolve_companion_paths(targets_path: Path, value: object, default: str) -> list[Path]:

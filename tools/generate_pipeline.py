@@ -78,20 +78,20 @@ def render_readme(spec: PipelineSpec) -> str:
         pip install -r requirements.txt
 
         # Dry-run classify only
-        python -m collector_core.dc_cli pipeline {spec.domain} -- --targets {spec.targets_filename}
+        python -m collector_core.dc_cli pipeline {spec.domain} -- --targets ../pipelines/targets/{spec.targets_filename}
 
         # Acquire GREEN and YELLOW
         python -m collector_core.dc_cli run --pipeline {spec.domain} --stage acquire -- \\
-          --targets-yaml {spec.targets_filename} --queue /data/{spec.domain}/_queues/green_download.jsonl --bucket green --execute
+          --targets-yaml ../pipelines/targets/{spec.targets_filename} --queue /data/{spec.domain}/_queues/green_download.jsonl --bucket green --execute
         python -m collector_core.dc_cli run --pipeline {spec.domain} --stage acquire -- \\
-          --targets-yaml {spec.targets_filename} --queue /data/{spec.domain}/_queues/yellow_pipeline.jsonl --bucket yellow --execute
+          --targets-yaml ../pipelines/targets/{spec.targets_filename} --queue /data/{spec.domain}/_queues/yellow_pipeline.jsonl --bucket yellow --execute
 
         # Screen, merge, catalog
         python -m collector_core.dc_cli run --pipeline {spec.domain} --stage yellow_screen -- \\
-          --targets {spec.targets_filename} --queue /data/{spec.domain}/_queues/yellow_pipeline.jsonl --execute
-        python -m collector_core.dc_cli run --pipeline {spec.domain} --stage merge -- --targets {spec.targets_filename} --execute
+          --targets ../pipelines/targets/{spec.targets_filename} --queue /data/{spec.domain}/_queues/yellow_pipeline.jsonl --execute
+        python -m collector_core.dc_cli run --pipeline {spec.domain} --stage merge -- --targets ../pipelines/targets/{spec.targets_filename} --execute
         python -m collector_core.generic_workers --domain {spec.domain} catalog -- \\
-          --targets {spec.targets_filename} --output /data/{spec.domain}/_catalogs/catalog.json
+          --targets ../pipelines/targets/{spec.targets_filename} --output /data/{spec.domain}/_catalogs/catalog.json
         ```
 
         ## Directory layout
@@ -545,11 +545,11 @@ def render_targets_yaml(spec: PipelineSpec) -> str:
 
         companion_files:
           license_map:
-            - "../configs/common/license_map.yaml"
+            - "../../configs/common/license_map.yaml"
           field_schemas:
-            - "../configs/common/field_schemas.yaml"
+            - "../../configs/common/field_schemas.yaml"
           denylist:
-            - "../configs/common/denylist.yaml"
+            - "../../configs/common/denylist.yaml"
 
         globals:
           raw_root: /data/{spec.domain}/raw
@@ -700,7 +700,9 @@ def generate_pipeline(spec: PipelineSpec, repo_root: Path, force: bool) -> Path:
     write_file(pipeline_dir / "catalog_builder.py", render_catalog_builder(), force)
     write_file(pipeline_dir / "review_queue.py", render_review_queue(), force)
     write_file(pipeline_dir / "run_pipeline.sh", render_run_pipeline(spec), force)
-    write_file(pipeline_dir / spec.targets_filename, render_targets_yaml(spec), force)
+    targets_dir = repo_root / "pipelines" / "targets"
+    targets_dir.mkdir(parents=True, exist_ok=True)
+    write_file(targets_dir / spec.targets_filename, render_targets_yaml(spec), force)
     write_file(pipeline_dir / "requirements.txt", render_requirements(), force)
 
     return pipeline_dir

@@ -34,7 +34,7 @@ Targets YAML defaults to `/data/...`; the orchestrator patches to your `--dest-r
 For standalone runs, pass `--dataset-root` or use `tools/patch_targets.py`.
 
 
-Roots are defined in `targets_chem.yaml -> globals`:
+Roots are defined in `../pipelines/targets/targets_chem.yaml -> globals`:
 
 ```
 /data/chem/
@@ -74,21 +74,21 @@ Sharding is controlled by `globals.sharding` (max records per shard, compression
 pip install -r requirements.txt
 
 # Dry-run classify only
-./run_pipeline.sh --targets targets_chem.yaml --stage classify
+./run_pipeline.sh --targets ../pipelines/targets/targets_chem.yaml --stage classify
 
 # Acquire GREEN and YELLOW (execute downloads)
-./run_pipeline.sh --targets targets_chem.yaml --stage acquire_green --execute
-./run_pipeline.sh --targets targets_chem.yaml --stage acquire_yellow --execute
+./run_pipeline.sh --targets ../pipelines/targets/targets_chem.yaml --stage acquire_green --execute
+./run_pipeline.sh --targets ../pipelines/targets/targets_chem.yaml --stage acquire_yellow --execute
 
 # Screen, merge, catalog
-./run_pipeline.sh --targets targets_chem.yaml --stage screen_yellow --execute
-./run_pipeline.sh --targets targets_chem.yaml --stage merge --execute
-./run_pipeline.sh --targets targets_chem.yaml --stage catalog
+./run_pipeline.sh --targets ../pipelines/targets/targets_chem.yaml --stage screen_yellow --execute
+./run_pipeline.sh --targets ../pipelines/targets/targets_chem.yaml --stage merge --execute
+./run_pipeline.sh --targets ../pipelines/targets/targets_chem.yaml --stage catalog
 ```
 
 ### Notes
 
-- YELLOW screening enforces "anything unclear is pitched"; see `targets_chem.yaml -> globals.screening` and per-target `yellow_screen` overrides.
+- YELLOW screening enforces "anything unclear is pitched"; see `../pipelines/targets/targets_chem.yaml -> globals.screening` and per-target `yellow_screen` overrides.
 - Chemistry plugins (e.g., PubChem computed-only) run inside `yellow_screen_worker.py` rather than a standalone stage.
 - Outputs are segregated by `license_profile` (`permissive`, `copyleft`, `quarantine`).
 - Ledgers in `_ledger/` provide pass/pitch summaries and shard indexes for reproducibility.

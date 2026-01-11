@@ -95,7 +95,7 @@ Please file new work as GitHub Issues (or entries here if offline) instead of ad
 
 ### Near-term follow-ups:
 - [ ] Add acquisition handlers for stac_catalog, thredds_opendap, and api_tabular strategies.
-- [ ] Flesh out targets_earth.yaml with additional NASA/NOAA/USGS collections and richer routing.
+- [ ] Flesh out pipelines/targets/targets_earth.yaml with additional NASA/NOAA/USGS collections and richer routing.
 - [ ] Create tiny fixture queues to smoke-test classify → acquire → screen → merge → catalog locally (sorting handled in sorter pipeline).
 - [ ] Wire schema validation for earth_canonical_record_v1.0.0 in yellow_screen_worker.
 - [ ] Add sensitivity scrubbing hooks (geo coarsening, PII trimming) before merge.

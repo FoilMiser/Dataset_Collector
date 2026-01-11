@@ -11,6 +11,7 @@ from typing import Any
 
 from collector_core import acquire_strategies
 from collector_core.config_validator import read_yaml
+from collector_core.targets_paths import resolve_targets_path
 
 STRATEGY_HANDLER = Callable[
     [acquire_strategies.AcquireContext, dict[str, Any], Path], list[dict[str, Any]]
@@ -67,13 +68,8 @@ def _available_pipelines(repo_root: Path) -> list[str]:
     return sorted(path.name for path in repo_root.glob("*_pipeline_v2") if path.is_dir())
 
 
-def _pick_default_targets(pipeline_dir: Path | None) -> Path | None:
-    if not pipeline_dir:
-        return None
-    targets = sorted(pipeline_dir.glob("targets_*.yaml"))
-    if len(targets) == 1:
-        return targets[0]
-    return None
+def _pick_default_targets(repo_root: Path, slug: str) -> Path | None:
+    return resolve_targets_path(repo_root, slug)
 
 
 def _load_overrides(repo_root: Path) -> dict[str, Any]:
@@ -105,7 +101,7 @@ def resolve_pipeline_context(*, pipeline_id: str | None, repo_root: Path) -> Pip
         slug = normalized.removesuffix("_pipeline_v2")
 
     overrides = _load_overrides(repo_root).get(slug, {})
-    targets_path = _pick_default_targets(pipeline_dir)
+    targets_path = _pick_default_targets(repo_root, slug)
     return PipelineContext(
         pipeline_id=normalized,
         slug=slug,

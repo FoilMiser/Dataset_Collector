@@ -13,6 +13,7 @@ if __package__ in (None, ""):
         sys.path.insert(0, str(repo_root))
 
 from collector_core.config_validator import read_yaml
+from collector_core.targets_paths import resolve_targets_path, targets_root
 from tools.init_layout import init_layout
 from tools.patch_targets import patch_targets_yaml
 from tools.preflight import run_preflight
@@ -218,9 +219,11 @@ def main(argv: Iterable[str] | None = None) -> int:
             raise SystemExit(f"Pipeline map entry incomplete for {pipeline_name}.")
 
         pipeline_dir = repo_root / pipeline_name
-        targets_path = pipeline_dir / targets_yaml
-        if not targets_path.exists():
-            raise SystemExit(f"Targets YAML not found: {targets_path}")
+        slug = pipeline_name.removesuffix("_pipeline_v2")
+        targets_path = resolve_targets_path(repo_root, slug, targets_yaml)
+        if not targets_path or not targets_path.exists():
+            expected = targets_root(repo_root) / targets_yaml
+            raise SystemExit(f"Targets YAML not found: {expected}")
 
         dataset_root_fs, dataset_root_yaml = _dataset_root_paths(dest_root, dest_folder)
         init_layout(dataset_root_fs)

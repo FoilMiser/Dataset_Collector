@@ -32,7 +32,7 @@ Targets YAML defaults to `/data/...`; the orchestrator patches to your `--dest-r
 For standalone runs, pass `--dataset-root` or use `tools/patch_targets.py`.
 
 
-The recommended roots live in `targets_3d.yaml -> globals`:
+The recommended roots live in `../pipelines/targets/targets_3d.yaml -> globals`:
 
 ```
 /data/3d/
@@ -72,21 +72,21 @@ Sharding is controlled by `globals.sharding` (max records per shard, compression
 pip install -r requirements.txt
 
 # Dry-run classify only
-./run_pipeline.sh --targets targets_3d.yaml --stage classify
+./run_pipeline.sh --targets ../pipelines/targets/targets_3d.yaml --stage classify
 
 # Acquire GREEN and YELLOW (execute downloads)
-./run_pipeline.sh --targets targets_3d.yaml --stage acquire_green --execute
-./run_pipeline.sh --targets targets_3d.yaml --stage acquire_yellow --execute
+./run_pipeline.sh --targets ../pipelines/targets/targets_3d.yaml --stage acquire_green --execute
+./run_pipeline.sh --targets ../pipelines/targets/targets_3d.yaml --stage acquire_yellow --execute
 
 # Screen, merge, catalog
-./run_pipeline.sh --targets targets_3d.yaml --stage screen_yellow --execute
-./run_pipeline.sh --targets targets_3d.yaml --stage merge --execute
-./run_pipeline.sh --targets targets_3d.yaml --stage catalog
+./run_pipeline.sh --targets ../pipelines/targets/targets_3d.yaml --stage screen_yellow --execute
+./run_pipeline.sh --targets ../pipelines/targets/targets_3d.yaml --stage merge --execute
+./run_pipeline.sh --targets ../pipelines/targets/targets_3d.yaml --stage catalog
 ```
 
 ### Notes
 
-- YELLOW screening enforces strict pitch semantics; see `targets_3d.yaml -> globals.screening` and per-target `yellow_screen` overrides.
+- YELLOW screening enforces strict pitch semantics; see `../pipelines/targets/targets_3d.yaml -> globals.screening` and per-target `yellow_screen` overrides.
 - Mesh metadata is computed when assets are present; enable mesh dependencies for richer metadata and hashing.
 - Outputs are segregated by `license_profile` (`permissive`, `copyleft`, `quarantine`).
 - Ledgers in `_ledger/` provide pass/pitch summaries and shard indexes for reproducibility.
