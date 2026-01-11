@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import socket
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -28,6 +29,33 @@ class StreamResponse:
         yield self._content
 
     def __enter__(self) -> StreamResponse:
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> bool:
+        return False
+
+
+class RedirectResponse:
+    def __init__(self, url: str, location: str) -> None:
+        self.url = url
+        self.headers = {"Location": location}
+
+
+class DummyResponse:
+    def __init__(self, url: str, history: list[RedirectResponse], content: bytes = b"ok") -> None:
+        self.url = url
+        self.headers = {"Content-Type": "text/plain"}
+        self.status_code = 200
+        self.history = history
+        self._content = content
+
+    def raise_for_status(self) -> None:
+        return None
+
+    def iter_content(self, chunk_size: int = 1024) -> list[bytes]:
+        return [self._content]
+
+    def __enter__(self) -> DummyResponse:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> bool:
@@ -92,6 +120,7 @@ def make_ctx(
     roots = aw.Roots(
         raw_root=tmp_path / "raw",
         manifests_root=tmp_path / "_manifests",
+        ledger_root=tmp_path / "_ledger",
         logs_root=tmp_path / "_logs",
     )
     limits = aw.Limits(
@@ -145,6 +174,61 @@ def test_http_download_size_mismatch(tmp_path: Path, monkeypatch: pytest.MonkeyP
 
     assert result["status"] == "error"
     assert result["error"] == "size_mismatch"
+
+
+def test_http_download_blocks_private_redirect(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    redirect = RedirectResponse("https://example.test/start", "http://127.0.0.1/private")
+    response = DummyResponse("http://127.0.0.1/private", [redirect])
+
+    def fake_get(url: str, stream: bool, headers: dict, timeout: tuple[int, int]):
+        return response
+
+    def fake_getaddrinfo(host: str, *args: object, **kwargs: object) -> list[tuple[object, ...]]:
+        if host == "example.test":
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))]
+        return []
+
+    monkeypatch.setattr(aw.socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr(aw, "requests", SimpleNamespace(get=fake_get))
+
+    ctx = make_ctx(tmp_path)
+    out_path = tmp_path / "blocked.txt"
+    result = aw._http_download_with_resume(ctx, "https://example.test/start", out_path)
+
+    assert result["status"] == "error"
+    assert result["error"] == "blocked_url"
+    assert result["blocked_url"] == "http://127.0.0.1/private"
+
+
+def test_http_download_blocks_dns_rebinding_redirect(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    redirect = RedirectResponse("https://rebind.test/start", "https://rebind.test/private")
+    response = DummyResponse("https://rebind.test/private", [redirect])
+
+    def fake_get(url: str, stream: bool, headers: dict, timeout: tuple[int, int]):
+        return response
+
+    call_state = {"count": 0}
+
+    def fake_getaddrinfo(host: str, *args: object, **kwargs: object) -> list[tuple[object, ...]]:
+        if host != "rebind.test":
+            return []
+        call_state["count"] += 1
+        if call_state["count"] == 1:
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))]
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("10.0.0.8", 0))]
+
+    monkeypatch.setattr(aw.socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr(aw, "requests", SimpleNamespace(get=fake_get))
+
+    ctx = make_ctx(tmp_path)
+    out_path = tmp_path / "blocked.txt"
+    result = aw._http_download_with_resume(ctx, "https://rebind.test/start", out_path)
+
+    assert result["status"] == "error"
+    assert result["error"] == "blocked_url"
+    assert result["blocked_url"] == "https://rebind.test/private"
 
 
 def test_zenodo_md5_mismatch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
