@@ -136,6 +136,10 @@ targets:
     enabled: false
     license_profile: "permissive"
     license_evidence: { spdx_hint: "Proprietary", url: "" }
+    source_urls:
+      - "internal://synthetic_biology_problems"
+    evidence_urls:
+      - "internal://synthetic_biology_problems"
     data_type: ["synthetic", "problems", "biology"]
     routing:
       subject: "biology"
@@ -166,6 +170,10 @@ targets:
     priority: 10
     license_profile: "permissive"
     license_evidence: { spdx_hint: "CC0-1.0", url: "https://www.rcsb.org/pages/policies" }
+    source_urls:
+      - "https://www.rcsb.org/pages/policies"
+    evidence_urls:
+      - "https://www.rcsb.org/pages/policies"
     data_type: ["structures", "proteins", "nucleic_acids", "3d"]
     routing:
       subject: "biology"
@@ -191,6 +199,10 @@ targets:
     priority: 10
     license_profile: "permissive"
     license_evidence: { spdx_hint: "CC-BY-4.0", url: "https://www.uniprot.org/help/license" }
+    source_urls:
+      - "https://www.uniprot.org/help/license"
+    evidence_urls:
+      - "https://www.uniprot.org/help/license"
     data_type: ["proteins", "annotations", "ids", "sequences"]
     routing:
       subject: "biology"
@@ -215,6 +227,10 @@ targets:
     priority: 6
     license_profile: "permissive"
     license_evidence: { spdx_hint: "CC-BY-4.0", url: "https://www.uniprot.org/help/license" }
+    source_urls:
+      - "https://www.uniprot.org/help/license"
+    evidence_urls:
+      - "https://www.uniprot.org/help/license"
     data_type: ["proteins", "annotations", "ids", "sequences"]
     routing:
       subject: "biology"
@@ -234,6 +250,10 @@ targets:
     priority: 9
     license_profile: "permissive"
     license_evidence: { spdx_hint: "CC-BY-4.0", url: "http://geneontology.org/docs/go-citation-policy/" }
+    source_urls:
+      - "http://geneontology.org/docs/go-citation-policy/"
+    evidence_urls:
+      - "http://geneontology.org/docs/go-citation-policy/"
     data_type: ["ontology", "annotations", "ids"]
     routing:
       subject: "biology"
@@ -256,6 +276,10 @@ targets:
     priority: 8
     license_profile: "permissive"
     license_evidence: { spdx_hint: "CC-BY-4.0", url: "https://reactome.org/license" }
+    source_urls:
+      - "https://reactome.org/license"
+    evidence_urls:
+      - "https://reactome.org/license"
     data_type: ["pathways", "reactions", "genes", "proteins"]
     routing:
       subject: "biology"
@@ -277,6 +301,10 @@ targets:
     priority: 7
     license_profile: "permissive"
     license_evidence: { spdx_hint: "CC0-1.0", url: "https://www.wikidata.org/wiki/Wikidata:Licensing" }
+    source_urls:
+      - "https://www.wikidata.org/wiki/Wikidata:Licensing"
+    evidence_urls:
+      - "https://www.wikidata.org/wiki/Wikidata:Licensing"
     data_type: ["knowledge_graph", "ids", "links"]
     routing:
       subject: "biology"
@@ -295,6 +323,10 @@ targets:
     priority: 7
     license_profile: "permissive"
     license_evidence: { spdx_hint: "CC0-1.0", url: "https://github.com/OpenTreeOfLife/opentree/wiki/Open-Tree-of-Life-data-use-policy" }
+    source_urls:
+      - "https://github.com/OpenTreeOfLife/opentree/wiki/Open-Tree-of-Life-data-use-policy"
+    evidence_urls:
+      - "https://github.com/OpenTreeOfLife/opentree/wiki/Open-Tree-of-Life-data-use-policy"
     data_type: ["taxonomy", "phylogeny", "ids"]
     routing:
       subject: "biology"
@@ -312,6 +344,10 @@ targets:
     priority: 5
     license_profile: "record_level"
     license_evidence: { spdx_hint: "MIXED", url: "https://obofoundry.org/" }
+    source_urls:
+      - "https://obofoundry.org/"
+    evidence_urls:
+      - "https://obofoundry.org/"
     data_type: ["ontology", "ids"]
     routing:
       subject: "biology"
@@ -338,6 +374,10 @@ targets:
     priority: 8
     license_profile: "unknown"
     license_evidence: { spdx_hint: "US-PUBLIC-DOMAIN", url: "https://www.ncbi.nlm.nih.gov/home/about/policies/" }
+    source_urls:
+      - "https://www.ncbi.nlm.nih.gov/home/about/policies/"
+    evidence_urls:
+      - "https://www.ncbi.nlm.nih.gov/home/about/policies/"
     data_type: ["taxonomy", "ids"]
     routing:
       subject: "biology"
@@ -364,6 +404,10 @@ targets:
     priority: 7
     license_profile: "unknown"
     license_evidence: { spdx_hint: "US-PUBLIC-DOMAIN", url: "https://www.ncbi.nlm.nih.gov/home/about/policies/" }
+    source_urls:
+      - "https://www.ncbi.nlm.nih.gov/home/about/policies/"
+    evidence_urls:
+      - "https://www.ncbi.nlm.nih.gov/home/about/policies/"
     data_type: ["genes", "ids", "annotations"]
     routing:
       subject: "biology"
@@ -391,6 +435,10 @@ targets:
     priority: 8
     license_profile: "record_level"
     license_evidence: { spdx_hint: "MIXED", url: "https://pmc.ncbi.nlm.nih.gov/tools/openftlist/" }
+    source_urls:
+      - "https://pmc.ncbi.nlm.nih.gov/tools/openftlist/"
+    evidence_urls:
+      - "https://pmc.ncbi.nlm.nih.gov/tools/openftlist/"
     data_type: ["papers", "full_text", "jats_xml"]
     routing:
       subject: "biology"
@@ -420,6 +468,11 @@ targets:
     priority: 8
     license_profile: "permissive"
     license_evidence: { spdx_hint: "CC-BY-4.0", url: "https://huggingface.co/datasets/common-pile/common-pile" }
+    source_urls:
+      - "https://huggingface.co/datasets/common-pile/common-pile"
+    evidence_urls:
+      - "https://huggingface.co/datasets/common-pile/common-pile"
+    dataset_version: "main"
     data_type: ["papers", "full_text"]
     routing:
       subject: "biology"
@@ -444,6 +497,11 @@ targets:
     priority: 7
     license_profile: "permissive"
     license_evidence: { spdx_hint: "CC-BY-4.0", url: "https://huggingface.co/datasets/common-pile/common-pile" }
+    source_urls:
+      - "https://huggingface.co/datasets/common-pile/common-pile"
+    evidence_urls:
+      - "https://huggingface.co/datasets/common-pile/common-pile"
+    dataset_version: "main"
     data_type: ["papers", "full_text"]
     routing:
       subject: "biology"
@@ -468,6 +526,11 @@ targets:
     priority: 6
     license_profile: "permissive"
     license_evidence: { spdx_hint: "US-PUBLIC-DOMAIN", url: "https://huggingface.co/datasets/common-pile/common-pile" }
+    source_urls:
+      - "https://huggingface.co/datasets/common-pile/common-pile"
+    evidence_urls:
+      - "https://huggingface.co/datasets/common-pile/common-pile"
+    dataset_version: "main"
     data_type: ["biodiversity", "books", "papers", "text"]
     routing:
       subject: "biology"
@@ -492,6 +555,10 @@ targets:
     priority: 6
     license_profile: "permissive"
     license_evidence: { spdx_hint: "CC-BY-4.0", url: "https://openstax.org/details/books/biology-2e" }
+    source_urls:
+      - "https://openstax.org/details/books/biology-2e"
+    evidence_urls:
+      - "https://openstax.org/details/books/biology-2e"
     data_type: ["textbook", "education", "biology"]
     routing:
       subject: "biology"
@@ -511,6 +578,10 @@ targets:
     priority: 6
     license_profile: "permissive"
     license_evidence: { spdx_hint: "CC-BY-4.0", url: "https://openstax.org/details/books/anatomy-and-physiology-2e" }
+    source_urls:
+      - "https://openstax.org/details/books/anatomy-and-physiology-2e"
+    evidence_urls:
+      - "https://openstax.org/details/books/anatomy-and-physiology-2e"
     data_type: ["textbook", "education", "anatomy", "physiology"]
     routing:
       subject: "biology"
@@ -534,6 +605,10 @@ targets:
     priority: 6
     license_profile: "permissive"
     license_evidence: { spdx_hint: "US-PUBLIC-DOMAIN", url: "https://wwwnc.cdc.gov/eid/page/copyright-and-disclaimer" }
+    source_urls:
+      - "https://wwwnc.cdc.gov/eid/page/copyright-and-disclaimer"
+    evidence_urls:
+      - "https://wwwnc.cdc.gov/eid/page/copyright-and-disclaimer"
     data_type: ["public_health", "papers", "reports"]
     routing:
       subject: "biology"
@@ -555,6 +630,11 @@ targets:
     priority: 6
     license_profile: "permissive"
     license_evidence: { spdx_hint: "US-PUBLIC-DOMAIN", url: "https://huggingface.co/datasets/common-pile/common-pile" }
+    source_urls:
+      - "https://huggingface.co/datasets/common-pile/common-pile"
+    evidence_urls:
+      - "https://huggingface.co/datasets/common-pile/common-pile"
+    dataset_version: "main"
     data_type: ["government", "reports", "public_domain"]
     routing:
       subject: "biology"
@@ -579,6 +659,11 @@ targets:
     priority: 4
     license_profile: "unknown"
     license_evidence: { spdx_hint: "MIXED", url: "https://huggingface.co/datasets/common-pile/common-pile" }
+    source_urls:
+      - "https://huggingface.co/datasets/common-pile/common-pile"
+    evidence_urls:
+      - "https://huggingface.co/datasets/common-pile/common-pile"
+    dataset_version: "main"
     data_type: ["government", "regulation"]
     routing:
       subject: "biology"
@@ -605,6 +690,10 @@ targets:
     priority: 3
     license_profile: "open_gov"
     license_evidence: { spdx_hint: "OGL-UK-3.0", url: "https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/" }
+    source_urls:
+      - "https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/"
+    evidence_urls:
+      - "https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/"
     data_type: ["government", "open_data"]
     routing:
       subject: "biology"
@@ -628,6 +717,10 @@ targets:
     priority: 2
     license_profile: "copyleft"
     license_evidence: { spdx_hint: "CC-BY-SA-4.0", url: "https://en.wikipedia.org/wiki/Wikipedia:Copyrights" }
+    source_urls:
+      - "https://en.wikipedia.org/wiki/Wikipedia:Copyrights"
+    evidence_urls:
+      - "https://en.wikipedia.org/wiki/Wikipedia:Copyrights"
     data_type: ["text", "encyclopedia"]
     routing:
       subject: "biology"
@@ -654,6 +747,10 @@ targets:
     priority: 5
     license_profile: "record_level"
     license_evidence: { spdx_hint: "MIXED", url: "https://www.gbif.org/" }
+    source_urls:
+      - "https://www.gbif.org/"
+    evidence_urls:
+      - "https://www.gbif.org/"
     data_type: ["biodiversity", "occurrences", "ecology"]
     routing:
       subject: "biology"
@@ -675,6 +772,10 @@ targets:
     priority: 4
     license_profile: "record_level"
     license_evidence: { spdx_hint: "MIXED", url: "https://www.inaturalist.org/pages/terms" }
+    source_urls:
+      - "https://www.inaturalist.org/pages/terms"
+    evidence_urls:
+      - "https://www.inaturalist.org/pages/terms"
     data_type: ["biodiversity", "observations", "images", "text"]
     routing:
       subject: "biology"
@@ -696,6 +797,10 @@ targets:
     priority: 1
     license_profile: "human_subjects"
     license_evidence: { spdx_hint: "RESTRICTED", url: "" }
+    source_urls:
+      - "internal://clinical_notes_or_ehr"
+    evidence_urls:
+      - "internal://clinical_notes_or_ehr"
     data_type: ["human_subjects", "phi"]
     routing:
       subject: "biology"

@@ -116,6 +116,10 @@ targets:
     enabled: false
     license_profile: "permissive"
     license_evidence: { spdx_hint: "Proprietary", url: "" }
+    source_urls:
+      - "internal://synthetic_chemistry_problems"
+    evidence_urls:
+      - "internal://synthetic_chemistry_problems"
     data_type: ["synthetic", "problems", "equations", "word_problems"]
     download:
       strategy: "none"
@@ -139,6 +143,10 @@ targets:
     priority: 10
     license_profile: "permissive"
     license_evidence: { spdx_hint: "CC-BY-4.0", url: "https://github.com/ebi-chebi/ChEBI/blob/master/LICENSE" }
+    source_urls:
+      - "https://github.com/ebi-chebi/ChEBI/blob/master/LICENSE"
+    evidence_urls:
+      - "https://github.com/ebi-chebi/ChEBI/blob/master/LICENSE"
     data_type: ["ontology", "structures", "names", "ids"]
     download:
       strategy: "http"
@@ -160,6 +168,10 @@ targets:
     priority: 8
     license_profile: "permissive"
     license_evidence: { spdx_hint: "CC0-1.0", url: "https://www.wikidata.org/wiki/Wikidata:Licensing" }
+    source_urls:
+      - "https://www.wikidata.org/wiki/Wikidata:Licensing"
+    evidence_urls:
+      - "https://www.wikidata.org/wiki/Wikidata:Licensing"
     data_type: ["knowledge_graph", "ids", "links"]
     download:
       strategy: "http"
@@ -175,6 +187,10 @@ targets:
     priority: 10
     license_profile: "record_level"
     license_evidence: { spdx_hint: "US-PUBLIC-DOMAIN", url: "https://pubchem.ncbi.nlm.nih.gov/docs/downloads" }
+    source_urls:
+      - "https://pubchem.ncbi.nlm.nih.gov/docs/downloads"
+    evidence_urls:
+      - "https://pubchem.ncbi.nlm.nih.gov/docs/downloads"
     data_type: ["structures", "properties", "annotations"]
     download:
       strategy: "ftp"
@@ -196,6 +212,10 @@ targets:
     priority: 10
     license_profile: "permissive"
     license_evidence: { spdx_hint: "Derived", url: "" }
+    source_urls:
+      - "internal://pubchem_derived_computed_only"
+    evidence_urls:
+      - "internal://pubchem_derived_computed_only"
     data_type: ["structures", "computed_properties"]
     build:
       from: ["pubchem_compound_sdf_bulk"]
@@ -245,6 +265,10 @@ targets:
     priority: 9
     license_profile: "copyleft"
     license_evidence: { spdx_hint: "CC-BY-SA-3.0", url: "https://chembl.gitbook.io/chembl-interface-documentation/frequently-asked-questions/general-questions" }
+    source_urls:
+      - "https://chembl.gitbook.io/chembl-interface-documentation/frequently-asked-questions/general-questions"
+    evidence_urls:
+      - "https://chembl.gitbook.io/chembl-interface-documentation/frequently-asked-questions/general-questions"
     data_type: ["structures", "bioactivity", "targets", "assays"]
     download:
       strategy: "http"
@@ -264,6 +288,11 @@ targets:
     priority: 7
     license_profile: "permissive"
     license_evidence: { spdx_hint: "CC-BY-4.0", url: "https://zenodo.org/records/4288677" }
+    source_urls:
+      - "https://zenodo.org/records/4288677"
+    evidence_urls:
+      - "https://zenodo.org/records/4288677"
+    dataset_version: "4288677"
     data_type: ["qm", "conformers", "forces"]
     download:
       strategy: "zenodo"
@@ -282,6 +311,10 @@ targets:
     priority: 7
     license_profile: "permissive"
     license_evidence: { spdx_hint: "CC0-1.0", url: "https://figshare.com/articles/dataset/ANI-1x_dataset/7022546" }
+    source_urls:
+      - "https://figshare.com/articles/dataset/ANI-1x_dataset/7022546"
+    evidence_urls:
+      - "https://figshare.com/articles/dataset/ANI-1x_dataset/7022546"
     data_type: ["qm", "conformers", "forces"]
     download:
       strategy: "http"
@@ -297,6 +330,10 @@ targets:
     priority: 8
     license_profile: "record_level"
     license_evidence: { spdx_hint: "MIXED", url: "https://pmc.ncbi.nlm.nih.gov/tools/openftlist/" }
+    source_urls:
+      - "https://pmc.ncbi.nlm.nih.gov/tools/openftlist/"
+    evidence_urls:
+      - "https://pmc.ncbi.nlm.nih.gov/tools/openftlist/"
     data_type: ["papers", "full_text", "jats_xml"]
     download:
       strategy: "http"
@@ -324,6 +361,10 @@ targets:
     priority: 3
     license_profile: "copyleft"
     license_evidence: { spdx_hint: "CC-BY-SA-4.0", url: "https://en.wikipedia.org/wiki/Wikipedia:Copyrights" }
+    source_urls:
+      - "https://en.wikipedia.org/wiki/Wikipedia:Copyrights"
+    evidence_urls:
+      - "https://en.wikipedia.org/wiki/Wikipedia:Copyrights"
     data_type: ["text"]
     download:
       strategy: "http"
@@ -344,6 +385,10 @@ targets:
     priority: 6
     license_profile: "record_level"
     license_evidence: { spdx_hint: "CC-BY-4.0", url: "https://mona.fiehnlab.ucdavis.edu/documentation/license" }
+    source_urls:
+      - "https://mona.fiehnlab.ucdavis.edu/documentation/license"
+    evidence_urls:
+      - "https://mona.fiehnlab.ucdavis.edu/documentation/license"
     data_type: ["spectra", "mass_spec", "structures"]
     download:
       strategy: "http"
@@ -369,6 +414,10 @@ targets:
     priority: 6
     license_profile: "record_level"
     license_evidence: { spdx_hint: "CC0-1.0", url: "https://gnps.ucsd.edu/ProteoSAFe/static/gnps-splash.jsp" }
+    source_urls:
+      - "https://gnps.ucsd.edu/ProteoSAFe/static/gnps-splash.jsp"
+    evidence_urls:
+      - "https://gnps.ucsd.edu/ProteoSAFe/static/gnps-splash.jsp"
     data_type: ["spectra", "mass_spec", "natural_products"]
     download:
       strategy: "http"
@@ -393,6 +442,10 @@ targets:
     priority: 5
     license_profile: "record_level"
     license_evidence: { spdx_hint: "Custom-Restrictive", url: "https://www.chemspider.com/TermsOfUse.aspx" }
+    source_urls:
+      - "https://www.chemspider.com/TermsOfUse.aspx"
+    evidence_urls:
+      - "https://www.chemspider.com/TermsOfUse.aspx"
     review_required: true
     review_notes: "Confirm terms allow ML training/redistribution, capture evidence snapshot, and document attribution or access limits before approval."
     data_type: ["structures", "properties", "ids"]

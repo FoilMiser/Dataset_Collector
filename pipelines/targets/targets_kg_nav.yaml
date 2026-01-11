@@ -100,6 +100,10 @@ targets:
     license_evidence:
       spdx_hint: CC0-1.0
       url: https://www.wikidata.org/wiki/Wikidata:Licensing
+    source_urls:
+      - "https://www.wikidata.org/wiki/Wikidata:Licensing"
+    evidence_urls:
+      - "https://www.wikidata.org/wiki/Wikidata:Licensing"
     output:
       pool: permissive
       formats: [bz2, json, ttl.bz2]
@@ -130,6 +134,10 @@ targets:
     license_evidence:
       spdx_hint: CC0-1.0
       url: https://docs.openalex.org/download-all-data/download-to-your-machine
+    source_urls:
+      - "https://docs.openalex.org/download-all-data/download-to-your-machine"
+    evidence_urls:
+      - "https://docs.openalex.org/download-all-data/download-to-your-machine"
     output:
       pool: permissive
       formats: [jsonl.gz]
@@ -157,6 +165,10 @@ targets:
     license_evidence:
       spdx_hint: CC0-1.0
       url: https://www.crossref.org/documentation/retrieve-metadata/rest-api/
+    source_urls:
+      - "https://www.crossref.org/documentation/retrieve-metadata/rest-api/"
+    evidence_urls:
+      - "https://www.crossref.org/documentation/retrieve-metadata/rest-api/"
     output:
       pool: permissive
       formats: [tar.gz]
@@ -185,6 +197,10 @@ targets:
     license_evidence:
       spdx_hint: CC0-1.0
       url: https://opencitations.net/index/coci
+    source_urls:
+      - "https://opencitations.net/index/coci"
+    evidence_urls:
+      - "https://opencitations.net/index/coci"
     output:
       pool: permissive
       formats: [csv.gz]
@@ -213,6 +229,11 @@ targets:
     license_evidence:
       spdx_hint: CC-BY-4.0
       url: https://info.orcid.org/documentation/data-corrections-and-data-license/
+    source_urls:
+      - "https://info.orcid.org/documentation/data-corrections-and-data-license/"
+    evidence_urls:
+      - "https://info.orcid.org/documentation/data-corrections-and-data-license/"
+    dataset_version: "22739310"
     output:
       pool: permissive
       formats: [xml.gz, json.gz]
@@ -240,6 +261,10 @@ targets:
     license_evidence:
       spdx_hint: CC0-1.0
       url: https://www.nlm.nih.gov/databases/download/terms_and_conditions.html
+    source_urls:
+      - "https://www.nlm.nih.gov/databases/download/terms_and_conditions.html"
+    evidence_urls:
+      - "https://www.nlm.nih.gov/databases/download/terms_and_conditions.html"
     output:
       pool: permissive
       formats: [json, xml]

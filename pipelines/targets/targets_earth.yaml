@@ -120,6 +120,10 @@ targets:
     priority: 1
     license_profile: permissive
     license_evidence: { spdx_hint: CC0-1.0, url: "" }
+    source_urls:
+      - "internal://synthetic_earth_cards"
+    evidence_urls:
+      - "internal://synthetic_earth_cards"
     download:
       strategy: none
     build:
@@ -150,6 +154,10 @@ targets:
     license_evidence:
       spdx_hint: US-PUBLIC-DOMAIN
       url: https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits
+    source_urls:
+      - "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits"
+    evidence_urls:
+      - "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits"
     download:
       strategy: http
       url: https://prd-wret.s3.us-west-2.amazonaws.com/assets/palladium/production/atoms/files/usgs-copyrights-and-credits.pdf
@@ -171,6 +179,10 @@ targets:
     license_evidence:
       spdx_hint: US-PUBLIC-DOMAIN
       url: https://www.noaa.gov/information-technology/policies
+    source_urls:
+      - "https://www.noaa.gov/information-technology/policies"
+    evidence_urls:
+      - "https://www.noaa.gov/information-technology/policies"
     download:
       strategy: http
       url: https://www.ncei.noaa.gov/access/services/search/v1/download?dataset=global-hourly&format=json
@@ -192,6 +204,10 @@ targets:
     license_evidence:
       spdx_hint: COPERNICUS-SENTINEL-LEGAL-NOTICE
       url: https://marine.copernicus.eu/terms-and-conditions
+    source_urls:
+      - "https://marine.copernicus.eu/terms-and-conditions"
+    evidence_urls:
+      - "https://marine.copernicus.eu/terms-and-conditions"
     download:
       strategy: api_tabular
       base_url: https://catalogue.marine.copernicus.eu/catalog/catalog.xml

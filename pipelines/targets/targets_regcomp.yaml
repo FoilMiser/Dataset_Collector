@@ -105,6 +105,10 @@ targets:
     license_evidence:
       spdx_hint: US-PUBLIC-DOMAIN
       url: https://www.govinfo.gov/about/policies-and-notices/
+    source_urls:
+      - "https://www.govinfo.gov/about/policies-and-notices/"
+    evidence_urls:
+      - "https://www.govinfo.gov/about/policies-and-notices/"
     data_type: [regulation, bulk, xml]
     download:
       strategy: http
@@ -135,6 +139,10 @@ targets:
     license_evidence:
       spdx_hint: US-PUBLIC-DOMAIN
       url: https://www.govinfo.gov/about/policies-and-notices/
+    source_urls:
+      - "https://www.govinfo.gov/about/policies-and-notices/"
+    evidence_urls:
+      - "https://www.govinfo.gov/about/policies-and-notices/"
     data_type: [rulemaking, notice, proposed_rule, final_rule]
     download:
       strategy: http
@@ -165,6 +173,10 @@ targets:
     license_evidence:
       spdx_hint: US-PUBLIC-DOMAIN
       url: https://www.govinfo.gov/about/policies-and-notices/
+    source_urls:
+      - "https://www.govinfo.gov/about/policies-and-notices/"
+    evidence_urls:
+      - "https://www.govinfo.gov/about/policies-and-notices/"
     data_type: [statute, bulk, xml]
     download:
       strategy: http
@@ -195,6 +207,10 @@ targets:
     license_evidence:
       spdx_hint: US-PUBLIC-DOMAIN
       url: https://www.govinfo.gov/about/policies-and-notices/
+    source_urls:
+      - "https://www.govinfo.gov/about/policies-and-notices/"
+    evidence_urls:
+      - "https://www.govinfo.gov/about/policies-and-notices/"
     data_type: [statute, bulk, xml]
     download:
       strategy: http
@@ -225,6 +241,10 @@ targets:
     license_evidence:
       spdx_hint: US-PUBLIC-DOMAIN
       url: https://www.federalregister.gov/developers/documentation/api/v1
+    source_urls:
+      - "https://www.federalregister.gov/developers/documentation/api/v1"
+    evidence_urls:
+      - "https://www.federalregister.gov/developers/documentation/api/v1"
     data_type: [rulemaking, notice, proposed_rule, final_rule]
     download:
       strategy: http
@@ -255,6 +275,10 @@ targets:
     license_evidence:
       spdx_hint: US-PUBLIC-DOMAIN
       url: https://csrc.nist.gov/publications/sp800
+    source_urls:
+      - "https://csrc.nist.gov/publications/sp800"
+    evidence_urls:
+      - "https://csrc.nist.gov/publications/sp800"
     data_type: [controls, guidance, framework]
     download:
       strategy: http
@@ -285,6 +309,10 @@ targets:
     license_evidence:
       spdx_hint: US-PUBLIC-DOMAIN
       url: https://csrc.nist.gov/publications/fips
+    source_urls:
+      - "https://csrc.nist.gov/publications/fips"
+    evidence_urls:
+      - "https://csrc.nist.gov/publications/fips"
     data_type: [standard, controls]
     download:
       strategy: http
@@ -315,6 +343,10 @@ targets:
     license_evidence:
       spdx_hint: US-PUBLIC-DOMAIN
       url: https://www.gao.gov/about/what-legal-notice
+    source_urls:
+      - "https://www.gao.gov/about/what-legal-notice"
+    evidence_urls:
+      - "https://www.gao.gov/about/what-legal-notice"
     data_type: [audit, report]
     download:
       strategy: http
@@ -345,6 +377,10 @@ targets:
     license_evidence:
       spdx_hint: US-PUBLIC-DOMAIN
       url: https://www.oversight.gov/
+    source_urls:
+      - "https://www.oversight.gov/"
+    evidence_urls:
+      - "https://www.oversight.gov/"
     data_type: [audit, investigation, report]
     download:
       strategy: http
@@ -375,6 +411,10 @@ targets:
     license_evidence:
       spdx_hint: US-PUBLIC-DOMAIN
       url: https://echo.epa.gov/tools/data-downloads
+    source_urls:
+      - "https://echo.epa.gov/tools/data-downloads"
+    evidence_urls:
+      - "https://echo.epa.gov/tools/data-downloads"
     data_type: [compliance_dataset, enforcement_dataset]
     download:
       strategy: http
@@ -405,6 +445,10 @@ targets:
     license_evidence:
       spdx_hint: US-PUBLIC-DOMAIN
       url: https://www.osha.gov/foia/inspection
+    source_urls:
+      - "https://www.osha.gov/foia/inspection"
+    evidence_urls:
+      - "https://www.osha.gov/foia/inspection"
     data_type: [compliance_dataset, enforcement_dataset]
     download:
       strategy: http
@@ -435,6 +479,10 @@ targets:
     license_evidence:
       spdx_hint: US-PUBLIC-DOMAIN
       url: https://api.usaspending.gov/
+    source_urls:
+      - "https://api.usaspending.gov/"
+    evidence_urls:
+      - "https://api.usaspending.gov/"
     data_type: [procurement_dataset]
     download:
       strategy: http
@@ -465,6 +513,10 @@ targets:
     license_evidence:
       spdx_hint: US-PUBLIC-DOMAIN
       url: https://sam.gov/
+    source_urls:
+      - "https://sam.gov/"
+    evidence_urls:
+      - "https://sam.gov/"
     data_type: [exclusions_dataset]
     download:
       strategy: http
@@ -495,6 +547,10 @@ targets:
     license_evidence:
       spdx_hint: CC0-1.0
       url: https://case.law/
+    source_urls:
+      - "https://case.law/"
+    evidence_urls:
+      - "https://case.law/"
     data_type: [case_law]
     download:
       strategy: http
@@ -525,6 +581,11 @@ targets:
     license_evidence:
       spdx_hint: UNKNOWN
       url: https://huggingface.co/datasets/common-pile
+    source_urls:
+      - "https://huggingface.co/datasets/common-pile"
+    evidence_urls:
+      - "https://huggingface.co/datasets/common-pile"
+    dataset_version: "main"
     data_type: [mixed]
     download:
       strategy: huggingface_datasets
@@ -561,6 +622,10 @@ targets:
     license_evidence:
       spdx_hint: UNKNOWN
       url: https://www.regulations.gov/
+    source_urls:
+      - "https://www.regulations.gov/"
+    evidence_urls:
+      - "https://www.regulations.gov/"
     data_type: [docket, comment, supporting_material]
     download:
       strategy: http
@@ -593,6 +658,10 @@ targets:
     license_evidence:
       spdx_hint: US-PUBLIC-DOMAIN
       url: https://www.ecfr.gov/reader-aids/what-is-the-ecfr
+    source_urls:
+      - "https://www.ecfr.gov/reader-aids/what-is-the-ecfr"
+    evidence_urls:
+      - "https://www.ecfr.gov/reader-aids/what-is-the-ecfr"
     data_type: [regulation]
     download:
       strategy: http
@@ -625,6 +694,10 @@ targets:
     license_evidence:
       spdx_hint: CC-BY-4.0
       url: https://eur-lex.europa.eu/content/legal-notice/legal-notice.html
+    source_urls:
+      - "https://eur-lex.europa.eu/content/legal-notice/legal-notice.html"
+    evidence_urls:
+      - "https://eur-lex.europa.eu/content/legal-notice/legal-notice.html"
     data_type: [directive, regulation, decision, guidance]
     download:
       strategy: http
@@ -657,6 +730,10 @@ targets:
     license_evidence:
       spdx_hint: CC-BY-4.0
       url: https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/
+    source_urls:
+      - "https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/"
+    evidence_urls:
+      - "https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/"
     data_type: [statute, regulation]
     download:
       strategy: http
@@ -687,6 +764,10 @@ targets:
     license_evidence:
       spdx_hint: CC-BY-4.0
       url: https://open.canada.ca/en/open-government-licence-canada
+    source_urls:
+      - "https://open.canada.ca/en/open-government-licence-canada"
+    evidence_urls:
+      - "https://open.canada.ca/en/open-government-licence-canada"
     data_type: [statute, regulation, guidance]
     download:
       strategy: http
@@ -717,6 +798,10 @@ targets:
     license_evidence:
       spdx_hint: CC-BY-4.0
       url: https://www.legislation.gov.au/
+    source_urls:
+      - "https://www.legislation.gov.au/"
+    evidence_urls:
+      - "https://www.legislation.gov.au/"
     data_type: [statute, regulation]
     download:
       strategy: http
@@ -747,6 +832,10 @@ targets:
     license_evidence:
       spdx_hint: UNKNOWN
       url: https://www.ncsl.org/research/administrative-law-state-administrative-procedure-acts.aspx
+    source_urls:
+      - "https://www.ncsl.org/research/administrative-law-state-administrative-procedure-acts.aspx"
+    evidence_urls:
+      - "https://www.ncsl.org/research/administrative-law-state-administrative-procedure-acts.aspx"
     data_type: [regulation, notice]
     download:
       strategy: http
@@ -779,6 +868,10 @@ targets:
     license_evidence:
       spdx_hint: UNKNOWN
       url: https://www.courtlistener.com/api/
+    source_urls:
+      - "https://www.courtlistener.com/api/"
+    evidence_urls:
+      - "https://www.courtlistener.com/api/"
     data_type: [case_law, docket]
     download:
       strategy: http
@@ -811,6 +904,10 @@ targets:
     license_evidence:
       spdx_hint: US-PUBLIC-DOMAIN
       url: https://www.sec.gov/os/accessing-edgar-data
+    source_urls:
+      - "https://www.sec.gov/os/accessing-edgar-data"
+    evidence_urls:
+      - "https://www.sec.gov/os/accessing-edgar-data"
     data_type: [rulemaking, release, guidance]
     download:
       strategy: http
@@ -843,6 +940,10 @@ targets:
     license_evidence:
       spdx_hint: All-Rights-Reserved
       url: https://www.sec.gov/edgar
+    source_urls:
+      - "https://www.sec.gov/edgar"
+    evidence_urls:
+      - "https://www.sec.gov/edgar"
     data_type: [corporate_filing]
     download:
       strategy: http
@@ -876,6 +977,10 @@ targets:
     license_evidence:
       spdx_hint: Custom-Restrictive
       url: https://www.iso.org/standards.html
+    source_urls:
+      - "https://www.iso.org/standards.html"
+    evidence_urls:
+      - "https://www.iso.org/standards.html"
     data_type: [standard]
     download:
       strategy: none
@@ -905,6 +1010,10 @@ targets:
     license_evidence:
       spdx_hint: Custom-Restrictive
       url: https://www.astm.org/standards.html
+    source_urls:
+      - "https://www.astm.org/standards.html"
+    evidence_urls:
+      - "https://www.astm.org/standards.html"
     data_type: [standard]
     download:
       strategy: none
@@ -934,6 +1043,10 @@ targets:
     license_evidence:
       spdx_hint: Custom-Restrictive
       url: https://www.nfpa.org/Codes-and-Standards
+    source_urls:
+      - "https://www.nfpa.org/Codes-and-Standards"
+    evidence_urls:
+      - "https://www.nfpa.org/Codes-and-Standards"
     data_type: [standard]
     download:
       strategy: none
@@ -963,6 +1076,10 @@ targets:
     license_evidence:
       spdx_hint: Custom-Restrictive
       url: https://www.cisecurity.org/cis-benchmarks
+    source_urls:
+      - "https://www.cisecurity.org/cis-benchmarks"
+    evidence_urls:
+      - "https://www.cisecurity.org/cis-benchmarks"
     data_type: [benchmark]
     download:
       strategy: none
@@ -992,6 +1109,10 @@ targets:
     license_evidence:
       spdx_hint: Custom-Restrictive
       url: https://www.pcisecuritystandards.org/document_library
+    source_urls:
+      - "https://www.pcisecuritystandards.org/document_library"
+    evidence_urls:
+      - "https://www.pcisecuritystandards.org/document_library"
     data_type: [standard]
     download:
       strategy: none
@@ -1021,6 +1142,10 @@ targets:
     license_evidence:
       spdx_hint: Custom-Restrictive
       url: https://www.aicpa-cima.com/landing/soc2
+    source_urls:
+      - "https://www.aicpa-cima.com/landing/soc2"
+    evidence_urls:
+      - "https://www.aicpa-cima.com/landing/soc2"
     data_type: [standard]
     download:
       strategy: none
@@ -1050,6 +1175,10 @@ targets:
     license_evidence:
       spdx_hint: Custom-Restrictive
       url: https://www.uniformlaws.org/committees/community-home?communitykey=15f48a52-1454-4a5c-b11e-801d4bb1bcf9
+    source_urls:
+      - "https://www.uniformlaws.org/committees/community-home?communitykey=15f48a52-1454-4a5c-b11e-801d4bb1bcf9"
+    evidence_urls:
+      - "https://www.uniformlaws.org/committees/community-home?communitykey=15f48a52-1454-4a5c-b11e-801d4bb1bcf9"
     data_type: [statute]
     download:
       strategy: none
@@ -1079,6 +1208,10 @@ targets:
     license_evidence:
       spdx_hint: Custom-Restrictive
       url: https://legal.thomsonreuters.com/en/products/westlaw
+    source_urls:
+      - "https://legal.thomsonreuters.com/en/products/westlaw"
+    evidence_urls:
+      - "https://legal.thomsonreuters.com/en/products/westlaw"
     data_type: [treatise]
     download:
       strategy: none
@@ -1108,6 +1241,10 @@ targets:
     license_evidence:
       spdx_hint: Custom-Restrictive
       url: https://www.acams.org/en/training
+    source_urls:
+      - "https://www.acams.org/en/training"
+    evidence_urls:
+      - "https://www.acams.org/en/training"
     data_type: [training_material]
     download:
       strategy: none

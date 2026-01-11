@@ -135,6 +135,10 @@ targets:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://echo.epa.gov/resources/echo-data/about-the-data"
       notes: "EPA ECHO bulk downloads; U.S. federal government data."
+    source_urls:
+      - "https://echo.epa.gov/resources/echo-data/about-the-data"
+    evidence_urls:
+      - "https://echo.epa.gov/resources/echo-data/about-the-data"
     data_type: ["tabular", "registry", "facility", "waste", "water", "air"]
     download:
       strategy: "http"
@@ -156,6 +160,10 @@ targets:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://echo.epa.gov/files/echodownloads/"
       notes: "Convenient flattened exports for analytics/joins."
+    source_urls:
+      - "https://echo.epa.gov/files/echodownloads/"
+    evidence_urls:
+      - "https://echo.epa.gov/files/echodownloads/"
     data_type: ["tabular", "facility", "compliance"]
     download:
       strategy: "http"
@@ -176,6 +184,10 @@ targets:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://echo.epa.gov/files/echodownloads/"
       notes: "Air program compliance + combined emissions reports; useful for ag burning/industrial bioeconomy."
+    source_urls:
+      - "https://echo.epa.gov/files/echodownloads/"
+    evidence_urls:
+      - "https://echo.epa.gov/files/echodownloads/"
     data_type: ["tabular", "air", "emissions", "regulatory"]
     download:
       strategy: "http"
@@ -198,6 +210,10 @@ targets:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://echo.epa.gov/files/echodownloads/"
       notes: "Crosswalks help map facilities to industry categories; not the full TRI release."
+    source_urls:
+      - "https://echo.epa.gov/files/echodownloads/"
+    evidence_urls:
+      - "https://echo.epa.gov/files/echodownloads/"
     data_type: ["tabular", "emissions", "industry_codes"]
     download:
       strategy: "http"
@@ -218,6 +234,10 @@ targets:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://echo.epa.gov/files/echodownloads/"
       notes: "State-level aggregates useful for trend modeling; low PII risk."
+    source_urls:
+      - "https://echo.epa.gov/files/echodownloads/"
+    evidence_urls:
+      - "https://echo.epa.gov/files/echodownloads/"
     data_type: ["tabular", "aggregates", "policy"]
     download:
       strategy: "http"
@@ -240,6 +260,10 @@ targets:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://echo.epa.gov/files/echodownloads/"
       notes: "Large files; keep disabled until you implement downsampling + aggregation to reduce re-identification risk."
+    source_urls:
+      - "https://echo.epa.gov/files/echodownloads/"
+    evidence_urls:
+      - "https://echo.epa.gov/files/echodownloads/"
     data_type: ["tabular", "demographics", "environmental_justice"]
     download:
       strategy: "http"
@@ -260,6 +284,10 @@ targets:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://echo.epa.gov/files/echodownloads/"
       notes: "Contains RCRA hazardous waste handler / program tables via ECHO."
+    source_urls:
+      - "https://echo.epa.gov/files/echodownloads/"
+    evidence_urls:
+      - "https://echo.epa.gov/files/echodownloads/"
     data_type: ["tabular", "waste", "hazardous_waste", "regulatory"]
     download:
       strategy: "http"
@@ -281,6 +309,10 @@ targets:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://echo.epa.gov/files/echodownloads/"
       notes: "NPDES permits, outfalls, enforcement/compliance tables."
+    source_urls:
+      - "https://echo.epa.gov/files/echodownloads/"
+    evidence_urls:
+      - "https://echo.epa.gov/files/echodownloads/"
     data_type: ["tabular", "water", "wastewater", "regulatory"]
     download:
       strategy: "http"
@@ -305,6 +337,10 @@ targets:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://echo.epa.gov/files/echodownloads/"
       notes: "Discharge Monitoring Reports: HTF and annual FY zips."
+    source_urls:
+      - "https://echo.epa.gov/files/echodownloads/"
+    evidence_urls:
+      - "https://echo.epa.gov/files/echodownloads/"
     data_type: ["tabular", "water_quality", "wastewater"]
     download:
       strategy: "http"
@@ -328,6 +364,10 @@ targets:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://echo.epa.gov/files/echodownloads/"
       notes: "Safe Drinking Water Act compliance tables; useful for circular water systems."
+    source_urls:
+      - "https://echo.epa.gov/files/echodownloads/"
+    evidence_urls:
+      - "https://echo.epa.gov/files/echodownloads/"
     data_type: ["tabular", "water", "drinking_water", "regulatory"]
     download:
       strategy: "http"
@@ -351,6 +391,10 @@ targets:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://echo.epa.gov/files/echodownloads/"
       notes: "PFAS-related ATTAINS JSON exports for water impairment analysis."
+    source_urls:
+      - "https://echo.epa.gov/files/echodownloads/"
+    evidence_urls:
+      - "https://echo.epa.gov/files/echodownloads/"
     data_type: ["json", "water_quality", "pfas"]
     download:
       strategy: "http"
@@ -371,6 +415,10 @@ targets:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://echo.epa.gov/files/echodownloads/"
       notes: "Combined sewer overflows and sanitary sewer overflows; waste stream infrastructure."
+    source_urls:
+      - "https://echo.epa.gov/files/echodownloads/"
+    evidence_urls:
+      - "https://echo.epa.gov/files/echodownloads/"
     data_type: ["tabular", "wastewater", "infrastructure"]
     download:
       strategy: "http"
@@ -392,6 +440,10 @@ targets:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://echo.epa.gov/files/echodownloads/"
       notes: "Enforcement cases and related tables."
+    source_urls:
+      - "https://echo.epa.gov/files/echodownloads/"
+    evidence_urls:
+      - "https://echo.epa.gov/files/echodownloads/"
     data_type: ["tabular", "regulatory", "enforcement"]
     download:
       strategy: "http"
@@ -415,6 +467,10 @@ targets:
       spdx_hint: "CC-BY-3.0-IGO"
       url: "https://www.fao.org/agrovoc/"
       notes: "Use for normalization/ontology; ensure attribution requirements in downstream artifacts."
+    source_urls:
+      - "https://www.fao.org/agrovoc/"
+    evidence_urls:
+      - "https://www.fao.org/agrovoc/"
     data_type: ["ontology", "taxonomy", "text"]
     download:
       strategy: "http"
@@ -437,6 +493,10 @@ targets:
       spdx_hint: "ODbL-1.0"
       url: "https://world.openfoodfacts.org/data"
       notes: "ODbL share-alike; keep in copyleft pool and avoid mixing with permissive pools."
+    source_urls:
+      - "https://world.openfoodfacts.org/data"
+    evidence_urls:
+      - "https://world.openfoodfacts.org/data"
     data_type: ["tabular", "food", "nutrition", "packaging"]
     download:
       strategy: "http"
@@ -456,6 +516,11 @@ targets:
       spdx_hint: "MIXED"
       url: "https://huggingface.co/collections/common-pile/common-pile-v01-6724f18a787781ca9ae25749"
       notes: "CommonPile is large and heterogeneous; implement streaming + per-component license filters before enabling."
+    source_urls:
+      - "https://huggingface.co/collections/common-pile/common-pile-v01-6724f18a787781ca9ae25749"
+    evidence_urls:
+      - "https://huggingface.co/collections/common-pile/common-pile-v01-6724f18a787781ca9ae25749"
+    dataset_version: "main"
     data_type: ["text", "web", "scientific", "policy"]
     download:
       strategy: "huggingface_datasets"
@@ -477,6 +542,10 @@ targets:
       spdx_hint: "CC0-1.0 OR CC-BY-4.0 OR CC-BY-NC-4.0"
       url: "https://www.gbif.org/"
       notes: "Filter out non-commercial (BY-NC) records; retain CC0/BY only. Requires custom download worker."
+    source_urls:
+      - "https://www.gbif.org/"
+    evidence_urls:
+      - "https://www.gbif.org/"
     data_type: ["tabular", "biodiversity", "geospatial"]
     download:
       strategy: "none"
@@ -495,6 +564,10 @@ targets:
       spdx_hint: "TERMS-REVIEW"
       url: "https://www.fao.org/faostat/"
       notes: "Prefer official bulk downloads and capture citation/attribution requirements."
+    source_urls:
+      - "https://www.fao.org/faostat/"
+    evidence_urls:
+      - "https://www.fao.org/faostat/"
     data_type: ["tabular", "agriculture", "trade", "emissions"]
     download:
       strategy: "none"
@@ -517,6 +590,10 @@ targets:
       spdx_hint: "PROPRIETARY"
       url: "https://ecoinvent.org/"
       notes: "Commercial license; not suitable for training corpora ingestion."
+    source_urls:
+      - "https://ecoinvent.org/"
+    evidence_urls:
+      - "https://ecoinvent.org/"
     data_type: ["lca", "proprietary"]
     download:
       strategy: "none"
@@ -534,6 +611,10 @@ targets:
       spdx_hint: "PROPRIETARY"
       url: "https://gabi.sphera.com/"
       notes: "Commercial license; not suitable for training corpora ingestion."
+    source_urls:
+      - "https://gabi.sphera.com/"
+    evidence_urls:
+      - "https://gabi.sphera.com/"
     data_type: ["lca", "proprietary"]
     download:
       strategy: "none"

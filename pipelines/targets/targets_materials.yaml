@@ -99,6 +99,10 @@ targets:
   license_evidence:
     url: https://jarvis.nist.gov/
     spdx_hint: CC-BY-4.0 (confirm per release)
+  source_urls:
+    - "https://jarvis.nist.gov/"
+  evidence_urls:
+    - "https://jarvis.nist.gov/"
   data_type: [materials, structures, properties, dft]
   download:
     strategy: http
@@ -122,6 +126,10 @@ targets:
   license_evidence:
     url: https://opencatalystproject.org/
     spdx_hint: CC-BY-4.0 (confirm per dataset release)
+  source_urls:
+    - "https://opencatalystproject.org/"
+  evidence_urls:
+    - "https://opencatalystproject.org/"
   data_type: [materials, catalysis, surfaces, properties]
   download:
     strategy: http
@@ -144,6 +152,11 @@ targets:
   license_evidence:
     url: https://github.com/materialsproject/matbench
     spdx_hint: MIT (repo); verify each embedded dataset license
+  source_urls:
+    - "https://github.com/materialsproject/matbench"
+  evidence_urls:
+    - "https://github.com/materialsproject/matbench"
+  dataset_tag: "default_branch"
   data_type: [materials, benchmarks, ml]
   download:
     strategy: git
@@ -169,6 +182,10 @@ targets:
   license_evidence:
     url: https://matbench-discovery.materialsproject.org/
     spdx_hint: CC-BY-4.0 (confirm)
+  source_urls:
+    - "https://matbench-discovery.materialsproject.org/"
+  evidence_urls:
+    - "https://matbench-discovery.materialsproject.org/"
   data_type: [materials, ml, screening]
   download:
     strategy: http
@@ -191,6 +208,10 @@ targets:
   license_evidence:
     url: https://www.usgs.gov/special-topics/critical-minerals
     spdx_hint: US-PUBLIC-DOMAIN (confirm)
+  source_urls:
+    - "https://www.usgs.gov/special-topics/critical-minerals"
+  evidence_urls:
+    - "https://www.usgs.gov/special-topics/critical-minerals"
   data_type: [auxiliary, supply_chain, stats]
   download:
     strategy: http
@@ -212,6 +233,10 @@ targets:
   license_evidence:
     url: https://www.epa.gov/egrid
     spdx_hint: US-PUBLIC-DOMAIN (confirm)
+  source_urls:
+    - "https://www.epa.gov/egrid"
+  evidence_urls:
+    - "https://www.epa.gov/egrid"
   data_type: [auxiliary, environment, emissions]
   download:
     strategy: http
@@ -233,6 +258,10 @@ targets:
   license_evidence:
     url: https://materialsproject.org/about
     spdx_hint: Custom-Restrictive (treat as YELLOW)
+  source_urls:
+    - "https://materialsproject.org/about"
+  evidence_urls:
+    - "https://materialsproject.org/about"
   data_type: [materials, api, structures, properties]
   download:
     strategy: api
@@ -254,6 +283,10 @@ targets:
   license_evidence:
     url: https://nomad-lab.eu/
     spdx_hint: mixed; record-level licensing
+  source_urls:
+    - "https://nomad-lab.eu/"
+  evidence_urls:
+    - "https://nomad-lab.eu/"
   data_type: [materials, repository, archive]
   download:
     strategy: api
@@ -275,6 +308,10 @@ targets:
   license_evidence:
     url: https://oqmd.org/
     spdx_hint: mixed; confirm ToS
+  source_urls:
+    - "https://oqmd.org/"
+  evidence_urls:
+    - "https://oqmd.org/"
   data_type: [materials, thermo, phase, database]
   download:
     strategy: api
@@ -296,6 +333,10 @@ targets:
   license_evidence:
     url: https://pmc.ncbi.nlm.nih.gov/tools/openftlist/
     spdx_hint: mixed; record-level licenses
+  source_urls:
+    - "https://pmc.ncbi.nlm.nih.gov/tools/openftlist/"
+  evidence_urls:
+    - "https://pmc.ncbi.nlm.nih.gov/tools/openftlist/"
   data_type: [materials, literature, oa, text]
   download:
     strategy: pmc_oa
@@ -317,6 +358,10 @@ targets:
   license_evidence:
     url: https://info.arxiv.org/help/license/index.html
     spdx_hint: mixed; record-level
+  source_urls:
+    - "https://info.arxiv.org/help/license/index.html"
+  evidence_urls:
+    - "https://info.arxiv.org/help/license/index.html"
   data_type: [materials, preprints, text]
   download:
     strategy: http
@@ -338,6 +383,10 @@ targets:
   license_evidence:
     url: http://www.aflowlib.org/
     spdx_hint: Custom-Restrictive (confirm)
+  source_urls:
+    - "http://www.aflowlib.org/"
+  evidence_urls:
+    - "http://www.aflowlib.org/"
   data_type: [materials, dft, repository]
   download:
     strategy: http
@@ -359,6 +408,11 @@ targets:
   license_evidence:
     url: https://zenodo.org/
     spdx_hint: mixed; per-record
+  source_urls:
+    - "https://zenodo.org/"
+  evidence_urls:
+    - "https://zenodo.org/"
+  dataset_version: "latest"
   data_type: [materials, mixed, zenodo]
   download:
     strategy: zenodo
@@ -380,6 +434,11 @@ targets:
   license_evidence:
     url: https://creativecommons.org/licenses/by-sa/4.0/
     spdx_hint: CC-BY-SA-4.0
+  source_urls:
+    - "https://creativecommons.org/licenses/by-sa/4.0/"
+  evidence_urls:
+    - "https://creativecommons.org/licenses/by-sa/4.0/"
+  dataset_version: "main"
   data_type: [materials, reference, wikipedia]
   download:
     strategy: huggingface_datasets
@@ -404,6 +463,10 @@ targets:
   license_evidence:
     url: https://www.openstreetmap.org/copyright
     spdx_hint: ODbL-1.0
+  source_urls:
+    - "https://www.openstreetmap.org/copyright"
+  evidence_urls:
+    - "https://www.openstreetmap.org/copyright"
   data_type: [auxiliary, geodata, osm]
   download:
     strategy: http
@@ -425,6 +488,10 @@ targets:
   license_evidence:
     url: ""
     spdx_hint: Proprietary
+  source_urls:
+    - "internal://proprietary_lca_databases"
+  evidence_urls:
+    - "internal://proprietary_lca_databases"
   data_type: [auxiliary, environment, lca]
   download:
     strategy: none

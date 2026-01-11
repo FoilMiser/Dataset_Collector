@@ -181,6 +181,18 @@
           "name": { "type": "string" },
           "enabled": { "type": "boolean" },
           "priority": { "type": "number" },
+          "source_urls": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "minItems": 1
+          },
+          "evidence_urls": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "minItems": 1
+          },
+          "dataset_version": { "type": "string", "minLength": 1 },
+          "dataset_tag": { "type": "string", "minLength": 1 },
           "license_profile": { "type": "string" },
           "license_evidence": {
             "type": "object",
@@ -226,6 +238,66 @@
           "license_gates": { "$ref": "#/definitions/license_gate_override" },
           "content_checks": { "$ref": "#/definitions/content_check_override" }
         },
+        "allOf": [
+          {
+            "if": {
+              "properties": { "enabled": { "const": false } },
+              "required": ["enabled"]
+            },
+            "then": {},
+            "else": {
+              "required": ["source_urls", "evidence_urls"]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "download": {
+                  "properties": { "strategy": { "const": "huggingface_datasets" } },
+                  "required": ["strategy"]
+                }
+              },
+              "required": ["download"]
+            },
+            "then": { "required": ["dataset_version"] }
+          },
+          {
+            "if": {
+              "properties": {
+                "download": {
+                  "properties": { "strategy": { "const": "git" } },
+                  "required": ["strategy"]
+                }
+              },
+              "required": ["download"]
+            },
+            "then": { "required": ["dataset_tag"] }
+          },
+          {
+            "if": {
+              "properties": {
+                "download": {
+                  "properties": { "strategy": { "const": "zenodo" } },
+                  "required": ["strategy"]
+                }
+              },
+              "required": ["download"]
+            },
+            "then": { "required": ["dataset_version"] }
+          },
+          {
+            "if": {
+              "properties": {
+                "download": {
+                  "properties": { "strategy": { "const": "figshare" } },
+                  "required": ["strategy"]
+                }
+              },
+              "required": ["download"]
+            },
+            "then": { "required": ["dataset_version"] }
+          }
+        ],
         "additionalProperties": true
       }
     }

@@ -133,6 +133,10 @@ targets:
     license_evidence:
       spdx_hint: "CC-BY-4.0"
       url: "https://www.bipm.org/en/publications/si-brochure"
+    source_urls:
+      - "https://www.bipm.org/en/publications/si-brochure"
+    evidence_urls:
+      - "https://www.bipm.org/en/publications/si-brochure"
     data_type: ["metrology", "units", "standards_guidance", "technical_report"]
     download:
       strategy: "http"
@@ -156,6 +160,10 @@ targets:
     license_evidence:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://www.nist.gov/open/license"
+    source_urls:
+      - "https://www.nist.gov/open/license"
+    evidence_urls:
+      - "https://www.nist.gov/open/license"
     data_type: ["metrology", "units", "standards_guidance", "technical_report"]
     download:
       strategy: "http"
@@ -179,6 +187,10 @@ targets:
     license_evidence:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://www.nist.gov/open/license"
+    source_urls:
+      - "https://www.nist.gov/open/license"
+    evidence_urls:
+      - "https://www.nist.gov/open/license"
     data_type: ["policy_guidance", "research_data", "technical_report", "nist_style"]
     download:
       strategy: "http"
@@ -202,6 +214,10 @@ targets:
     license_evidence:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://catalog.data.gov/dataset/nist-technical-series-publication-metadata"
+    source_urls:
+      - "https://catalog.data.gov/dataset/nist-technical-series-publication-metadata"
+    evidence_urls:
+      - "https://catalog.data.gov/dataset/nist-technical-series-publication-metadata"
     data_type: ["metadata", "catalog", "nist_tech_series", "dois"]
     download:
       strategy: "http"
@@ -229,6 +245,10 @@ targets:
     license_evidence:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://www.nist.gov/open/license"
+    source_urls:
+      - "https://www.nist.gov/open/license"
+    evidence_urls:
+      - "https://www.nist.gov/open/license"
     data_type: ["technical_report", "nist_style", "metrology", "measurement_uncertainty", "calibration"]
     download:
       strategy: "api"
@@ -257,6 +277,10 @@ targets:
     license_evidence:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://sti.nasa.gov/harvesting-data-from-ntrs/"
+    source_urls:
+      - "https://sti.nasa.gov/harvesting-data-from-ntrs/"
+    evidence_urls:
+      - "https://sti.nasa.gov/harvesting-data-from-ntrs/"
     data_type: ["technical_report", "nasa_style", "engineering", "test_reports", "handbooks", "ntrs"]
     download:
       strategy: "ntrs_openapi"
@@ -287,6 +311,10 @@ targets:
     license_evidence:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://pubs.usgs.gov/documentation/web_service_documentation"
+    source_urls:
+      - "https://pubs.usgs.gov/documentation/web_service_documentation"
+    evidence_urls:
+      - "https://pubs.usgs.gov/documentation/web_service_documentation"
     data_type: ["technical_report", "methods", "measurement", "instrumentation", "calibration", "uncertainty"]
     download:
       strategy: "usgs_pubs_warehouse"
@@ -316,6 +344,10 @@ targets:
     license_evidence:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://github.com/NOAA-Central-Library-NCL/NOAA_IR"
+    source_urls:
+      - "https://github.com/NOAA-Central-Library-NCL/NOAA_IR"
+    evidence_urls:
+      - "https://github.com/NOAA-Central-Library-NCL/NOAA_IR"
     data_type: ["technical_report", "noaa_style", "methods", "instrumentation"]
     download:
       strategy: "noaa_ir_json"
@@ -341,6 +373,10 @@ targets:
     license_evidence:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://library.noaa.gov/author-publishing/NOAA-Publications"
+    source_urls:
+      - "https://library.noaa.gov/author-publishing/NOAA-Publications"
+    evidence_urls:
+      - "https://library.noaa.gov/author-publishing/NOAA-Publications"
     data_type: ["technical_report", "noaa_style", "methods"]
     download:
       strategy: "http"
@@ -364,6 +400,10 @@ targets:
     license_evidence:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://data.ntsb.gov/avdata"
+    source_urls:
+      - "https://data.ntsb.gov/avdata"
+    evidence_urls:
+      - "https://data.ntsb.gov/avdata"
     data_type: ["datasets", "coding_manuals", "data_definitions", "safety"]
     download:
       strategy: "http"
@@ -393,6 +433,10 @@ targets:
     license_evidence:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://www.faa.gov/regulations_policies/advisory_circulars/"
+    source_urls:
+      - "https://www.faa.gov/regulations_policies/advisory_circulars/"
+    evidence_urls:
+      - "https://www.faa.gov/regulations_policies/advisory_circulars/"
     data_type: ["technical_guidance", "procedures", "safety", "standards"]
     download:
       strategy: "faa_ac_crawl"
@@ -420,6 +464,11 @@ targets:
     license_evidence:
       spdx_hint: "Derived"
       url: "https://huggingface.co/datasets/common-pile/arxiv_abstracts"
+    source_urls:
+      - "https://huggingface.co/datasets/common-pile/arxiv_abstracts"
+    evidence_urls:
+      - "https://huggingface.co/datasets/common-pile/arxiv_abstracts"
+    dataset_version: "main"
     data_type: ["commonpile", "scientific_writing", "background"]
     download:
       strategy: "huggingface_datasets"
@@ -449,6 +498,11 @@ targets:
     license_evidence:
       spdx_hint: "Derived"
       url: "https://huggingface.co/datasets/common-pile/doab"
+    source_urls:
+      - "https://huggingface.co/datasets/common-pile/doab"
+    evidence_urls:
+      - "https://huggingface.co/datasets/common-pile/doab"
+    dataset_version: "main"
     data_type: ["commonpile", "books", "background"]
     download:
       strategy: "huggingface_datasets"
@@ -476,6 +530,10 @@ targets:
     license_evidence:
       spdx_hint: "All-Rights-Reserved"
       url: ""
+    source_urls:
+      - "internal://iso_standards_paywalled"
+    evidence_urls:
+      - "internal://iso_standards_paywalled"
     data_type: ["standards", "restricted"]
     download:
       strategy: "none"
@@ -493,6 +551,10 @@ targets:
     license_evidence:
       spdx_hint: "All-Rights-Reserved"
       url: ""
+    source_urls:
+      - "internal://ieee_standards_paywalled"
+    evidence_urls:
+      - "internal://ieee_standards_paywalled"
     data_type: ["standards", "restricted"]
     download:
       strategy: "none"

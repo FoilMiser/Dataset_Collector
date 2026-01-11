@@ -111,6 +111,10 @@ targets:
   license_evidence:
     spdx_hint: CC0-1.0
     url: ''
+  source_urls:
+    - "internal://synthetic_math_problems"
+  evidence_urls:
+    - "internal://synthetic_math_problems"
   data_type:
   - synthetic
   - math
@@ -155,6 +159,11 @@ targets:
   license_evidence:
     spdx_hint: CC-BY-SA-4.0
     url: https://creativecommons.org/licenses/by-sa/4.0/
+  source_urls:
+    - "https://creativecommons.org/licenses/by-sa/4.0/"
+  evidence_urls:
+    - "https://creativecommons.org/licenses/by-sa/4.0/"
+  dataset_version: "main"
   data_type:
   - text
   - math
@@ -196,6 +205,11 @@ targets:
   license_evidence:
     spdx_hint: CC-BY-SA-4.0
     url: https://creativecommons.org/licenses/by-sa/4.0/
+  source_urls:
+    - "https://creativecommons.org/licenses/by-sa/4.0/"
+  evidence_urls:
+    - "https://creativecommons.org/licenses/by-sa/4.0/"
+  dataset_version: "main"
   data_type:
   - text
   - math
@@ -237,6 +251,11 @@ targets:
   license_evidence:
     spdx_hint: CC-BY-SA-4.0
     url: https://creativecommons.org/licenses/by-sa/4.0/
+  source_urls:
+    - "https://creativecommons.org/licenses/by-sa/4.0/"
+  evidence_urls:
+    - "https://creativecommons.org/licenses/by-sa/4.0/"
+  dataset_version: "main"
   data_type:
   - text
   - math
@@ -279,6 +298,11 @@ targets:
   license_evidence:
     spdx_hint: CC-BY-SA-4.0
     url: https://creativecommons.org/licenses/by-sa/4.0/
+  source_urls:
+    - "https://creativecommons.org/licenses/by-sa/4.0/"
+  evidence_urls:
+    - "https://creativecommons.org/licenses/by-sa/4.0/"
+  dataset_version: "main"
   data_type:
   - qa
   - math
@@ -320,6 +344,11 @@ targets:
   license_evidence:
     spdx_hint: CC-BY-4.0
     url: https://huggingface.co/datasets/common-pile/arxiv_papers
+  source_urls:
+    - "https://huggingface.co/datasets/common-pile/arxiv_papers"
+  evidence_urls:
+    - "https://huggingface.co/datasets/common-pile/arxiv_papers"
+  dataset_version: "main"
   data_type:
   - papers
   - math
@@ -363,6 +392,11 @@ targets:
   license_evidence:
     spdx_hint: UNKNOWN
     url: https://huggingface.co/datasets/common-pile/oercommons
+  source_urls:
+    - "https://huggingface.co/datasets/common-pile/oercommons"
+  evidence_urls:
+    - "https://huggingface.co/datasets/common-pile/oercommons"
+  dataset_version: "main"
   data_type:
   - text
   - math
@@ -406,6 +440,11 @@ targets:
   license_evidence:
     spdx_hint: UNKNOWN
     url: https://huggingface.co/datasets/common-pile/libretexts
+  source_urls:
+    - "https://huggingface.co/datasets/common-pile/libretexts"
+  evidence_urls:
+    - "https://huggingface.co/datasets/common-pile/libretexts"
+  dataset_version: "main"
   data_type:
   - text
   - math
@@ -449,6 +488,11 @@ targets:
   license_evidence:
     spdx_hint: UNKNOWN
     url: https://huggingface.co/datasets/common-pile/pressbooks
+  source_urls:
+    - "https://huggingface.co/datasets/common-pile/pressbooks"
+  evidence_urls:
+    - "https://huggingface.co/datasets/common-pile/pressbooks"
+  dataset_version: "main"
   data_type:
   - text
   - math
@@ -492,6 +536,11 @@ targets:
   license_evidence:
     spdx_hint: UNKNOWN
     url: https://huggingface.co/datasets/common-pile/doab
+  source_urls:
+    - "https://huggingface.co/datasets/common-pile/doab"
+  evidence_urls:
+    - "https://huggingface.co/datasets/common-pile/doab"
+  dataset_version: "main"
   data_type:
   - text
   - math
@@ -535,6 +584,11 @@ targets:
   license_evidence:
     spdx_hint: UNKNOWN
     url: https://huggingface.co/datasets/common-pile/project_gutenberg
+  source_urls:
+    - "https://huggingface.co/datasets/common-pile/project_gutenberg"
+  evidence_urls:
+    - "https://huggingface.co/datasets/common-pile/project_gutenberg"
+  dataset_version: "main"
   data_type:
   - text
   - math
@@ -578,6 +632,11 @@ targets:
   license_evidence:
     spdx_hint: CC0-1.0
     url: https://us.metamath.org/#license
+  source_urls:
+    - "https://us.metamath.org/#license"
+  evidence_urls:
+    - "https://us.metamath.org/#license"
+  dataset_tag: "default_branch"
   data_type:
   - formal_math
   - proofs
@@ -612,6 +671,11 @@ targets:
   license_evidence:
     spdx_hint: Apache-2.0
     url: https://github.com/leanprover/lean4
+  source_urls:
+    - "https://github.com/leanprover/lean4"
+  evidence_urls:
+    - "https://github.com/leanprover/lean4"
+  dataset_tag: "default_branch"
   data_type:
   - formal_math
   - proofs
@@ -647,6 +711,11 @@ targets:
   license_evidence:
     spdx_hint: Apache-2.0
     url: https://github.com/leanprover-community/mathlib4
+  source_urls:
+    - "https://github.com/leanprover-community/mathlib4"
+  evidence_urls:
+    - "https://github.com/leanprover-community/mathlib4"
+  dataset_tag: "default_branch"
   data_type:
   - formal_math
   - proofs
@@ -683,6 +752,11 @@ targets:
   license_evidence:
     spdx_hint: MIT
     url: https://github.com/UniMath/UniMath
+  source_urls:
+    - "https://github.com/UniMath/UniMath"
+  evidence_urls:
+    - "https://github.com/UniMath/UniMath"
+  dataset_tag: "default_branch"
   data_type:
   - formal_math
   - proofs
@@ -718,6 +792,11 @@ targets:
   license_evidence:
     spdx_hint: MIT
     url: https://github.com/agda/agda-stdlib
+  source_urls:
+    - "https://github.com/agda/agda-stdlib"
+  evidence_urls:
+    - "https://github.com/agda/agda-stdlib"
+  dataset_tag: "default_branch"
   data_type:
   - formal_math
   - proofs
@@ -752,6 +831,11 @@ targets:
   license_evidence:
     spdx_hint: LGPL-2.1
     url: https://github.com/coq/coq
+  source_urls:
+    - "https://github.com/coq/coq"
+  evidence_urls:
+    - "https://github.com/coq/coq"
+  dataset_tag: "default_branch"
   data_type:
   - formal_math
   - proofs
@@ -786,6 +870,11 @@ targets:
   license_evidence:
     spdx_hint: BSD-2-Clause
     url: https://github.com/jrh13/hol-light
+  source_urls:
+    - "https://github.com/jrh13/hol-light"
+  evidence_urls:
+    - "https://github.com/jrh13/hol-light"
+  dataset_tag: "default_branch"
   data_type:
   - formal_math
   - proofs
@@ -820,6 +909,11 @@ targets:
   license_evidence:
     spdx_hint: BSD-3-Clause
     url: https://github.com/sympy/sympy/blob/master/LICENSE
+  source_urls:
+    - "https://github.com/sympy/sympy/blob/master/LICENSE"
+  evidence_urls:
+    - "https://github.com/sympy/sympy/blob/master/LICENSE"
+  dataset_tag: "default_branch"
   data_type:
   - math
   - cas
@@ -855,6 +949,11 @@ targets:
   license_evidence:
     spdx_hint: BSD-2-Clause
     url: https://www.isa-afp.org/
+  source_urls:
+    - "https://www.isa-afp.org/"
+  evidence_urls:
+    - "https://www.isa-afp.org/"
+  dataset_tag: "default_branch"
   data_type:
   - formal_math
   - proofs
@@ -892,6 +991,10 @@ targets:
   license_evidence:
     spdx_hint: CC-BY-4.0
     url: https://openstax.org/license/
+  source_urls:
+    - "https://openstax.org/license/"
+  evidence_urls:
+    - "https://openstax.org/license/"
   data_type:
   - textbook
   - math
@@ -927,6 +1030,10 @@ targets:
   license_evidence:
     spdx_hint: CC-BY-4.0
     url: https://openstax.org/license/
+  source_urls:
+    - "https://openstax.org/license/"
+  evidence_urls:
+    - "https://openstax.org/license/"
   data_type:
   - textbook
   - math
@@ -962,6 +1069,10 @@ targets:
   license_evidence:
     spdx_hint: CC-BY-SA-3.0
     url: https://proofwiki.org/wiki/ProofWiki:Copyrights
+  source_urls:
+    - "https://proofwiki.org/wiki/ProofWiki:Copyrights"
+  evidence_urls:
+    - "https://proofwiki.org/wiki/ProofWiki:Copyrights"
   data_type:
   - math
   - reference
@@ -997,6 +1108,10 @@ targets:
   license_evidence:
     spdx_hint: CC-BY-SA-3.0
     url: https://planetmath.org/terms
+  source_urls:
+    - "https://planetmath.org/terms"
+  evidence_urls:
+    - "https://planetmath.org/terms"
   data_type:
   - math
   - encyclopedia
@@ -1032,6 +1147,11 @@ targets:
   license_evidence:
     spdx_hint: CC-BY-NC-SA-3.0
     url: https://github.com/openwebwork/webwork-open-problem-library/blob/main/OPL_LICENSE
+  source_urls:
+    - "https://github.com/openwebwork/webwork-open-problem-library/blob/main/OPL_LICENSE"
+  evidence_urls:
+    - "https://github.com/openwebwork/webwork-open-problem-library/blob/main/OPL_LICENSE"
+  dataset_tag: "default_branch"
   data_type:
   - problems
   - math
@@ -1066,6 +1186,10 @@ targets:
   license_evidence:
     spdx_hint: CC-BY-NC-SA-4.0
     url: https://ocw.mit.edu/terms/
+  source_urls:
+    - "https://ocw.mit.edu/terms/"
+  evidence_urls:
+    - "https://ocw.mit.edu/terms/"
   data_type:
   - courseware
   - math

@@ -118,6 +118,11 @@ targets:
     license_evidence:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://huggingface.co/datasets/common-pile/usgpo_filtered"
+    source_urls:
+      - "https://huggingface.co/datasets/common-pile/usgpo_filtered"
+    evidence_urls:
+      - "https://huggingface.co/datasets/common-pile/usgpo_filtered"
+    dataset_version: "main"
     data_type: ["nlp", "english", "government", "reports", "law", "policy"]
     download:
       strategy: "huggingface_datasets"
@@ -144,6 +149,11 @@ targets:
     license_evidence:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://huggingface.co/datasets/common-pile/regulations_filtered"
+    source_urls:
+      - "https://huggingface.co/datasets/common-pile/regulations_filtered"
+    evidence_urls:
+      - "https://huggingface.co/datasets/common-pile/regulations_filtered"
+    dataset_version: "main"
     data_type: ["nlp", "english", "government", "regulation", "rulemaking"]
     download:
       strategy: "huggingface_datasets"
@@ -172,6 +182,11 @@ targets:
     license_evidence:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://huggingface.co/datasets/common-pile/caselaw_access_project"
+    source_urls:
+      - "https://huggingface.co/datasets/common-pile/caselaw_access_project"
+    evidence_urls:
+      - "https://huggingface.co/datasets/common-pile/caselaw_access_project"
+    dataset_version: "main"
     data_type: ["nlp", "english", "government", "law", "judicial_opinions"]
     download:
       strategy: "huggingface_datasets"
@@ -198,6 +213,11 @@ targets:
     license_evidence:
       spdx_hint: "CC-BY-4.0"
       url: "https://huggingface.co/datasets/common-pile/uspto_filtered"
+    source_urls:
+      - "https://huggingface.co/datasets/common-pile/uspto_filtered"
+    evidence_urls:
+      - "https://huggingface.co/datasets/common-pile/uspto_filtered"
+    dataset_version: "main"
     data_type: ["nlp", "english", "patents", "engineering", "technical_writing"]
     download:
       strategy: "huggingface_datasets"
@@ -224,6 +244,11 @@ targets:
     license_evidence:
       spdx_hint: "CC-BY-4.0"
       url: "https://huggingface.co/datasets/common-pile/libretexts_filtered"
+    source_urls:
+      - "https://huggingface.co/datasets/common-pile/libretexts_filtered"
+    evidence_urls:
+      - "https://huggingface.co/datasets/common-pile/libretexts_filtered"
+    dataset_version: "main"
     data_type: ["nlp", "english", "education", "textbooks", "explanations"]
     download:
       strategy: "huggingface_datasets"
@@ -250,6 +275,11 @@ targets:
     license_evidence:
       spdx_hint: "CC-BY-4.0"
       url: "https://huggingface.co/datasets/common-pile/pressbooks_filtered"
+    source_urls:
+      - "https://huggingface.co/datasets/common-pile/pressbooks_filtered"
+    evidence_urls:
+      - "https://huggingface.co/datasets/common-pile/pressbooks_filtered"
+    dataset_version: "main"
     data_type: ["nlp", "english", "open_books", "education"]
     download:
       strategy: "huggingface_datasets"
@@ -278,6 +308,11 @@ targets:
     license_evidence:
       spdx_hint: "UNKNOWN"
       url: "https://huggingface.co/datasets/common-pile/oercommons_filtered"
+    source_urls:
+      - "https://huggingface.co/datasets/common-pile/oercommons_filtered"
+    evidence_urls:
+      - "https://huggingface.co/datasets/common-pile/oercommons_filtered"
+    dataset_version: "main"
     data_type: ["nlp", "english", "education", "lesson_plans", "open_education"]
     download:
       strategy: "huggingface_datasets"
@@ -308,6 +343,11 @@ targets:
     license_evidence:
       spdx_hint: "CC-BY-4.0"
       url: "https://huggingface.co/datasets/common-pile/pubmed_filtered"
+    source_urls:
+      - "https://huggingface.co/datasets/common-pile/pubmed_filtered"
+    evidence_urls:
+      - "https://huggingface.co/datasets/common-pile/pubmed_filtered"
+    dataset_version: "main"
     data_type: ["nlp", "english", "science", "biomed", "papers"]
     download:
       strategy: "huggingface_datasets"
@@ -338,6 +378,11 @@ targets:
     license_evidence:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://huggingface.co/datasets/common-pile/python_enhancement_proposals_filtered"
+    source_urls:
+      - "https://huggingface.co/datasets/common-pile/python_enhancement_proposals_filtered"
+    evidence_urls:
+      - "https://huggingface.co/datasets/common-pile/python_enhancement_proposals_filtered"
+    dataset_version: "main"
     data_type: ["nlp", "english", "technical_specs", "software_design"]
     download:
       strategy: "huggingface_datasets"
@@ -364,6 +409,11 @@ targets:
     license_evidence:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://huggingface.co/datasets/common-pile/library_of_congress_filtered"
+    source_urls:
+      - "https://huggingface.co/datasets/common-pile/library_of_congress_filtered"
+    evidence_urls:
+      - "https://huggingface.co/datasets/common-pile/library_of_congress_filtered"
+    dataset_version: "main"
     data_type: ["nlp", "english", "government", "archives", "historical"]
     download:
       strategy: "huggingface_datasets"
@@ -391,6 +441,11 @@ targets:
     license_evidence:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://huggingface.co/datasets/common-pile/project_gutenberg_filtered"
+    source_urls:
+      - "https://huggingface.co/datasets/common-pile/project_gutenberg_filtered"
+    evidence_urls:
+      - "https://huggingface.co/datasets/common-pile/project_gutenberg_filtered"
+    dataset_version: "main"
     data_type: ["nlp", "english", "books", "public_domain"]
     download:
       strategy: "huggingface_datasets"
@@ -417,6 +472,11 @@ targets:
     license_evidence:
       spdx_hint: "US-PUBLIC-DOMAIN"
       url: "https://huggingface.co/datasets/common-pile/pre_1929_books_filtered"
+    source_urls:
+      - "https://huggingface.co/datasets/common-pile/pre_1929_books_filtered"
+    evidence_urls:
+      - "https://huggingface.co/datasets/common-pile/pre_1929_books_filtered"
+    dataset_version: "main"
     data_type: ["nlp", "english", "books", "public_domain", "ocr"]
     download:
       strategy: "huggingface_datasets"
@@ -448,6 +508,10 @@ targets:
     license_evidence:
       spdx_hint: "LicenseRef-OGL-UK-3.0"
       url: "https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/"
+    source_urls:
+      - "https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/"
+    evidence_urls:
+      - "https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/"
     data_type: ["nlp", "english", "government", "policy", "guidance", "uk"]
     download:
       strategy: "api"
@@ -475,6 +539,10 @@ targets:
     license_evidence:
       spdx_hint: "OGL-Canada-2.0"
       url: "https://open.canada.ca/en/open-government-licence-canada"
+    source_urls:
+      - "https://open.canada.ca/en/open-government-licence-canada"
+    evidence_urls:
+      - "https://open.canada.ca/en/open-government-licence-canada"
     data_type: ["nlp", "english", "government", "canada", "open_data"]
     download:
       strategy: "api"
@@ -504,6 +572,10 @@ targets:
     license_evidence:
       spdx_hint: "CC-BY-4.0"
       url: "https://www.data.gov.au/"
+    source_urls:
+      - "https://www.data.gov.au/"
+    evidence_urls:
+      - "https://www.data.gov.au/"
     data_type: ["nlp", "english", "government", "australia", "open_data"]
     download:
       strategy: "api"
@@ -533,6 +605,10 @@ targets:
     license_evidence:
       spdx_hint: "CC-BY-4.0"
       url: "https://data.govt.nz/copyright"
+    source_urls:
+      - "https://data.govt.nz/copyright"
+    evidence_urls:
+      - "https://data.govt.nz/copyright"
     data_type: ["nlp", "english", "government", "new_zealand", "open_data"]
     download:
       strategy: "api"
@@ -564,6 +640,10 @@ targets:
     license_evidence:
       spdx_hint: "CC-BY-4.0"
       url: "https://commission.europa.eu/legal-notice_en"
+    source_urls:
+      - "https://commission.europa.eu/legal-notice_en"
+    evidence_urls:
+      - "https://commission.europa.eu/legal-notice_en"
     data_type: ["nlp", "english", "government", "eu", "policy", "reports"]
     download:
       strategy: "api"
@@ -597,6 +677,11 @@ targets:
     license_evidence:
       spdx_hint: "CC-BY-SA-4.0"
       url: "https://huggingface.co/datasets/common-pile/wikimedia_filtered"
+    source_urls:
+      - "https://huggingface.co/datasets/common-pile/wikimedia_filtered"
+    evidence_urls:
+      - "https://huggingface.co/datasets/common-pile/wikimedia_filtered"
+    dataset_version: "main"
     data_type: ["nlp", "english", "encyclopedia", "copyleft"]
     download:
       strategy: "huggingface_datasets"
@@ -627,6 +712,11 @@ targets:
     license_evidence:
       spdx_hint: "CC-BY-SA-4.0"
       url: "https://huggingface.co/datasets/common-pile/stackexchange_filtered"
+    source_urls:
+      - "https://huggingface.co/datasets/common-pile/stackexchange_filtered"
+    evidence_urls:
+      - "https://huggingface.co/datasets/common-pile/stackexchange_filtered"
+    dataset_version: "main"
     data_type: ["nlp", "english", "qa_forums", "copyleft"]
     download:
       strategy: "huggingface_datasets"

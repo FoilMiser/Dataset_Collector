@@ -89,6 +89,11 @@ targets:
   license_evidence:
     spdx_hint: MIXED
     url: https://huggingface.co/datasets/common-pile/uspto_filtered
+  source_urls:
+    - "https://huggingface.co/datasets/common-pile/uspto_filtered"
+  evidence_urls:
+    - "https://huggingface.co/datasets/common-pile/uspto_filtered"
+  dataset_version: "main"
   data_type: text
   download:
     strategy: huggingface_datasets
@@ -112,6 +117,11 @@ targets:
   license_evidence:
     spdx_hint: MIXED
     url: https://huggingface.co/datasets/common-pile/regulations_filtered
+  source_urls:
+    - "https://huggingface.co/datasets/common-pile/regulations_filtered"
+  evidence_urls:
+    - "https://huggingface.co/datasets/common-pile/regulations_filtered"
+  dataset_version: "main"
   data_type: text
   download:
     strategy: huggingface_datasets
@@ -135,6 +145,11 @@ targets:
   license_evidence:
     spdx_hint: MIXED
     url: https://huggingface.co/datasets/common-pile/usgpo_filtered
+  source_urls:
+    - "https://huggingface.co/datasets/common-pile/usgpo_filtered"
+  evidence_urls:
+    - "https://huggingface.co/datasets/common-pile/usgpo_filtered"
+  dataset_version: "main"
   data_type: text
   download:
     strategy: huggingface_datasets
@@ -158,6 +173,11 @@ targets:
   license_evidence:
     spdx_hint: MIXED
     url: https://huggingface.co/datasets/common-pile/arxiv_papers_filtered
+  source_urls:
+    - "https://huggingface.co/datasets/common-pile/arxiv_papers_filtered"
+  evidence_urls:
+    - "https://huggingface.co/datasets/common-pile/arxiv_papers_filtered"
+  dataset_version: "main"
   data_type: text
   download:
     strategy: huggingface_datasets
@@ -181,6 +201,11 @@ targets:
   license_evidence:
     spdx_hint: MIXED
     url: https://huggingface.co/datasets/common-pile/arxiv_abstracts_filtered
+  source_urls:
+    - "https://huggingface.co/datasets/common-pile/arxiv_abstracts_filtered"
+  evidence_urls:
+    - "https://huggingface.co/datasets/common-pile/arxiv_abstracts_filtered"
+  dataset_version: "main"
   data_type: text
   download:
     strategy: huggingface_datasets
@@ -204,6 +229,11 @@ targets:
   license_evidence:
     spdx_hint: CC-BY-SA-4.0
     url: https://huggingface.co/datasets/common-pile/stackexchange_filtered
+  source_urls:
+    - "https://huggingface.co/datasets/common-pile/stackexchange_filtered"
+  evidence_urls:
+    - "https://huggingface.co/datasets/common-pile/stackexchange_filtered"
+  dataset_version: "main"
   data_type: text
   download:
     strategy: huggingface_datasets
@@ -227,6 +257,11 @@ targets:
   license_evidence:
     spdx_hint: MIXED
     url: https://huggingface.co/datasets/common-pile/github_archive_filtered
+  source_urls:
+    - "https://huggingface.co/datasets/common-pile/github_archive_filtered"
+  evidence_urls:
+    - "https://huggingface.co/datasets/common-pile/github_archive_filtered"
+  dataset_version: "main"
   data_type: code
   download:
     strategy: huggingface_datasets
@@ -250,6 +285,10 @@ targets:
   license_evidence:
     spdx_hint: CC-PDDC
     url: https://catalog.data.gov/dataset/open-data-portal-odp-bulk-datasets-api-search-product-data-and-download
+  source_urls:
+    - "https://catalog.data.gov/dataset/open-data-portal-odp-bulk-datasets-api-search-product-data-and-download"
+  evidence_urls:
+    - "https://catalog.data.gov/dataset/open-data-portal-odp-bulk-datasets-api-search-product-data-and-download"
   data_type: metadata
   download:
     strategy: http
@@ -271,6 +310,10 @@ targets:
   license_evidence:
     spdx_hint: US-PUBLIC-DOMAIN
     url: https://catalog.data.gov/dataset/patent-grant-full-text-1976-present-154b8
+  source_urls:
+    - "https://catalog.data.gov/dataset/patent-grant-full-text-1976-present-154b8"
+  evidence_urls:
+    - "https://catalog.data.gov/dataset/patent-grant-full-text-1976-present-154b8"
   data_type: text
   download:
     strategy: http
@@ -292,6 +335,10 @@ targets:
   license_evidence:
     spdx_hint: CC-BY-4.0
     url: https://search.patentsview.org/docs/
+  source_urls:
+    - "https://search.patentsview.org/docs/"
+  evidence_urls:
+    - "https://search.patentsview.org/docs/"
   data_type: metadata
   download:
     strategy: http
@@ -313,6 +360,10 @@ targets:
   license_evidence:
     spdx_hint: CC-BY-4.0
     url: https://search.patentsview.org/docs/
+  source_urls:
+    - "https://search.patentsview.org/docs/"
+  evidence_urls:
+    - "https://search.patentsview.org/docs/"
   data_type: table
   download:
     strategy: http
@@ -334,6 +385,10 @@ targets:
   license_evidence:
     spdx_hint: CC0-1.0
     url: https://docs.openalex.org/additional-help/faq
+  source_urls:
+    - "https://docs.openalex.org/additional-help/faq"
+  evidence_urls:
+    - "https://docs.openalex.org/additional-help/faq"
   data_type: metadata
   download:
     strategy: http
@@ -355,6 +410,10 @@ targets:
   license_evidence:
     spdx_hint: CC0-1.0
     url: https://registry.opendata.aws/openalex/
+  source_urls:
+    - "https://registry.opendata.aws/openalex/"
+  evidence_urls:
+    - "https://registry.opendata.aws/openalex/"
   data_type: table
   download:
     strategy: http
@@ -376,6 +435,10 @@ targets:
   license_evidence:
     spdx_hint: CC0-1.0
     url: https://www.wikidata.org/wiki/Wikidata:Licensing
+  source_urls:
+    - "https://www.wikidata.org/wiki/Wikidata:Licensing"
+  evidence_urls:
+    - "https://www.wikidata.org/wiki/Wikidata:Licensing"
   data_type: graph
   download:
     strategy: http
@@ -397,6 +460,10 @@ targets:
   license_evidence:
     spdx_hint: US-PUBLIC-DOMAIN
     url: https://data.gov/privacy-policy/
+  source_urls:
+    - "https://data.gov/privacy-policy/"
+  evidence_urls:
+    - "https://data.gov/privacy-policy/"
   data_type: metadata
   download:
     strategy: http
@@ -418,6 +485,10 @@ targets:
   license_evidence:
     spdx_hint: US-PUBLIC-DOMAIN
     url: https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits
+  source_urls:
+    - "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits"
+  evidence_urls:
+    - "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits"
   data_type: metadata
   download:
     strategy: http
@@ -439,6 +510,10 @@ targets:
   license_evidence:
     spdx_hint: US-PUBLIC-DOMAIN
     url: https://www.nasa.gov/nasa-brand-center/images-and-media/
+  source_urls:
+    - "https://www.nasa.gov/nasa-brand-center/images-and-media/"
+  evidence_urls:
+    - "https://www.nasa.gov/nasa-brand-center/images-and-media/"
   data_type: metadata
   download:
     strategy: http
@@ -460,6 +535,10 @@ targets:
   license_evidence:
     spdx_hint: US-PUBLIC-DOMAIN
     url: https://www.nist.gov/open/license
+  source_urls:
+    - "https://www.nist.gov/open/license"
+  evidence_urls:
+    - "https://www.nist.gov/open/license"
   data_type: metadata
   download:
     strategy: http
@@ -481,6 +560,11 @@ targets:
   license_evidence:
     spdx_hint: CC-BY-4.0
     url: https://github.com/riscv/riscv-isa-manual
+  source_urls:
+    - "https://github.com/riscv/riscv-isa-manual"
+  evidence_urls:
+    - "https://github.com/riscv/riscv-isa-manual"
+  dataset_tag: "default_branch"
   data_type: text
   download:
     strategy: git
@@ -502,6 +586,11 @@ targets:
   license_evidence:
     spdx_hint: Apache-2.0
     url: https://github.com/lowRISC/opentitan
+  source_urls:
+    - "https://github.com/lowRISC/opentitan"
+  evidence_urls:
+    - "https://github.com/lowRISC/opentitan"
+  dataset_tag: "default_branch"
   data_type: text
   download:
     strategy: git
@@ -523,6 +612,11 @@ targets:
   license_evidence:
     spdx_hint: GPL-3.0-only
     url: https://www.openfoam.com/legal
+  source_urls:
+    - "https://www.openfoam.com/legal"
+  evidence_urls:
+    - "https://www.openfoam.com/legal"
+  dataset_tag: "default_branch"
   data_type: code
   download:
     strategy: git
@@ -544,6 +638,10 @@ targets:
   license_evidence:
     spdx_hint: CC-BY-4.0
     url: https://openstax.org/license
+  source_urls:
+    - "https://openstax.org/license"
+  evidence_urls:
+    - "https://openstax.org/license"
   data_type: text
   download:
     strategy: http
@@ -565,6 +663,10 @@ targets:
   license_evidence:
     spdx_hint: Custom-Restrictive
     url: https://ieeexplore.ieee.org/Xplorehelp/overview-of-ieee-xplore/ieee-xplore-terms-of-use
+  source_urls:
+    - "https://ieeexplore.ieee.org/Xplorehelp/overview-of-ieee-xplore/ieee-xplore-terms-of-use"
+  evidence_urls:
+    - "https://ieeexplore.ieee.org/Xplorehelp/overview-of-ieee-xplore/ieee-xplore-terms-of-use"
   data_type: text
   download:
     strategy: http
@@ -586,6 +688,10 @@ targets:
   license_evidence:
     spdx_hint: Custom-Restrictive
     url: https://asmedigitalcollection.asme.org/terms-of-use
+  source_urls:
+    - "https://asmedigitalcollection.asme.org/terms-of-use"
+  evidence_urls:
+    - "https://asmedigitalcollection.asme.org/terms-of-use"
   data_type: text
   download:
     strategy: http
@@ -607,6 +713,10 @@ targets:
   license_evidence:
     spdx_hint: Custom-Restrictive
     url: https://www.astm.org/terms-of-use
+  source_urls:
+    - "https://www.astm.org/terms-of-use"
+  evidence_urls:
+    - "https://www.astm.org/terms-of-use"
   data_type: text
   download:
     strategy: http

@@ -106,6 +106,10 @@ targets:
     license_evidence:
       spdx_hint: US-PUBLIC-DOMAIN
       url: https://www.bls.gov/opub/copyright-information.htm
+    source_urls:
+      - "https://www.bls.gov/opub/copyright-information.htm"
+    evidence_urls:
+      - "https://www.bls.gov/opub/copyright-information.htm"
     routing:
       subject: econ
       domain: data_and_measurement
@@ -135,6 +139,10 @@ targets:
     license_evidence:
       spdx_hint: US-PUBLIC-DOMAIN
       url: https://www.bls.gov/opub/copyright-information.htm
+    source_urls:
+      - "https://www.bls.gov/opub/copyright-information.htm"
+    evidence_urls:
+      - "https://www.bls.gov/opub/copyright-information.htm"
     routing:
       subject: econ
       domain: data_and_measurement
@@ -167,6 +175,10 @@ targets:
     license_evidence:
       spdx_hint: US-PUBLIC-DOMAIN
       url: https://www.bea.gov/help/faq/145
+    source_urls:
+      - "https://www.bea.gov/help/faq/145"
+    evidence_urls:
+      - "https://www.bea.gov/help/faq/145"
     routing:
       subject: econ
       domain: data_and_measurement
