@@ -55,7 +55,7 @@ Each pipeline writes queue files to a per-pipeline queues root, configured via `
   yellow_pipeline.jsonl
 ```
 
-If `globals.queues_root` is not set, each pipeline falls back to a default `/data/<pipeline>/_queues` path (the same defaults used by `dc run`).
+If `globals.queues_root` is not set, each pipeline falls back to a default `/data/<pipeline>/_queues` path (the same defaults used by `dc run`). To use those defaults, pass `--allow-data-root` to the review helper.
 
 ### Unified review queue helper
 

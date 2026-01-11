@@ -25,6 +25,7 @@ from typing import Any
 from collector_core.__version__ import __schema_version__ as SCHEMA_VERSION
 from collector_core.__version__ import __version__ as TOOL_VERSION
 from collector_core.config_validator import read_yaml as read_yaml_config
+from collector_core.dataset_root import ensure_data_root_allowed
 from collector_core.utils import ensure_dir, read_jsonl_list, utc_now
 
 
@@ -169,6 +170,9 @@ def run_yellow_review(
     ).expanduser()
     queue_path = Path(args.queue or (queues_root / "yellow_pipeline.jsonl")).expanduser()
     output_path = Path(args.output or (queues_root / "yellow_review_plan.json")).expanduser()
+    ensure_data_root_allowed(
+        [queue_path, output_path], bool(getattr(args, "allow_data_root", False))
+    )
 
     if not queue_path.exists():
         raise SystemExit(
@@ -210,6 +214,11 @@ def make_main(
         type=int,
         default=None,
         help="Limit number of YELLOW entries to include",
+    )
+    ap.add_argument(
+        "--allow-data-root",
+        action="store_true",
+        help="Allow /data defaults for queue/output paths (default: disabled).",
     )
     args = ap.parse_args()
 

@@ -106,9 +106,9 @@ and clean-room rerun steps (what to delete vs. keep), see
 Use the unified CLI to run a single stage for any pipeline:
 
 ```bash
-dc run --pipeline physics --stage acquire -- --queue /data/physics/_queues/green_pipeline.jsonl --bucket green --execute
-dc run --pipeline physics --stage merge -- --queue /data/physics/_queues/green_pipeline.jsonl --execute
-dc run --pipeline physics --stage yellow_screen -- --queue /data/physics/_queues/yellow_pipeline.jsonl --execute
+dc run --pipeline physics --stage acquire --allow-data-root -- --queue /data/physics/_queues/green_pipeline.jsonl --bucket green --execute
+dc run --pipeline physics --stage merge --allow-data-root -- --queue /data/physics/_queues/green_pipeline.jsonl --execute
+dc run --pipeline physics --stage yellow_screen --allow-data-root -- --queue /data/physics/_queues/yellow_pipeline.jsonl --execute
 ```
 
 The `--` separator passes additional flags directly to the underlying stage worker (so you can continue to use

@@ -64,6 +64,11 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help="Override dataset root for stage outputs.",
     )
+    run.add_argument(
+        "--allow-data-root",
+        action="store_true",
+        help="Allow /data defaults for stage outputs (default: disabled).",
+    )
     run.add_argument("args", nargs=argparse.REMAINDER)
 
     # Add pipeline subcommand for running full pipeline drivers
@@ -84,6 +89,12 @@ def _resolve_dataset_root_arg(args: list[str], dataset_root: str | None) -> list
     if not dataset_root or _has_arg(args, "--dataset-root"):
         return args
     return ["--dataset-root", dataset_root, *args]
+
+
+def _resolve_allow_data_root_arg(args: list[str], allow_data_root: bool) -> list[str]:
+    if not allow_data_root or _has_arg(args, "--allow-data-root"):
+        return args
+    return ["--allow-data-root", *args]
 
 
 def _resolve_acquire_label(targets_path: Path | None) -> str:
@@ -179,6 +190,7 @@ def main() -> int:
     if passthrough[:1] == ["--"]:
         passthrough = passthrough[1:]
     passthrough = _resolve_dataset_root_arg(passthrough, args.dataset_root)
+    passthrough = _resolve_allow_data_root_arg(passthrough, args.allow_data_root)
 
     repo_root = Path(args.repo_root).expanduser().resolve()
     ctx = resolve_pipeline_context(pipeline_id=args.pipeline, repo_root=repo_root)

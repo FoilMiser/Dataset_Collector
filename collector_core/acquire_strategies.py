@@ -26,7 +26,7 @@ from collector_core.acquire_limits import (
 from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.checks.runner import generate_run_id, run_checks_for_target
 from collector_core.config_validator import read_yaml
-from collector_core.dataset_root import resolve_dataset_root
+from collector_core.dataset_root import ensure_data_root_allowed, resolve_dataset_root
 from collector_core.dependencies import _try_import, requires
 from collector_core.network_utils import _with_retries
 from collector_core.rate_limit import get_resolver_rate_limiter
@@ -1490,6 +1490,7 @@ def load_config(targets_path: Path | None) -> dict[str, Any]:
 def load_roots(
     cfg: dict[str, Any], overrides: argparse.Namespace, defaults: RootsDefaults
 ) -> Roots:
+    allow_data_root = bool(getattr(overrides, "allow_data_root", False))
     dataset_root = resolve_dataset_root(overrides.dataset_root)
     if dataset_root:
         defaults = RootsDefaults(
@@ -1505,12 +1506,17 @@ def load_roots(
     )
     ledger_root = Path(overrides.ledger_root or g.get("ledger_root", defaults.ledger_root))
     logs_root = Path(overrides.logs_root or g.get("logs_root", defaults.logs_root))
-    return Roots(
+    roots = Roots(
         raw_root=raw_root.expanduser().resolve(),
         manifests_root=manifests_root.expanduser().resolve(),
         ledger_root=ledger_root.expanduser().resolve(),
         logs_root=logs_root.expanduser().resolve(),
     )
+    ensure_data_root_allowed(
+        [roots.raw_root, roots.manifests_root, roots.ledger_root, roots.logs_root],
+        allow_data_root,
+    )
+    return roots
 
 
 def run_acquire_worker(
@@ -1535,6 +1541,11 @@ def run_acquire_worker(
     ap.add_argument("--manifests-root", default=None, help="Override manifests root")
     ap.add_argument("--ledger-root", default=None, help="Override ledger root")
     ap.add_argument("--logs-root", default=None, help="Override logs root")
+    ap.add_argument(
+        "--allow-data-root",
+        action="store_true",
+        help="Allow /data defaults for outputs (default: disabled).",
+    )
     ap.add_argument("--execute", action="store_true", help="Perform downloads")
     ap.add_argument("--overwrite", action="store_true", help="Overwrite existing outputs")
     ap.add_argument(
