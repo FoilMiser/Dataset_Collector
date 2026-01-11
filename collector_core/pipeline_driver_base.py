@@ -242,6 +242,7 @@ class DriverConfig:
     targets: list[dict[str, Any]]
     require_yellow_signoff: bool
     checks_run_id: str
+    content_check_actions: dict[str, str]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -264,6 +265,7 @@ class TargetContext:
     review_required: bool
     license_gates: list[str]
     content_checks: list[str]
+    content_check_actions: dict[str, str]
     target_manifest_dir: Path
     signoff: dict[str, Any]
     review_status: str
@@ -395,6 +397,9 @@ def load_driver_config(args: argparse.Namespace) -> DriverConfig:
     targets_path = Path(args.targets).resolve()
     targets_cfg = read_yaml(targets_path, schema_name="targets")
     globals_cfg = targets_cfg.get("globals", {}) or {}
+    content_check_actions = normalize_content_check_actions(
+        globals_cfg.get("content_check_actions", {})
+    )
     retry_max, retry_backoff = resolve_retry_config(args, globals_cfg)
     companion = targets_cfg.get("companion_files", {}) or {}
     license_map_value = (
@@ -430,6 +435,7 @@ def load_driver_config(args: argparse.Namespace) -> DriverConfig:
         targets=targets_cfg.get("targets", []) or [],
         require_yellow_signoff=bool(globals_cfg.get("require_yellow_signoff", False)),
         checks_run_id=generate_run_id("classification"),
+        content_check_actions=content_check_actions,
     )
 
 
@@ -916,6 +922,39 @@ def canonicalize_checks(checks: list[str]) -> list[str]:
         if check not in canonicalized:
             canonicalized.append(check)
     return canonicalized
+
+
+def normalize_content_check_actions(
+    actions: dict[str, Any] | None,
+) -> dict[str, str]:
+    if not isinstance(actions, dict):
+        return {}
+    normalized: dict[str, str] = {}
+    for key, value in actions.items():
+        key_name = str(key).strip()
+        value_name = str(value).strip().lower()
+        if key_name and value_name:
+            normalized[key_name] = value_name
+    return normalized
+
+
+def resolve_content_check_action(
+    results: list[dict[str, Any]],
+) -> tuple[str | None, list[str]]:
+    action: str | None = None
+    checks: list[str] = []
+    for result in results:
+        status = str(result.get("status", "") or "").lower()
+        if status not in {"block", "quarantine"}:
+            continue
+        if status == "block":
+            action = "block"
+        elif action != "block":
+            action = "quarantine"
+        check_name = str(result.get("check", "") or "").strip()
+        if check_name:
+            checks.append(check_name)
+    return action, checks
 
 
 def compute_effective_bucket(
@@ -1520,6 +1559,11 @@ class BasePipelineDriver:
                 strict=cfg.args.strict,
             )
         )
+        content_check_actions = dict(cfg.content_check_actions)
+        target_actions = normalize_content_check_actions(
+            target.get("content_check_actions", {}) or {}
+        )
+        content_check_actions.update(target_actions)
         license_gates = canonicalize_license_gates(merged_license_gates)
         content_checks = canonicalize_checks(merged_content_checks)
         target_manifest_dir = cfg.manifests_root / tid
@@ -1543,6 +1587,7 @@ class BasePipelineDriver:
             review_required=review_required,
             license_gates=license_gates,
             content_checks=content_checks,
+            content_check_actions=content_check_actions,
             target_manifest_dir=target_manifest_dir,
             signoff=signoff,
             review_status=review_status,
@@ -1635,7 +1680,7 @@ class BasePipelineDriver:
             review_required,
             out_pool,
         )
-        run_checks_for_target(
+        check_results = run_checks_for_target(
             content_checks=ctx.content_checks,
             ledger_root=cfg.ledger_root,
             run_id=cfg.checks_run_id,
@@ -1643,7 +1688,28 @@ class BasePipelineDriver:
             stage="classification",
             target=ctx.target,
             row=row,
+            extra={"content_check_actions": ctx.content_check_actions},
         )
+        action, action_checks = resolve_content_check_action(check_results)
+        row["content_check_action"] = action or "ok"
+        row["content_check_action_checks"] = action_checks
+        evaluation["content_check_action"] = action or "ok"
+        evaluation["content_check_action_checks"] = action_checks
+        if action == "block":
+            row["effective_bucket"] = "RED"
+            row["queue_bucket"] = "RED"
+            row["output_pool"] = "quarantine"
+            evaluation["effective_bucket"] = "RED"
+            evaluation["queue_bucket"] = "RED"
+            evaluation["output_pool"] = "quarantine"
+        elif action == "quarantine":
+            if row["effective_bucket"] == "GREEN":
+                row["effective_bucket"] = "YELLOW"
+                row["queue_bucket"] = "YELLOW"
+                evaluation["effective_bucket"] = "YELLOW"
+                evaluation["queue_bucket"] = "YELLOW"
+            row["output_pool"] = "quarantine"
+            evaluation["output_pool"] = "quarantine"
         return evaluation, row
 
     def fetch_evidence(self, ctx: TargetContext, cfg: DriverConfig) -> EvidenceResult:
@@ -1753,6 +1819,7 @@ class BasePipelineDriver:
             "restriction_hits": restriction_hits,
             "license_gates": ctx.license_gates,
             "content_checks": ctx.content_checks,
+            "content_check_actions": ctx.content_check_actions,
             "effective_bucket": eff_bucket,
             "queue_bucket": eff_bucket,
             "license_evidence_url": ctx.evidence_url,
@@ -1842,6 +1909,7 @@ class BasePipelineDriver:
             "enabled": ctx.enabled,
             "statistics": ctx.target.get("statistics", {}),
             "content_checks": ctx.content_checks,
+            "content_check_actions": ctx.content_check_actions,
             "split_group_id": ctx.split_group_id,
             "denylist_hits": ctx.dl_hits,
             "review_required": review_required,

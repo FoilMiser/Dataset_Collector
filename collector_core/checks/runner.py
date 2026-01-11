@@ -6,6 +6,7 @@ from typing import Any
 
 from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.checks.base import BaseCheck, CheckContext
+from collector_core.checks.loader import load_builtin_checks
 from collector_core.checks.registry import get_check
 from collector_core.utils import ensure_dir, safe_filename, utc_now, write_json
 
@@ -71,6 +72,7 @@ def run_checks_for_target(
     results: list[dict[str, Any]] = []
     if not content_checks:
         return results
+    load_builtin_checks()
     for check_name in content_checks:
         started_at = utc_now()
         check_cls = get_check(check_name)
