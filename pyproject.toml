@@ -75,6 +75,17 @@ python_version = "3.10"
 warn_unused_configs = true
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = [
+  "collector_core.classification.*",
+  "collector_core.evidence.*",
+  "collector_core.acquire_strategies",
+  "collector_core.merge.*",
+  "collector_core.yellow_screen_*",
+  "collector_core.yellow_scrubber_base",
+]
+disallow_untyped_defs = true
+
 [build-system]
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"

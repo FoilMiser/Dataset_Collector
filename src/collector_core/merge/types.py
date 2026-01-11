@@ -4,11 +4,14 @@ import dataclasses
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from collector_core.stability import stable_api
+
 if TYPE_CHECKING:
     from collector_core.merge.dedupe import DedupeIndex, PartitionedDedupeIndex
     from collector_core.merge.shard import Sharder
 
 
+@stable_api
 @dataclasses.dataclass(frozen=True)
 class RootDefaults:
     raw_root: str
@@ -17,6 +20,7 @@ class RootDefaults:
     ledger_root: str
 
 
+@stable_api
 @dataclasses.dataclass
 class Roots:
     raw_root: Path
@@ -25,6 +29,7 @@ class Roots:
     ledger_root: Path
 
 
+@stable_api
 @dataclasses.dataclass
 class ShardingConfig:
     max_records_per_shard: int
@@ -32,6 +37,7 @@ class ShardingConfig:
     prefix: str
 
 
+@stable_api
 @dataclasses.dataclass
 class GreenInput:
     raw: dict[str, Any]
@@ -41,6 +47,7 @@ class GreenInput:
     source_kind: str
 
 
+@stable_api
 @dataclasses.dataclass
 class GreenSkip:
     target_id: str
@@ -51,6 +58,7 @@ class GreenSkip:
     detail: dict[str, Any] | None = None
 
 
+@stable_api
 @dataclasses.dataclass
 class MergeState:
     summary: dict[str, Any]
@@ -69,6 +77,7 @@ class MergeState:
     max_duplicates: int
 
 
+@stable_api
 @dataclasses.dataclass
 class MergeRuntimeConfig:
     progress: bool = False

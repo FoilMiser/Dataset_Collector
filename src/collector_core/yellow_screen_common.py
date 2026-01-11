@@ -8,6 +8,7 @@ from typing import Any
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.config_validator import read_yaml
 from collector_core.dataset_root import ensure_data_root_allowed, resolve_dataset_root
+from collector_core.stability import stable_api
 from collector_core.utils import (
     write_jsonl,
 )
@@ -18,6 +19,7 @@ PITCH_SAMPLE_LIMIT_DEFAULT = 25
 PITCH_TEXT_LIMIT_DEFAULT = 400
 
 
+@stable_api
 @dataclasses.dataclass(frozen=True)
 class YellowRootDefaults:
     raw_root: str
@@ -27,6 +29,7 @@ class YellowRootDefaults:
     pitches_root: str
 
 
+@stable_api
 @dataclasses.dataclass
 class Roots:
     raw_root: Path
@@ -36,6 +39,7 @@ class Roots:
     pitches_root: Path
 
 
+@stable_api
 @dataclasses.dataclass
 class ScreeningConfig:
     text_fields: list[str]
@@ -47,6 +51,7 @@ class ScreeningConfig:
     max_chars: int
 
 
+@stable_api
 @dataclasses.dataclass
 class ShardingConfig:
     max_records_per_shard: int
@@ -54,14 +59,16 @@ class ShardingConfig:
     prefix: str
 
 
+@stable_api
 @dataclasses.dataclass(frozen=True)
 class PitchConfig:
     sample_limit: int
     text_limit: int
 
 
+@stable_api
 class Sharder:
-    def __init__(self, base_dir: Path, cfg: ShardingConfig):
+    def __init__(self, base_dir: Path, cfg: ShardingConfig) -> None:
         self.base_dir = base_dir
         self.cfg = cfg
         self.count = 0
@@ -91,6 +98,7 @@ class Sharder:
         return path
 
 
+@stable_api
 def default_yellow_roots(prefix: str) -> YellowRootDefaults:
     return YellowRootDefaults(
         raw_root=f"/data/{prefix}/raw",
@@ -101,10 +109,12 @@ def default_yellow_roots(prefix: str) -> YellowRootDefaults:
     )
 
 
+@stable_api
 def load_targets_cfg(path: Path) -> dict[str, Any]:
     return read_yaml(path, schema_name="targets") or {}
 
 
+@stable_api
 def resolve_roots(
     cfg: dict[str, Any],
     defaults: YellowRootDefaults,
@@ -146,6 +156,7 @@ def resolve_roots(
     return roots
 
 
+@stable_api
 def merge_screening_config(cfg: dict[str, Any], target: dict[str, Any]) -> ScreeningConfig:
     g = cfg.get("globals", {}) or {}
     g_screen = g.get("screening", {}) or {}
@@ -184,6 +195,7 @@ def merge_screening_config(cfg: dict[str, Any], target: dict[str, Any]) -> Scree
     )
 
 
+@stable_api
 def sharding_cfg(cfg: dict[str, Any], prefix: str) -> ShardingConfig:
     g = cfg.get("globals", {}).get("sharding", {}) or {}
     return ShardingConfig(
@@ -193,6 +205,7 @@ def sharding_cfg(cfg: dict[str, Any], prefix: str) -> ShardingConfig:
     )
 
 
+@stable_api
 def resolve_pitch_config(
     cfg: dict[str, Any],
     sample_limit_override: int | None = None,
@@ -213,6 +226,7 @@ def resolve_pitch_config(
     return PitchConfig(sample_limit=sample_limit, text_limit=text_limit)
 
 
+@stable_api
 def find_text(row: dict[str, Any], candidates: list[str]) -> str | None:
     for k in candidates:
         if k in row and row[k]:
@@ -223,6 +237,7 @@ def find_text(row: dict[str, Any], candidates: list[str]) -> str | None:
     return None
 
 
+@stable_api
 def extract_text(row: dict[str, Any], candidates: list[str]) -> str | None:
     if row.get("text"):
         val = row["text"]
@@ -242,6 +257,7 @@ def extract_text(row: dict[str, Any], candidates: list[str]) -> str | None:
         return str(row)
 
 
+@stable_api
 def find_license(row: dict[str, Any], candidates: list[str]) -> str | None:
     for k in candidates:
         if k in row and row[k]:
@@ -249,6 +265,7 @@ def find_license(row: dict[str, Any], candidates: list[str]) -> str | None:
     return None
 
 
+@stable_api
 def contains_deny(text: str, phrases: list[str]) -> bool:
     low = text.lower()
     return any(p in low for p in phrases)

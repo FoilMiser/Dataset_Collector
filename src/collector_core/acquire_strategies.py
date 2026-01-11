@@ -32,6 +32,7 @@ from collector_core.dataset_root import ensure_data_root_allowed, resolve_datase
 from collector_core.dependencies import _try_import, requires
 from collector_core.network_utils import _with_retries
 from collector_core.rate_limit import get_resolver_rate_limiter
+from collector_core.stability import stable_api
 from collector_core.utils import (
     ensure_dir,
     safe_filename,
@@ -52,6 +53,7 @@ PostProcessor = Callable[
 ]
 
 
+@stable_api
 @dataclasses.dataclass(frozen=True)
 class RootsDefaults:
     raw_root: str
@@ -60,6 +62,7 @@ class RootsDefaults:
     logs_root: str
 
 
+@stable_api
 @dataclasses.dataclass
 class Roots:
     raw_root: Path
@@ -68,6 +71,7 @@ class Roots:
     logs_root: Path
 
 
+@stable_api
 @dataclasses.dataclass
 class Limits:
     limit_targets: int | None
@@ -75,6 +79,7 @@ class Limits:
     max_bytes_per_target: int | None
 
 
+@stable_api
 @dataclasses.dataclass
 class RunMode:
     execute: bool
@@ -85,6 +90,7 @@ class RunMode:
     workers: int
 
 
+@stable_api
 @dataclasses.dataclass
 class RetryConfig:
     max_attempts: int = 3
@@ -92,6 +98,7 @@ class RetryConfig:
     backoff_max: float = 60.0
 
 
+@stable_api
 @dataclasses.dataclass
 class AcquireContext:
     roots: Roots
@@ -107,6 +114,7 @@ class AcquireContext:
     checks_run_id: str = ""
 
 
+@stable_api
 @dataclasses.dataclass(frozen=True)
 class InternalMirrorAllowlist:
     hosts: frozenset[str] = frozenset()
@@ -192,6 +200,7 @@ def _resolve_host_ips(hostname: str) -> list[str]:
     return sorted(ips)
 
 
+@stable_api
 def validate_download_url(
     url: str,
     allow_non_global_hosts: bool,
@@ -248,6 +257,7 @@ def _validate_redirect_chain(
     return True, None, None
 
 
+@stable_api
 def normalize_download(download: dict[str, Any]) -> dict[str, Any]:
     d = dict(download or {})
     cfg = d.get("config")
@@ -266,6 +276,7 @@ def normalize_download(download: dict[str, Any]) -> dict[str, Any]:
     return d
 
 
+@stable_api
 def sha256_file(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as f:
@@ -274,6 +285,7 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+@stable_api
 def md5_file(path: Path) -> str:
     h = hashlib.md5()
     with path.open("rb") as f:
@@ -282,6 +294,7 @@ def md5_file(path: Path) -> str:
     return h.hexdigest()
 
 
+@stable_api
 def run_cmd(cmd: list[str], cwd: Path | None = None) -> str:
     p = subprocess.run(
         cmd,
@@ -485,6 +498,7 @@ def _http_download_with_resume(
 # ---------------------------------
 
 
+@stable_api
 def handle_http_multi(
     ctx: AcquireContext, row: dict[str, Any], out_dir: Path
 ) -> list[dict[str, Any]]:
@@ -575,6 +589,7 @@ def handle_http_multi(
     return results
 
 
+@stable_api
 def handle_http_single(
     ctx: AcquireContext, row: dict[str, Any], out_dir: Path
 ) -> list[dict[str, Any]]:
@@ -624,6 +639,7 @@ def handle_http_single(
     return [result]
 
 
+@stable_api
 def handle_http(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     download = normalize_download(row.get("download", {}) or {})
     urls: list[str] = []
@@ -635,6 +651,7 @@ def handle_http(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list
     return handle_http_single(ctx, row, out_dir)
 
 
+@stable_api
 def handle_ftp(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     download = normalize_download(row.get("download", {}) or {})
     enforcer = build_target_limit_enforcer(
@@ -700,6 +717,7 @@ def handle_ftp(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
     return results
 
 
+@stable_api
 def handle_git(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     download = normalize_download(row.get("download", {}) or {})
     enforcer = build_target_limit_enforcer(
@@ -766,6 +784,7 @@ def handle_git(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
     return [result]
 
 
+@stable_api
 def handle_zenodo(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     download = normalize_download(row.get("download", {}) or {})
     enforcer = build_target_limit_enforcer(
@@ -849,6 +868,7 @@ def handle_zenodo(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> li
     return results or [{"status": "noop", "reason": "no files"}]
 
 
+@stable_api
 def handle_dataverse(
     ctx: AcquireContext, row: dict[str, Any], out_dir: Path
 ) -> list[dict[str, Any]]:
@@ -920,6 +940,7 @@ def handle_dataverse(
     ]
 
 
+@stable_api
 def handle_figshare_article(
     ctx: AcquireContext, row: dict[str, Any], out_dir: Path
 ) -> list[dict[str, Any]]:
@@ -1009,6 +1030,7 @@ def handle_figshare_article(
 handle_figshare = handle_figshare_article
 
 
+@stable_api
 def handle_figshare_files(
     ctx: AcquireContext, row: dict[str, Any], out_dir: Path
 ) -> list[dict[str, Any]]:
@@ -1087,6 +1109,7 @@ def handle_figshare_files(
     return results or [{"status": "noop", "reason": "no files"}]
 
 
+@stable_api
 def make_github_release_handler(user_agent: str) -> StrategyHandler:
     def _handle_github_release(
         ctx: AcquireContext, row: dict[str, Any], out_dir: Path
@@ -1191,6 +1214,7 @@ def make_github_release_handler(user_agent: str) -> StrategyHandler:
     return _handle_github_release
 
 
+@stable_api
 def handle_hf_datasets(
     ctx: AcquireContext, row: dict[str, Any], out_dir: Path
 ) -> list[dict[str, Any]]:
@@ -1275,6 +1299,7 @@ DEFAULT_STRATEGY_HANDLERS: dict[str, StrategyHandler] = {
 }
 
 
+@stable_api
 def handle_s3_sync(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     download = normalize_download(row.get("download", {}) or {})
     enforcer = build_target_limit_enforcer(
@@ -1320,6 +1345,7 @@ def handle_s3_sync(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> l
     return results
 
 
+@stable_api
 def handle_aws_requester_pays(
     ctx: AcquireContext, row: dict[str, Any], out_dir: Path
 ) -> list[dict[str, Any]]:
@@ -1399,6 +1425,7 @@ def handle_aws_requester_pays(
     return [result]
 
 
+@stable_api
 def handle_torrent(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     download = normalize_download(row.get("download", {}) or {})
     enforcer = build_target_limit_enforcer(
@@ -1444,11 +1471,13 @@ LICENSE_POOL_MAP = {
 }
 
 
+@stable_api
 def resolve_license_pool(row: dict[str, Any]) -> str:
     lp = str(row.get("license_profile") or row.get("license_pool") or "quarantine").lower()
     return LICENSE_POOL_MAP.get(lp, "quarantine")
 
 
+@stable_api
 def resolve_output_dir(ctx: AcquireContext, bucket: str, pool: str, target_id: str) -> Path:
     bucket = (bucket or "yellow").strip().lower()
     pool = (pool or "quarantine").strip().lower()
@@ -1457,6 +1486,7 @@ def resolve_output_dir(ctx: AcquireContext, bucket: str, pool: str, target_id: s
     return out
 
 
+@stable_api
 def write_done_marker(
     ctx: AcquireContext,
     target_id: str,
@@ -1483,6 +1513,7 @@ def write_done_marker(
     write_json(marker, payload)
 
 
+@stable_api
 def run_target(
     ctx: AcquireContext,
     bucket: str,
@@ -1568,6 +1599,7 @@ def run_target(
     return {"id": tid, "status": status, "bucket": bucket, "license_pool": pool, "strategy": strat}
 
 
+@stable_api
 def load_config(targets_path: Path | None) -> dict[str, Any]:
     cfg: dict[str, Any] = {}
     if targets_path and targets_path.exists():
@@ -1575,6 +1607,7 @@ def load_config(targets_path: Path | None) -> dict[str, Any]:
     return cfg
 
 
+@stable_api
 def load_roots(
     cfg: dict[str, Any], overrides: argparse.Namespace, defaults: RootsDefaults
 ) -> Roots:
@@ -1607,6 +1640,7 @@ def load_roots(
     return roots
 
 
+@stable_api
 def run_acquire_worker(
     *,
     defaults: RootsDefaults,

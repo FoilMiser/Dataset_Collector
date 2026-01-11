@@ -34,6 +34,7 @@ from collector_core.companion_files import (
     resolve_companion_paths,
 )
 from collector_core.config_validator import read_yaml as read_yaml_config
+from collector_core.stability import stable_api
 
 try:
     import requests
@@ -41,21 +42,25 @@ except ImportError:
     requests = None  # type: ignore[assignment]
 
 
+@stable_api
 def utc_now() -> str:
     """Return current UTC time as ISO8601 string."""
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
+@stable_api
 def ensure_dir(p: Path) -> None:
     """Create directory and parents if they don't exist."""
     p.mkdir(parents=True, exist_ok=True)
 
 
+@stable_api
 def read_yaml(path: Path) -> dict[str, Any]:
     """Read and validate YAML config file."""
     return read_yaml_config(path, schema_name="targets") or {}
 
 
+@stable_api
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
     """Read JSONL file into list of dicts."""
     rows: list[dict[str, Any]] = []
@@ -67,6 +72,7 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
+@stable_api
 def write_json(path: Path, obj: dict[str, Any]) -> None:
     """Write dict to JSON file with atomic rename."""
     ensure_dir(path.parent)
@@ -75,6 +81,7 @@ def write_json(path: Path, obj: dict[str, Any]) -> None:
     tmp_path.replace(path)
 
 
+@stable_api
 def write_jsonl_gz(path: Path, rows: Iterable[dict[str, Any]]) -> tuple[int, int]:
     """Write rows to gzipped JSONL file, return (count, bytes)."""
     ensure_dir(path.parent)
@@ -86,6 +93,7 @@ def write_jsonl_gz(path: Path, rows: Iterable[dict[str, Any]]) -> tuple[int, int
     return count, path.stat().st_size
 
 
+@stable_api
 def sha256_file(path: Path) -> str:
     """Compute SHA256 hash of file."""
     h = hashlib.sha256()
@@ -95,21 +103,25 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+@stable_api
 def normalize_whitespace(text: str) -> str:
     """Collapse whitespace to single spaces."""
     return re.sub(r"\s+", " ", text or "").strip()
 
 
+@stable_api
 def lower(s: str) -> str:
     """Lowercase string, handling None."""
     return (s or "").lower()
 
 
+@stable_api
 def safe_text(x: Any) -> str:
     """Convert value to string, handling None."""
     return "" if x is None else str(x)
 
 
+@stable_api
 def require_requests() -> None:
     """Raise if requests module not available."""
     if requests is None:
@@ -121,6 +133,7 @@ def require_requests() -> None:
 # --------------------------
 
 
+@stable_api
 @dataclasses.dataclass
 class Pools:
     """Pool directories for dataset storage."""
@@ -130,6 +143,7 @@ class Pools:
     quarantine: Path
 
 
+@stable_api
 def pools_from_targets_yaml(targets_yaml: Path, fallback: Path) -> Pools:
     """Load pool paths from targets YAML config."""
     cfg = read_yaml(targets_yaml)
@@ -146,6 +160,7 @@ def pools_from_targets_yaml(targets_yaml: Path, fallback: Path) -> Pools:
 # --------------------------
 
 
+@stable_api
 @dataclasses.dataclass
 class FieldSpec:
     """Specification for a field with validation rules."""
@@ -157,6 +172,7 @@ class FieldSpec:
     validation: dict[str, Any] = dataclasses.field(default_factory=dict)
 
 
+@stable_api
 def load_field_schemas(paths: list[Path]) -> dict[str, dict[str, FieldSpec]]:
     """Load field schemas from field_schemas.yaml files."""
     schemas: dict[str, dict[str, FieldSpec]] = {}
@@ -176,6 +192,7 @@ def load_field_schemas(paths: list[Path]) -> dict[str, dict[str, FieldSpec]]:
     return schemas
 
 
+@stable_api
 def cast_value(value: str, field_type: str, validation: dict[str, Any]) -> Any:
     """Cast a string value to the appropriate type with validation."""
     if not value or value.strip() == "":
@@ -218,6 +235,7 @@ def cast_value(value: str, field_type: str, validation: dict[str, Any]) -> Any:
         return None
 
 
+@stable_api
 def validate_record(
     record: dict[str, Any], schema: dict[str, FieldSpec]
 ) -> tuple[bool, list[str]]:
@@ -241,6 +259,7 @@ def validate_record(
 # --------------------------
 
 
+@stable_api
 def iter_sdf_records_from_gz(gz_path: Path) -> Iterable[str]:
     """Iterate over SDF records in a gzipped file."""
     with gzip.open(gz_path, "rt", encoding="utf-8", errors="ignore") as f:
@@ -259,6 +278,7 @@ def iter_sdf_records_from_gz(gz_path: Path) -> Iterable[str]:
 TAG_RE = re.compile(r"^>\s*<([^>]+)>\s*$")
 
 
+@stable_api
 def parse_sdf_tags(record: str) -> dict[str, str]:
     """Parse SDF tags from a record."""
     lines = record.splitlines()
@@ -281,6 +301,7 @@ def parse_sdf_tags(record: str) -> dict[str, str]:
     return out
 
 
+@stable_api
 def extract_pubchem_computed_only(
     quarantine_dir: Path,
     permissive_out_dir: Path,
@@ -432,11 +453,13 @@ def extract_pubchem_computed_only(
 # --------------------------
 
 
+@stable_api
 def load_license_map(paths: list[Path]) -> dict[str, Any]:
     """Load license maps from files."""
     return read_license_maps(paths)
 
 
+@stable_api
 def normalize_spdx_from_text(license_map: dict[str, Any], blob: str, spdx_hint: str = "") -> str:
     """Normalize license text to SPDX identifier."""
     hint = normalize_whitespace(safe_text(spdx_hint))
@@ -454,6 +477,7 @@ def normalize_spdx_from_text(license_map: dict[str, Any], blob: str, spdx_hint: 
     return "UNKNOWN"
 
 
+@stable_api
 def spdx_is_allowed(license_map: dict[str, Any], spdx: str) -> bool:
     """Check if SPDX identifier is in allowlist."""
     spdx = safe_text(spdx).strip()
@@ -466,6 +490,7 @@ def spdx_is_allowed(license_map: dict[str, Any], spdx: str) -> bool:
     return spdx in allow
 
 
+@stable_api
 def restriction_phrase_hits(license_map: dict[str, Any], text: str) -> list[str]:
     """Find restriction phrases in text."""
     phrases = license_map.get("restriction_scan", {}).get("phrases", [])
@@ -494,6 +519,7 @@ PMC_OA_FILE_LIST_PATTERNS = [
 ]
 
 
+@stable_api
 def fetch_text_with_fallback(
     urls: list[str], timeout_s: int = 30, user_agent_prefix: str = "corpus-scrubber"
 ) -> tuple[str, str]:
@@ -515,6 +541,7 @@ def fetch_text_with_fallback(
     raise RuntimeError(f"Failed to fetch from any URL: {urls}")
 
 
+@stable_api
 def download_file(
     url: str, out_path: Path, timeout_s: int = 60, user_agent_prefix: str = "corpus-scrubber"
 ) -> dict[str, Any]:
@@ -545,6 +572,7 @@ def download_file(
     }
 
 
+@stable_api
 def detect_delimiter(lines: list[str]) -> str:
     """Detect CSV/TSV delimiter from file content."""
     if not lines:
@@ -557,6 +585,7 @@ def detect_delimiter(lines: list[str]) -> str:
     return "\t" if tab_count > comma_count else ","
 
 
+@stable_api
 def find_column_index(header: list[str], patterns: list[str]) -> int | None:
     """Find column index matching any of the patterns."""
     for i, h in enumerate(header):
@@ -567,6 +596,7 @@ def find_column_index(header: list[str], patterns: list[str]) -> int | None:
     return None
 
 
+@stable_api
 def plan_pmc_allowlist(
     license_map: dict[str, Any],
     out_dir: Path,

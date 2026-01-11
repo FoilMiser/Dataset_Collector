@@ -4,9 +4,11 @@ import json
 from typing import Any
 
 from collector_core.output_contract import normalize_output_record, validate_output_contract
+from collector_core.stability import stable_api
 from collector_core.utils import sha256_text, utc_now
 
 
+@stable_api
 def resolve_canonicalize_config(
     cfg: dict[str, Any],
     target_cfg: dict[str, Any] | None,
@@ -31,12 +33,14 @@ def resolve_canonicalize_config(
     return candidates, max_chars
 
 
+@stable_api
 def coerce_text(value: Any) -> str:
     if isinstance(value, (list, tuple)):
         return "\n".join(map(str, value))
     return str(value)
 
 
+@stable_api
 def extract_text(row: dict[str, Any], candidates: list[str]) -> str | None:
     if "text" in row and row["text"]:
         return coerce_text(row["text"])
@@ -54,6 +58,7 @@ def extract_text(row: dict[str, Any], candidates: list[str]) -> str | None:
         return str(row)
 
 
+@stable_api
 def resolve_routing(raw: dict[str, Any]) -> dict[str, Any]:
     if raw.get("routing") or raw.get("route"):
         return raw.get("routing") or raw.get("route") or {}
@@ -64,6 +69,7 @@ def resolve_routing(raw: dict[str, Any]) -> dict[str, Any]:
     return {}
 
 
+@stable_api
 def canonicalize_row(
     raw: dict[str, Any],
     target_id: str,
@@ -98,6 +104,7 @@ def canonicalize_row(
     return record, None
 
 
+@stable_api
 def normalize_record(
     record: dict[str, Any],
     *,

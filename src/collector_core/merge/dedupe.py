@@ -5,9 +5,11 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
+from collector_core.stability import stable_api
 from collector_core.utils import ensure_dir, utc_now
 
 
+@stable_api
 def merge_distinct_urls(
     existing: Iterable[str],
     incoming: Iterable[str],
@@ -27,6 +29,7 @@ def merge_distinct_urls(
     return merged
 
 
+@stable_api
 def build_dedupe_update(
     record: dict[str, Any],
     *,
@@ -48,6 +51,7 @@ def build_dedupe_update(
     }
 
 
+@stable_api
 def merge_update_payload(
     base: dict[str, Any],
     update: dict[str, Any],
@@ -72,6 +76,7 @@ def merge_update_payload(
     }
 
 
+@stable_api
 def merge_provenance_update(
     record: dict[str, Any],
     update: dict[str, Any],
@@ -97,6 +102,7 @@ def merge_provenance_update(
     record["timestamp_updated"] = utc_now()
 
 
+@stable_api
 class DedupeIndex:
     def __init__(self, path: Path) -> None:
         self.path = path
@@ -120,6 +126,7 @@ class DedupeIndex:
         self.conn.close()
 
 
+@stable_api
 class PartitionedDedupeIndex:
     def __init__(self, path: Path, partitions: int) -> None:
         if partitions < 2:
@@ -148,6 +155,7 @@ class PartitionedDedupeIndex:
             index.close()
 
 
+@stable_api
 def build_dedupe_index(
     roots: "Roots",
     partitions: int,

@@ -3,14 +3,15 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from collector_core.utils import lower, normalize_whitespace
-
 from collector_core.evidence.change_detection import normalize_evidence_fetch_status
+from collector_core.stability import stable_api
+from collector_core.utils import lower, normalize_whitespace
 
 if False:  # pragma: no cover - type checking
     from collector_core.pipeline_driver_base import EvidenceResult, LicenseMap, TargetContext
 
 
+@stable_api
 def resolve_spdx_with_confidence(
     license_map: "LicenseMap", evidence_text: str, spdx_hint: str
 ) -> tuple[str, float, str]:
@@ -67,6 +68,7 @@ def resolve_spdx_with_confidence(
     return "UNKNOWN", 0.2, "no confident match"
 
 
+@stable_api
 def spdx_bucket(license_map: "LicenseMap", spdx: str) -> str:
     s = str(spdx or "").strip()
     if not s or s.upper() == "UNKNOWN":
@@ -84,6 +86,7 @@ def spdx_bucket(license_map: "LicenseMap", spdx: str) -> str:
     return license_map.gating.get("unknown_spdx_bucket", "YELLOW")
 
 
+@stable_api
 def compute_effective_bucket(
     license_map: "LicenseMap",
     license_gates: list[str],
@@ -123,6 +126,7 @@ def compute_effective_bucket(
     return bucket
 
 
+@stable_api
 def apply_denylist_bucket(dl_hits: list[dict[str, Any]], eff_bucket: str) -> str:
     for hit in dl_hits:
         severity = hit.get("severity", "hard_red")
@@ -133,6 +137,7 @@ def apply_denylist_bucket(dl_hits: list[dict[str, Any]], eff_bucket: str) -> str
     return eff_bucket
 
 
+@stable_api
 def apply_review_gates(
     eff_bucket: str,
     review_required: bool,
@@ -156,6 +161,7 @@ def apply_review_gates(
     return eff_bucket
 
 
+@stable_api
 def resolve_effective_bucket(
     license_map: "LicenseMap",
     license_gates: list[str],
@@ -195,6 +201,7 @@ def resolve_effective_bucket(
     )
 
 
+@stable_api
 def apply_yellow_signoff_requirement(
     eff_bucket: str,
     review_status: str,
@@ -210,6 +217,7 @@ def apply_yellow_signoff_requirement(
     return review_required
 
 
+@stable_api
 def resolve_output_pool(profile: str, eff_bucket: str, target: dict[str, Any]) -> str:
     out_pool = (target.get("output", {}) or {}).get("pool")
     if out_pool:
@@ -221,6 +229,7 @@ def resolve_output_pool(profile: str, eff_bucket: str, target: dict[str, Any]) -
     return "quarantine"
 
 
+@stable_api
 def summarize_denylist_hits(dl_hits: list[dict[str, Any]]) -> tuple[bool, bool]:
     hard_red = False
     force_yellow = False
@@ -233,6 +242,7 @@ def summarize_denylist_hits(dl_hits: list[dict[str, Any]]) -> tuple[bool, bool]:
     return hard_red, force_yellow
 
 
+@stable_api
 def build_bucket_signals(
     *,
     ctx: "TargetContext",
