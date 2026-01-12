@@ -21,7 +21,8 @@ from collector_core.__version__ import __version__ as PIPELINE_VERSION
 from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.config_validator import read_yaml
 from collector_core.dataset_root import ensure_data_root_allowed
-from collector_core.utils import ensure_dir, utc_now
+from collector_core.utils.logging import utc_now
+from collector_core.utils.paths import ensure_dir
 
 
 def count_lines(path: Path, max_lines: int = 0) -> int:

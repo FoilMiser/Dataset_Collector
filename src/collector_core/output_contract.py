@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import hashlib
-import re
 from typing import Any
 
-from collector_core.utils import utc_now
+from collector_core.utils.hash import sha256_text
+from collector_core.utils.logging import utc_now
 
 REQUIRED_FIELDS: dict[str, type] = {
     "dataset_id": str,
@@ -23,11 +22,6 @@ REQUIRED_FIELDS: dict[str, type] = {
     "timestamp_created": str,
     "timestamp_updated": str,
 }
-
-
-def sha256_text(text: str) -> str:
-    norm = re.sub(r"\s+", " ", (text or "").strip())
-    return hashlib.sha256(norm.encode("utf-8")).hexdigest()
 
 
 def normalize_output_record(

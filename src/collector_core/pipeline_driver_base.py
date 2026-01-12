@@ -38,13 +38,10 @@ from collector_core.logging_config import add_logging_args, configure_logging
 from collector_core.metrics import MetricsCollector, clear_collector, set_collector
 from collector_core.policy_snapshot import build_policy_snapshot
 from collector_core.queue.emission import emit_queues
-from collector_core.utils import (
-    coerce_int,
-    contains_any,
-    ensure_dir,
-    utc_now,
-    write_json,
-)
+from collector_core.utils.io import write_json
+from collector_core.utils.logging import utc_now
+from collector_core.utils.paths import ensure_dir
+from collector_core.utils.text import coerce_int, contains_any
 
 from collector_core.evidence.change_detection import (
     compute_signoff_mismatches,

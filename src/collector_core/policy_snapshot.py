@@ -8,7 +8,7 @@ from typing import Any, Sequence
 from collector_core.__version__ import __schema_version__ as SCHEMA_VERSION
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.config_validator import read_yaml
-from collector_core.utils import utc_now
+from collector_core.utils.logging import utc_now
 
 
 def _resolve_git_sha() -> str:

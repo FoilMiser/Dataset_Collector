@@ -5,7 +5,8 @@ from typing import Any
 import re
 
 from collector_core.stability import stable_api
-from collector_core.utils import normalize_whitespace, sha256_bytes
+from collector_core.utils.hash import sha256_bytes
+from collector_core.utils.text import normalize_whitespace
 
 EVIDENCE_CHANGE_POLICIES = {"raw", "normalized", "either"}
 COSMETIC_CHANGE_POLICIES = {"warn_only", "treat_as_changed"}

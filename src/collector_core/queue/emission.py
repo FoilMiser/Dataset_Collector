@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from collector_core.utils import write_jsonl
+from collector_core.utils.io import write_jsonl
 
 if False:  # pragma: no cover - type checking
     from collector_core.pipeline_driver_base import ClassificationResult

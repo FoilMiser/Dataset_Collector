@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import ipaddress
-import json
 import logging
 import os
 import socket
@@ -45,12 +44,9 @@ from collector_core.logging_config import LogContext, add_logging_args, configur
 from collector_core.network_utils import _with_retries
 from collector_core.rate_limit import get_resolver_rate_limiter
 from collector_core.stability import stable_api
-from collector_core.utils import (
-    ensure_dir,
-    safe_filename,
-    utc_now,
-    write_json,
-)
+from collector_core.utils.io import read_jsonl_list, write_json
+from collector_core.utils.logging import utc_now
+from collector_core.utils.paths import ensure_dir, safe_filename
 
 # Alias for backwards compatibility
 safe_name = safe_filename
@@ -65,17 +61,6 @@ logger.warning(
     "use collector_core.acquire.context for context types "
     "and collector_core.acquire.strategies.* for handlers."
 )
-
-
-def _read_jsonl_list(path: Path) -> list[dict[str, Any]]:
-    """Read JSONL file and return as list (local non-gzip version for backwards compatibility)."""
-    rows: list[dict[str, Any]] = []
-    with path.open("r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                rows.append(json.loads(line))
-    return rows
 
 
 def _non_global_ip_reason(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> str:
@@ -1657,7 +1642,7 @@ def run_acquire_worker(
     configure_logging(level=args.log_level, fmt=args.log_format)
 
     queue_path = Path(args.queue).expanduser().resolve()
-    rows = _read_jsonl_list(queue_path)
+    rows = read_jsonl_list(queue_path)
 
     targets_path = Path(args.targets_yaml).expanduser().resolve() if args.targets_yaml else None
     cfg = load_config(targets_path)

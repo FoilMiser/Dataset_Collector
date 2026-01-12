@@ -26,7 +26,9 @@ from collector_core.__version__ import __schema_version__ as SCHEMA_VERSION
 from collector_core.__version__ import __version__ as TOOL_VERSION
 from collector_core.config_validator import read_yaml as read_yaml_config
 from collector_core.dataset_root import ensure_data_root_allowed
-from collector_core.utils import ensure_dir, read_jsonl_list, utc_now
+from collector_core.utils.io import read_jsonl_list
+from collector_core.utils.logging import utc_now
+from collector_core.utils.paths import ensure_dir
 
 
 @dataclass
