@@ -1,6 +1,6 @@
 # Yellow Review Workflow
 
-This document defines a single, consistent review workflow for all v2 pipelines. It standardizes review states, required evidence artifacts, queue locations, and how review decisions flow into `screen_yellow`, `merge`, and `catalog` stages.
+This document defines a single, consistent review workflow for all v2 pipelines. It standardizes review states, required evidence artifacts, queue locations, and how review decisions flow into `yellow_screen`, `merge`, and `catalog` stages.
 
 ## Review states
 
@@ -107,10 +107,10 @@ The workflow is consistent across all pipelines:
 6. **Catalog (`dc catalog-builder`)**
    - Summarizes raw, screened YELLOW, combined shards, and ledgers.
 
-## Decision flow into `screen_yellow` / `merge` / `catalog`
+## Decision flow into `yellow_screen` / `merge` / `catalog`
 
-- **`screen_yellow`** reads `review_signoff.json` from the manifest directory. Signoff status controls whether the target is screened or pitched when `require_yellow_signoff` is enabled.
-- **`merge`** only reads `screened_yellow` shards. If a target was pitched or skipped in `screen_yellow`, it is never merged.
+- **`yellow_screen`** reads `review_signoff.json` from the manifest directory. Signoff status controls whether the target is screened or pitched when `require_yellow_signoff` is enabled.
+- **`merge`** only reads `screened_yellow` shards. If a target was pitched or skipped in `yellow_screen`, it is never merged.
 - **`catalog`** includes ledger entries (`yellow_passed.jsonl`, `yellow_pitched.jsonl`, `combined_index.jsonl`) and shard summaries to provide an auditable trail of review outcomes.
 
 ## Example commands

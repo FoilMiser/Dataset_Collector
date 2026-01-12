@@ -201,7 +201,7 @@ Required:
 Options:
   --execute               Perform actions (default is dry-run/plan only)
   --stage STAGE           Stage to run: all, classify, acquire_green, acquire_yellow, \\
-                          screen_yellow, merge, catalog, review
+                          yellow_screen, merge, catalog, review
   --limit-targets N       Limit number of queue rows processed
   --limit-files N         Limit files per target during acquisition
   --workers N             Parallel workers for acquisition (default: 4)
@@ -296,13 +296,13 @@ run_acquire() {{
     $LIMIT_FILES_ARG
 }}
 
-run_screen_yellow() {{
+run_yellow_screen() {{
   local queue_file="$QUEUES_ROOT/yellow_pipeline.jsonl"
   if [[ ! -f "$queue_file" ]]; then
     echo -e "${{RED}}Queue not found: $queue_file${{NC}}"
     exit 1
   fi
-  echo -e "${{BLUE}}== Stage: screen_yellow ==${{NC}}"
+  echo -e "${{BLUE}}== Stage: yellow_screen ==${{NC}}"
   python -m collector_core.dc_cli run --pipeline {domain} --stage yellow_screen -- \\
     --targets "$TARGETS" \\
     --queue "$queue_file" \\
@@ -324,14 +324,14 @@ case "$STAGE" in
     run_classify
     run_acquire green
     run_acquire yellow
-    run_screen_yellow
+    run_yellow_screen
     run_merge
     run_catalog
     ;;
   classify) run_classify ;;
   acquire_green) run_acquire green ;;
   acquire_yellow) run_acquire yellow ;;
-  screen_yellow) run_screen_yellow ;;
+  yellow_screen) run_yellow_screen ;;
   merge) run_merge ;;
   catalog) run_catalog ;;
   review) run_review ;;

@@ -8,7 +8,7 @@ with a single canonical description.
 
 1. **classify** — identify targets and apply license profiles.
 2. **acquire** — fetch source artifacts and capture evidence.
-3. **screen_yellow** — isolate potential restrictions for manual review.
+3. **yellow_screen** — isolate potential restrictions for manual review.
 4. **merge** — consolidate GREEN sources into the combined corpus.
 5. **catalog** — produce summary metadata and outputs.
 

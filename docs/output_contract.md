@@ -25,7 +25,7 @@ single domain folder must include the following structure:
 - **classify**: emits queue files in `_queues/` describing which targets to acquire.
 - **acquire_green / acquire_yellow**: downloads raw files into `raw/green/...` and
   `raw/yellow/...` respectively.
-- **screen_yellow**: canonicalizes yellow data into `screened_yellow/<pool>/shards/`.
+- **yellow_screen**: canonicalizes yellow data into `screened_yellow/<pool>/shards/`.
 - **merge**: combines green and screened yellow data into `combined/<pool>/shards/`. The merge stage consumes JSONL (`.jsonl/.jsonl.gz`) and HF saved datasets (`datasets.load_from_disk`) from `raw/green/...`.
 - **catalog**: writes summary metadata to `_catalogs/catalog.json`.
 - **downstream normalization (optional, out-of-scope)**: no difficulty routing occurs in this
@@ -84,7 +84,7 @@ outside the collector contract.
 
 Each JSONL shard contains one record per line. Records are JSON objects that must include
 the required fields below; optional fields are allowed but should not override required
-semantics. Field names are stable across stages (`screen_yellow`, `merge`) so downstream
+semantics. Field names are stable across stages (`yellow_screen`, `merge`) so downstream
 pipelines can rely on a consistent contract.
 
 ### Required fields and types

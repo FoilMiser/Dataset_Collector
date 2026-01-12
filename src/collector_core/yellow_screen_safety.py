@@ -8,7 +8,7 @@ behavior. Outputs:
   - _ledger/yellow_passed.jsonl (accepted rows)
   - _ledger/yellow_pitched.jsonl (pitched rows)
   - _pitches/yellow_pitch.jsonl (pitched samples)
-  - _manifests/{target_id}/screen_yellow_done.json
+  - _manifests/{target_id}/yellow_screen_done.json
 """
 
 from __future__ import annotations
@@ -495,7 +495,7 @@ def process_target(
             manifest.update(build_artifact_metadata(written_at_utc=manifest["finished_at_utc"]))
             if execute:
                 ensure_dir(roots.manifests_root / target_id)
-                write_json(roots.manifests_root / target_id / "screen_yellow_done.json", manifest)
+                write_json(roots.manifests_root / target_id / "yellow_screen_done.json", manifest)
             return manifest
         if status != "approved":
             if execute:
@@ -519,7 +519,7 @@ def process_target(
             manifest.update(build_artifact_metadata(written_at_utc=manifest["finished_at_utc"]))
             if execute:
                 ensure_dir(roots.manifests_root / target_id)
-                write_json(roots.manifests_root / target_id / "screen_yellow_done.json", manifest)
+                write_json(roots.manifests_root / target_id / "yellow_screen_done.json", manifest)
             return manifest
 
     for pool in pools:
@@ -716,7 +716,7 @@ def process_target(
     manifest.update(build_artifact_metadata(written_at_utc=manifest["finished_at_utc"]))
     if execute:
         ensure_dir(roots.manifests_root / target_id)
-        write_json(roots.manifests_root / target_id / "screen_yellow_done.json", manifest)
+        write_json(roots.manifests_root / target_id / "yellow_screen_done.json", manifest)
     return manifest
 
 

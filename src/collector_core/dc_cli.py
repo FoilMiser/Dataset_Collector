@@ -21,6 +21,7 @@ from collector_core.yellow_screen_dispatch import get_yellow_screen_main
 STAGE_ACQUIRE = "acquire"
 STAGE_MERGE = "merge"
 STAGE_YELLOW = "yellow_screen"
+STAGE_YELLOW_ALIAS = "screen_yellow"
 COMMAND_REVIEW_QUEUE = "review-queue"
 COMMAND_CATALOG_BUILDER = "catalog-builder"
 
@@ -54,8 +55,8 @@ def _parse_args() -> argparse.Namespace:
     run.add_argument(
         "--stage",
         required=True,
-        choices=[STAGE_ACQUIRE, STAGE_MERGE, STAGE_YELLOW],
-        help="Pipeline stage to run.",
+        choices=[STAGE_ACQUIRE, STAGE_MERGE, STAGE_YELLOW, STAGE_YELLOW_ALIAS],
+        help="Pipeline stage to run (use yellow_screen; screen_yellow is deprecated).",
     )
     run.add_argument(
         "--repo-root",
@@ -249,6 +250,12 @@ def main() -> int:
         passthrough = list(args.args)
         if passthrough[:1] == ["--"]:
             passthrough = passthrough[1:]
+        if args.stage == STAGE_YELLOW_ALIAS:
+            print(
+                "Warning: 'screen_yellow' is deprecated; use 'yellow_screen' instead.",
+                file=sys.stderr,
+            )
+            args.stage = STAGE_YELLOW
         passthrough = _resolve_dataset_root_arg(passthrough, args.dataset_root)
         passthrough = _resolve_allow_data_root_arg(passthrough, args.allow_data_root)
 
