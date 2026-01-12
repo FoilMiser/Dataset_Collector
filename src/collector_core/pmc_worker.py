@@ -101,7 +101,7 @@ def chunk_text(text: str, max_chars: int, min_chars: int) -> list[str]:
 
 
 def _pmc_user_agent(version: str = TOOL_VERSION) -> str:
-    return build_user_agent(\"pmc-worker\", version)
+    return build_user_agent("pmc-worker", version)
 
 
 def ftp_get_bytes(host: str, remote_path: str) -> bytes:

@@ -48,7 +48,8 @@ class LogContext:
         self.token: contextvars.Token | None = None
 
     def __enter__(self) -> LogContext:
-        current = _log_context.get().copy()
+        ctx = _log_context.get()
+        current = ctx.copy() if ctx else {}
         current.update(self.kwargs)
         self.token = _log_context.set(current)
         return self

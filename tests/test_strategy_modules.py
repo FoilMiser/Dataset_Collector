@@ -136,6 +136,7 @@ def make_ctx(
     verify_zenodo_md5: bool = False,
     max_attempts: int = 1,
     cfg: dict[str, Any] | None = None,
+    allow_non_global_download_hosts: bool = True,
 ) -> aw.AcquireContext:
     roots = aw.Roots(
         raw_root=tmp_path / "raw",
@@ -154,7 +155,15 @@ def make_ctx(
     )
     retry = aw.RetryConfig(max_attempts=max_attempts, backoff_base=0.0, backoff_max=0.0)
     run_budget = aw.build_run_budget(None)
-    return aw.AcquireContext(roots=roots, limits=limits, mode=mode, retry=retry, run_budget=run_budget, cfg=cfg)
+    return aw.AcquireContext(
+        roots=roots,
+        limits=limits,
+        mode=mode,
+        retry=retry,
+        run_budget=run_budget,
+        cfg=cfg,
+        allow_non_global_download_hosts=allow_non_global_download_hosts,
+    )
 
 
 def test_http_strategy_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -163,7 +172,7 @@ def test_http_strategy_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     def fake_get(url: str, stream: bool, headers: dict, timeout: tuple[int, int]):
         return response
 
-    monkeypatch.setattr(aw.requests, "get", fake_get)
+    monkeypatch.setattr(http, "requests", SimpleNamespace(get=fake_get, exceptions=requests.exceptions))
 
     handler = http.resolve_http_handler("single")
     ctx = make_ctx(tmp_path)

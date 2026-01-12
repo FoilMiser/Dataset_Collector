@@ -1,61 +1,176 @@
 # denylist.yaml
-# v0.2 — shared denylist patterns (v0.9 enhancements)
+# v1.0 — shared denylist patterns with real entries and provenance
 #
 # The pipeline scans target id/name, license evidence URL, and download config.
-# v0.9 NEW: Structured patterns, per-pattern severity, and mandatory provenance.
+# Structured patterns with per-pattern severity and mandatory provenance.
 #
 # Severity levels:
-#   - hard_red: Forces RED immediately (default, backwards compatible)
+#   - hard_red: Forces RED immediately (blocked from collection)
 #   - force_yellow: Forces YELLOW for deeper manual review
 #
-# All patterns now require 'link' and 'rationale' fields for auditability.
+# All patterns require 'link' and 'rationale' fields for auditability.
 
-schema_version: "0.9"
-updated_utc: "2025-12-14"
+schema_version: "1.0"
+updated_utc: "2026-01-12"
 
-# v0.9: Domain extraction patterns (match against extracted domain from URLs)
-domain_patterns: []
-  # Example:
-  # - domain: "example.com"
-  #   severity: "hard_red"
-  #   link: "https://example.com/terms"
-  #   rationale: "Terms explicitly prohibit ML training"
+# Domain extraction patterns (match against extracted domain from URLs)
+domain_patterns:
+  - domain: "sci-hub.se"
+    severity: "hard_red"
+    link: "https://en.wikipedia.org/wiki/Sci-Hub"
+    rationale: "Unauthorized redistribution of copyrighted scientific papers"
 
-# v0.9: Publisher/provider tags (match against publisher metadata if available)
-publisher_patterns: []
-  # Example:
-  # - publisher: "Example Publisher"
-  #   severity: "force_yellow"
-  #   link: "https://publisher.example/policy"
-  #   rationale: "Unclear terms, needs manual review"
+  - domain: "sci-hub.st"
+    severity: "hard_red"
+    link: "https://en.wikipedia.org/wiki/Sci-Hub"
+    rationale: "Unauthorized redistribution of copyrighted scientific papers"
 
-patterns: []
-  # Example pattern with v0.9 required provenance fields:
-  # - type: "substring"        # substring | regex | domain
-  #   value: "example.com"
-  #   fields: ["license_evidence_url", "download_blob"]
-  #   severity: "hard_red"     # hard_red (default) | force_yellow
-  #   link: "https://example.com/terms"
-  #   rationale: "Terms prohibit text mining and AI training"
+  - domain: "libgen.is"
+    severity: "hard_red"
+    link: "https://en.wikipedia.org/wiki/Library_Genesis"
+    rationale: "Unauthorized redistribution of copyrighted books and papers"
 
-  # Placeholder patterns (add your denylisted sources here)
-  # - type: "substring"
-  #   value: "restricted-publisher.com"
-  #   fields: ["license_evidence_url", "download_blob", "id", "name"]
-  #   severity: "hard_red"
-  #   link: "https://restricted-publisher.com/legal"
-  #   rationale: "Publisher explicitly prohibits AI/ML training in their terms of service"
+  - domain: "libgen.rs"
+    severity: "hard_red"
+    link: "https://en.wikipedia.org/wiki/Library_Genesis"
+    rationale: "Unauthorized redistribution of copyrighted books and papers"
 
-  # - type: "regex"
-  #   value: "(?i)proprietary.*dataset"
-  #   fields: ["name", "id"]
-  #   severity: "force_yellow"
-  #   link: ""
-  #   rationale: "Datasets with 'proprietary' in name require manual license verification"
+  - domain: "z-library.org"
+    severity: "hard_red"
+    link: "https://en.wikipedia.org/wiki/Z-Library"
+    rationale: "Unauthorized redistribution of copyrighted ebooks"
 
-  # - type: "domain"
-  #   value: "paywalled-journal.com"
-  #   fields: ["license_evidence_url", "download_blob"]
-  #   severity: "hard_red"
-  #   link: "https://paywalled-journal.com/terms"
-  #   rationale: "Journal requires subscription and prohibits bulk download/training"
+  - domain: "annas-archive.org"
+    severity: "hard_red"
+    link: "https://en.wikipedia.org/wiki/Anna%27s_Archive"
+    rationale: "Aggregator of pirated content from multiple shadow libraries"
+
+  - domain: "thepiratebay.org"
+    severity: "hard_red"
+    link: "https://en.wikipedia.org/wiki/The_Pirate_Bay"
+    rationale: "Torrent site primarily distributing copyrighted content"
+
+# Publisher/provider tags (match against publisher metadata if available)
+publisher_patterns:
+  - publisher: "Elsevier"
+    severity: "force_yellow"
+    link: "https://www.elsevier.com/about/policies/text-and-data-mining"
+    rationale: "Requires TDM agreement; verify institutional access and licensing"
+
+  - publisher: "Springer Nature"
+    severity: "force_yellow"
+    link: "https://www.springernature.com/gp/researchers/text-and-data-mining"
+    rationale: "TDM policy varies by content; requires verification"
+
+  - publisher: "Wiley"
+    severity: "force_yellow"
+    link: "https://onlinelibrary.wiley.com/library-info/resources/text-mining"
+    rationale: "TDM requires license agreement; verify terms"
+
+  - publisher: "IEEE"
+    severity: "force_yellow"
+    link: "https://www.ieee.org/publications/rights/index.html"
+    rationale: "Restrictive TDM terms; requires institutional agreement"
+
+  - publisher: "ACM"
+    severity: "force_yellow"
+    link: "https://www.acm.org/publications/policies/text-mining"
+    rationale: "TDM policy requires license; verify before collection"
+
+patterns:
+  # Explicit text-mining restriction phrases
+  - type: "regex"
+    value: "(?i)\\bno\\s+(text|data)\\s*(mining|scraping)\\b"
+    fields: ["license_evidence_url", "terms_text"]
+    severity: "hard_red"
+    link: ""
+    rationale: "Explicit prohibition of text/data mining in terms"
+
+  - type: "regex"
+    value: "(?i)\\bprohibit(ed|s)?\\s+(machine|ai|ml)\\s+(learning|training)\\b"
+    fields: ["license_evidence_url", "terms_text"]
+    severity: "hard_red"
+    link: ""
+    rationale: "Explicit prohibition of ML/AI training in terms"
+
+  - type: "regex"
+    value: "(?i)\\bnot\\s+for\\s+(commercial|ai|training)\\s+use\\b"
+    fields: ["license_evidence_url", "terms_text"]
+    severity: "force_yellow"
+    link: ""
+    rationale: "Restriction on commercial/AI use requires review"
+
+  # Dual-use chemical/biological content requiring extra scrutiny
+  - type: "regex"
+    value: "(?i)\\b(synthesis|precursor|route)\\b.{0,50}\\b(nerve\\s+agent|explosive|weapon)\\b"
+    fields: ["name", "description", "abstract"]
+    severity: "hard_red"
+    link: "https://www.opcw.org/chemical-weapons-convention"
+    rationale: "Potential weapons synthesis information; prohibited content"
+
+  - type: "regex"
+    value: "(?i)\\b(bioweapon|pathogen|toxin)\\s*(synthesis|production|enhancement)\\b"
+    fields: ["name", "description", "abstract"]
+    severity: "hard_red"
+    link: "https://www.un.org/disarmament/wmd/bio/"
+    rationale: "Potential biological weapons content; prohibited"
+
+  # Personal data and privacy concerns
+  - type: "regex"
+    value: "(?i)\\b(scraped|leaked)\\s*(personal|private|user)\\s*(data|information|emails)\\b"
+    fields: ["name", "description"]
+    severity: "hard_red"
+    link: "https://gdpr.eu/"
+    rationale: "Likely contains personal data collected without consent"
+
+  - type: "regex"
+    value: "(?i)\\bfacebook\\s*(leak|breach|scraped)\\b"
+    fields: ["name", "description"]
+    severity: "hard_red"
+    link: ""
+    rationale: "Likely unauthorized personal data from social media"
+
+  # Known problematic datasets
+  - type: "substring"
+    value: "JFT-300M"
+    fields: ["name", "id"]
+    severity: "hard_red"
+    link: "https://arxiv.org/abs/1707.02968"
+    rationale: "Proprietary Google dataset; not available for public use"
+
+  - type: "substring"
+    value: "Instagram"
+    fields: ["name", "description"]
+    severity: "force_yellow"
+    link: "https://help.instagram.com/581066165581870"
+    rationale: "Instagram ToS prohibits scraping; verify data provenance"
+
+  # Paywalled academic content
+  - type: "domain"
+    value: "jstor.org"
+    fields: ["license_evidence_url", "download_blob"]
+    severity: "force_yellow"
+    link: "https://about.jstor.org/terms/"
+    rationale: "JSTOR content requires subscription; verify access rights"
+
+  - type: "domain"
+    value: "sciencedirect.com"
+    fields: ["license_evidence_url", "download_blob"]
+    severity: "force_yellow"
+    link: "https://www.elsevier.com/legal/elsevier-website-terms-and-conditions"
+    rationale: "Elsevier content; verify TDM agreement"
+
+  # Generic restrictive license indicators
+  - type: "regex"
+    value: "(?i)\\ball\\s+rights\\s+reserved\\b"
+    fields: ["license_text", "terms_text"]
+    severity: "force_yellow"
+    link: ""
+    rationale: "Traditional copyright without explicit permissions; needs review"
+
+  - type: "regex"
+    value: "(?i)\\bnon-?commercial\\s+only\\b"
+    fields: ["license_text", "name"]
+    severity: "force_yellow"
+    link: ""
+    rationale: "Non-commercial restriction may conflict with intended use"

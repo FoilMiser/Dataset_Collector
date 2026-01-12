@@ -29,17 +29,22 @@ def get_yellow_screen_main(domain: str) -> Callable[[], None]:
     if spec is None:
         raise ValueError(f"Unknown domain: {domain}")
 
+    defaults = default_yellow_roots(spec.prefix)
+
     if spec.yellow_screen_module:
         module_name = f"collector_core.{spec.yellow_screen_module}"
         try:
             mod = importlib.import_module(module_name)
-            return mod.main
+
+            # Wrap the module's main to pass defaults
+            def _custom_main() -> None:
+                mod.main(defaults=defaults)
+
+            return _custom_main
         except ImportError as e:
             raise ImportError(
                 f"Failed to import yellow screen module {module_name} for domain {domain}: {e}"
             ) from e
-
-    defaults = default_yellow_roots(spec.prefix)
 
     def _standard_main() -> None:
         # Lazy import to avoid requiring datasets module at module load time

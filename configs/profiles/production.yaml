@@ -1,0 +1,74 @@
+# production.yaml - Production profile
+# Optimized for reliable, auditable production runs
+#
+# Usage: DC_PROFILE=production dc pipeline run ...
+
+schema_version: "1.0"
+profile_name: "production"
+inherits: "base"
+
+# Production logging with structured output
+logging:
+  level: "INFO"
+  format: "json"  # Structured logs for aggregation
+  include_timestamps: true
+  redact_secrets: true
+
+# Conservative network settings
+network:
+  max_retries: 5
+  retry_backoff_base: 2.0
+  retry_backoff_max: 120.0
+  timeout_connect: 30
+  timeout_read: 600
+
+# Production acquire settings
+acquire:
+  enable_resume: true
+  verify_sha256: true  # Always verify in production
+  verify_zenodo_md5: true
+  workers: 4  # Parallel downloads
+  allow_non_global_hosts: false
+
+# Strict classification in production
+classification:
+  strict_spdx: true
+  require_license_evidence: true
+  auto_approve_permissive: true
+
+# Full screening in production
+yellow_screen:
+  enabled: true
+  require_dual_use_scan: true
+  require_pii_scan: true
+
+# Production merge settings
+merge:
+  dedupe_enabled: true
+  shard_rows: 50000  # Larger shards for efficiency
+  output_format: "jsonl.gz"
+
+# Strict policy enforcement
+policy:
+  enforce_evidence_hash: true
+  re_review_on_evidence_change: true
+
+# Conservative rate limits (respect upstream services)
+rate_limits:
+  github:
+    requests_per_hour: 1000
+    burst: 50
+  figshare:
+    requests_per_minute: 30
+    burst: 5
+  zenodo:
+    requests_per_minute: 50
+    burst: 10
+
+# Full observability in production
+observability:
+  metrics_enabled: true
+  metrics_port: 9090
+  tracing_enabled: true
+  tracing_endpoint: "${OTEL_EXPORTER_OTLP_ENDPOINT}"
+  json_logs: true

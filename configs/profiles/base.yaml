@@ -1,0 +1,80 @@
+# base.yaml - Base configuration profile
+# All other profiles inherit from this file
+#
+# Select profile via DC_PROFILE environment variable:
+#   DC_PROFILE=production dc pipeline run ...
+#
+# Profile inheritance:
+#   development.yaml -> base.yaml
+#   production.yaml -> base.yaml
+
+schema_version: "1.0"
+profile_name: "base"
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "text"  # "text" | "json"
+  include_timestamps: true
+  redact_secrets: true
+
+# Network/download settings
+network:
+  max_retries: 3
+  retry_backoff_base: 2.0
+  retry_backoff_max: 60.0
+  timeout_connect: 15
+  timeout_read: 300
+  user_agent_prefix: "DatasetCollector"
+
+# Acquire stage defaults
+acquire:
+  enable_resume: true
+  verify_sha256: false
+  verify_zenodo_md5: true
+  workers: 1
+  allow_non_global_hosts: false
+
+# Classification defaults
+classification:
+  strict_spdx: false
+  require_license_evidence: true
+  auto_approve_permissive: true
+
+# Yellow screen defaults
+yellow_screen:
+  enabled: true
+  require_dual_use_scan: true
+  require_pii_scan: true
+  default_domain: "standard"
+
+# Merge defaults
+merge:
+  dedupe_enabled: true
+  shard_rows: 10000
+  output_format: "jsonl.gz"
+
+# Policy defaults
+policy:
+  denylist_path: "configs/common/denylist.yaml"
+  license_map_path: "configs/common/license_map.yaml"
+  enforce_evidence_hash: false
+  re_review_on_evidence_change: true
+
+# Rate limiting
+rate_limits:
+  github:
+    requests_per_hour: 5000
+    burst: 100
+  figshare:
+    requests_per_minute: 60
+    burst: 10
+  zenodo:
+    requests_per_minute: 100
+    burst: 20
+
+# Observability (disabled by default in base)
+observability:
+  metrics_enabled: false
+  tracing_enabled: false
+  json_logs: false
