@@ -3,11 +3,11 @@
 sync_pipeline_wrappers.py
 
 One-command regeneration of all thin wrappers for pipeline directories.
-Can also run in lint mode (--check) for CI to verify wrappers are up-to-date.
+Defaults to check mode unless --write is provided.
 
 Usage:
-    python -m tools.sync_pipeline_wrappers          # Regenerate all wrappers
-    python -m tools.sync_pipeline_wrappers --check  # Check without writing (CI mode)
+    python -m tools.sync_pipeline_wrappers --write   # Regenerate all wrappers
+    python -m tools.sync_pipeline_wrappers --check   # Check without writing (CI mode)
     python -m tools.sync_pipeline_wrappers --dry-run # Show what would be written
 """
 
@@ -20,6 +20,8 @@ from typing import NamedTuple
 
 import collector_core.pipeline_specs_registry  # noqa: E402,F401
 from collector_core.pipeline_spec import get_pipeline_spec, list_pipelines  # noqa: E402
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class WrapperTemplate(NamedTuple):
@@ -51,10 +53,14 @@ ACQUIRE_WORKER_TEMPLATE = '''#!/usr/bin/env python3
 """
 acquire_worker.py (v2.0)
 
-Thin wrapper that delegates to the spec-driven generic acquire worker.
+Deprecated compatibility shim for `dc run --pipeline {domain} --stage acquire`.
+Removal target: v3.0.
 """
 from __future__ import annotations
+
+import warnings
 from pathlib import Path
+
 from collector_core.acquire_strategies import (  # noqa: E402
     AcquireContext,
     Limits,
@@ -66,6 +72,10 @@ from collector_core.acquire_strategies import (  # noqa: E402
 from collector_core.generic_workers import main_acquire  # noqa: E402
 
 DOMAIN = "{domain}"
+DEPRECATION_MESSAGE = (
+    "acquire_worker.py is deprecated; use `dc run --pipeline {domain} --stage acquire` instead. "
+    "Removal target: v3.0."
+)
 
 __all__ = [
     "AcquireContext",
@@ -79,6 +89,7 @@ __all__ = [
 
 
 def main() -> None:
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning, stacklevel=2)
     main_acquire(DOMAIN, repo_root=Path(__file__).resolve().parents[1])
 
 
@@ -91,35 +102,24 @@ MERGE_WORKER_TEMPLATE = '''#!/usr/bin/env python3
 """
 merge_worker.py (v2.0)
 
-Thin wrapper that delegates to the spec-driven generic merge worker.
+Deprecated compatibility shim for `dc run --pipeline {domain} --stage merge`.
+Removal target: v3.0.
 """
 from __future__ import annotations
-from pathlib import Path
-from collector_core import merge as core_merge  # noqa: E402
+
+import warnings
+
 from collector_core.generic_workers import main_merge  # noqa: E402
-from collector_core.pipeline_spec import get_pipeline_spec  # noqa: E402
 
 DOMAIN = "{domain}"
-SPEC = get_pipeline_spec(DOMAIN)
-if SPEC is None:
-    raise SystemExit(f"Unknown pipeline domain: {{DOMAIN}}")
-
-PIPELINE_ID = SPEC.pipeline_id
-DEFAULT_ROOTS = core_merge.default_merge_roots(SPEC.prefix)
-
-read_jsonl = core_merge.read_jsonl
-write_json = core_merge.write_json
-
-
-def resolve_roots(cfg: dict) -> core_merge.Roots:
-    return core_merge.resolve_roots(cfg, DEFAULT_ROOTS)
-
-
-def merge_records(cfg: dict, roots: core_merge.Roots, execute: bool) -> dict:
-    return core_merge.merge_records(cfg, roots, execute, pipeline_id=PIPELINE_ID)
+DEPRECATION_MESSAGE = (
+    "merge_worker.py is deprecated; use `dc run --pipeline {domain} --stage merge` instead. "
+    "Removal target: v3.0."
+)
 
 
 def main() -> None:
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning, stacklevel=2)
     main_merge(DOMAIN)
 
 
@@ -176,36 +176,37 @@ RUN_PIPELINE_TEMPLATE = """#!/usr/bin/env bash
 #
 # run_pipeline.sh (v2.0)
 #
-# Wrapper script for the {domain} pipeline using the unified dc CLI.
+# Deprecated compatibility shim for the {domain} pipeline.
+# Use: dc run --pipeline {domain} --stage <stage>
+# Removal target: v3.0.
 #
 set -euo pipefail
 
+YELLOW='\\033[0;33m'
 RED='\\033[0;31m'
-BLUE='\\033[0;34m'
 NC='\\033[0m'
 
 TARGETS=""
 EXECUTE=""
-STAGE="all"
-LIMIT_TARGETS=""
-LIMIT_FILES=""
-WORKERS="4"
+STAGE=""
+EXTRA_ARGS=()
 
 usage() {{
   cat << 'EOM'
-Pipeline wrapper (v2)
+Deprecated pipeline wrapper (v2)
 
 Required:
   --targets FILE          Path to targets YAML
+  --stage STAGE           Stage to run: classify, acquire, yellow_screen, merge, catalog, review
 
 Options:
   --execute               Perform actions (default is dry-run/plan only)
-  --stage STAGE           Stage to run: all, classify, acquire_green, acquire_yellow, \\
-                          yellow_screen, merge, catalog, review
-  --limit-targets N       Limit number of queue rows processed
-  --limit-files N         Limit files per target during acquisition
-  --workers N             Parallel workers for acquisition (default: 4)
+  --                      Pass remaining args directly to the stage command
   -h, --help              Show this help
+
+Notes:
+  - This shim no longer resolves queue paths automatically.
+  - Provide stage arguments after -- (for example: --queue, --bucket, --targets-yaml).
 EOM
 }}
 
@@ -214,16 +215,14 @@ while [[ $# -gt 0 ]]; do
     --targets) TARGETS="$2"; shift 2 ;;
     --stage) STAGE="$2"; shift 2 ;;
     --execute) EXECUTE="--execute"; shift ;;
-    --limit-targets) LIMIT_TARGETS="$2"; shift 2 ;;
-    --limit-files) LIMIT_FILES="$2"; shift 2 ;;
-    --workers) WORKERS="$2"; shift 2 ;;
+    --) shift; EXTRA_ARGS+=("$@"); break ;;
     -h|--help) usage; exit 0 ;;
-    *) echo -e "${{RED}}Unknown option: $1${{NC}}"; usage; exit 1 ;;
+    *) EXTRA_ARGS+=("$1"); shift ;;
   esac
 done
 
-if [[ -z "$TARGETS" ]]; then
-  echo -e "${{RED}}--targets is required${{NC}}"
+if [[ -z "$TARGETS" || -z "$STAGE" ]]; then
+  echo -e "${{RED}}--targets and --stage are required${{NC}}"
   usage
   exit 1
 fi
@@ -233,109 +232,40 @@ if [[ ! -f "$TARGETS" ]]; then
   exit 1
 fi
 
+echo -e "${{YELLOW}}[deprecated] run_pipeline.sh is deprecated; use 'dc run --pipeline {domain} --stage <stage>' instead. Removal target: v3.0.${{NC}}" >&2
+
 SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
 REPO_ROOT="$(cd "${{SCRIPT_DIR}}/.." && pwd)"
 export PYTHONPATH="${{REPO_ROOT}}:${{PYTHONPATH:-}}"
 
-QUEUES_ROOT=$(python - << PY
-from pathlib import Path
-from collector_core.config_validator import read_yaml
-from collector_core.pipeline_spec import get_pipeline_spec
-cfg = read_yaml(Path("${{TARGETS}}"), schema_name="targets") or {{}}
-spec = get_pipeline_spec("{domain}")
-prefix = spec.prefix if spec else "{domain}"
-print(cfg.get("globals", {{}}).get("queues_root", f"/data/{{prefix}}/_queues"))
-PY
-)
-CATALOGS_ROOT=$(python - << PY
-from pathlib import Path
-from collector_core.config_validator import read_yaml
-from collector_core.pipeline_spec import get_pipeline_spec
-cfg = read_yaml(Path("${{TARGETS}}"), schema_name="targets") or {{}}
-spec = get_pipeline_spec("{domain}")
-prefix = spec.prefix if spec else "{domain}"
-print(cfg.get("globals", {{}}).get("catalogs_root", f"/data/{{prefix}}/_catalogs"))
-PY
-)
-LIMIT_TARGETS_ARG=""; [[ -n "$LIMIT_TARGETS" ]] && LIMIT_TARGETS_ARG="--limit-targets $LIMIT_TARGETS"
-LIMIT_FILES_ARG=""; [[ -n "$LIMIT_FILES" ]] && LIMIT_FILES_ARG="--limit-files $LIMIT_FILES"
-
-run_classify() {{
-  echo -e "${{BLUE}}== Stage: classify ==${{NC}}"
-  local no_fetch=""
-  if [[ -z "$EXECUTE" ]]; then
-    no_fetch="--no-fetch"
-  fi
-  python -m collector_core.dc_cli pipeline {domain} -- --targets "$TARGETS" $no_fetch
-}}
-
-run_review() {{
-  local queue_file="$QUEUES_ROOT/yellow_pipeline.jsonl"
-  echo -e "${{BLUE}}== Stage: review ==${{NC}}"
-  python -m collector_core.dc_cli review-queue --pipeline {domain} -- --queue "$queue_file" --targets "$TARGETS" --limit 50 || true
-}}
-
-run_acquire() {{
-  local bucket="$1"
-  local queue_file="$QUEUES_ROOT/${{bucket}}_download.jsonl"
-  if [[ "$bucket" == "yellow" ]]; then
-    queue_file="$QUEUES_ROOT/yellow_pipeline.jsonl"
-  fi
-  if [[ ! -f "$queue_file" ]]; then
-    echo -e "${{RED}}Queue not found: $queue_file${{NC}}"
-    exit 1
-  fi
-  echo -e "${{BLUE}}== Stage: acquire_${{bucket}} ==${{NC}}"
-  python -m collector_core.dc_cli run --pipeline {domain} --stage acquire -- \\
-    --queue "$queue_file" \\
-    --targets-yaml "$TARGETS" \\
-    --bucket "$bucket" \\
-    --workers "$WORKERS" \\
-    $EXECUTE \\
-    $LIMIT_TARGETS_ARG \\
-    $LIMIT_FILES_ARG
-}}
-
-run_yellow_screen() {{
-  local queue_file="$QUEUES_ROOT/yellow_pipeline.jsonl"
-  if [[ ! -f "$queue_file" ]]; then
-    echo -e "${{RED}}Queue not found: $queue_file${{NC}}"
-    exit 1
-  fi
-  echo -e "${{BLUE}}== Stage: yellow_screen ==${{NC}}"
-  python -m collector_core.dc_cli run --pipeline {domain} --stage yellow_screen -- \\
-    --targets "$TARGETS" \\
-    --queue "$queue_file" \\
-    $EXECUTE
-}}
-
-run_merge() {{
-  echo -e "${{BLUE}}== Stage: merge ==${{NC}}"
-  python -m collector_core.dc_cli run --pipeline {domain} --stage merge -- --targets "$TARGETS" $EXECUTE
-}}
-
-run_catalog() {{
-  echo -e "${{BLUE}}== Stage: catalog ==${{NC}}"
-  python -m collector_core.dc_cli catalog-builder --pipeline {domain} -- --targets "$TARGETS" --output "${{CATALOGS_ROOT}}/catalog.json"
-}}
-
 case "$STAGE" in
-  all)
-    run_classify
-    run_acquire green
-    run_acquire yellow
-    run_yellow_screen
-    run_merge
-    run_catalog
+  classify)
+    NO_FETCH=""
+    if [[ -z "$EXECUTE" ]]; then
+      NO_FETCH="--no-fetch"
+    fi
+    python -m collector_core.dc_cli pipeline {domain} -- --targets "$TARGETS" $NO_FETCH "${{EXTRA_ARGS[@]}}"
     ;;
-  classify) run_classify ;;
-  acquire_green) run_acquire green ;;
-  acquire_yellow) run_acquire yellow ;;
-  yellow_screen) run_yellow_screen ;;
-  merge) run_merge ;;
-  catalog) run_catalog ;;
-  review) run_review ;;
-  *) echo -e "${{RED}}Unknown stage: $STAGE${{NC}}"; usage; exit 1 ;;
+  acquire)
+    python -m collector_core.dc_cli run --pipeline {domain} --stage acquire -- --targets-yaml "$TARGETS" $EXECUTE "${{EXTRA_ARGS[@]}}"
+    ;;
+  yellow_screen)
+    python -m collector_core.dc_cli run --pipeline {domain} --stage yellow_screen -- --targets "$TARGETS" $EXECUTE "${{EXTRA_ARGS[@]}}"
+    ;;
+  merge)
+    python -m collector_core.dc_cli run --pipeline {domain} --stage merge -- --targets "$TARGETS" $EXECUTE "${{EXTRA_ARGS[@]}}"
+    ;;
+  catalog)
+    python -m collector_core.dc_cli catalog-builder --pipeline {domain} -- --targets "$TARGETS" "${{EXTRA_ARGS[@]}}"
+    ;;
+  review)
+    python -m collector_core.dc_cli review-queue --pipeline {domain} -- --targets "$TARGETS" "${{EXTRA_ARGS[@]}}"
+    ;;
+  *)
+    echo -e "${{RED}}Unknown stage: $STAGE${{NC}}"
+    usage
+    exit 1
+    ;;
 esac
 """
 
@@ -364,15 +294,23 @@ YELLOW_SCREEN_WORKER_TEMPLATE = '''#!/usr/bin/env python3
 """
 yellow_screen_worker.py (v2.0)
 
-Thin wrapper that delegates to the spec-driven yellow screen dispatch.
+Deprecated compatibility shim for `dc run --pipeline {domain} --stage yellow_screen`.
+Removal target: v3.0.
 """
 from __future__ import annotations
-from pathlib import Path
+
+import warnings
+
 from collector_core.yellow_screen_dispatch import main_yellow_screen  # noqa: E402
 
 DOMAIN = "{domain}"
+DEPRECATION_MESSAGE = (
+    "yellow_screen_worker.py is deprecated; use `dc run --pipeline {domain} --stage yellow_screen` instead. "
+    "Removal target: v3.0."
+)
 
 if __name__ == "__main__":
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning, stacklevel=2)
     main_yellow_screen(DOMAIN)
 '''
 
@@ -485,6 +423,11 @@ def main() -> int:
         help="Check mode: exit non-zero if any wrapper differs from expected",
     )
     parser.add_argument(
+        "--write",
+        action="store_true",
+        help="Write updated wrappers (default is check-only).",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Show what would be done without making changes",
@@ -503,13 +446,16 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    if not args.write and not args.check and not args.dry_run:
+        args.check = True
+
     domains = [args.domain] if args.domain else list_pipelines()
     all_issues: list[str] = []
 
     for domain in domains:
         if args.verbose:
             print(f"Processing {domain}...")
-        issues = sync_domain(domain, check_only=args.check, dry_run=args.dry_run)
+        issues = sync_domain(domain, check_only=args.check and not args.write, dry_run=args.dry_run)
         all_issues.extend(issues)
 
     # Print results

@@ -26,7 +26,7 @@ Located in `configs/common/domain_denylist.yaml`:
 
 ## How the denylist is enforced
 
-1. **Classification stage**: `pipeline_driver.py` checks targets against denylists
+1. **Classification stage**: `dc pipeline` checks targets against denylists
 2. **YELLOW bucket routing**: Denied targets route to RED bucket
 3. **Merge stage**: Denylist hits are recorded in output metadata
 4. **Audit trail**: All denylist decisions are logged with rationale

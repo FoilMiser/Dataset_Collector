@@ -4,7 +4,7 @@ A safety-first **two-pool engineering pipeline** aligned with the `math_pipeline
 
 What's new in v2:
 - `../pipelines/targets/targets_engineering.yaml` (schema v0.8) with explicit roots + routing metadata for downstream sorting
-- v2 workers: `acquire_worker.py`, `yellow_screen_worker.py`, `merge_worker.py`, `catalog_builder.py`
+- v2 workers: `dc run --stage acquire`, `dc run --stage yellow_screen`, `dc run --stage merge`, `dc catalog-builder`
 - Two-pool raw layout: `raw/green` + `raw/yellow` → screened_yellow → combined → screened shards
 - Unified CLI via `dc pipeline` (classification) and `dc run` (worker stages)
 
@@ -34,19 +34,19 @@ You can also run the Jupyter notebook, which invokes the same workflow. For dire
 ../pipelines/targets/targets_engineering.yaml
         |
         v
-pipeline_driver.py  -> _queues/{green_download,yellow_pipeline,red_rejected}.jsonl
+dc pipeline  -> _queues/{green_download,yellow_pipeline,red_rejected}.jsonl
         |
         v
-acquire_worker.py (green/yellow) -> raw/{green|yellow}/{pool}/{target}/...
+dc run --stage acquire (green/yellow) -> raw/{green|yellow}/{pool}/{target}/...
         |
         v
-yellow_screen_worker.py -> screened_yellow/{pool}/shards/*.jsonl.gz
+dc run --stage yellow_screen -> screened_yellow/{pool}/shards/*.jsonl.gz
         |
         v
-merge_worker.py -> combined/{pool}/shards/*.jsonl.gz
+dc run --stage merge -> combined/{pool}/shards/*.jsonl.gz
         |
         v
-catalog_builder.py -> _catalogs/global_catalog.json
+dc catalog-builder -> _catalogs/global_catalog.json
 ```
 
 ---
@@ -99,12 +99,12 @@ dc catalog-builder --pipeline engineering --allow-data-root -- \
 
 ## Repository Layout
 
-- `pipeline_driver.py` - classify targets, snapshot license evidence, emit queues with routing metadata
+- `dc pipeline` - classify targets, snapshot license evidence, emit queues with routing metadata
 - `review_queue.py` - manual YELLOW review/signoff helper
-- `acquire_worker.py` - download GREEN/YELLOW payloads into `raw/green|yellow/{pool}/{target}`
-- `yellow_screen_worker.py` - canonicalize YELLOW payloads into screened JSONL shards + ledgers
-- `merge_worker.py` - merge GREEN + screened YELLOW into combined shards
-- `catalog_builder.py` - summarize raw/screened/combined outputs
+- `dc run --stage acquire` - download GREEN/YELLOW payloads into `raw/green|yellow/{pool}/{target}`
+- `dc run --stage yellow_screen` - canonicalize YELLOW payloads into screened JSONL shards + ledgers
+- `dc run --stage merge` - merge GREEN + screened YELLOW into combined shards
+- `dc catalog-builder` - summarize raw/screened/combined outputs
 - `legacy/run_pipeline.sh` - deprecated wrapper for the v2 stage order
 - `yellow_scrubber.py` - legacy helper for bespoke YELLOW transforms (optional)
 - `pmc_worker.py` - optional PMC addon (run before merge if used)

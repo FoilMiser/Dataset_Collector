@@ -1,20 +1,19 @@
 # Architecture
 
-The Dataset Collector is organized around a shared pipeline contract with domain-specific implementations. The preferred entrypoint is the unified `dc run` CLI, which delegates to the Python driver and stage-specific workers to write outputs to the canonical layout. Legacy `run_pipeline.sh` scripts have been moved under `legacy/` for backwards compatibility but are deprecated.
+The Dataset Collector is organized around a shared pipeline contract with domain-specific implementations. The preferred entrypoint is the unified `dc run --pipeline <slug> --stage <stage>` CLI, which delegates to spec-driven workers to write outputs to the canonical layout. Legacy `run_pipeline.sh` scripts remain only as deprecated compatibility shims.
 
 ## Pipeline flow
 
 ```mermaid
 flowchart LR
     A[Targets YAML\n(e.g., pipelines/targets/targets_math.yaml)] --> B[dc run\nCLI contract]
-    B --> C[pipeline_driver.py\nPipelineDriverBase]
-    C --> D{Stage selection\nclassify / acquire_* / yellow_screen / merge / catalog}
-    D --> E[Worker modules\n(acquire_worker.py, merge.py, etc.)]
+    B --> C{Stage selection\nclassify / acquire / yellow_screen / merge / catalog}
+    C --> D[Generic workers\n(spec-driven)]
     E --> F[Artifacts & logs\nqueues, manifests, catalogs]
     F --> G[Combined outputs\ncombined/ stage]
 
     C --> H[Global config\nDATASET_ROOT / DATASET_COLLECTOR_ROOT]
-    E --> I[Safety controls\nyellow screening, denylist]
+    D --> I[Safety controls\nyellow screening, denylist]
 ```
 
 ## Core modules
@@ -59,7 +58,7 @@ Consolidated helpers for YELLOW bucket planning and manual review prep:
 - **`dc run`**: Standardized CLI entrypoint; forwards stage and targets arguments into the driver.
 - **`dc --list-pipelines`**: List all registered pipeline domains.
 - **`dc pipeline <domain>`**: Run a full pipeline driver for a domain.
-- **`legacy/run_pipeline.sh`** (deprecated): Legacy wrapper that forwards stage and targets arguments into the driver.
-- **`pipeline_driver.py`**: Orchestrates stage execution, logging, retries, and output locations.
-- **Worker modules**: Implement stage logic (classification, acquisition, screening, merge, catalog).
+- **`legacy/run_pipeline.sh`** (deprecated): Compatibility shim for legacy entrypoints.
+- **`pipeline_driver.py`**: Internal driver used by `dc pipeline` to emit queues and manifests.
+- **Worker modules**: Implement stage logic behind `dc run` (acquisition, screening, merge, catalog).
 - **Outputs**: Stage outputs land under the configured dataset root and the `combined/` stage defined in `docs/output_contract.md`.

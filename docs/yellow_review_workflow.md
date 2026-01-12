@@ -21,7 +21,7 @@ All manual YELLOW reviews MUST land in one of these states:
 Each YELLOW target MUST have a manifest directory and review signoff artifacts. The minimum required artifacts are:
 
 1. **Queue row in the YELLOW queue** (JSONL)
-   - Emitted by `pipeline_driver.py` during `classify`.
+   - Emitted by `dc pipeline` during `classify`.
    - Includes `id`, `name`, `license_profile`, `license_evidence_url`, and `manifest_dir`.
 2. **`review_signoff.json` in the manifest directory**
    - Written by the `review-queue` helper when a reviewer approves or rejects a target.
@@ -87,10 +87,10 @@ These deprecated scripts still work but emit a warning. Prefer the unified CLI a
 
 The workflow is consistent across all pipelines:
 
-1. **Classify (`pipeline_driver.py`)**
+1. **Classify (`dc pipeline`)**
    - Emits `green_download.jsonl` and `yellow_pipeline.jsonl` in the queues root.
 2. **Acquire YELLOW (`dc run --stage acquire`)**
-   - Downloads YELLOW data into the raw YELLOW bucket (legacy `acquire_worker.py` scripts are deprecated).
+   - Downloads YELLOW data into the raw YELLOW bucket.
 3. **Manual review (`review-queue`)**
    - `list` to see pending entries.
    - `approve` for `ALLOW` or `ALLOW_WITH_RESTRICTIONS`.

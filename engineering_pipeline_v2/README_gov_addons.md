@@ -34,7 +34,7 @@ Dry run:
 Write output (execute):
   python ckan_worker.py ... --execute
 
-Then merge the emitted `targets:` block into your main engineering targets file (or point `pipeline_driver.py` at a combined targets file).
+Then merge the emitted `targets:` block into your main engineering targets file (or point `dc pipeline` at a combined targets file).
 
 ## 3) Sitemap expansion (GOV.UK)
 GOV.UK has a global sitemap. Start narrow with include/exclude regex to avoid huge downloads.
@@ -57,4 +57,4 @@ Write output:
 ## 4) Integration notes (important)
 - These generated targets use `download.strategy: http` (supported by `download_worker.py`).
 - Engineering targets inherit the gov license normalization updates; keep `license_map.yaml` synced.
-- The engineering `pipeline_driver.py` now propagates `output.pool` into the download queue so HTTP/CKAN batches route into the correct pool.
+- The engineering `dc pipeline` now propagates `output.pool` into the download queue so HTTP/CKAN batches route into the correct pool.

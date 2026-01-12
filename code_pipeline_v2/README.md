@@ -4,11 +4,11 @@ Version 2 aligns the code pipeline with the math_pipeline_v2 stage flow while la
 
 Stages:
 
-1. Classify targets and snapshot license/ToU evidence (`pipeline_driver.py`).
-2. Acquire GREEN and YELLOW targets into the v2 raw layout (`acquire_worker.py` + `code_worker.py` extraction).
-3. Screen YELLOW data into canonical records with strict pitch rules (`yellow_screen_worker.py`).
-4. Merge canonical GREEN + screened YELLOW into combined shards (`merge_worker.py`).
-5. Build collector catalogs, ledgers, and manifests over screened shards (`catalog_builder.py`).
+1. Classify targets and snapshot license/ToU evidence (`dc pipeline`).
+2. Acquire GREEN and YELLOW targets into the v2 raw layout (`dc run --stage acquire` + `code_worker.py` extraction).
+3. Screen YELLOW data into canonical records with strict pitch rules (`dc run --stage yellow_screen`).
+4. Merge canonical GREEN + screened YELLOW into combined shards (`dc run --stage merge`).
+5. Build collector catalogs, ledgers, and manifests over screened shards (`dc catalog-builder`).
 
 > Not legal advice. This tooling helps track licenses and restrictions; you remain responsible for compliance.
 
@@ -58,13 +58,13 @@ Sharding is controlled by `globals.sharding` (max records per shard, compression
 
 ## Stage overview
 
-| Stage | Script | Notes |
+| Stage | Invocation | Notes |
 | --- | --- | --- |
-| Classify | `pipeline_driver.py` | Emits GREEN/YELLOW/RED queues with `routing` defaults tuned for code. |
-| Acquire | `acquire_worker.py` | Downloads payloads into `raw/{green|yellow}/{license_pool}/{target_id}` and optionally runs `code_worker.py` to emit canonical shards. Supports HTTP/FTP/git/Zenodo/Dataverse, HuggingFace datasets, Figshare, and GitHub releases. |
-| Screen YELLOW | `yellow_screen_worker.py` | Converts raw YELLOW payloads into canonical records, pitching anything that violates length/licensing/deny-phrase or secrets policies. Writes pass/pitch ledgers + done markers. |
-| Merge | `merge_worker.py` | Combines canonical GREEN + screened YELLOW shards with deduplication and a combined ledger. |
-| Catalog | `catalog_builder.py` | Summarizes counts, bytes, language coverage, manifests, and ledgers across stages. |
+| Classify | `dc pipeline` | Emits GREEN/YELLOW/RED queues with `routing` defaults tuned for code. |
+| Acquire | `dc run --stage acquire` | Downloads payloads into `raw/{green|yellow}/{license_pool}/{target_id}` and optionally runs `code_worker.py` to emit canonical shards. Supports HTTP/FTP/git/Zenodo/Dataverse, HuggingFace datasets, Figshare, and GitHub releases. |
+| Screen YELLOW | `dc run --stage yellow_screen` | Converts raw YELLOW payloads into canonical records, pitching anything that violates length/licensing/deny-phrase or secrets policies. Writes pass/pitch ledgers + done markers. |
+| Merge | `dc run --stage merge` | Combines canonical GREEN + screened YELLOW shards with deduplication and a combined ledger. |
+| Catalog | `dc catalog-builder` | Summarizes counts, bytes, language coverage, manifests, and ledgers across stages. |
 
 Use `dc pipeline` for classification, `dc run` for acquire/merge/yellow_screen, and `dc catalog-builder` for catalog outputs.
 

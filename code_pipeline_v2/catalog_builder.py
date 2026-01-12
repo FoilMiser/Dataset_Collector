@@ -5,6 +5,7 @@ catalog_builder.py (v2.0)
 Thin wrapper that delegates to the spec-driven generic catalog builder.
 """
 from __future__ import annotations
+from pathlib import Path
 from collector_core.generic_workers import main_catalog  # noqa: E402
 
 DOMAIN = "code"

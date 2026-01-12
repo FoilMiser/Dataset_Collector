@@ -2,36 +2,37 @@
 #
 # run_pipeline.sh (v2.0)
 #
-# Wrapper script for the kg_nav pipeline using the unified dc CLI.
+# Deprecated compatibility shim for the kg_nav pipeline.
+# Use: dc run --pipeline kg_nav --stage <stage>
+# Removal target: v3.0.
 #
 set -euo pipefail
 
+YELLOW='\033[0;33m'
 RED='\033[0;31m'
-BLUE='\033[0;34m'
 NC='\033[0m'
 
 TARGETS=""
 EXECUTE=""
-STAGE="all"
-LIMIT_TARGETS=""
-LIMIT_FILES=""
-WORKERS="4"
+STAGE=""
+EXTRA_ARGS=()
 
 usage() {
   cat << 'EOM'
-Pipeline wrapper (v2)
+Deprecated pipeline wrapper (v2)
 
 Required:
   --targets FILE          Path to targets YAML
+  --stage STAGE           Stage to run: classify, acquire, yellow_screen, merge, catalog, review
 
 Options:
   --execute               Perform actions (default is dry-run/plan only)
-  --stage STAGE           Stage to run: all, classify, acquire_green, acquire_yellow, \
-                          screen_yellow, merge, catalog, review
-  --limit-targets N       Limit number of queue rows processed
-  --limit-files N         Limit files per target during acquisition
-  --workers N             Parallel workers for acquisition (default: 4)
+  --                      Pass remaining args directly to the stage command
   -h, --help              Show this help
+
+Notes:
+  - This shim no longer resolves queue paths automatically.
+  - Provide stage arguments after -- (for example: --queue, --bucket, --targets-yaml).
 EOM
 }
 
@@ -40,16 +41,14 @@ while [[ $# -gt 0 ]]; do
     --targets) TARGETS="$2"; shift 2 ;;
     --stage) STAGE="$2"; shift 2 ;;
     --execute) EXECUTE="--execute"; shift ;;
-    --limit-targets) LIMIT_TARGETS="$2"; shift 2 ;;
-    --limit-files) LIMIT_FILES="$2"; shift 2 ;;
-    --workers) WORKERS="$2"; shift 2 ;;
+    --) shift; EXTRA_ARGS+=("$@"); break ;;
     -h|--help) usage; exit 0 ;;
-    *) echo -e "${RED}Unknown option: $1${NC}"; usage; exit 1 ;;
+    *) EXTRA_ARGS+=("$1"); shift ;;
   esac
 done
 
-if [[ -z "$TARGETS" ]]; then
-  echo -e "${RED}--targets is required${NC}"
+if [[ -z "$TARGETS" || -z "$STAGE" ]]; then
+  echo -e "${RED}--targets and --stage are required${NC}"
   usage
   exit 1
 fi
@@ -59,107 +58,38 @@ if [[ ! -f "$TARGETS" ]]; then
   exit 1
 fi
 
+echo -e "${YELLOW}[deprecated] run_pipeline.sh is deprecated; use 'dc run --pipeline kg_nav --stage <stage>' instead. Removal target: v3.0.${NC}" >&2
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 export PYTHONPATH="${REPO_ROOT}:${PYTHONPATH:-}"
 
-QUEUES_ROOT=$(python - << PY
-from pathlib import Path
-from collector_core.config_validator import read_yaml
-from collector_core.pipeline_spec import get_pipeline_spec
-cfg = read_yaml(Path("${TARGETS}"), schema_name="targets") or {}
-spec = get_pipeline_spec("kg_nav")
-prefix = spec.prefix if spec else "kg_nav"
-print(cfg.get("globals", {}).get("queues_root", f"/data/{prefix}/_queues"))
-PY
-)
-CATALOGS_ROOT=$(python - << PY
-from pathlib import Path
-from collector_core.config_validator import read_yaml
-from collector_core.pipeline_spec import get_pipeline_spec
-cfg = read_yaml(Path("${TARGETS}"), schema_name="targets") or {}
-spec = get_pipeline_spec("kg_nav")
-prefix = spec.prefix if spec else "kg_nav"
-print(cfg.get("globals", {}).get("catalogs_root", f"/data/{prefix}/_catalogs"))
-PY
-)
-LIMIT_TARGETS_ARG=""; [[ -n "$LIMIT_TARGETS" ]] && LIMIT_TARGETS_ARG="--limit-targets $LIMIT_TARGETS"
-LIMIT_FILES_ARG=""; [[ -n "$LIMIT_FILES" ]] && LIMIT_FILES_ARG="--limit-files $LIMIT_FILES"
-
-run_classify() {
-  echo -e "${BLUE}== Stage: classify ==${NC}"
-  local no_fetch=""
-  if [[ -z "$EXECUTE" ]]; then
-    no_fetch="--no-fetch"
-  fi
-  python -m collector_core.dc_cli pipeline kg_nav -- --targets "$TARGETS" $no_fetch
-}
-
-run_review() {
-  local queue_file="$QUEUES_ROOT/yellow_pipeline.jsonl"
-  echo -e "${BLUE}== Stage: review ==${NC}"
-  python -m collector_core.dc_cli review-queue --pipeline kg_nav -- --queue "$queue_file" --targets "$TARGETS" --limit 50 || true
-}
-
-run_acquire() {
-  local bucket="$1"
-  local queue_file="$QUEUES_ROOT/${bucket}_download.jsonl"
-  if [[ "$bucket" == "yellow" ]]; then
-    queue_file="$QUEUES_ROOT/yellow_pipeline.jsonl"
-  fi
-  if [[ ! -f "$queue_file" ]]; then
-    echo -e "${RED}Queue not found: $queue_file${NC}"
-    exit 1
-  fi
-  echo -e "${BLUE}== Stage: acquire_${bucket} ==${NC}"
-  python -m collector_core.dc_cli run --pipeline kg_nav --stage acquire -- \
-    --queue "$queue_file" \
-    --targets-yaml "$TARGETS" \
-    --bucket "$bucket" \
-    --workers "$WORKERS" \
-    $EXECUTE \
-    $LIMIT_TARGETS_ARG \
-    $LIMIT_FILES_ARG
-}
-
-run_screen_yellow() {
-  local queue_file="$QUEUES_ROOT/yellow_pipeline.jsonl"
-  if [[ ! -f "$queue_file" ]]; then
-    echo -e "${RED}Queue not found: $queue_file${NC}"
-    exit 1
-  fi
-  echo -e "${BLUE}== Stage: screen_yellow ==${NC}"
-  python -m collector_core.dc_cli run --pipeline kg_nav --stage yellow_screen -- \
-    --targets "$TARGETS" \
-    --queue "$queue_file" \
-    $EXECUTE
-}
-
-run_merge() {
-  echo -e "${BLUE}== Stage: merge ==${NC}"
-  python -m collector_core.dc_cli run --pipeline kg_nav --stage merge -- --targets "$TARGETS" $EXECUTE
-}
-
-run_catalog() {
-  echo -e "${BLUE}== Stage: catalog ==${NC}"
-  python -m collector_core.dc_cli catalog-builder --pipeline kg_nav -- --targets "$TARGETS" --output "${CATALOGS_ROOT}/catalog.json"
-}
-
 case "$STAGE" in
-  all)
-    run_classify
-    run_acquire green
-    run_acquire yellow
-    run_screen_yellow
-    run_merge
-    run_catalog
+  classify)
+    NO_FETCH=""
+    if [[ -z "$EXECUTE" ]]; then
+      NO_FETCH="--no-fetch"
+    fi
+    python -m collector_core.dc_cli pipeline kg_nav -- --targets "$TARGETS" $NO_FETCH "${EXTRA_ARGS[@]}"
     ;;
-  classify) run_classify ;;
-  acquire_green) run_acquire green ;;
-  acquire_yellow) run_acquire yellow ;;
-  screen_yellow) run_screen_yellow ;;
-  merge) run_merge ;;
-  catalog) run_catalog ;;
-  review) run_review ;;
-  *) echo -e "${RED}Unknown stage: $STAGE${NC}"; usage; exit 1 ;;
+  acquire)
+    python -m collector_core.dc_cli run --pipeline kg_nav --stage acquire -- --targets-yaml "$TARGETS" $EXECUTE "${EXTRA_ARGS[@]}"
+    ;;
+  yellow_screen)
+    python -m collector_core.dc_cli run --pipeline kg_nav --stage yellow_screen -- --targets "$TARGETS" $EXECUTE "${EXTRA_ARGS[@]}"
+    ;;
+  merge)
+    python -m collector_core.dc_cli run --pipeline kg_nav --stage merge -- --targets "$TARGETS" $EXECUTE "${EXTRA_ARGS[@]}"
+    ;;
+  catalog)
+    python -m collector_core.dc_cli catalog-builder --pipeline kg_nav -- --targets "$TARGETS" "${EXTRA_ARGS[@]}"
+    ;;
+  review)
+    python -m collector_core.dc_cli review-queue --pipeline kg_nav -- --targets "$TARGETS" "${EXTRA_ARGS[@]}"
+    ;;
+  *)
+    echo -e "${RED}Unknown stage: $STAGE${NC}"
+    usage
+    exit 1
+    ;;
 esac

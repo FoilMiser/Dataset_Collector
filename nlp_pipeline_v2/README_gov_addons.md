@@ -57,6 +57,6 @@ Write output:
   python sitemap_worker.py ... --execute
 
 ## 4) Integration notes (important)
-- These generated targets use `download.strategy: http` (supported by `acquire_worker.py`).
+- These generated targets use `download.strategy: http` (supported by `dc run --stage acquire`).
 - The v2 pipeline driver already emits `output_pool` fields in queue rows, and acquire respects
   license profiles for raw routing. Double-check per-target `output.pool` when mixing pools.

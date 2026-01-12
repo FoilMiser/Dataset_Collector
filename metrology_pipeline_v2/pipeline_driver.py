@@ -5,6 +5,7 @@ pipeline_driver.py (v2.0)
 Thin wrapper that delegates to the spec-driven pipeline factory.
 """
 from __future__ import annotations
+from pathlib import Path
 from collector_core.pipeline_factory import get_pipeline_driver  # noqa: E402
 
 DOMAIN = "metrology"

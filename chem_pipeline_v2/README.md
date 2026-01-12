@@ -4,11 +4,11 @@ A safety-first pipeline for building an ethical chemistry training corpus. Versi
 
 Stages:
 
-1. Classify targets and snapshot evidence (`pipeline_driver.py`).
-2. Acquire GREEN and YELLOW targets into raw pools (`acquire_worker.py`).
-3. Screen YELLOW data into canonical records with chemistry-aware plugins (`yellow_screen_worker.py`).
-4. Merge GREEN + screened YELLOW into combined candidate shards (`merge_worker.py`).
-5. Build collector catalogs, ledgers, and manifests over screened shards (`catalog_builder.py`).
+1. Classify targets and snapshot evidence (`dc pipeline`).
+2. Acquire GREEN and YELLOW targets into raw pools (`dc run --stage acquire`).
+3. Screen YELLOW data into canonical records with chemistry-aware plugins (`dc run --stage yellow_screen`).
+4. Merge GREEN + screened YELLOW into combined candidate shards (`dc run --stage merge`).
+5. Build collector catalogs, ledgers, and manifests over screened shards (`dc catalog-builder`).
 
 > Not legal advice. This tooling helps track licenses and restrictions; you remain responsible for compliance.
 
@@ -56,13 +56,13 @@ Sharding is controlled by `globals.sharding` (max records per shard, compression
 
 ## Stage overview
 
-| Stage | Script | Notes |
+| Stage | Invocation | Notes |
 | --- | --- | --- |
-| Classify | `pipeline_driver.py` | Emits GREEN/YELLOW/RED queues; adds `queue_bucket` for downstream routing with `chem_routing` support. |
-| Acquire | `acquire_worker.py` | Downloads payloads into `raw/{green|yellow}/{license_pool}/{target_id}`. Dry-run by default; `--execute` performs downloads. Supports HTTP/FTP/git/Zenodo/Dataverse, HuggingFace datasets, Figshare, and GitHub releases. |
-| Screen YELLOW | `yellow_screen_worker.py` | Converts raw YELLOW payloads into canonical records. Includes `jsonl` default plus chemistry plugins such as `pubchem_computed_only` and `pmc_oa`. Writes pass/pitch ledgers + done markers. |
-| Merge | `merge_worker.py` | Combines canonical GREEN + screened YELLOW shards with deduplication and a combined ledger. |
-| Catalog | `catalog_builder.py` | Summarizes counts, bytes, manifests, and ledgers across stages. |
+| Classify | `dc pipeline` | Emits GREEN/YELLOW/RED queues; adds `queue_bucket` for downstream routing with `chem_routing` support. |
+| Acquire | `dc run --stage acquire` | Downloads payloads into `raw/{green|yellow}/{license_pool}/{target_id}`. Dry-run by default; `--execute` performs downloads. Supports HTTP/FTP/git/Zenodo/Dataverse, HuggingFace datasets, Figshare, and GitHub releases. |
+| Screen YELLOW | `dc run --stage yellow_screen` | Converts raw YELLOW payloads into canonical records. Includes `jsonl` default plus chemistry plugins such as `pubchem_computed_only` and `pmc_oa`. Writes pass/pitch ledgers + done markers. |
+| Merge | `dc run --stage merge` | Combines canonical GREEN + screened YELLOW shards with deduplication and a combined ledger. |
+| Catalog | `dc catalog-builder` | Summarizes counts, bytes, manifests, and ledgers across stages. |
 
 Use `dc pipeline` for classification, `dc run` for acquire/merge/yellow_screen, and `dc catalog-builder` for catalog outputs.
 
@@ -89,7 +89,7 @@ dc catalog-builder --pipeline chem --allow-data-root -- --targets ../pipelines/t
 ### Notes
 
 - YELLOW screening enforces "anything unclear is pitched"; see `../pipelines/targets/targets_chem.yaml -> globals.screening` and per-target `yellow_screen` overrides.
-- Chemistry plugins (e.g., PubChem computed-only) run inside `yellow_screen_worker.py` rather than a standalone stage.
+- Chemistry plugins (e.g., PubChem computed-only) run inside `dc run --stage yellow_screen` rather than a standalone stage.
 - Outputs are segregated by `license_profile` (`permissive`, `copyleft`, `quarantine`).
 - Ledgers in `_ledger/` provide pass/pitch summaries and shard indexes for reproducibility.
 

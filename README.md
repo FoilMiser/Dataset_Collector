@@ -146,8 +146,8 @@ Available stages are `acquire`, `merge`, and `yellow_screen`.
 
 ### Deprecated pipeline scripts
 The per-pipeline worker scripts (`acquire_worker.py`, `merge_worker.py`, `yellow_screen_worker.py`) are deprecated in
-favor of `dc run`. Legacy `run_pipeline.sh` wrappers have moved under `legacy/` for reference, but new usage should
-prefer the unified CLI.
+favor of `dc run`. Legacy `run_pipeline.sh` wrappers have moved under `legacy/` as compatibility shims and are slated
+for removal in v3.0. Prefer the unified CLI for all new usage.
 
 ## Example sequential execution flow (dc CLI)
 
@@ -221,9 +221,9 @@ Each `PipelineSpec` defines:
 - **yellow_screen_module**: Domain-specific yellow screen module (if any)
 - **custom_workers**: Domain-specific worker modules (if any)
 
-### Thin wrappers
+### Compatibility shims (deprecated)
 
-Per-pipeline worker files are now thin wrappers that delegate to `collector_core`:
+Per-pipeline worker files are deprecated compatibility shims that delegate to `collector_core`:
 
 ```python
 # pipeline_driver.py
@@ -254,7 +254,7 @@ if __name__ == "__main__":
 To regenerate all thin wrappers from the registry:
 
 ```bash
-python src/tools/sync_pipeline_wrappers.py
+PYTHONPATH=src python src/tools/sync_pipeline_wrappers.py --write
 ```
 
 To check wrappers are up-to-date (CI mode):
@@ -269,10 +269,21 @@ Within each `*_pipeline_v2` directory, you should expect:
 
 ```
 *_pipeline_v2/
-  legacy/run_pipeline.sh  # deprecated legacy wrapper
   requirements.txt
+  README.md
+```
+
+Deprecated compatibility shims (optional) live alongside the pipeline directory:
+
+```
+*_pipeline_v2/
+  legacy/run_pipeline.sh  # deprecated legacy wrapper
   pipeline_driver.py
   acquire_worker.py
+  yellow_screen_worker.py
+  merge_worker.py
+  catalog_builder.py
+  review_queue.py
 ```
 
 Targets YAML files now live in a shared directory:

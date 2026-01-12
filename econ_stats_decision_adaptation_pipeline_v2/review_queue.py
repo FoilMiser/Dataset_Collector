@@ -5,6 +5,7 @@ review_queue.py (v2.0)
 Thin wrapper that delegates to the spec-driven review queue helper.
 """
 from __future__ import annotations
+from pathlib import Path
 from collector_core.generic_workers import main_review_queue  # noqa: E402
 
 DOMAIN = "econ_stats_decision_adaptation"

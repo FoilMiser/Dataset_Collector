@@ -1,20 +1,19 @@
 # Pipeline Runtime Contract (v2)
 
-This document standardizes how **pipeline drivers** and **runtime worker entrypoints**
+This document standardizes how **dc pipeline** and **dc run** entrypoints
 behave across every `*_pipeline_v2/` directory. It complements
 `docs/output_contract.md` (what files are produced) by defining **how** the
 CLI/runtime determines those locations and retries.
 
 The preferred entrypoint for these stages is `dc run --pipeline <slug> --stage <acquire|merge|yellow_screen> -- ...`.
-Direct use of per-pipeline `*_worker.py` scripts or legacy `run_pipeline.sh` wrappers is deprecated but still supported.
+Direct use of per-pipeline `*_worker.py` scripts or legacy `run_pipeline.sh` wrappers is deprecated and slated for removal.
 
 ## Scope
 
 Applies to:
 
-- `*_pipeline_v2/pipeline_driver.py`
-- `*_pipeline_v2/yellow_screen_worker.py` (via `collector_core`)
-- `*_pipeline_v2/merge_worker.py` (via `collector_core`)
+- `dc pipeline <domain>` (classification and queue emission)
+- `dc run --pipeline <domain> --stage acquire|yellow_screen|merge`
 
 ## Root resolution and precedence
 
@@ -74,12 +73,12 @@ standard subfolders:
   _logs/
 ```
 
-Only the relevant subset is used per stage (for example, `pipeline_driver`
+Only the relevant subset is used per stage (for example, `dc pipeline`
 only uses `_queues`/`_manifests`).
 
 ## Standard CLI arguments
 
-### `pipeline_driver.py`
+### `dc pipeline`
 
 Required:
 
@@ -94,7 +93,7 @@ Optional (standardized):
 - `--retry-backoff FLOAT` (default: `2.0`)
 - `--allow-private-evidence-hosts` (allow evidence URLs that resolve to private, loopback, or link-local IPs)
 
-### `acquire_worker.py`
+### `dc run --stage acquire`
 
 Required:
 
@@ -111,12 +110,12 @@ Optional (standardized):
 - `--retry-max INT` (default: `3`)
 - `--retry-backoff FLOAT` (default: `2.0`)
 
-### `yellow_screen_worker.py` / `merge_worker.py`
+### `dc run --stage yellow_screen` / `dc run --stage merge`
 
 Required:
 
-- `--targets PATH` (`merge_worker.py`)
-- `--targets PATH` + `--queue PATH` (`yellow_screen_worker.py`)
+- `--targets PATH` (`merge`)
+- `--targets PATH` + `--queue PATH` (`yellow_screen`)
 
 Optional (standardized):
 
@@ -145,10 +144,10 @@ See `docs/output_contract.md` for the full layout; key stage outputs are:
 
 | Stage | Key outputs |
 | --- | --- |
-| `pipeline_driver.py` | `_queues/{green_download,yellow_pipeline,red_rejected}.jsonl`, `_queues/run_summary.json`, per-target `_manifests/<target_id>/...` |
-| `acquire_worker.py` | `raw/{green,yellow}/...`, per-target download manifests under `_manifests/<target_id>/`, `_logs/acquire_summary_<bucket>.json` |
-| `yellow_screen_worker.py` | `screened_yellow/<pool>/shards/*`, `_ledger/yellow_passed.jsonl`, `_ledger/yellow_pitched.jsonl` |
-| `merge_worker.py` | `combined/<pool>/shards/*`, `_ledger/combined_index.jsonl`, `_ledger/merge_summary.json` |
+| `dc pipeline` | `_queues/{green_download,yellow_pipeline,red_rejected}.jsonl`, `_queues/run_summary.json`, per-target `_manifests/<target_id>/...` |
+| `dc run --stage acquire` | `raw/{green,yellow}/...`, per-target download manifests under `_manifests/<target_id>/`, `_logs/acquire_summary_<bucket>.json` |
+| `dc run --stage yellow_screen` | `screened_yellow/<pool>/shards/*`, `_ledger/yellow_passed.jsonl`, `_ledger/yellow_pitched.jsonl` |
+| `dc run --stage merge` | `combined/<pool>/shards/*`, `_ledger/combined_index.jsonl`, `_ledger/merge_summary.json` |
 
 ## Summary payload fields
 
@@ -166,5 +165,5 @@ All stages that perform network I/O use **exponential backoff** with:
 - `max_retries` controlled by `--retry-max`, `globals.retry.max`, or `PIPELINE_RETRY_MAX`.
 - `backoff_base` controlled by `--retry-backoff`, `globals.retry.backoff`, or `PIPELINE_RETRY_BACKOFF`.
 
-The pipeline driver’s evidence fetcher and the acquire worker’s download
+The `dc pipeline` evidence fetcher and the `dc run` acquire stage's download
 retries now share the same defaults and naming.
