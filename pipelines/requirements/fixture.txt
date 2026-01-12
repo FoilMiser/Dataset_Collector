@@ -1,0 +1,6 @@
+# Fixture Pipeline Requirements (for testing)
+# Issue 2.2 (v3.0): Canonical location for domain requirements
+#
+# Install: pip install -r pipelines/requirements/fixture.txt
+
+-r base.txt

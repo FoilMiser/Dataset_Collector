@@ -56,11 +56,13 @@ Targets and catalog entries may specify a `license_profile` value. Supported val
 
 ## Documentation
 
+- **[Quickstart Guide](docs/quickstart.md)** - Start here for installation and usage
 - [Architecture](docs/architecture.md)
 - [Environment variables](docs/environment-variables.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Adding a new pipeline](docs/adding-new-pipeline.md)
 - [Run instructions](docs/run_instructions.md)
+- [Policy Semantics](docs/quickstart.md#policy-semantics) - GREEN/YELLOW/RED + evidence change + denylist
 
 ## Install (CLI)
 
@@ -71,9 +73,15 @@ The `dc` CLI is provided by the editable install.
 pip install -r requirements.constraints.txt
 pip install -r requirements-dev.constraints.txt
 pip install -e .
-pip install -r math_pipeline_v2/requirements.txt
-# repeat for other pipeline extras as needed
+
+# v3.0: Domain requirements are now centralized in pipelines/requirements/
+pip install -r pipelines/requirements/math.txt
+pip install -r pipelines/requirements/physics.txt
+# repeat for other domains as needed
 ```
+
+**Note (v3.0):** Domain requirements have moved from `*_pipeline_v2/requirements.txt` to
+`pipelines/requirements/<domain>.txt`. See `pipelines/requirements/README.md` for details.
 
 ## Reproducible installs (recommended)
 
@@ -86,8 +94,8 @@ requirements/constraints files exist to support deterministic CI installs.
 pip install -r requirements.constraints.txt
 pip install -r requirements-dev.constraints.txt
 pip install -e .
-pip install -r math_pipeline_v2/requirements.txt
-# repeat for other pipeline extras as needed
+pip install -r pipelines/requirements/math.txt
+# repeat for other domain extras as needed
 ```
 
 ### Regenerate the constraints files

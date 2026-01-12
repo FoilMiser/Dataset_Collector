@@ -1,0 +1,6 @@
+# Regulatory Compliance Pipeline Requirements
+# Issue 2.2 (v3.0): Canonical location for domain requirements
+#
+# Install: pip install -r pipelines/requirements/regcomp.txt
+
+-r base.txt

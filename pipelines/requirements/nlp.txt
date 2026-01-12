@@ -1,0 +1,10 @@
+# NLP Pipeline Requirements
+# Issue 2.2 (v3.0): Canonical location for domain requirements
+#
+# Install: pip install -r pipelines/requirements/nlp.txt
+
+-r base.txt
+
+# NLP-specific optional dependencies
+# spacy>=3.5.0  # For advanced NLP processing
+# transformers>=4.30.0  # For transformer models

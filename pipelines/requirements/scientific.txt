@@ -1,0 +1,11 @@
+# Dataset Collector - Scientific domain requirements
+# For domains that work with scientific/mathematical content
+# Issue 2.2 (v3.0): Centralized pipeline requirements
+
+-r base.txt
+
+# For LaTeX/math detection and symbolic computation
+sympy>=1.12
+
+# For chemical formula parsing (optional)
+# rdkit  # Large dependency, only install if needed

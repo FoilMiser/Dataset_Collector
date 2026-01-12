@@ -1,0 +1,6 @@
+# Agriculture & Circular Economy Pipeline Requirements
+# Issue 2.2 (v3.0): Canonical location for domain requirements
+#
+# Install: pip install -r pipelines/requirements/agri_circular.txt
+
+-r scientific.txt

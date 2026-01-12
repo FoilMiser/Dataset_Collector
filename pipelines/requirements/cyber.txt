@@ -1,0 +1,9 @@
+# Cybersecurity Pipeline Requirements
+# Issue 2.2 (v3.0): Canonical location for domain requirements
+#
+# Install: pip install -r pipelines/requirements/cyber.txt
+
+-r base.txt
+
+# Cybersecurity-specific optional dependencies
+# stix2>=3.0.0  # For STIX threat intelligence format

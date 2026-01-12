@@ -1,0 +1,9 @@
+# Metrology Pipeline Requirements
+# Issue 2.2 (v3.0): Canonical location for domain requirements
+#
+# Install: pip install -r pipelines/requirements/metrology.txt
+
+-r scientific.txt
+
+# Metrology-specific optional dependencies
+# uncertainties>=3.1.0  # For uncertainty propagation

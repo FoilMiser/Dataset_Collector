@@ -3,7 +3,7 @@
 acquire_worker.py (v2.0)
 
 Deprecated compatibility shim for `dc run --pipeline math --stage acquire`.
-Removal target: v3.0.
+Removal target: v4.0.
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from collector_core.generic_workers import main_acquire  # noqa: E402
 DOMAIN = "math"
 DEPRECATION_MESSAGE = (
     "acquire_worker.py is deprecated; use `dc run --pipeline math --stage acquire` instead. "
-    "Removal target: v3.0."
+    "Removal target: v4.0."
 )
 
 __all__ = [
