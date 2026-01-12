@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import gzip
+import io
 import json
 import subprocess
 import sys
@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+import zstandard as zstd
 
 datasets = pytest.importorskip("datasets")
 Dataset = datasets.Dataset
@@ -68,11 +69,13 @@ def test_yellow_screen_hf_dataset(tmp_path: Path) -> None:
         cwd=Path(".").resolve(),
     )
 
-    shard_path = screened_root / pool / "shards" / "yellow_shard_00000.jsonl.gz"
+    shard_path = screened_root / pool / "shards" / "yellow_shard_00000.jsonl.zst"
     assert shard_path.exists()
 
-    with gzip.open(shard_path, "rt", encoding="utf-8") as handle:
-        rows = [json.loads(line) for line in handle if line.strip()]
+    with shard_path.open("rb") as handle:
+        stream = zstd.ZstdDecompressor().stream_reader(handle)
+        with io.TextIOWrapper(stream, encoding="utf-8") as text_handle:
+            rows = [json.loads(line) for line in text_handle if line.strip()]
 
     assert len(rows) == 1
     record = rows[0]
@@ -145,11 +148,13 @@ def test_yellow_screen_target_text_candidates_override(tmp_path: Path) -> None:
         cwd=Path(".").resolve(),
     )
 
-    shard_path = screened_root / pool / "shards" / "yellow_shard_00000.jsonl.gz"
+    shard_path = screened_root / pool / "shards" / "yellow_shard_00000.jsonl.zst"
     assert shard_path.exists()
 
-    with gzip.open(shard_path, "rt", encoding="utf-8") as handle:
-        rows = [json.loads(line) for line in handle if line.strip()]
+    with shard_path.open("rb") as handle:
+        stream = zstd.ZstdDecompressor().stream_reader(handle)
+        with io.TextIOWrapper(stream, encoding="utf-8") as text_handle:
+            rows = [json.loads(line) for line in text_handle if line.strip()]
 
     assert len(rows) == 1
     record = rows[0]

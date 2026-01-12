@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import gzip
 import hashlib
+import io
 import json
 import logging
 import re
@@ -19,6 +20,8 @@ import zipfile
 from collections.abc import Iterable, Iterator
 from pathlib import Path, PurePosixPath
 from typing import Any
+
+import zstandard as zstd
 
 logger = logging.getLogger(__name__)
 
@@ -80,10 +83,21 @@ def write_json(path: Path, obj: dict[str, Any], *, indent: int = 2) -> None:
     tmp_path.replace(path)
 
 
+def _open_text(path: Path, mode: str) -> io.TextIOBase:
+    if path.suffix == ".gz":
+        return gzip.open(path, mode, encoding="utf-8", errors="ignore")
+    if path.suffix == ".zst":
+        if "r" in mode:
+            stream = zstd.ZstdDecompressor().stream_reader(path.open("rb"))
+            return io.TextIOWrapper(stream, encoding="utf-8", errors="ignore")
+        stream = zstd.ZstdCompressor().stream_writer(path.open("wb"))
+        return io.TextIOWrapper(stream, encoding="utf-8")
+    return open(path, mode, encoding="utf-8", errors="ignore")
+
+
 def read_jsonl(path: Path) -> Iterator[dict[str, Any]]:
-    """Read JSONL file (supports .gz) and yield records."""
-    opener = gzip.open if path.suffix == ".gz" else open
-    with opener(path, "rt", encoding="utf-8", errors="ignore") as f:
+    """Read JSONL file (supports .gz/.zst) and yield records."""
+    with _open_text(path, "rt") as f:
         for line in f:
             line = line.strip()
             if line:
@@ -99,25 +113,31 @@ def read_jsonl_list(path: Path) -> list[dict[str, Any]]:
 
 
 def write_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
-    """Write records to JSONL file (supports .gz)."""
+    """Write records to JSONL file (supports .gz/.zst)."""
     ensure_dir(path.parent)
-    opener = gzip.open if path.suffix == ".gz" else open
-    with opener(path, "wt", encoding="utf-8") as f:
+    with _open_text(path, "wt") as f:
         for row in rows:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
 def append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
-    """Append records to JSONL file (supports .gz)."""
+    """Append records to JSONL file (supports .gz/.zst)."""
     ensure_dir(path.parent)
     if path.suffix == ".gz":
         with gzip.open(path, "ab") as f:
             for row in rows:
                 f.write((json.dumps(row, ensure_ascii=False) + "\n").encode("utf-8"))
-    else:
-        with open(path, "a", encoding="utf-8") as f:
-            for row in rows:
-                f.write(json.dumps(row, ensure_ascii=False) + "\n")
+        return
+    if path.suffix == ".zst":
+        with path.open("ab") as raw:
+            cctx = zstd.ZstdCompressor()
+            with cctx.stream_writer(raw) as compressor:
+                for row in rows:
+                    compressor.write((json.dumps(row, ensure_ascii=False) + "\n").encode("utf-8"))
+        return
+    with open(path, "a", encoding="utf-8") as f:
+        for row in rows:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
 def safe_filename(

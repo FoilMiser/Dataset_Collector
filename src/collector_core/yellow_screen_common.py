@@ -76,7 +76,12 @@ class Sharder:
         self.current_rows: list[dict[str, Any]] = []
 
     def _next_path(self) -> Path:
-        suffix = "jsonl.gz" if self.cfg.compression == "gzip" else "jsonl"
+        if self.cfg.compression == "gzip":
+            suffix = "jsonl.gz"
+        elif self.cfg.compression in {"zstd", "zst"}:
+            suffix = "jsonl.zst"
+        else:
+            suffix = "jsonl"
         name = f"{self.cfg.prefix}_{self.shard_idx:05d}.{suffix}"
         return self.base_dir / name
 
@@ -200,7 +205,7 @@ def sharding_cfg(cfg: dict[str, Any], prefix: str) -> ShardingConfig:
     g = cfg.get("globals", {}).get("sharding", {}) or {}
     return ShardingConfig(
         max_records_per_shard=int(g.get("max_records_per_shard", 50000)),
-        compression=str(g.get("compression", "gzip")),
+        compression=str(g.get("compression", "zstd")),
         prefix=prefix,
     )
 
