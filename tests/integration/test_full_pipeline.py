@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import gzip
 import json
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -14,9 +12,8 @@ pytest.importorskip("pytest_httpserver")
 from pytest_httpserver import HTTPServer
 from werkzeug.wrappers import Response
 
-from kg_nav_pipeline_v2 import acquire_worker as kg_acquire
-
-pytest.importorskip("pytest_httpserver")
+from collector_core.acquire.context import AcquireContext, Limits, RetryConfig, Roots, RunMode
+from collector_core.acquire_strategies import _http_download_with_resume
 
 
 def _write_targets(path: Path, roots: dict[str, Path], target_id: str) -> None:
@@ -47,7 +44,9 @@ def _read_gzip_jsonl(path: Path) -> list[dict[str, object]]:
         return [json.loads(line) for line in handle if line.strip()]
 
 
-def test_full_pipeline_zenodo_retry(tmp_path: Path, httpserver: HTTPServer) -> None:
+def test_full_pipeline_zenodo_retry(
+    tmp_path: Path, httpserver: HTTPServer, run_dc
+) -> None:
     record_path = "/api/records/123"
     file_path = "/files/data.jsonl"
 
@@ -105,10 +104,14 @@ def test_full_pipeline_zenodo_retry(tmp_path: Path, httpserver: HTTPServer) -> N
         encoding="utf-8",
     )
 
-    subprocess.run(
+    run_dc(
         [
-            sys.executable,
-            "kg_nav_pipeline_v2/acquire_worker.py",
+            "run",
+            "--pipeline",
+            "kg_nav",
+            "--stage",
+            "acquire",
+            "--",
             "--queue",
             str(acquire_queue),
             "--targets-yaml",
@@ -120,9 +123,7 @@ def test_full_pipeline_zenodo_retry(tmp_path: Path, httpserver: HTTPServer) -> N
             "2",
             "--retry-backoff",
             "0",
-        ],
-        check=True,
-        cwd=Path(".").resolve(),
+        ]
     )
 
     assert download_calls["count"] == 2
@@ -134,30 +135,34 @@ def test_full_pipeline_zenodo_retry(tmp_path: Path, httpserver: HTTPServer) -> N
         encoding="utf-8",
     )
 
-    subprocess.run(
+    run_dc(
         [
-            sys.executable,
-            "kg_nav_pipeline_v2/yellow_screen_worker.py",
+            "run",
+            "--pipeline",
+            "kg_nav",
+            "--stage",
+            "yellow_screen",
+            "--",
             "--targets",
             str(targets_path),
             "--queue",
             str(screen_queue),
             "--execute",
-        ],
-        check=True,
-        cwd=Path(".").resolve(),
+        ]
     )
 
-    subprocess.run(
+    run_dc(
         [
-            sys.executable,
-            "kg_nav_pipeline_v2/merge_worker.py",
+            "run",
+            "--pipeline",
+            "kg_nav",
+            "--stage",
+            "merge",
+            "--",
             "--targets",
             str(targets_path),
             "--execute",
-        ],
-        check=True,
-        cwd=Path(".").resolve(),
+        ]
     )
 
     shard_paths = list((roots["combined_root"] / "permissive" / "shards").glob("*.jsonl.gz"))
@@ -192,10 +197,15 @@ def test_resume_partial_download(tmp_path: Path, httpserver: HTTPServer) -> None
     out_path = tmp_path / "partial.bin"
     out_path.write_bytes(partial)
 
-    ctx = kg_acquire.AcquireContext(
-        roots=kg_acquire.Roots(raw_root=tmp_path, manifests_root=tmp_path, logs_root=tmp_path),
-        limits=kg_acquire.Limits(limit_targets=None, limit_files=None, max_bytes_per_target=None),
-        mode=kg_acquire.RunMode(
+    ctx = AcquireContext(
+        roots=Roots(
+            raw_root=tmp_path,
+            manifests_root=tmp_path,
+            ledger_root=tmp_path,
+            logs_root=tmp_path,
+        ),
+        limits=Limits(limit_targets=None, limit_files=None, max_bytes_per_target=None),
+        mode=RunMode(
             execute=True,
             overwrite=False,
             verify_sha256=False,
@@ -203,9 +213,9 @@ def test_resume_partial_download(tmp_path: Path, httpserver: HTTPServer) -> None
             enable_resume=True,
             workers=1,
         ),
-        retry=kg_acquire.RetryConfig(max_attempts=1, backoff_base=0),
+        retry=RetryConfig(max_attempts=1, backoff_base=0),
     )
 
-    result = kg_acquire._http_download_with_resume(ctx, httpserver.url_for(file_path), out_path)
+    result = _http_download_with_resume(ctx, httpserver.url_for(file_path), out_path)
     assert result["status"] == "ok"
     assert out_path.read_bytes() == payload

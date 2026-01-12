@@ -1,26 +1,16 @@
 from __future__ import annotations
 
 import gzip
-import importlib.util
 import json
-import sys
 from pathlib import Path
 
-
-_SCRUBBER_SPEC = importlib.util.spec_from_file_location(
-    "regcomp_yellow_scrubber",
-    Path("regcomp_pipeline_v2/yellow_scrubber.py"),
+from collector_core.yellow_scrubber_base import (
+    FieldSpec,
+    extract_pubchem_computed_only,
+    iter_sdf_records_from_gz,
+    parse_sdf_tags,
+    validate_record,
 )
-assert _SCRUBBER_SPEC and _SCRUBBER_SPEC.loader
-_SCRUBBER_MODULE = importlib.util.module_from_spec(_SCRUBBER_SPEC)
-sys.modules[_SCRUBBER_SPEC.name] = _SCRUBBER_MODULE
-_SCRUBBER_SPEC.loader.exec_module(_SCRUBBER_MODULE)
-
-FieldSpec = _SCRUBBER_MODULE.FieldSpec
-extract_pubchem_computed_only = _SCRUBBER_MODULE.extract_pubchem_computed_only
-iter_sdf_records_from_gz = _SCRUBBER_MODULE.iter_sdf_records_from_gz
-parse_sdf_tags = _SCRUBBER_MODULE.parse_sdf_tags
-validate_record = _SCRUBBER_MODULE.validate_record
 
 
 def _write_sdf_gz(path: Path, blocks: list[str]) -> None:
@@ -106,15 +96,10 @@ def test_validate_record_reports_non_nullable_empty() -> None:
     assert "Non-nullable field is empty: PUBCHEM_MOLECULAR_FORMULA" in errors
 
 
-def test_math_routing_difficulty_level_regression() -> None:
-    module_path = Path("math_pipeline_v2/pipeline_driver.py")
-    spec = importlib.util.spec_from_file_location("math_pipeline_driver", module_path)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
+def test_math_routing_level_in_routing_block() -> None:
+    from collector_core.pipeline_factory import get_pipeline_driver
 
-    MathPipelineDriver = module.MathPipelineDriver
+    driver = get_pipeline_driver("math")()
     target = {"math_routing": {"level": 7}}
-    extras = MathPipelineDriver().build_row_extras(target, routing={})
-    assert extras["difficulty_level"] == 7
+    routing_block = driver.build_routing_block(target, driver.ROUTING_BLOCKS[0])
+    assert routing_block["level"] == 7

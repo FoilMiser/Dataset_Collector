@@ -3,7 +3,7 @@ import json
 import tracemalloc
 from pathlib import Path
 
-from chem_pipeline_v2 import merge_worker
+from collector_core import merge as merge_worker
 
 
 def write_screened_records(

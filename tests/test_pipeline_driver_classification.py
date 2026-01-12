@@ -2,9 +2,6 @@ from __future__ import annotations
 
 import dataclasses
 import json
-import os
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -113,17 +110,15 @@ def read_jsonl(path: Path) -> list[dict[str, object]]:
 
 
 def run_driver(
-    targets_path: Path, license_map_path: Path, extra_args: list[str] | None = None
+    run_dc,
+    targets_path: Path,
+    license_map_path: Path,
+    extra_args: list[str] | None = None,
 ) -> None:
-    driver_path = Path("regcomp_pipeline_v2/pipeline_driver.py").resolve()
-    env = os.environ.copy()
-    repo_root = Path(".").resolve()
-    env["PYTHONPATH"] = os.pathsep.join(
-        [str(repo_root / "src"), str(repo_root), env.get("PYTHONPATH", "")]
-    ).strip(os.pathsep)
     args = [
-        sys.executable,
-        str(driver_path),
+        "pipeline",
+        "regcomp",
+        "--",
         "--targets",
         str(targets_path),
         "--license-map",
@@ -133,11 +128,11 @@ def run_driver(
     ]
     if extra_args:
         args.extend(extra_args)
-    subprocess.run(args, check=True, cwd=Path(".").resolve(), env=env)
+    run_dc(args)
 
 
 def test_green_yellow_red_classification(
-    tmp_path: Path, minimal_config: PipelineTestConfig
+    tmp_path: Path, minimal_config: PipelineTestConfig, run_dc
 ) -> None:
     targets = [
         {
@@ -161,7 +156,7 @@ def test_green_yellow_red_classification(
     ]
     targets_path = minimal_config.write_targets(tmp_path, targets)
 
-    run_driver(targets_path, minimal_config.license_map_path)
+    run_driver(run_dc, targets_path, minimal_config.license_map_path)
 
     green_rows = read_jsonl(minimal_config.queues_root / "green_download.jsonl")
     yellow_rows = read_jsonl(minimal_config.queues_root / "yellow_pipeline.jsonl")
@@ -192,7 +187,7 @@ def test_green_yellow_red_classification(
     assert snapshot["enabled_checks"] == []
 
 
-def test_run_metrics_emitted(tmp_path: Path, minimal_config: PipelineTestConfig) -> None:
+def test_run_metrics_emitted(tmp_path: Path, minimal_config: PipelineTestConfig, run_dc) -> None:
     targets = [
         {
             "id": "metrics_target",
@@ -203,7 +198,7 @@ def test_run_metrics_emitted(tmp_path: Path, minimal_config: PipelineTestConfig)
     ]
     targets_path = minimal_config.write_targets(tmp_path, targets)
 
-    run_driver(targets_path, minimal_config.license_map_path)
+    run_driver(run_dc, targets_path, minimal_config.license_map_path)
 
     run_dirs = [path for path in minimal_config.ledger_root.iterdir() if path.is_dir()]
     assert len(run_dirs) == 1
@@ -225,7 +220,7 @@ def test_run_metrics_emitted(tmp_path: Path, minimal_config: PipelineTestConfig)
 
 
 def test_offline_snapshot_terms_forces_yellow(
-    tmp_path: Path, minimal_config: PipelineTestConfig
+    tmp_path: Path, minimal_config: PipelineTestConfig, run_dc
 ) -> None:
     targets = [
         {
@@ -239,7 +234,7 @@ def test_offline_snapshot_terms_forces_yellow(
         tmp_path, targets, globals_override={"default_license_gates": ["snapshot_terms"]}
     )
 
-    run_driver(targets_path, minimal_config.license_map_path)
+    run_driver(run_dc, targets_path, minimal_config.license_map_path)
 
     green_rows = read_jsonl(minimal_config.queues_root / "green_download.jsonl")
     yellow_rows = read_jsonl(minimal_config.queues_root / "yellow_pipeline.jsonl")
@@ -258,7 +253,7 @@ def test_offline_snapshot_terms_forces_yellow(
 
 
 def test_strict_snapshot_terms_emits_reason(
-    tmp_path: Path, minimal_config: PipelineTestConfig
+    tmp_path: Path, minimal_config: PipelineTestConfig, run_dc
 ) -> None:
     targets = [
         {
@@ -272,7 +267,7 @@ def test_strict_snapshot_terms_emits_reason(
         tmp_path, targets, globals_override={"default_license_gates": ["snapshot_terms"]}
     )
 
-    run_driver(targets_path, minimal_config.license_map_path, extra_args=["--strict"])
+    run_driver(run_dc, targets_path, minimal_config.license_map_path, extra_args=["--strict"])
 
     yellow_rows = read_jsonl(minimal_config.queues_root / "yellow_pipeline.jsonl")
 
@@ -282,7 +277,7 @@ def test_strict_snapshot_terms_emits_reason(
 
 
 def test_evaluation_manifest_redacts_headers(
-    tmp_path: Path, minimal_config: PipelineTestConfig
+    tmp_path: Path, minimal_config: PipelineTestConfig, run_dc
 ) -> None:
     secret = "supersecret"
     targets = [
@@ -296,6 +291,7 @@ def test_evaluation_manifest_redacts_headers(
     targets_path = minimal_config.write_targets(tmp_path, targets)
 
     run_driver(
+        run_dc,
         targets_path,
         minimal_config.license_map_path,
         extra_args=[
@@ -333,7 +329,7 @@ def _collect_strings(value: object) -> list[str]:
 
 
 def test_manifests_omit_or_redact_secret_headers(
-    tmp_path: Path, minimal_config: PipelineTestConfig
+    tmp_path: Path, minimal_config: PipelineTestConfig, run_dc
 ) -> None:
     secret = "supersecret"
     targets = [
@@ -347,6 +343,7 @@ def test_manifests_omit_or_redact_secret_headers(
     targets_path = minimal_config.write_targets(tmp_path, targets)
 
     run_driver(
+        run_dc,
         targets_path,
         minimal_config.license_map_path,
         extra_args=["--evidence-header", f"Authorization=Bearer {secret}"],
@@ -367,7 +364,9 @@ def test_manifests_omit_or_redact_secret_headers(
             assert REDACTED in strings
 
 
-def test_denylist_overrides_bucket(tmp_path: Path, minimal_config: PipelineTestConfig) -> None:
+def test_denylist_overrides_bucket(
+    tmp_path: Path, minimal_config: PipelineTestConfig, run_dc
+) -> None:
     denylist_path = tmp_path / "denylist.yaml"
     denylist_path.write_text(
         yaml.safe_dump(
@@ -413,7 +412,7 @@ def test_denylist_overrides_bucket(tmp_path: Path, minimal_config: PipelineTestC
         tmp_path, targets, companion_override={"denylist": str(denylist_path)}
     )
 
-    run_driver(targets_path, minimal_config.license_map_path)
+    run_driver(run_dc, targets_path, minimal_config.license_map_path)
 
     green_rows = read_jsonl(minimal_config.queues_root / "green_download.jsonl")
     yellow_rows = read_jsonl(minimal_config.queues_root / "yellow_pipeline.jsonl")
@@ -429,7 +428,7 @@ def test_denylist_overrides_bucket(tmp_path: Path, minimal_config: PipelineTestC
 
 
 def test_content_check_block_action_forces_red(
-    tmp_path: Path, minimal_config: PipelineTestConfig
+    tmp_path: Path, minimal_config: PipelineTestConfig, run_dc
 ) -> None:
     targets = [
         {
@@ -448,7 +447,7 @@ def test_content_check_block_action_forces_red(
         },
     )
 
-    run_driver(targets_path, minimal_config.license_map_path)
+    run_driver(run_dc, targets_path, minimal_config.license_map_path)
 
     red_rows = read_jsonl(minimal_config.queues_root / "red_rejected.jsonl")
     assert {row["id"] for row in red_rows} == {"pii_target"}
@@ -464,7 +463,7 @@ def test_content_check_block_action_forces_red(
 
 
 def test_content_check_quarantine_action_forces_yellow(
-    tmp_path: Path, minimal_config: PipelineTestConfig
+    tmp_path: Path, minimal_config: PipelineTestConfig, run_dc
 ) -> None:
     targets = [
         {
@@ -481,7 +480,7 @@ def test_content_check_quarantine_action_forces_yellow(
         globals_override={"default_content_checks": ["dual_use_scan"]},
     )
 
-    run_driver(targets_path, minimal_config.license_map_path)
+    run_driver(run_dc, targets_path, minimal_config.license_map_path)
 
     yellow_rows = read_jsonl(minimal_config.queues_root / "yellow_pipeline.jsonl")
     assert {row["id"] for row in yellow_rows} == {"dual_use_target"}
@@ -507,6 +506,7 @@ def test_content_check_quarantine_action_forces_yellow(
 def test_edge_conditions_and_low_confidence(
     tmp_path: Path,
     minimal_config: PipelineTestConfig,
+    run_dc,
     spdx_hint: str,
     extra_args: list[str],
     expected_bucket: str,
@@ -521,7 +521,7 @@ def test_edge_conditions_and_low_confidence(
     ]
     targets_path = minimal_config.write_targets(tmp_path, targets)
 
-    run_driver(targets_path, minimal_config.license_map_path, extra_args=extra_args)
+    run_driver(run_dc, targets_path, minimal_config.license_map_path, extra_args=extra_args)
 
     buckets = {
         "GREEN": read_jsonl(minimal_config.queues_root / "green_download.jsonl"),
