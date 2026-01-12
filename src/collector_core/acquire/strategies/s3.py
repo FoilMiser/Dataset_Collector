@@ -1,6 +1,7 @@
 """S3 acquisition strategy handlers."""
 
-from collector_core.acquire_strategies import StrategyHandler, handle_aws_requester_pays, handle_s3_sync
+from collector_core.acquire.context import StrategyHandler
+from collector_core.acquire_strategies import handle_aws_requester_pays, handle_s3_sync
 
 
 def get_sync_handler() -> StrategyHandler:

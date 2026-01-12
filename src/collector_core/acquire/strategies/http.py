@@ -1,6 +1,7 @@
 """HTTP acquisition strategy handlers."""
 
-from collector_core.acquire_strategies import StrategyHandler, handle_http_multi, handle_http_single
+from collector_core.acquire.context import StrategyHandler
+from collector_core.acquire_strategies import handle_http_multi, handle_http_single
 
 
 def resolve_http_handler(variant: str = "multi") -> StrategyHandler:

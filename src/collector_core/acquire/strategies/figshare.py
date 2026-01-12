@@ -1,10 +1,7 @@
 """Figshare acquisition strategy handlers."""
 
-from collector_core.acquire_strategies import (
-    StrategyHandler,
-    handle_figshare_article,
-    handle_figshare_files,
-)
+from collector_core.acquire.context import StrategyHandler
+from collector_core.acquire_strategies import handle_figshare_article, handle_figshare_files
 
 
 def resolve_figshare_handler(variant: str) -> StrategyHandler:
