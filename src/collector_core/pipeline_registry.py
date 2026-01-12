@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import importlib.util
-from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
 from typing import Any
 
-from collector_core import acquire_strategies
+from collector_core.acquire.context import PostProcessor, StrategyHandler
 from collector_core.acquire.strategies import registry as strategies_registry
 from collector_core.config_validator import read_yaml
 from collector_core.pipeline_discovery import (
@@ -20,13 +19,8 @@ from collector_core.pipeline_discovery import (
     resolve_repo_root,
 )
 
-STRATEGY_HANDLER = Callable[
-    [acquire_strategies.AcquireContext, dict[str, Any], Path], list[dict[str, Any]]
-]
-POSTPROCESSOR = Callable[
-    [acquire_strategies.AcquireContext, dict[str, Any], Path, str, dict[str, Any]],
-    dict[str, Any] | None,
-]
+STRATEGY_HANDLER = StrategyHandler
+POSTPROCESSOR = PostProcessor
 
 
 @dataclass(frozen=True)

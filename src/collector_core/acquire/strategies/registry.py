@@ -14,7 +14,7 @@ from collector_core.acquire.strategies import (
     torrent,
     zenodo,
 )
-from collector_core.acquire_strategies import StrategyHandler
+from collector_core.acquire.context import StrategyHandler
 
 
 def build_default_handlers(

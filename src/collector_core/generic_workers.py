@@ -14,7 +14,8 @@ from typing import TYPE_CHECKING
 
 import collector_core.pipeline_specs_registry  # noqa: F401
 from collector_core import catalog_builder, merge, review_queue
-from collector_core.acquire_strategies import RootsDefaults, run_acquire_worker
+from collector_core.acquire.context import RootsDefaults
+from collector_core.acquire_strategies import run_acquire_worker
 from collector_core.pipeline_registry import resolve_acquire_hooks, resolve_pipeline_context
 from collector_core.pipeline_spec import PipelineSpec, get_pipeline_spec
 

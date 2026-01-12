@@ -11,7 +11,8 @@ from pathlib import Path
 # Import registry to ensure specs are registered
 import collector_core.pipeline_specs_registry  # noqa: F401
 from collector_core import catalog_builder, merge, review_queue
-from collector_core.acquire_strategies import RootsDefaults, run_acquire_worker
+from collector_core.acquire.context import RootsDefaults
+from collector_core.acquire_strategies import run_acquire_worker
 from collector_core.pipeline_factory import run_pipeline
 from collector_core.pipeline_registry import resolve_acquire_hooks, resolve_pipeline_context
 from collector_core.pipeline_spec import list_pipelines
