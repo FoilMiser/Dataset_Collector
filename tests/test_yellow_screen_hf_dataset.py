@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import io
 import json
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -14,7 +12,7 @@ datasets = pytest.importorskip("datasets")
 Dataset = datasets.Dataset
 
 
-def test_yellow_screen_hf_dataset(tmp_path: Path) -> None:
+def test_yellow_screen_hf_dataset(tmp_path: Path, run_dc) -> None:
     raw_root = tmp_path / "raw"
     screened_root = tmp_path / "screened_yellow"
     manifests_root = tmp_path / "_manifests"
@@ -54,19 +52,20 @@ def test_yellow_screen_hf_dataset(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    worker_path = Path("kg_nav_pipeline_v2/yellow_screen_worker.py").resolve()
-    subprocess.run(
+    run_dc(
         [
-            sys.executable,
-            str(worker_path),
+            "run",
+            "--pipeline",
+            "kg_nav",
+            "--stage",
+            "yellow_screen",
+            "--",
             "--targets",
             str(targets_path),
             "--queue",
             str(queue_path),
             "--execute",
-        ],
-        check=True,
-        cwd=Path(".").resolve(),
+        ]
     )
 
     shard_path = screened_root / pool / "shards" / "yellow_shard_00000.jsonl.zst"
@@ -88,7 +87,7 @@ def test_yellow_screen_hf_dataset(tmp_path: Path) -> None:
     assert ledger_path.exists()
 
 
-def test_yellow_screen_target_text_candidates_override(tmp_path: Path) -> None:
+def test_yellow_screen_target_text_candidates_override(tmp_path: Path, run_dc) -> None:
     raw_root = tmp_path / "raw"
     screened_root = tmp_path / "screened_yellow"
     manifests_root = tmp_path / "_manifests"
@@ -133,19 +132,20 @@ def test_yellow_screen_target_text_candidates_override(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    worker_path = Path("kg_nav_pipeline_v2/yellow_screen_worker.py").resolve()
-    subprocess.run(
+    run_dc(
         [
-            sys.executable,
-            str(worker_path),
+            "run",
+            "--pipeline",
+            "kg_nav",
+            "--stage",
+            "yellow_screen",
+            "--",
             "--targets",
             str(targets_path),
             "--queue",
             str(queue_path),
             "--execute",
-        ],
-        check=True,
-        cwd=Path(".").resolve(),
+        ]
     )
 
     shard_path = screened_root / pool / "shards" / "yellow_shard_00000.jsonl.zst"

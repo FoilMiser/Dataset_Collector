@@ -3,8 +3,6 @@ from __future__ import annotations
 import gzip
 import importlib.util
 import json
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -26,7 +24,7 @@ REQUIRED_FIELDS = OUTPUT_CONTRACT_MODULE.REQUIRED_FIELDS
 validate_output_contract = OUTPUT_CONTRACT_MODULE.validate_output_contract
 
 
-def test_end_to_end_pipeline_contract(tmp_path: Path) -> None:
+def test_end_to_end_pipeline_contract(tmp_path: Path, run_dc) -> None:
     raw_root = tmp_path / "raw"
     screened_root = tmp_path / "screened_yellow"
     combined_root = tmp_path / "combined"
@@ -74,32 +72,34 @@ def test_end_to_end_pipeline_contract(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    yellow_worker = Path("kg_nav_pipeline_v2/yellow_screen_worker.py").resolve()
-    subprocess.run(
+    run_dc(
         [
-            sys.executable,
-            str(yellow_worker),
+            "run",
+            "--pipeline",
+            "kg_nav",
+            "--stage",
+            "yellow_screen",
+            "--",
             "--targets",
             str(targets_path),
             "--queue",
             str(queue_path),
             "--execute",
-        ],
-        check=True,
-        cwd=Path(".").resolve(),
+        ]
     )
 
-    merge_worker = Path("kg_nav_pipeline_v2/merge_worker.py").resolve()
-    subprocess.run(
+    run_dc(
         [
-            sys.executable,
-            str(merge_worker),
+            "run",
+            "--pipeline",
+            "kg_nav",
+            "--stage",
+            "merge",
+            "--",
             "--targets",
             str(targets_path),
             "--execute",
-        ],
-        check=True,
-        cwd=Path(".").resolve(),
+        ]
     )
 
     shard_paths = list(combined_root.glob("**/shards/*.jsonl.gz"))

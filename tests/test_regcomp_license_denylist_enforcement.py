@@ -1,9 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
-import subprocess
-import sys
 from pathlib import Path
 
 import yaml
@@ -15,7 +12,7 @@ def read_jsonl(path: Path) -> list[dict[str, object]]:
     ]
 
 
-def test_regcomp_license_map_and_denylist_enforced(tmp_path: Path) -> None:
+def test_regcomp_license_map_and_denylist_enforced(tmp_path: Path, run_dc) -> None:
     manifests_root = tmp_path / "_manifests"
     queues_root = tmp_path / "_queues"
     license_map_path = tmp_path / "license_map.yaml"
@@ -99,23 +96,18 @@ def test_regcomp_license_map_and_denylist_enforced(tmp_path: Path) -> None:
     }
     targets_path.write_text(yaml.safe_dump(targets_cfg), encoding="utf-8")
 
-    driver_path = Path("regcomp_pipeline_v2/pipeline_driver.py").resolve()
-    env = dict(**os.environ)
-    env["PYTHONPATH"] = str(Path(".").resolve())
-    subprocess.run(
+    run_dc(
         [
-            sys.executable,
-            str(driver_path),
+            "pipeline",
+            "regcomp",
+            "--",
             "--targets",
             str(targets_path),
             "--license-map",
             str(license_map_path),
             "--no-fetch",
             "--quiet",
-        ],
-        check=True,
-        cwd=Path(".").resolve(),
-        env=env,
+        ]
     )
 
     green_rows = read_jsonl(queues_root / "green_download.jsonl")
