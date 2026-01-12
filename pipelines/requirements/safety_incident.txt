@@ -1,0 +1,6 @@
+# Safety Incident Pipeline Requirements
+# Issue 2.2 (v3.0): Canonical location for domain requirements
+#
+# Install: pip install -r pipelines/requirements/safety_incident.txt
+
+-r base.txt

@@ -1,0 +1,18 @@
+# Dataset Collector - Base pipeline requirements
+# This file contains common optional dependencies used across multiple pipelines.
+# Include this file in domain-specific requirements with: -r base.txt
+#
+# Issue 2.2 (v3.0): Centralized pipeline requirements in pipelines/requirements/
+
+# Core constraints - install these first
+-r ../../requirements.constraints.txt
+
+# Optional: for accurate token counting in catalog_builder
+tiktoken>=0.5.0
+
+# Optional: for near-duplicate detection
+datasketch>=1.6.0
+
+# Optional: for PDF extraction
+pypdf>=4.0.0
+pdfminer.six>=20221105

@@ -3,7 +3,7 @@
 merge_worker.py (v2.0)
 
 Deprecated compatibility shim for `dc run --pipeline materials_science --stage merge`.
-Removal target: v3.0.
+Removal target: v4.0.
 """
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from collector_core.generic_workers import main_merge  # noqa: E402
 DOMAIN = "materials_science"
 DEPRECATION_MESSAGE = (
     "merge_worker.py is deprecated; use `dc run --pipeline materials_science --stage merge` instead. "
-    "Removal target: v3.0."
+    "Removal target: v4.0."
 )
 
 

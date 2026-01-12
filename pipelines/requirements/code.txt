@@ -1,0 +1,10 @@
+# Code Pipeline Requirements
+# Issue 2.2 (v3.0): Canonical location for domain requirements
+#
+# Install: pip install -r pipelines/requirements/code.txt
+
+-r base.txt
+
+# Code-specific optional dependencies
+# tree-sitter>=0.20.0  # For source code parsing
+# pygments>=2.15.0  # For syntax highlighting

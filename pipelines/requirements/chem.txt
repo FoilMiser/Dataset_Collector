@@ -1,0 +1,10 @@
+# Chemistry Pipeline Requirements
+# Issue 2.2 (v3.0): Canonical location for domain requirements
+#
+# Install: pip install -r pipelines/requirements/chem.txt
+
+-r scientific.txt
+
+# Chemistry-specific optional dependencies
+# pubchempy>=1.0.4  # For PubChem API access
+# rdkit  # For chemical structure handling (large dependency)

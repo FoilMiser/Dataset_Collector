@@ -1,0 +1,10 @@
+# Knowledge Graph & Navigation Pipeline Requirements
+# Issue 2.2 (v3.0): Canonical location for domain requirements
+#
+# Install: pip install -r pipelines/requirements/kg_nav.txt
+
+-r base.txt
+
+# Knowledge graph-specific optional dependencies
+# rdflib>=6.0.0  # For RDF/semantic web data
+# networkx>=3.0  # For graph analysis

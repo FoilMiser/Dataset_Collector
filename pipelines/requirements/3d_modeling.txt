@@ -1,0 +1,10 @@
+# 3D Modeling Pipeline Requirements
+# Issue 2.2 (v3.0): Canonical location for domain requirements
+#
+# Install: pip install -r pipelines/requirements/3d_modeling.txt
+
+-r base.txt
+
+# 3D modeling-specific optional dependencies
+# trimesh>=3.20.0  # For mesh processing
+# numpy-stl>=3.0.0  # For STL file handling

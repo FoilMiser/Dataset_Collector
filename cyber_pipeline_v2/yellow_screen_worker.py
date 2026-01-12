@@ -3,7 +3,7 @@
 yellow_screen_worker.py (v2.0)
 
 Deprecated compatibility shim for `dc run --pipeline cyber --stage yellow_screen`.
-Removal target: v3.0.
+Removal target: v4.0.
 """
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from collector_core.yellow_screen_dispatch import main_yellow_screen  # noqa: E4
 DOMAIN = "cyber"
 DEPRECATION_MESSAGE = (
     "yellow_screen_worker.py is deprecated; use `dc run --pipeline cyber --stage yellow_screen` instead. "
-    "Removal target: v3.0."
+    "Removal target: v4.0."
 )
 
 if __name__ == "__main__":

@@ -1,0 +1,9 @@
+# Biology Pipeline Requirements
+# Issue 2.2 (v3.0): Canonical location for domain requirements
+#
+# Install: pip install -r pipelines/requirements/biology.txt
+
+-r scientific.txt
+
+# Biology-specific optional dependencies
+# biopython>=1.80  # For bioinformatics tools

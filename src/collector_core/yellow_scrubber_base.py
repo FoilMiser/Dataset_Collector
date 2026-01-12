@@ -11,6 +11,14 @@ This module provides common utilities for:
 
 Pipeline-specific yellow_scrubber.py files should import from this module
 rather than duplicating the implementation.
+
+Issue 3.2 (v3.0): This module is being consolidated with yellow/base.py.
+New code should use collector_core.yellow.base for yellow screen logic.
+The utilities in this module (Pools, FieldSpec, etc.) remain stable API.
+
+Deprecation schedule:
+- v3.0: Both locations work; this module provides utilities
+- v4.0: Consider consolidating remaining utilities into yellow/ package
 """
 
 from __future__ import annotations
