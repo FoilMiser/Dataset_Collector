@@ -5,7 +5,7 @@ from typing import Any
 
 from collector_core.evidence.change_detection import normalize_evidence_fetch_status
 from collector_core.stability import stable_api
-from collector_core.utils import lower, normalize_whitespace
+from collector_core.utils.text import lower, normalize_whitespace
 
 if False:  # pragma: no cover - type checking
     from collector_core.pipeline_driver_base import EvidenceResult, LicenseMap, TargetContext

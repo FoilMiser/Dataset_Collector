@@ -19,7 +19,10 @@ from collector_core.dependencies import _try_import
 from collector_core.network_utils import _with_retries
 from collector_core.secrets import REDACTED, SecretStr, redact_headers
 from collector_core.stability import stable_api
-from collector_core.utils import ensure_dir, sha256_bytes, sha256_file, utc_now, write_json
+from collector_core.utils.hash import sha256_bytes, sha256_file
+from collector_core.utils.io import write_json
+from collector_core.utils.logging import utc_now
+from collector_core.utils.paths import ensure_dir
 
 from .change_detection import (
     apply_normalized_hash_fallback,

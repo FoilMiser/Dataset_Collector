@@ -5,7 +5,8 @@ from typing import Any
 
 from collector_core.output_contract import normalize_output_record, validate_output_contract
 from collector_core.stability import stable_api
-from collector_core.utils import sha256_text, utc_now
+from collector_core.utils.hash import sha256_text
+from collector_core.utils.logging import utc_now
 
 
 @stable_api

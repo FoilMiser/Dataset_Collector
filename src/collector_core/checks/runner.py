@@ -8,7 +8,9 @@ from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.checks.base import BaseCheck, CheckContext
 from collector_core.checks.loader import load_builtin_checks
 from collector_core.checks.registry import get_check
-from collector_core.utils import ensure_dir, safe_filename, utc_now, write_json
+from collector_core.utils.io import write_json
+from collector_core.utils.logging import utc_now
+from collector_core.utils.paths import ensure_dir, safe_filename
 
 
 def generate_run_id(prefix: str | None = None) -> str:

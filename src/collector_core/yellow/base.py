@@ -12,7 +12,10 @@ from datasets import DatasetDict, load_from_disk
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.stability import stable_api
-from collector_core.utils import append_jsonl, ensure_dir, read_jsonl, utc_now, write_json
+from collector_core.utils.hash import sha256_text
+from collector_core.utils.io import append_jsonl, read_jsonl, write_json
+from collector_core.utils.logging import utc_now
+from collector_core.utils.paths import ensure_dir
 from collector_core.yellow_screen_common import (
     PitchConfig,
     Roots,
@@ -28,7 +31,6 @@ from collector_core.yellow_screen_common import (
     resolve_pitch_config,
     resolve_roots,
     sharding_cfg,
-    sha256_text,
 )
 
 

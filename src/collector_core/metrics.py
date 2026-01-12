@@ -11,7 +11,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-from collector_core.utils import utc_now
+from collector_core.utils.logging import utc_now
 
 
 @dataclass

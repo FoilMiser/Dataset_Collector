@@ -18,7 +18,6 @@ from __future__ import annotations
 import dataclasses
 import fnmatch
 import gzip
-import hashlib
 import json
 import re
 import time
@@ -33,100 +32,13 @@ from collector_core.companion_files import (
     read_license_maps,
     resolve_companion_paths,
 )
-from collector_core.config_validator import read_yaml as read_yaml_config
 from collector_core.stability import stable_api
-
-try:
-    import requests
-except ImportError:
-    requests = None  # type: ignore[assignment]
-
-
-@stable_api
-def utc_now() -> str:
-    """Return current UTC time as ISO8601 string."""
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-
-
-@stable_api
-def ensure_dir(p: Path) -> None:
-    """Create directory and parents if they don't exist."""
-    p.mkdir(parents=True, exist_ok=True)
-
-
-@stable_api
-def read_yaml(path: Path) -> dict[str, Any]:
-    """Read and validate YAML config file."""
-    return read_yaml_config(path, schema_name="targets") or {}
-
-
-@stable_api
-def read_jsonl(path: Path) -> list[dict[str, Any]]:
-    """Read JSONL file into list of dicts."""
-    rows: list[dict[str, Any]] = []
-    with path.open("r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                rows.append(json.loads(line))
-    return rows
-
-
-@stable_api
-def write_json(path: Path, obj: dict[str, Any]) -> None:
-    """Write dict to JSON file with atomic rename."""
-    ensure_dir(path.parent)
-    tmp_path = Path(f"{path}.tmp")
-    tmp_path.write_text(json.dumps(obj, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    tmp_path.replace(path)
-
-
-@stable_api
-def write_jsonl_gz(path: Path, rows: Iterable[dict[str, Any]]) -> tuple[int, int]:
-    """Write rows to gzipped JSONL file, return (count, bytes)."""
-    ensure_dir(path.parent)
-    count = 0
-    with gzip.open(path, "wt", encoding="utf-8") as f:
-        for r in rows:
-            f.write(json.dumps(r, ensure_ascii=False) + "\n")
-            count += 1
-    return count, path.stat().st_size
-
-
-@stable_api
-def sha256_file(path: Path) -> str:
-    """Compute SHA256 hash of file."""
-    h = hashlib.sha256()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            h.update(chunk)
-    return h.hexdigest()
-
-
-@stable_api
-def normalize_whitespace(text: str) -> str:
-    """Collapse whitespace to single spaces."""
-    return re.sub(r"\s+", " ", text or "").strip()
-
-
-@stable_api
-def lower(s: str) -> str:
-    """Lowercase string, handling None."""
-    return (s or "").lower()
-
-
-@stable_api
-def safe_text(x: Any) -> str:
-    """Convert value to string, handling None."""
-    return "" if x is None else str(x)
-
-
-@stable_api
-def require_requests() -> None:
-    """Raise if requests module not available."""
-    if requests is None:
-        raise RuntimeError("Missing dependency: requests")
-
+from collector_core.utils.hash import sha256_file
+from collector_core.utils.http import requests, require_requests
+from collector_core.utils.io import read_jsonl_list as read_jsonl, read_yaml, write_json, write_jsonl_gz
+from collector_core.utils.logging import utc_now
+from collector_core.utils.paths import ensure_dir
+from collector_core.utils.text import lower, normalize_whitespace, safe_text
 
 # --------------------------
 # Pools configuration
@@ -146,7 +58,7 @@ class Pools:
 @stable_api
 def pools_from_targets_yaml(targets_yaml: Path, fallback: Path) -> Pools:
     """Load pool paths from targets YAML config."""
-    cfg = read_yaml(targets_yaml)
+    cfg = read_yaml(targets_yaml, schema_name="targets")
     pools = cfg.get("globals", {}).get("pools", {})
     return Pools(
         permissive=Path(pools.get("permissive", fallback / "permissive")).expanduser(),

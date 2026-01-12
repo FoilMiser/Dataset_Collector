@@ -21,11 +21,9 @@ from __future__ import annotations
 
 import argparse
 import gzip
-import hashlib
 import io
 import json
 import logging
-import re
 import tarfile
 import time
 import xml.etree.ElementTree as ET
@@ -43,44 +41,16 @@ from collector_core.exceptions import (
     OutputPathsBuilderError,
 )
 from collector_core.logging_config import add_logging_args, configure_logging
-from collector_core.utils import (
-    ensure_dir,
-    sha256_file,
-    utc_now,
-    validate_tar_archive,
-    write_json,
-)
-from collector_core.utils import (
-    read_jsonl_list as read_jsonl,
-)
+from collector_core.utils.hash import sha256_bytes, sha256_file, stable_unit_interval
+from collector_core.utils.http import build_user_agent, http_get_bytes
+from collector_core.utils.io import append_jsonl, read_jsonl_list as read_jsonl, write_json
+from collector_core.utils.logging import utc_now
+from collector_core.utils.paths import ensure_dir, validate_tar_archive
+from collector_core.utils.text import normalize_whitespace, safe_text
 
-requests = _try_import("requests")
 FTP = _try_import("ftplib", "FTP")
 
 logger = logging.getLogger(__name__)
-
-
-def append_jsonl(path: Path, obj: dict[str, Any]) -> None:
-    ensure_dir(path.parent)
-    with path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(obj) + "\n")
-
-
-def sha256_bytes(b: bytes) -> str:
-    return hashlib.sha256(b).hexdigest()
-
-
-def normalize_whitespace(text: str) -> str:
-    return re.sub(r"\s+", " ", text or "").strip()
-
-
-def safe_text(x: Any) -> str:
-    return "" if x is None else str(x)
-
-
-def stable_unit_interval(key: str) -> float:
-    h = hashlib.sha256(key.encode()).digest()
-    return (int.from_bytes(h[:8], "big") % 1_000_000) / 1_000_000.0
 
 
 def pools_from_targets_yaml(targets_yaml: Path, fallback: Path):
@@ -130,24 +100,8 @@ def chunk_text(text: str, max_chars: int, min_chars: int) -> list[str]:
     return [c for c in chunks if len(c) >= min_chars]
 
 
-def http_get_bytes(
-    url: str, timeout_s: int = 120, user_agent_version: str = TOOL_VERSION
-) -> tuple[bytes, dict]:
-    missing = requires("requests", requests, install="pip install requests")
-    if missing:
-        raise DependencyMissingError(
-            missing,
-            dependency="requests",
-            install="pip install requests",
-        )
-    with requests.get(
-        url,
-        stream=True,
-        timeout=timeout_s,
-        headers={"User-Agent": f"pmc-worker/{user_agent_version}"},
-    ) as r:
-        r.raise_for_status()
-        return r.content, {"status_code": r.status_code, "bytes": len(r.content)}
+def _pmc_user_agent(version: str = TOOL_VERSION) -> str:
+    return build_user_agent(\"pmc-worker\", version)
 
 
 def ftp_get_bytes(host: str, remote_path: str) -> bytes:
@@ -188,7 +142,7 @@ def fetch_pmc_package(
 
     try:
         if fr.startswith("http"):
-            content, m = http_get_bytes(fr, user_agent_version=user_agent_version)
+            content, m = http_get_bytes(fr, user_agent=_pmc_user_agent(user_agent_version))
             meta.update(m)
         elif fr.startswith("ftp://"):
             from urllib.parse import urlparse
@@ -552,7 +506,7 @@ def run_pmc_worker(
         event = {"at_utc": utc_now(), "pmcid": pmcid, "file_ref": file_ref}
 
         if not parsed.execute:
-            append_jsonl(log_path, {**event, "status": "planned"})
+            append_jsonl(log_path, [{**event, "status": "planned"}])
             processed.add(key)
             state["processed"] = sorted(processed)
             write_json(resume_path, state)
@@ -565,7 +519,9 @@ def run_pmc_worker(
             user_agent_version=version,
         )
         if pkg is None:
-            append_jsonl(log_path, {**event, "status": meta.get("status", "error"), "meta": meta})
+            append_jsonl(
+                log_path, [{**event, "status": meta.get("status", "error"), "meta": meta}]
+            )
             processed.add(key)
             state["processed"] = sorted(processed)
             write_json(resume_path, state)
@@ -573,7 +529,7 @@ def run_pmc_worker(
 
         nxml, members = extract_nxml_fn(pkg)
         if nxml is None:
-            append_jsonl(log_path, {**event, "status": "no_nxml", "members": members[:20]})
+            append_jsonl(log_path, [{**event, "status": "no_nxml", "members": members[:20]}])
             processed.add(key)
             state["processed"] = sorted(processed)
             write_json(resume_path, state)
@@ -628,7 +584,7 @@ def run_pmc_worker(
         successful += 1
         append_jsonl(
             log_path,
-            {**event, "status": "ok", "chunks": len(chunks), "cached": meta.get("cached", False)},
+            [{**event, "status": "ok", "chunks": len(chunks), "cached": meta.get("cached", False)}],
         )
         processed.add(key)
         state["processed"] = sorted(processed)

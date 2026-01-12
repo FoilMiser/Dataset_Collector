@@ -36,7 +36,9 @@ from collector_core.merge.types import (
     RootDefaults,
     Roots,
 )
-from collector_core.utils import append_jsonl, ensure_dir, read_jsonl, utc_now, write_json
+from collector_core.utils.io import append_jsonl, read_jsonl, write_json
+from collector_core.utils.logging import utc_now
+from collector_core.utils.paths import ensure_dir
 
 if importlib.util.find_spec("tqdm"):
     from tqdm import tqdm as tqdm_progress

@@ -6,7 +6,8 @@ from pathlib import Path
 from typing import Any
 
 from collector_core.stability import stable_api
-from collector_core.utils import ensure_dir, utc_now
+from collector_core.utils.logging import utc_now
+from collector_core.utils.paths import ensure_dir
 
 
 @stable_api

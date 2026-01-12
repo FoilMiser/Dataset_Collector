@@ -5,7 +5,8 @@ from typing import Any
 
 from collector_core.merge.types import ShardingConfig
 from collector_core.stability import stable_api
-from collector_core.utils import append_jsonl, ensure_dir
+from collector_core.utils.io import append_jsonl
+from collector_core.utils.paths import ensure_dir
 
 
 @stable_api

@@ -9,9 +9,7 @@ from collector_core.__version__ import __version__ as VERSION
 from collector_core.config_validator import read_yaml
 from collector_core.dataset_root import ensure_data_root_allowed, resolve_dataset_root
 from collector_core.stability import stable_api
-from collector_core.utils import (
-    write_jsonl,
-)
+from collector_core.utils.io import write_jsonl
 
 __all__ = ["VERSION"]
 
