@@ -5,6 +5,7 @@ yellow_scrubber.py (v2.0)
 Thin wrapper that delegates to the spec-driven yellow review helper.
 """
 from __future__ import annotations
+from pathlib import Path
 from collector_core.pipeline_spec import get_pipeline_spec  # noqa: E402
 from collector_core.yellow_review_helpers import make_main  # noqa: E402
 

@@ -3,11 +3,11 @@
 Cybersecurity-focused staging of the math pipeline v2 layout. This version keeps the safety-first flow (evidence → queues → acquisition → screening → merge → catalog) while adopting cyber defaults, roots, and helper workers.
 
 Stage order:
-1) **Classify** targets and snapshot evidence (`pipeline_driver.py`).
-2) **Acquire** GREEN and YELLOW payloads into `/data/cyber/raw/...` (`acquire_worker.py`).
-3) **Screen YELLOW** records with strict pitch behavior (`yellow_screen_worker.py`).
-4) **Merge** GREEN + screened YELLOW shards (`merge_worker.py`).
-5) **Catalog** counts and shard summaries (`catalog_builder.py`).
+1) **Classify** targets and snapshot evidence (`dc pipeline`).
+2) **Acquire** GREEN and YELLOW payloads into `/data/cyber/raw/...` (`dc run --stage acquire`).
+3) **Screen YELLOW** records with strict pitch behavior (`dc run --stage yellow_screen`).
+4) **Merge** GREEN + screened YELLOW shards (`dc run --stage merge`).
+5) **Catalog** counts and shard summaries (`dc catalog-builder`).
 
 > Not legal advice. This tool helps you track licenses and restrictions; you are responsible for compliance.
 
@@ -59,13 +59,13 @@ Sharding is controlled by `globals.sharding` (max records per shard, compression
 
 ## Stage overview
 
-| Stage | Script | Notes |
+| Stage | Invocation | Notes |
 | --- | --- | --- |
-| Classify | `pipeline_driver.py` | Emits GREEN/YELLOW/RED queues; writes per-target manifests with evidence snapshots. |
-| Acquire | `acquire_worker.py` | Downloads payloads into `raw/{green|yellow}/{license_pool}/{target_id}`. Dry-run by default; `--execute` performs downloads. |
-| Screen YELLOW | `yellow_screen_worker.py` | Screens JSONL records, writing pass/pitch ledgers, done markers, and sharded outputs. |
-| Merge | `merge_worker.py` | Combines GREEN + screened YELLOW shards with deduplication and a combined ledger. |
-| Catalog | `catalog_builder.py` | Summarizes counts, bytes, manifests, and ledgers across stages. |
+| Classify | `dc pipeline` | Emits GREEN/YELLOW/RED queues; writes per-target manifests with evidence snapshots. |
+| Acquire | `dc run --stage acquire` | Downloads payloads into `raw/{green|yellow}/{license_pool}/{target_id}`. Dry-run by default; `--execute` performs downloads. |
+| Screen YELLOW | `dc run --stage yellow_screen` | Screens JSONL records, writing pass/pitch ledgers, done markers, and sharded outputs. |
+| Merge | `dc run --stage merge` | Combines GREEN + screened YELLOW shards with deduplication and a combined ledger. |
+| Catalog | `dc catalog-builder` | Summarizes counts, bytes, manifests, and ledgers across stages. |
 
 Use `dc pipeline` for classification, `dc run` for acquire/merge/yellow_screen, and `dc catalog-builder` for catalog outputs.
 

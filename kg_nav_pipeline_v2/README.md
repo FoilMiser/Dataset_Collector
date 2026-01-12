@@ -2,11 +2,11 @@
 
 A safety-first pipeline for building a license-auditable knowledge-graph navigation corpus. Version 2 mirrors the math pipeline v2 stage order while keeping KG/Lit specifics: computed-only extraction, PII scrubbing for sensitive identifiers, and navigation-episode synthesis handled downstream by the sorter pipeline.
 
-1. **Classify** targets and snapshot evidence (`pipeline_driver.py`).
-2. **Acquire** GREEN/YELLOW targets into the v2 raw layout (`acquire_worker.py`).
-3. **Screen YELLOW** with adapters + strict pitch (`yellow_screen_worker.py`).
-4. **Merge** canonical GREEN + screened YELLOW (`merge_worker.py`).
-5. **Catalog** stats and ledgers (`catalog_builder.py`).
+1. **Classify** targets and snapshot evidence (`dc pipeline`).
+2. **Acquire** GREEN/YELLOW targets into the v2 raw layout (`dc run --stage acquire`).
+3. **Screen YELLOW** with adapters + strict pitch (`dc run --stage yellow_screen`).
+4. **Merge** canonical GREEN + screened YELLOW (`dc run --stage merge`).
+5. **Catalog** stats and ledgers (`dc catalog-builder`).
 
 > Not legal advice. This tooling helps you track licenses and restrictions; you remain responsible for compliance.
 
@@ -55,13 +55,13 @@ Sharding is controlled by `globals.sharding` (max records per shard, compression
 
 ## Stage overview
 
-| Stage | Script | Notes |
+| Stage | Invocation | Notes |
 | --- | --- | --- |
-| Classify | `pipeline_driver.py` | Emits GREEN/YELLOW/RED queues; snaps license evidence; adds routing defaults for KG navigation. |
-| Acquire | `acquire_worker.py` | Downloads payloads into `raw/{green|yellow}/{license_pool}/{target_id}`. Dry-run by default; `--execute` performs downloads. Supports HTTP/FTP/Git/Zenodo/Dataverse/HF plus KG-specific `figshare`, `s3_sync`, `aws_requester_pays`, `torrent`. |
-| Screen YELLOW | `yellow_screen_worker.py` | Adapter-based canonicalization (`wikidata_truthy_edges`, `openalex_minimal_graph`, `crossref_minimal_graph`, `opencitations_coci_edges`, `orcid_scrub_minimal`, `nlm_mesh_minimal`). Strict pitch ledger + done markers. |
-| Merge | `merge_worker.py` | Combines canonical GREEN + screened YELLOW shards with content hash dedupe and a combined ledger. |
-| Catalog | `catalog_builder.py` | Summarizes counts, bytes, per-stage shard info, manifests, and ledgers. |
+| Classify | `dc pipeline` | Emits GREEN/YELLOW/RED queues; snaps license evidence; adds routing defaults for KG navigation. |
+| Acquire | `dc run --stage acquire` | Downloads payloads into `raw/{green|yellow}/{license_pool}/{target_id}`. Dry-run by default; `--execute` performs downloads. Supports HTTP/FTP/Git/Zenodo/Dataverse/HF plus KG-specific `figshare`, `s3_sync`, `aws_requester_pays`, `torrent`. |
+| Screen YELLOW | `dc run --stage yellow_screen` | Adapter-based canonicalization (`wikidata_truthy_edges`, `openalex_minimal_graph`, `crossref_minimal_graph`, `opencitations_coci_edges`, `orcid_scrub_minimal`, `nlm_mesh_minimal`). Strict pitch ledger + done markers. |
+| Merge | `dc run --stage merge` | Combines canonical GREEN + screened YELLOW shards with content hash dedupe and a combined ledger. |
+| Catalog | `dc catalog-builder` | Summarizes counts, bytes, per-stage shard info, manifests, and ledgers. |
 
 Use `dc pipeline` for classification, `dc run` for acquire/merge/yellow_screen, and `dc catalog-builder` for catalog outputs.
 

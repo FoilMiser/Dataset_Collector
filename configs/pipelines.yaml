@@ -1,20 +1,189 @@
+defaults:
+  pools: &default_pools
+    - permissive
+    - copyleft
+    - quarantine
+
 pipelines:
   3d_modeling:
+    pipeline_id: 3d_modeling_pipeline_v2
+    targets_path: pipelines/targets/targets_3d.yaml
+    default_pools: *default_pools
+    routing:
+      keys: [three_d_routing]
+      confidence_keys: [three_d_routing]
+      default:
+        subject: 3d
+        domain: misc
+        category: misc
+        level: 5
+        granularity: target
+    knobs:
+      domain_prefix: "3d"
+      custom_workers:
+        mesh_worker: mesh_worker.py
     acquire:
       plugin_module: acquire_plugin.py
       postprocess: modeling_postprocess
+  agri_circular:
+    pipeline_id: agri_circular_pipeline_v2
+    targets_path: pipelines/targets/targets_agri_circular.yaml
+    default_pools: *default_pools
+    routing:
+      keys: [agri_routing, math_routing]
+      confidence_keys: [agri_routing]
+      default:
+        subject: agri_circular
+        domain: misc
+        category: misc
+        level: 5
+        granularity: target
+    knobs: {}
+  biology:
+    pipeline_id: biology_pipeline_v2
+    targets_path: pipelines/targets/targets_biology.yaml
+    default_pools: *default_pools
+    routing:
+      keys: [bio_routing, math_routing]
+      confidence_keys: [bio_routing]
+      default:
+        subject: biology
+        domain: misc
+        category: misc
+        level: 5
+        granularity: target
+    knobs: {}
   chem:
+    pipeline_id: chem_pipeline_v2
+    targets_path: pipelines/targets/targets_chem.yaml
+    default_pools: *default_pools
+    routing:
+      keys: [chem_routing, math_routing]
+      confidence_keys: [chem_routing]
+      default:
+        subject: chem
+        domain: misc
+        category: misc
+        level: 5
+        granularity: target
+    knobs:
+      yellow_screen_module: yellow_screen_chem
     acquire:
       figshare_variant: article
       github_release_repo: chem-corpus-acquire
     yellow_screen: chem
   code:
+    pipeline_id: code_pipeline_v2
+    targets_path: pipelines/targets/targets_code.yaml
+    default_pools: *default_pools
+    routing:
+      keys: [code_routing, math_routing]
+      confidence_keys: [code_routing, math_routing]
+      default:
+        subject: code
+        domain: multi
+        category: misc
+        level: 5
+        granularity: target
+    knobs:
+      custom_workers:
+        code_worker: code_worker.py
     acquire:
       plugin_module: acquire_plugin.py
       postprocess: code_postprocess
+  cyber:
+    pipeline_id: cyber_pipeline_v2
+    targets_path: pipelines/targets/targets_cyber.yaml
+    default_pools: *default_pools
+    routing:
+      keys: [cyber_routing, math_routing]
+      confidence_keys: [cyber_routing]
+      default:
+        subject: cyber
+        domain: misc
+        category: misc
+        level: 5
+        granularity: target
+    knobs:
+      custom_workers:
+        nvd_worker: nvd_worker.py
+        stix_worker: stix_worker.py
+        advisory_worker: advisory_worker.py
   econ_stats_decision_adaptation:
+    pipeline_id: econ_stats_decision_adaptation_pipeline_v2
+    targets_path: pipelines/targets/targets_econ_stats_decision_v2.yaml
+    default_pools: *default_pools
+    routing:
+      keys: [econ_routing, math_routing]
+      confidence_keys: [econ_routing]
+      default:
+        subject: econ
+        domain: misc
+        category: misc
+        level: 5
+        granularity: target
+    knobs:
+      domain_prefix: econ
+      yellow_screen_module: yellow_screen_econ
+      include_routing_dict_in_row: true
     yellow_screen: econ
+  earth:
+    pipeline_id: earth_pipeline_v2
+    targets_path: pipelines/targets/targets_earth.yaml
+    default_pools: *default_pools
+    routing:
+      keys: [earth_routing, math_routing]
+      confidence_keys: [earth_routing]
+      default:
+        subject: earth
+        domain: misc
+        category: misc
+        level: 5
+        granularity: target
+    knobs: {}
+  engineering:
+    pipeline_id: engineering_pipeline_v2
+    targets_path: pipelines/targets/targets_engineering.yaml
+    default_pools: *default_pools
+    routing:
+      keys: [engineering_routing]
+      confidence_keys: [engineering_routing]
+      default:
+        subject: engineering
+        domain: misc
+        category: misc
+        level: 5
+        granularity: target
+    knobs: {}
+  fixture:
+    pipeline_id: fixture_pipeline_v2
+    targets_path: pipelines/targets/targets_fixture.yaml
+    default_pools: *default_pools
+    routing:
+      keys: [fixture_routing]
+      confidence_keys: [fixture_routing]
+      default:
+        subject: fixture
+        domain: misc
+        category: misc
+        level: 5
+        granularity: target
+    knobs: {}
   kg_nav:
+    pipeline_id: kg_nav_pipeline_v2
+    targets_path: pipelines/targets/targets_kg_nav.yaml
+    default_pools: *default_pools
+    routing:
+      keys: [kg_routing, math_routing]
+      confidence_keys: [kg_routing]
+      default:
+        subject: kg_nav
+        domain: misc
+        category: misc
+        level: 5
+        granularity: target
+    knobs:
+      yellow_screen_module: yellow_screen_kg_nav
     acquire:
       figshare_variant: files
       extra_handlers:
@@ -22,15 +191,129 @@ pipelines:
         - aws_requester_pays
         - torrent
     yellow_screen: kg_nav
+  logic:
+    pipeline_id: logic_pipeline_v2
+    targets_path: pipelines/targets/targets_logic.yaml
+    default_pools: *default_pools
+    routing:
+      keys: [logic_routing]
+      confidence_keys: [logic_routing]
+      default:
+        subject: logic
+        domain: misc
+        category: misc
+        level: 5
+        granularity: target
+    knobs: {}
+  materials_science:
+    pipeline_id: materials_science_pipeline_v2
+    targets_path: pipelines/targets/targets_materials.yaml
+    default_pools: *default_pools
+    routing:
+      keys: [materials_routing, math_routing]
+      confidence_keys: [materials_routing]
+      default:
+        subject: materials_science
+        domain: misc
+        category: misc
+        level: 5
+        granularity: target
+    knobs:
+      domain_prefix: matsci
+  math:
+    pipeline_id: math_pipeline_v2
+    targets_path: pipelines/targets/targets_math.yaml
+    default_pools: *default_pools
+    routing:
+      keys: [math_routing]
+      confidence_keys: [math_routing]
+      default:
+        subject: math
+        domain: misc
+        category: misc
+        level: 5
+        granularity: target
+    knobs: {}
   metrology:
+    pipeline_id: metrology_pipeline_v2
+    targets_path: pipelines/targets/targets_metrology.yaml
+    default_pools: *default_pools
+    routing:
+      keys: [metrology_routing, math_routing]
+      confidence_keys: [metrology_routing]
+      default:
+        subject: metrology
+        domain: misc
+        category: misc
+        level: 5
+        granularity: target
+    knobs:
+      include_routing_dict_in_row: true
     acquire:
       plugin_module: acquire_plugin.py
       postprocess: metrology_postprocess
       wrap_handlers: apply_artifacts_dir
   nlp:
+    pipeline_id: nlp_pipeline_v2
+    targets_path: pipelines/targets/targets_nlp.yaml
+    default_pools: *default_pools
+    routing:
+      keys: [nlp_routing]
+      confidence_keys: [nlp_routing]
+      default:
+        subject: nlp
+        domain: misc
+        category: misc
+        level: 5
+        granularity: target
+    knobs:
+      yellow_screen_module: yellow_screen_nlp
     acquire:
       figshare_variant: article
       github_release_repo: nlp-corpus-acquire
     yellow_screen: nlp
+  physics:
+    pipeline_id: physics_pipeline_v2
+    targets_path: pipelines/targets/targets_physics.yaml
+    default_pools: *default_pools
+    routing:
+      keys: [physics_routing, math_routing]
+      confidence_keys: [physics_routing]
+      default:
+        subject: physics
+        domain: misc
+        category: misc
+        level: 5
+        granularity: target
+    knobs: {}
+  regcomp:
+    pipeline_id: regcomp_pipeline_v2
+    targets_path: pipelines/targets/targets_regcomp.yaml
+    default_pools: *default_pools
+    routing:
+      keys: [regcomp_routing]
+      confidence_keys: [regcomp_routing]
+      default:
+        subject: regcomp
+        domain: misc
+        category: misc
+        level: 5
+        granularity: target
+    knobs: {}
   safety_incident:
+    pipeline_id: safety_incident_pipeline_v2
+    targets_path: pipelines/targets/targets_safety_incident.yaml
+    default_pools: *default_pools
+    routing:
+      keys: [safety_routing]
+      confidence_keys: [safety_routing]
+      default:
+        subject: safety_incident
+        domain: misc
+        category: misc
+        level: 5
+        granularity: target
+    knobs:
+      domain_prefix: safety
+      yellow_screen_module: yellow_screen_safety
     yellow_screen: safety

@@ -577,8 +577,8 @@ def generate_dry_run_report(
             "NEXT STEPS",
             "-" * 40,
             "  1. Review this summary for any unexpected classifications",
-            "  2. Run acquire_worker.py with --execute to download GREEN and YELLOW targets",
-            "  3. Run yellow_screen_worker.py and merge_worker.py per docs/PIPELINE_V2_REWORK_PLAN.md",
+            "  2. Run dc run --pipeline <slug> --stage acquire --execute to download GREEN and YELLOW targets",
+            "  3. Run dc run --pipeline <slug> --stage yellow_screen and merge per docs/PIPELINE_V2_REWORK_PLAN.md",
             "",
             "=" * 70,
         ]

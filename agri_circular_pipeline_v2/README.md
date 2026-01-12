@@ -100,11 +100,11 @@ Additional helper stages:
 ---
 
 ## Key files
-- `pipeline_driver.py` — classifies targets into GREEN/YELLOW/RED queues with routing metadata.
-- `acquire_worker.py` — downloads GREEN/YELLOW targets into the v2 raw layout and writes manifest markers.
-- `yellow_screen_worker.py` — strict YELLOW screening with pass/pitch ledgers; handles JSONL plus common CSV/TSV/TXT/HTML inputs.
-- `merge_worker.py` — merges canonical GREEN + screened YELLOW into `combined/` with deduplication and combined index ledger.
-- `catalog_builder.py` — summarizes counts/bytes across stages into `_catalogs/catalog_v2.json`.
+- `dc pipeline` — classifies targets into GREEN/YELLOW/RED queues with routing metadata.
+- `dc run --stage acquire` — downloads GREEN/YELLOW targets into the v2 raw layout and writes manifest markers.
+- `dc run --stage yellow_screen` — strict YELLOW screening with pass/pitch ledgers; handles JSONL plus common CSV/TSV/TXT/HTML inputs.
+- `dc run --stage merge` — merges canonical GREEN + screened YELLOW into `combined/` with deduplication and combined index ledger.
+- `dc catalog-builder` — summarizes counts/bytes across stages into `_catalogs/catalog_v2.json`.
 
 Legacy/compatibility helpers:
 - `yellow_scrubber.py` — lightweight planning helper for YELLOW queues (dry-run only).

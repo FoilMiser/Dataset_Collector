@@ -2,11 +2,13 @@
 """
 acquire_worker.py (v2.0)
 
-Thin wrapper that delegates to the spec-driven generic acquire worker.
+Deprecated compatibility shim for `dc run --pipeline kg_nav --stage acquire`.
+Removal target: v3.0.
 """
 from __future__ import annotations
-from pathlib import Path
 
+import warnings
+from pathlib import Path
 
 from collector_core.acquire_strategies import (  # noqa: E402
     AcquireContext,
@@ -19,6 +21,10 @@ from collector_core.acquire_strategies import (  # noqa: E402
 from collector_core.generic_workers import main_acquire  # noqa: E402
 
 DOMAIN = "kg_nav"
+DEPRECATION_MESSAGE = (
+    "acquire_worker.py is deprecated; use `dc run --pipeline kg_nav --stage acquire` instead. "
+    "Removal target: v3.0."
+)
 
 __all__ = [
     "AcquireContext",
@@ -32,6 +38,7 @@ __all__ = [
 
 
 def main() -> None:
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning, stacklevel=2)
     main_acquire(DOMAIN, repo_root=Path(__file__).resolve().parents[1])
 
 

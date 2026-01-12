@@ -4,25 +4,18 @@ This cookbook outlines the minimal steps to add a new pipeline configuration and
 
 ## 1. Generate a scaffold
 
-Use the generator to scaffold a new pipeline directory with optional entry points,
-README, and targets config:
+Use the generator to scaffold a new pipeline directory with README and targets
+config:
 
 ```bash
 python tools/generate_pipeline.py --domain your_domain
 ```
 
-The scaffolded directory can include:
+The scaffolded directory includes:
 
 ```
 your_domain_pipeline_v2/
   README.md
-  legacy/run_pipeline.sh  # deprecated legacy wrapper
-  pipeline_driver.py
-  acquire_worker.py
-  yellow_screen_worker.py
-  merge_worker.py
-  catalog_builder.py
-  review_queue.py
   requirements.txt
 ```
 
@@ -32,16 +25,19 @@ Targets YAMLs are created in the shared directory:
 pipelines/targets/targets_your_domain.yaml
 ```
 
-Only the targets YAML is required. Legacy wrapper scripts are optional and can be regenerated
-with `tools/sync_pipeline_wrappers.py` if you want historical entry points.
+Only the targets YAML is required. Deprecated compatibility shims (pipeline_driver,
+`*_worker.py`, `legacy/run_pipeline.sh`) are optional and can be added by passing
+`--with-compat-shims` or by running `tools/sync_pipeline_wrappers.py --write` if you
+need historical entry points.
 
 ## 2. Register the pipeline
 
 Register the pipeline in `collector_core/pipeline_specs_registry.py` with the domain,
-targets filename, and any routing defaults. The preferred entrypoint is `dc run`, which
-uses `configs/pipelines.yaml` to register pipeline-specific hooks (custom acquisition
-strategies, yellow-screen modules, etc.). If your new pipeline needs special behavior,
-add a new entry under `pipelines:` for its slug.
+targets filename, and any routing defaults. The preferred entrypoint is
+`dc run --pipeline <slug> --stage <stage>`, and `configs/pipelines.yaml` keeps the
+pipeline spec metadata (pipeline id, targets path, pools, routing, knobs) alongside
+optional overrides like custom acquisition hooks. If your new pipeline needs special
+behavior, add a new entry under `pipelines:` for its slug.
 
 ## 3. Optional: add custom hooks
 

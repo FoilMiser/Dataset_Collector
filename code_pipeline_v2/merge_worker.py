@@ -2,34 +2,24 @@
 """
 merge_worker.py (v2.0)
 
-Thin wrapper that delegates to the spec-driven generic merge worker.
+Deprecated compatibility shim for `dc run --pipeline code --stage merge`.
+Removal target: v3.0.
 """
 from __future__ import annotations
-from collector_core import merge as core_merge  # noqa: E402
+
+import warnings
+
 from collector_core.generic_workers import main_merge  # noqa: E402
-from collector_core.pipeline_spec import get_pipeline_spec  # noqa: E402
 
 DOMAIN = "code"
-SPEC = get_pipeline_spec(DOMAIN)
-if SPEC is None:
-    raise SystemExit(f"Unknown pipeline domain: {DOMAIN}")
-
-PIPELINE_ID = SPEC.pipeline_id
-DEFAULT_ROOTS = core_merge.default_merge_roots(SPEC.prefix)
-
-read_jsonl = core_merge.read_jsonl
-write_json = core_merge.write_json
-
-
-def resolve_roots(cfg: dict) -> core_merge.Roots:
-    return core_merge.resolve_roots(cfg, DEFAULT_ROOTS)
-
-
-def merge_records(cfg: dict, roots: core_merge.Roots, execute: bool) -> dict:
-    return core_merge.merge_records(cfg, roots, execute, pipeline_id=PIPELINE_ID)
+DEPRECATION_MESSAGE = (
+    "merge_worker.py is deprecated; use `dc run --pipeline code --stage merge` instead. "
+    "Removal target: v3.0."
+)
 
 
 def main() -> None:
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning, stacklevel=2)
     main_merge(DOMAIN)
 
 

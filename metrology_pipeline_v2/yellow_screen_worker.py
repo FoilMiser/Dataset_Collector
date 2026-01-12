@@ -2,12 +2,21 @@
 """
 yellow_screen_worker.py (v2.0)
 
-Thin wrapper that delegates to the spec-driven yellow screen dispatch.
+Deprecated compatibility shim for `dc run --pipeline metrology --stage yellow_screen`.
+Removal target: v3.0.
 """
 from __future__ import annotations
+
+import warnings
+
 from collector_core.yellow_screen_dispatch import main_yellow_screen  # noqa: E402
 
 DOMAIN = "metrology"
+DEPRECATION_MESSAGE = (
+    "yellow_screen_worker.py is deprecated; use `dc run --pipeline metrology --stage yellow_screen` instead. "
+    "Removal target: v3.0."
+)
 
 if __name__ == "__main__":
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning, stacklevel=2)
     main_yellow_screen(DOMAIN)
