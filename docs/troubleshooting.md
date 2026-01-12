@@ -90,7 +90,7 @@ Common issues and fixes when running Dataset Collector pipelines.
 ## Yellow screening does not run
 
 **Symptoms**
-- `screen_yellow` stage produces no output.
+- `yellow_screen` stage produces no output.
 
 **Likely causes**
 - No targets marked as YELLOW in targets YAML.

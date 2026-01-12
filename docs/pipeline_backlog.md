@@ -57,7 +57,7 @@ Please file new work as GitHub Issues (or entries here if offline) instead of ad
 - [ ] Expand routing coverage for more domains/categories (sorter pipeline ownership).
 - [ ] Add regression fixtures ensuring routing fields are present in queues.
 - [ ] Unit tests for restriction phrase scans and SPDX normalization.
-- [ ] Smoke test classify → acquire → screen_yellow → merge → catalog on small fixtures (sorting handled in sorter pipeline).
+- [ ] Smoke test classify → acquire → yellow_screen → merge → catalog on small fixtures (sorting handled in sorter pipeline).
 
 ### MEDIUM PRIORITY (Quality + safety)
 - [ ] Add PHI/PII scanning stubs for clinical/human-subjects buckets.

@@ -17,14 +17,14 @@ DEFAULT_STAGES = [
     "classify",
     "acquire_green",
     "acquire_yellow",
-    "screen_yellow",
+    "yellow_screen",
     "merge",
     "catalog",
 ]
 PIPELINE_MAP_PLACEHOLDER = "YOUR_DATASET_ROOT_HERE"
 MODE_STAGES = {
     "collect": ["classify", "acquire_green", "acquire_yellow"],
-    "compile": ["screen_yellow", "merge", "catalog"],
+    "compile": ["yellow_screen", "merge", "catalog"],
     "full": DEFAULT_STAGES,
 }
 
@@ -123,7 +123,7 @@ def _run_stage(
         ]
         if execute:
             cmd.append("--execute")
-    elif stage == "screen_yellow":
+    elif stage == "yellow_screen":
         queue_path = pick_existing(queues_root, ["yellow_pipeline.jsonl", "yellow_queue.jsonl"])
         cmd = [
             python_exe,

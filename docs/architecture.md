@@ -8,7 +8,7 @@ The Dataset Collector is organized around a shared pipeline contract with domain
 flowchart LR
     A[Targets YAML\n(e.g., pipelines/targets/targets_math.yaml)] --> B[dc run\nCLI contract]
     B --> C[pipeline_driver.py\nPipelineDriverBase]
-    C --> D{Stage selection\nclassify / acquire_* / screen_yellow / merge / catalog}
+    C --> D{Stage selection\nclassify / acquire_* / yellow_screen / merge / catalog}
     D --> E[Worker modules\n(acquire_worker.py, merge.py, etc.)]
     E --> F[Artifacts & logs\nqueues, manifests, catalogs]
     F --> G[Combined outputs\ncombined/ stage]
