@@ -1,0 +1,68 @@
+# development.yaml - Development profile
+# Optimized for local development and testing
+#
+# Usage: DC_PROFILE=development dc pipeline run ...
+
+schema_version: "1.0"
+profile_name: "development"
+inherits: "base"
+
+# Override logging for development
+logging:
+  level: "DEBUG"
+  format: "text"
+  include_timestamps: true
+  redact_secrets: false  # Allow seeing secrets during dev
+
+# Relaxed network settings for local testing
+network:
+  max_retries: 1
+  retry_backoff_base: 1.0
+  timeout_connect: 5
+  timeout_read: 60
+
+# Development acquire settings
+acquire:
+  enable_resume: true
+  verify_sha256: false
+  workers: 1
+  # Allow local mirrors in development
+  allow_non_global_hosts: true
+
+# Relaxed classification for testing
+classification:
+  strict_spdx: false
+  require_license_evidence: false
+  auto_approve_permissive: true
+
+# Yellow screen in development
+yellow_screen:
+  enabled: true
+  require_dual_use_scan: false  # Skip slow scans in dev
+  require_pii_scan: false
+
+# Smaller shards for faster iteration
+merge:
+  dedupe_enabled: true
+  shard_rows: 1000
+  output_format: "jsonl"  # Uncompressed for easy inspection
+
+# Relaxed policy for development
+policy:
+  enforce_evidence_hash: false
+  re_review_on_evidence_change: false
+
+# Higher rate limits for testing (against local mocks)
+rate_limits:
+  github:
+    requests_per_hour: 50000
+    burst: 1000
+  figshare:
+    requests_per_minute: 600
+    burst: 100
+
+# Enable verbose observability in dev
+observability:
+  metrics_enabled: false
+  tracing_enabled: false
+  json_logs: false

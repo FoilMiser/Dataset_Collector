@@ -7,3 +7,8 @@ pytest-cov
 pytest_httpserver
 ruff
 yamllint
+mypy>=1.8.0
+types-PyYAML
+types-requests
+types-jsonschema
+pre-commit>=3.6.0

@@ -10,12 +10,22 @@ from types import SimpleNamespace
 import pytest
 
 import collector_core.acquire_strategies as aw  # noqa: E402
+import collector_core.acquire.strategies.http as http_mod  # noqa: E402
+import collector_core.acquire.strategies.ftp as ftp_mod  # noqa: E402
+import collector_core.acquire.strategies.git as git_mod  # noqa: E402
+import collector_core.acquire.strategies.zenodo as zenodo_mod  # noqa: E402
+import collector_core.acquire.strategies.figshare as figshare_mod  # noqa: E402
+import collector_core.acquire.strategies.s3 as s3_mod  # noqa: E402
+import collector_core.acquire.strategies.torrent as torrent_mod  # noqa: E402
 
 
 class StreamResponse:
-    def __init__(self, content: bytes, status_code: int = 200) -> None:
+    def __init__(self, content: bytes, status_code: int = 200, url: str = "") -> None:
         self._content = content
         self.status_code = status_code
+        self.url = url or "https://example.com/file.txt"
+        self.history: list = []
+        self.headers: dict = {}
 
     def raise_for_status(self) -> None:
         if self.status_code >= 400:
@@ -113,6 +123,7 @@ def make_ctx(
     max_attempts: int = 1,
     max_bytes_per_target: int | None = None,
     run_byte_budget: int | None = None,
+    allow_non_global_download_hosts: bool = True,
 ) -> aw.AcquireContext:
     roots = aw.Roots(
         raw_root=tmp_path / "raw",
@@ -133,24 +144,35 @@ def make_ctx(
     )
     retry = aw.RetryConfig(max_attempts=max_attempts, backoff_base=0.0, backoff_max=0.0)
     run_budget = aw.build_run_budget(run_byte_budget)
-    return aw.AcquireContext(roots=roots, limits=limits, mode=mode, retry=retry, run_budget=run_budget)
+    return aw.AcquireContext(
+        roots=roots,
+        limits=limits,
+        mode=mode,
+        retry=retry,
+        run_budget=run_budget,
+        allow_non_global_download_hosts=allow_non_global_download_hosts,
+    )
 
 
 def test_http_download_retries_and_sha256(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import requests as real_requests
+
     calls = {"count": 0}
 
     def fake_get(url: str, stream: bool, headers: dict, timeout: tuple[int, int]):
         calls["count"] += 1
         if calls["count"] == 1:
-            raise RuntimeError("transient")
+            raise real_requests.exceptions.ConnectionError("transient")
         return StreamResponse(b"hello")
 
-    monkeypatch.setattr(aw, "requests", SimpleNamespace(get=fake_get))
-    monkeypatch.setattr(aw.time, "sleep", lambda *_: None)
+    monkeypatch.setattr(
+        http_mod, "requests", SimpleNamespace(get=fake_get, exceptions=real_requests.exceptions)
+    )
+    monkeypatch.setattr(http_mod.time, "sleep", lambda *_: None)
 
     ctx = make_ctx(tmp_path, verify_sha256=True, max_attempts=2)
     out_path = tmp_path / "out.txt"
-    result = aw._http_download_with_resume(ctx, "https://example.com/file.txt", out_path)
+    result = http_mod._http_download_with_resume(ctx, "https://example.com/file.txt", out_path)
 
     assert calls["count"] == 2
     assert result["status"] == "ok"
@@ -162,11 +184,11 @@ def test_http_download_size_mismatch(tmp_path: Path, monkeypatch: pytest.MonkeyP
     def fake_get(url: str, stream: bool, headers: dict, timeout: tuple[int, int]):
         return StreamResponse(b"hello")
 
-    monkeypatch.setattr(aw, "requests", SimpleNamespace(get=fake_get))
+    monkeypatch.setattr(http_mod, "requests", SimpleNamespace(get=fake_get))
 
     ctx = make_ctx(tmp_path, verify_sha256=True)
     out_path = tmp_path / "out.txt"
-    result = aw._http_download_with_resume(
+    result = http_mod._http_download_with_resume(
         ctx, "https://example.com/file.txt", out_path, expected_size=10
     )
 
@@ -186,12 +208,16 @@ def test_http_download_blocks_private_redirect(tmp_path: Path, monkeypatch: pyte
             return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))]
         return []
 
-    monkeypatch.setattr(aw.socket, "getaddrinfo", fake_getaddrinfo)
-    monkeypatch.setattr(aw, "requests", SimpleNamespace(get=fake_get))
+    import requests as real_requests
 
-    ctx = make_ctx(tmp_path)
+    monkeypatch.setattr(http_mod.socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr(
+        http_mod, "requests", SimpleNamespace(get=fake_get, exceptions=real_requests.exceptions)
+    )
+
+    ctx = make_ctx(tmp_path, allow_non_global_download_hosts=False)
     out_path = tmp_path / "blocked.txt"
-    result = aw._http_download_with_resume(ctx, "https://example.test/start", out_path)
+    result = http_mod._http_download_with_resume(ctx, "https://example.test/start", out_path)
 
     assert result["status"] == "error"
     assert result["error"] == "blocked_url"
@@ -217,12 +243,16 @@ def test_http_download_blocks_dns_rebinding_redirect(
             return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))]
         return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("10.0.0.8", 0))]
 
-    monkeypatch.setattr(aw.socket, "getaddrinfo", fake_getaddrinfo)
-    monkeypatch.setattr(aw, "requests", SimpleNamespace(get=fake_get))
+    import requests as real_requests
 
-    ctx = make_ctx(tmp_path)
+    monkeypatch.setattr(http_mod.socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr(
+        http_mod, "requests", SimpleNamespace(get=fake_get, exceptions=real_requests.exceptions)
+    )
+
+    ctx = make_ctx(tmp_path, allow_non_global_download_hosts=False)
     out_path = tmp_path / "blocked.txt"
-    result = aw._http_download_with_resume(ctx, "https://rebind.test/start", out_path)
+    result = http_mod._http_download_with_resume(ctx, "https://rebind.test/start", out_path)
 
     assert result["status"] == "error"
     assert result["error"] == "blocked_url"
@@ -251,12 +281,12 @@ def test_zenodo_md5_mismatch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
         out_path.write_bytes(b"actual")
         return {"status": "ok", "path": str(out_path)}
 
-    monkeypatch.setattr(aw, "requests", SimpleNamespace(get=fake_api_get))
-    monkeypatch.setattr(aw, "_http_download_with_resume", fake_download)
+    monkeypatch.setattr(zenodo_mod, "requests", SimpleNamespace(get=fake_api_get))
+    monkeypatch.setattr(zenodo_mod, "_http_download_with_resume", fake_download)
 
     ctx = make_ctx(tmp_path, verify_zenodo_md5=True)
     row = {"id": "zenodo", "download": {"strategy": "zenodo", "record_id": "123"}}
-    results = aw.handle_zenodo(ctx, row, tmp_path / "zenodo")
+    results = zenodo_mod.handle_zenodo(ctx, row, tmp_path / "zenodo")
 
     assert results[0]["status"] == "error"
     assert results[0]["error"] == "md5_mismatch"
@@ -279,12 +309,12 @@ def test_figshare_download(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
         out_path.write_bytes(b"figshare")
         return {"status": "ok", "path": str(out_path)}
 
-    monkeypatch.setattr(aw, "requests", SimpleNamespace(get=fake_api_get))
-    monkeypatch.setattr(aw, "_http_download_with_resume", fake_download)
+    monkeypatch.setattr(figshare_mod, "requests", SimpleNamespace(get=fake_api_get))
+    monkeypatch.setattr(figshare_mod, "_http_download_with_resume", fake_download)
 
     ctx = make_ctx(tmp_path)
     row = {"id": "figshare", "download": {"strategy": "figshare", "article_id": "42"}}
-    results = aw.handle_figshare(ctx, row, tmp_path / "figshare")
+    results = figshare_mod.handle_figshare_files(ctx, row, tmp_path / "figshare")
 
     assert results[0]["status"] == "ok"
     assert (tmp_path / "figshare" / "data.csv").exists()
@@ -319,7 +349,7 @@ def test_hf_datasets_splits(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def test_ftp_download(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(aw, "FTP", FakeFTP)
+    monkeypatch.setattr(ftp_mod, "FTP", FakeFTP)
 
     ctx = make_ctx(tmp_path)
     row = {
@@ -331,7 +361,7 @@ def test_ftp_download(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         },
     }
     out_dir = tmp_path / "ftp"
-    results = aw.handle_ftp(ctx, row, out_dir)
+    results = ftp_mod.handle_ftp(ctx, row, out_dir)
 
     assert results[0]["status"] == "ok"
     assert (out_dir / "dataset.csv").read_bytes() == b"ftp-data"
@@ -344,7 +374,7 @@ def test_s3_sync_mock(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         calls.append(cmd)
         return "synced"
 
-    monkeypatch.setattr(aw, "run_cmd", fake_run_cmd)
+    monkeypatch.setattr(s3_mod, "run_cmd", fake_run_cmd)
 
     ctx = make_ctx(tmp_path)
     row = {
@@ -358,7 +388,7 @@ def test_s3_sync_mock(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         },
     }
     out_dir = tmp_path / "s3"
-    results = aw.handle_s3_sync(ctx, row, out_dir)
+    results = s3_mod.handle_s3_sync(ctx, row, out_dir)
 
     assert results[0]["status"] == "ok"
     assert calls[0][:4] == ["aws", "s3", "sync", "s3://bucket/data"]
@@ -380,7 +410,7 @@ def test_http_multi_respects_max_bytes_per_target(
         out_path.write_bytes(b"x" * 10)
         return {"status": "ok", "path": str(out_path), "content_length": 10}
 
-    monkeypatch.setattr(aw, "_http_download_with_resume", fake_download)
+    monkeypatch.setattr(http_mod, "_http_download_with_resume", fake_download)
 
     ctx = make_ctx(tmp_path, max_bytes_per_target=5)
     row = {
@@ -392,7 +422,7 @@ def test_http_multi_respects_max_bytes_per_target(
         },
     }
     out_dir = tmp_path / "http"
-    results = aw.handle_http_multi(ctx, row, out_dir)
+    results = http_mod.handle_http_multi(ctx, row, out_dir)
 
     assert results[0]["status"] == "error"
     assert results[0]["error"] == "limit_exceeded"
@@ -419,7 +449,7 @@ def test_http_multi_respects_download_max_bytes(
         out_path.write_bytes(b"x" * 10)
         return {"status": "ok", "path": str(out_path), "content_length": 10}
 
-    monkeypatch.setattr(aw, "_http_download_with_resume", fake_download)
+    monkeypatch.setattr(http_mod, "_http_download_with_resume", fake_download)
 
     ctx = make_ctx(tmp_path)
     row = {
@@ -432,7 +462,7 @@ def test_http_multi_respects_download_max_bytes(
         },
     }
     out_dir = tmp_path / "http"
-    results = aw.handle_http(ctx, row, out_dir)
+    results = http_mod.handle_http(ctx, row, out_dir)
 
     assert results[0]["status"] == "error"
     assert results[0]["error"] == "limit_exceeded"
@@ -455,7 +485,7 @@ def test_http_multi_respects_run_byte_budget(
         out_path.write_bytes(b"x" * 10)
         return {"status": "ok", "path": str(out_path), "content_length": 10}
 
-    monkeypatch.setattr(aw, "_http_download_with_resume", fake_download)
+    monkeypatch.setattr(http_mod, "_http_download_with_resume", fake_download)
 
     ctx = make_ctx(tmp_path, run_byte_budget=5)
     row = {
@@ -467,7 +497,7 @@ def test_http_multi_respects_run_byte_budget(
         },
     }
     out_dir = tmp_path / "http"
-    results = aw.handle_http(ctx, row, out_dir)
+    results = http_mod.handle_http(ctx, row, out_dir)
 
     assert results[0]["status"] == "error"
     assert results[0]["error"] == "limit_exceeded"
@@ -489,12 +519,12 @@ def test_git_clone_post_check_respects_max_bytes_per_target(
             return "deadbeef"
         return ""
 
-    monkeypatch.setattr(aw, "run_cmd", fake_run_cmd)
+    monkeypatch.setattr(git_mod, "run_cmd", fake_run_cmd)
 
     ctx = make_ctx(tmp_path, max_bytes_per_target=5)
     row = {"id": "git", "download": {"strategy": "git", "repo": "https://example.com/repo.git"}}
     out_dir = tmp_path / "repo"
-    results = aw.handle_git(ctx, row, out_dir)
+    results = git_mod.handle_git(ctx, row, out_dir)
 
     assert results[0]["status"] == "error"
     assert results[0]["error"] == "limit_exceeded"
@@ -513,12 +543,12 @@ def test_s3_sync_post_check_respects_max_bytes_per_target(
         (out_dir / "payload.bin").write_bytes(b"x" * 10)
         return "synced"
 
-    monkeypatch.setattr(aw, "run_cmd", fake_run_cmd)
+    monkeypatch.setattr(s3_mod, "run_cmd", fake_run_cmd)
 
     ctx = make_ctx(tmp_path, max_bytes_per_target=5)
     row = {"id": "s3", "download": {"strategy": "s3_sync", "urls": ["s3://bucket/data"]}}
     out_dir = tmp_path / "s3"
-    results = aw.handle_s3_sync(ctx, row, out_dir)
+    results = s3_mod.handle_s3_sync(ctx, row, out_dir)
 
     assert results[0]["status"] == "error"
     assert results[0]["error"] == "limit_exceeded"
@@ -530,9 +560,9 @@ def test_s3_sync_post_check_respects_max_bytes_per_target(
 @pytest.mark.parametrize(
     "handler,row,error",
     [
-        (aw.handle_http, {"id": "http", "download": {"strategy": "http"}}, "missing url"),
+        (http_mod.handle_http, {"id": "http", "download": {"strategy": "http"}}, "missing url"),
         (
-            aw.handle_figshare,
+            figshare_mod.handle_figshare_files,
             {"id": "fig", "download": {"strategy": "figshare"}},
             "missing article_id",
         ),
@@ -541,7 +571,7 @@ def test_s3_sync_post_check_respects_max_bytes_per_target(
             {"id": "hf", "download": {"strategy": "huggingface_datasets"}},
             "missing dataset_id",
         ),
-        (aw.handle_s3_sync, {"id": "s3", "download": {"strategy": "s3_sync"}}, "missing urls"),
+        (s3_mod.handle_s3_sync, {"id": "s3", "download": {"strategy": "s3_sync"}}, "missing urls"),
     ],
 )
 def test_strategy_error_paths(

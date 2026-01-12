@@ -10,3 +10,4 @@ pdfminer.six==20221105
 beautifulsoup4==4.12.0
 lxml==5.0.0
 trafilatura==1.6.0
+zstandard==0.22.0

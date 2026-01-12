@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from collector_core.stability import stable_api
 from collector_core.yellow.base import run_yellow_screen
-from collector_core.yellow.domains import ${module} as domain
+from collector_core.yellow.domains import econ
 from collector_core.yellow_screen_common import YellowRootDefaults
 
 
 @stable_api
 def main(*, defaults: YellowRootDefaults) -> None:
-    run_yellow_screen(defaults=defaults, domain=domain)
+    run_yellow_screen(defaults=defaults, domain=econ)
 
 
 __all__ = ["main"]
