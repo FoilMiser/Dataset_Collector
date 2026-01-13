@@ -15,6 +15,7 @@ from collector_core.__version__ import __version__ as VERSION
 from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.config_validator import read_yaml
 from collector_core.dataset_root import ensure_data_root_allowed, resolve_dataset_root
+from collector_core.checks.near_duplicate import create_detector
 from collector_core.merge.contract import (
     canonicalize_row,
     normalize_record,
@@ -131,6 +132,15 @@ def resolve_merge_runtime(
         dedupe_partitions if dedupe_partitions is not None else g_merge.get("dedupe_partitions", 1)
     )
     resolved_partitions = max(int(partitions_value or 1), 1)
+    near_cfg = g_merge.get("near_dedup", {}) or {}
+    resolved_near_enabled = bool(near_cfg.get("enabled", False))
+    resolved_near_text = str(near_cfg.get("text_field", "text"))
+    resolved_near_threshold = float(near_cfg.get("threshold", 0.85))
+    resolved_near_backend = near_cfg.get("backend")
+    resolved_near_num_perm = int(near_cfg.get("num_perm", 128))
+    resolved_near_shingle_size = int(near_cfg.get("shingle_size", 3))
+    resolved_near_max_tokens = int(near_cfg.get("max_tokens", 2000))
+    resolved_near_max_candidates = int(near_cfg.get("max_candidates", 50))
     resolved_profile_path: Path | None = None
     if resolved_profile:
         profile_value = profile_path or g_merge.get("profile_path")
@@ -146,6 +156,14 @@ def resolve_merge_runtime(
         profile_path=resolved_profile_path,
         profile_sort=resolved_profile_sort,
         dedupe_partitions=resolved_partitions,
+        near_dedup=resolved_near_enabled,
+        near_dedup_text_field=resolved_near_text,
+        near_dedup_threshold=resolved_near_threshold,
+        near_dedup_backend=resolved_near_backend,
+        near_dedup_num_perm=resolved_near_num_perm,
+        near_dedup_shingle_size=resolved_near_shingle_size,
+        near_dedup_max_tokens=resolved_near_max_tokens,
+        near_dedup_max_candidates=resolved_near_max_candidates,
     )
 
 
@@ -258,6 +276,39 @@ def record_dedupe_event(
     if retained_shard:
         row["retained_shard"] = retained_shard
     append_jsonl(roots.ledger_root / "combined_deduped.jsonl", [row])
+
+
+def record_near_dedupe_event(
+    roots: Roots,
+    *,
+    content_hash: str,
+    source_kind: str,
+    source_path: Path | None,
+    target_id: str,
+    pool: str,
+    record: dict[str, Any],
+    match_id: str | None,
+    score: float,
+    backend: str,
+    text_field: str,
+) -> None:
+    row: dict[str, Any] = {
+        "stage": "merge",
+        "content_sha256": content_hash,
+        "target_id": target_id,
+        "license_pool": pool,
+        "source_kind": source_kind,
+        "seen_at_utc": utc_now(),
+        "source_urls": record.get("source_urls", []),
+        "source": record.get("source", {}),
+        "near_duplicate_score": score,
+        "near_duplicate_match": match_id,
+        "near_duplicate_backend": backend,
+        "near_duplicate_text_field": text_field,
+    }
+    if source_path is not None:
+        row["source_path"] = str(source_path)
+    append_jsonl(roots.ledger_root / "combined_near_deduped.jsonl", [row])
 
 
 def register_flushed_records(
@@ -386,6 +437,28 @@ def handle_record(
             else:
                 state.pending_updates[content_hash] = update
         return
+    if state.near_dedup is not None:
+        text_value = record.get(state.near_dedup_text_field)
+        if isinstance(text_value, str) and text_value.strip():
+            result = state.near_dedup.query(text_value)
+            if result.is_duplicate:
+                state.summary["near_deduped"] += 1
+                if state.execute:
+                    record_near_dedupe_event(
+                        roots,
+                        content_hash=content_hash,
+                        source_kind=source_kind,
+                        source_path=source_path,
+                        target_id=resolved_target,
+                        pool=pool_value,
+                        record=record,
+                        match_id=result.match_id,
+                        score=result.score,
+                        backend=result.backend,
+                        text_field=state.near_dedup_text_field,
+                    )
+                return
+            state.near_dedup.add(content_hash, text_value)
     pool = record.get("pool") or pool_value
     sharder = get_sharder(pool, roots, state)
     shard_path = str(sharder._path())
@@ -550,12 +623,26 @@ def merge_records(
     runtime = runtime or resolve_merge_runtime(cfg, ledger_root=roots.ledger_root)
     shard_cfg = sharding_cfg(cfg)
     dedupe = build_dedupe_index(roots, runtime.dedupe_partitions)
-    summary = {"written": 0, "deduped": 0, "skipped": 0, "shards": []}
+    near_dedup = (
+        create_detector(
+            backend=runtime.near_dedup_backend,
+            threshold=runtime.near_dedup_threshold,
+            num_perm=runtime.near_dedup_num_perm,
+            shingle_size=runtime.near_dedup_shingle_size,
+            max_tokens=runtime.near_dedup_max_tokens,
+            max_candidates=runtime.near_dedup_max_candidates,
+        )
+        if runtime.near_dedup
+        else None
+    )
+    summary = {"written": 0, "deduped": 0, "near_deduped": 0, "skipped": 0, "shards": []}
     target_meta = build_target_meta(cfg)
     target_canon, default_canon = build_target_canon(cfg)
     state = MergeState(
         summary=summary,
         dedupe=dedupe,
+        near_dedup=near_dedup,
+        near_dedup_text_field=runtime.near_dedup_text_field,
         shard_cfg=shard_cfg,
         pool_sharders={},
         target_meta=target_meta,
@@ -570,6 +657,17 @@ def merge_records(
         max_duplicates=DEFAULT_MAX_DUPLICATES,
     )
     summary["dedupe_partitions"] = runtime.dedupe_partitions
+    if runtime.near_dedup:
+        summary["near_dedup"] = {
+            "enabled": True,
+            "backend": near_dedup.backend if near_dedup else "python",
+            "text_field": runtime.near_dedup_text_field,
+            "threshold": runtime.near_dedup_threshold,
+            "num_perm": runtime.near_dedup_num_perm,
+            "shingle_size": runtime.near_dedup_shingle_size,
+            "max_tokens": runtime.near_dedup_max_tokens,
+            "max_candidates": runtime.near_dedup_max_candidates,
+        }
     profiler: cProfile.Profile | None = None
     if runtime.profile:
         profiler = cProfile.Profile()
@@ -598,9 +696,12 @@ def merge_records(
                 )
                 summary["profile_path"] = str(profile_path)
                 summary["profile_text_path"] = str(text_path)
+        if near_dedup is not None:
+            summary.setdefault("near_dedup", {})["stats"] = near_dedup.stats.to_dict()
     summary["counts"] = {
         "written": summary["written"],
         "deduped": summary["deduped"],
+        "near_deduped": summary["near_deduped"],
         "skipped": summary["skipped"],
     }
     summary["failed_targets"] = []
