@@ -86,7 +86,7 @@ version = { attr = "collector_core.__version__.__version__" }
 package-dir = { "" = "src" }
 
 [tool.setuptools.package-data]
-collector_core = ["py.typed"]
+collector_core = ["py.typed", "schemas/*.json"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

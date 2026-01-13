@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Pipeline map configuration",
+  "type": "object",
+  "required": ["pipelines"],
+  "properties": {
+    "destination_root": { "type": "string" },
+    "pipelines": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "dest_folder": { "type": "string" },
+          "targets_yaml": { "type": "string" }
+        },
+        "required": ["targets_yaml"],
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

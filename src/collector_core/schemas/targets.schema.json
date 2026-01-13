@@ -1,0 +1,306 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Targets configuration",
+  "type": "object",
+  "required": ["schema_version", "targets"],
+  "definitions": {
+    "rate_limit": {
+      "type": "object",
+      "properties": {
+        "requests_per_minute": { "type": "number", "minimum": 0 },
+        "requests_per_hour": { "type": "number", "minimum": 0 },
+        "requests_per_second": { "type": "number", "minimum": 0 },
+        "burst": { "type": "number", "minimum": 1 },
+        "capacity": { "type": "number", "minimum": 1 },
+        "refill_rate": { "type": "number", "minimum": 0 },
+        "retry_on_429": { "type": "boolean" },
+        "retry_on_403": { "type": "boolean" },
+        "exponential_backoff": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "license_gate": {
+      "type": "string",
+      "enum": [
+        "manual_legal_review",
+        "manual_review",
+        "no_restrictions",
+        "restriction_phrase_scan",
+        "snapshot_terms"
+      ]
+    },
+    "content_check": {
+      "type": "string",
+      "enum": [
+        "code_and_docs_chunking",
+        "collect_statistics",
+        "computed_only_extract",
+        "distribution_statement_scan",
+        "domain_filter_arxiv_math",
+        "domain_filter_math_stackexchange",
+        "domain_filter_math_textbooks",
+        "dual_use_instruction_scan",
+        "dual_use_scan",
+        "emit_attribution_bundle",
+        "emit_training_manifest",
+        "extract_latex_aware_chunks",
+        "extract_text_chunks",
+        "formal_chunk_by_entry",
+        "formal_chunk_by_lemma",
+        "formal_chunk_by_module",
+        "formal_chunk_by_theorem",
+        "exploit_code_scan",
+        "html_crawl",
+        "license_metadata_validate",
+        "mesh_extract_metadata",
+        "mesh_geometry_dedupe",
+        "mesh_render_thumbnails",
+        "mesh_sanitize",
+        "mesh_validate",
+        "near_duplicate_detection",
+        "pdf_extract",
+        "pii_phi_scan",
+        "pii_scan",
+        "pii_scan_and_redact",
+        "pii_scan_and_redact_strict",
+        "record_level_filter",
+        "secret_scan",
+        "segregate_copyleft_pool",
+        "strip_third_party_media",
+        "validate_schema",
+        "weapon_trademark_filter"
+      ]
+    },
+    "license_gate_list": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/license_gate" }
+    },
+    "content_check_list": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/content_check" }
+    },
+    "license_gate_override": {
+      "type": "object",
+      "properties": {
+        "add": { "$ref": "#/definitions/license_gate_list" },
+        "remove": { "$ref": "#/definitions/license_gate_list" }
+      },
+      "additionalProperties": false
+    },
+    "content_check_override": {
+      "type": "object",
+      "properties": {
+        "add": { "$ref": "#/definitions/content_check_list" },
+        "remove": { "$ref": "#/definitions/content_check_list" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "properties": {
+    "schema_version": { "type": "string", "enum": ["0.9"] },
+    "updated_utc": { "type": "string" },
+    "companion_files": {
+      "type": "object",
+      "properties": {
+        "license_map": {
+          "anyOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" } }
+          ]
+        },
+        "field_schemas": {
+          "anyOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" } }
+          ]
+        },
+        "denylist": {
+          "anyOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" } }
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "globals": {
+      "type": "object",
+      "properties": {
+        "pitch_limits": {
+          "type": "object",
+          "properties": {
+            "sample_limit": { "type": "integer", "minimum": 0 },
+            "text_limit": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": true
+        },
+        "retry": {
+          "type": "object",
+          "properties": {
+            "max": { "type": "integer", "minimum": 0 },
+            "backoff": { "type": "number", "minimum": 0 }
+          },
+          "additionalProperties": true
+        },
+        "sharding": {
+          "type": "object",
+          "properties": {
+            "max_records_per_shard": { "type": "integer", "minimum": 1 },
+            "compression": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "run_byte_budget": { "type": "integer", "minimum": 0 },
+        "default_license_gates": { "$ref": "#/definitions/license_gate_list" },
+        "default_content_checks": { "$ref": "#/definitions/content_check_list" }
+      },
+      "additionalProperties": true
+    },
+    "queues": { "type": "object" },
+    "gates_catalog": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "resolvers": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "rate_limit": { "$ref": "#/definitions/rate_limit" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "targets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "name": { "type": "string" },
+          "enabled": { "type": "boolean" },
+          "priority": { "type": "number" },
+          "source_urls": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "minItems": 1
+          },
+          "evidence_urls": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "minItems": 1
+          },
+          "dataset_version": { "type": "string", "minLength": 1 },
+          "dataset_tag": { "type": "string", "minLength": 1 },
+          "license_profile": { "type": "string" },
+          "license_evidence": {
+            "type": "object",
+            "properties": {
+              "spdx_hint": { "type": "string" },
+              "url": { "type": "string" }
+            },
+            "additionalProperties": true
+          },
+          "download": {
+            "type": "object",
+            "properties": {
+              "strategy": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "http",
+                  "ftp",
+                  "git",
+                  "zenodo",
+                  "dataverse",
+                  "figshare",
+                  "github_release",
+                  "huggingface_datasets",
+                  "s3_public",
+                  "s3_sync",
+                  "aws_requester_pays",
+                  "torrent",
+                  "api",
+                  "api_tabular",
+                  "web_crawl",
+                  "faa_ac_crawl",
+                  "noaa_ir_json",
+                  "ntrs_openapi",
+                  "pmc_oa",
+                  "usgs_pubs_warehouse"
+                ]
+              },
+              "max_bytes": { "type": "integer", "minimum": 0 }
+            },
+            "additionalProperties": true
+          },
+          "license_gates": { "$ref": "#/definitions/license_gate_override" },
+          "content_checks": { "$ref": "#/definitions/content_check_override" }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": { "enabled": { "const": false } },
+              "required": ["enabled"]
+            },
+            "then": {},
+            "else": {
+              "required": ["source_urls", "evidence_urls"]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "download": {
+                  "properties": { "strategy": { "const": "huggingface_datasets" } },
+                  "required": ["strategy"]
+                }
+              },
+              "required": ["download"]
+            },
+            "then": { "required": ["dataset_version"] }
+          },
+          {
+            "if": {
+              "properties": {
+                "download": {
+                  "properties": { "strategy": { "const": "git" } },
+                  "required": ["strategy"]
+                }
+              },
+              "required": ["download"]
+            },
+            "then": { "required": ["dataset_tag"] }
+          },
+          {
+            "if": {
+              "properties": {
+                "download": {
+                  "properties": { "strategy": { "const": "zenodo" } },
+                  "required": ["strategy"]
+                }
+              },
+              "required": ["download"]
+            },
+            "then": { "required": ["dataset_version"] }
+          },
+          {
+            "if": {
+              "properties": {
+                "download": {
+                  "properties": { "strategy": { "const": "figshare" } },
+                  "required": ["strategy"]
+                }
+              },
+              "required": ["download"]
+            },
+            "then": { "required": ["dataset_version"] }
+          }
+        ],
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}
