@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from importlib import resources
 from functools import cache
 from pathlib import Path
 from typing import Any
@@ -19,14 +20,26 @@ except ImportError:  # pragma: no cover - optional in some environments
     Draft7Validator = None
     FormatChecker = None
 
-_DEFAULT_SCHEMA_DIR = Path(__file__).resolve().parents[1] / "schemas"
 _FALLBACK_SCHEMA_DIR = Path(__file__).resolve().parents[2] / "schemas"
-SCHEMA_DIR = _DEFAULT_SCHEMA_DIR if _DEFAULT_SCHEMA_DIR.exists() else _FALLBACK_SCHEMA_DIR
+
+
+def _load_schema_from_package(schema_name: str) -> dict[str, Any] | None:
+    try:
+        schema_path = resources.files("collector_core").joinpath(
+            "schemas",
+            f"{schema_name}.schema.json",
+        )
+        return json.loads(schema_path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, ModuleNotFoundError, AttributeError):
+        return None
 
 
 @cache
 def load_schema(schema_name: str) -> dict[str, Any]:
-    schema_path = SCHEMA_DIR / f"{schema_name}.schema.json"
+    schema = _load_schema_from_package(schema_name)
+    if schema is not None:
+        return schema
+    schema_path = _FALLBACK_SCHEMA_DIR / f"{schema_name}.schema.json"
     if not schema_path.exists():
         raise FileNotFoundError(f"Schema not found: {schema_path}")
     return json.loads(schema_path.read_text(encoding="utf-8"))
