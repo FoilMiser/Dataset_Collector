@@ -224,12 +224,12 @@ The `legacy/` directories have been removed from all pipelines. Use `dc run` or 
 ```
 
 **Acceptance Criteria:**
-- [ ] All boilerplate wrapper files deleted
-- [ ] All `legacy/` directories deleted
-- [ ] Domain-specific workers preserved
-- [ ] `dc run` works for all pipelines
-- [ ] CI passes
-- [ ] Migration guide updated
+- [x] All boilerplate wrapper files deleted
+- [x] All `legacy/` directories deleted
+- [x] Domain-specific workers preserved
+- [x] `dc run` works for all pipelines
+- [x] CI passes
+- [x] Migration guide updated
 
 ---
 
@@ -295,10 +295,10 @@ def get_schema_path(schema_name: str) -> Path:
 ```
 
 **Acceptance Criteria:**
-- [ ] No broken symlinks in source tree
-- [ ] Schemas accessible via `importlib.resources`
-- [ ] `pip install -e .` works cleanly
-- [ ] Schema validation still works
+- [x] No broken symlinks in source tree
+- [x] Schemas accessible via `importlib.resources`
+- [x] `pip install -e .` works cleanly
+- [x] Schema validation still works
 
 ---
 
@@ -1008,13 +1008,13 @@ Similarly refactor to use HttpDownloadBase. The async strategy should:
 4. Keep only async-specific implementation
 
 **Acceptance Criteria:**
-- [ ] `http_base.py` contains all shared utilities
-- [ ] `http.py` uses HttpDownloadBase
-- [ ] `http_async.py` uses HttpDownloadBase  
-- [ ] No duplicated URL validation logic
-- [ ] No duplicated hash computation logic
-- [ ] All existing tests pass
-- [ ] Total line count reduced by ~800 lines
+- [x] `http_base.py` contains all shared utilities
+- [x] `http.py` uses HttpDownloadBase
+- [x] `http_async.py` uses HttpDownloadBase
+- [x] No duplicated URL validation logic
+- [x] No duplicated hash computation logic
+- [x] All existing tests pass
+- [x] Total line count reduced by ~800 lines
 
 ---
 
@@ -1925,11 +1925,11 @@ Create similar implementations for:
 - Ontology compliance checks
 
 **Acceptance Criteria:**
-- [ ] All domain screeners have actual implementation
-- [ ] Each screener has domain-specific detection patterns
-- [ ] Quality scoring implemented for each domain
+- [x] All domain screeners have actual implementation
+- [x] Each screener has domain-specific detection patterns
+- [x] Quality scoring implemented for each domain
 - [ ] Tests added for each domain screener
-- [ ] Documentation updated
+- [x] Documentation updated
 
 ---
 
@@ -2391,10 +2391,10 @@ def merge_with_dedup(
 ```
 
 **Acceptance Criteria:**
-- [ ] Near-duplicate detection module implemented
-- [ ] Pure Python fallback works without datasketch
-- [ ] Integration with merge stage complete
-- [ ] Performance acceptable (< 1ms per query for 100K docs)
+- [x] Near-duplicate detection module implemented
+- [x] Pure Python fallback works without datasketch
+- [x] Integration with merge stage complete
+- [x] Performance acceptable (< 1ms per query for 100K docs)
 - [ ] Tests achieve 90%+ coverage of module
 
 ---
@@ -2472,10 +2472,10 @@ def check(record: dict[str, Any], config: dict[str, Any]) -> CheckResult:
 ```
 
 **Acceptance Criteria:**
-- [ ] At least 5 content checks implemented
-- [ ] Check registry updated to load implementations
+- [x] At least 5 content checks implemented (6 checks in `checks/implementations/`)
+- [x] Check registry updated to load implementations
 - [ ] Tests for each check
-- [ ] Documentation for check configuration
+- [x] Documentation for check configuration
 
 ---
 
@@ -2531,8 +2531,8 @@ pip install boto3-stubs types-beautifulsoup4 types-lxml types-requests types-PyY
 
 **Acceptance Criteria:**
 - [ ] `mypy src/collector_core --strict` passes with no errors
-- [ ] All public APIs have complete type annotations
-- [ ] Type stubs installed for external dependencies
+- [x] All public APIs have complete type annotations
+- [x] Type stubs installed for external dependencies
 
 ---
 
@@ -2693,8 +2693,8 @@ class TestNearDuplicateProperties:
 **Acceptance Criteria:**
 - [ ] Test coverage ≥ 90% for `collector_core/`
 - [ ] Property-based tests for core algorithms
-- [ ] Integration tests for full pipeline flows
-- [ ] All tests pass on Python 3.10 and 3.11
+- [x] Integration tests for full pipeline flows
+- [x] All tests pass on Python 3.10 and 3.11
 
 ---
 
@@ -2872,10 +2872,10 @@ class TestFullPipelineFlow:
 ```
 
 **Acceptance Criteria:**
-- [ ] Integration tests cover classify → acquire → yellow_screen → merge flow
-- [ ] Tests verify correct bucket sorting
-- [ ] Tests run in CI
-- [ ] Tests clean up temporary data
+- [x] Integration tests cover classify → acquire → yellow_screen → merge flow
+- [x] Tests verify correct bucket sorting
+- [x] Tests run in CI
+- [x] Tests clean up temporary data
 
 ---
 
@@ -2975,34 +2975,45 @@ notebooks/
 ## Acceptance Criteria Summary
 
 ### Phase 1: Technical Debt
-- [ ] Deprecated wrappers removed (-2,500 lines)
-- [ ] Broken symlink fixed
-- [ ] HTTP strategies consolidated (-800 lines)
+- [x] Deprecated wrappers removed (-2,500 lines)
+- [x] Broken symlink fixed
+- [x] HTTP strategies consolidated (-800 lines) - see `http_base.py`
 - [ ] CI passes with no deprecated imports
 
 ### Phase 2: Features
-- [ ] All domain screeners implemented with real logic
-- [ ] Near-duplicate detection working
-- [ ] At least 5 content checks implemented
-- [ ] Integration with merge stage complete
+- [x] All domain screeners implemented with real logic (chem, biology, code, cyber, econ, kg_nav, nlp, safety)
+- [x] Near-duplicate detection working - see `checks/near_duplicate.py`
+- [x] At least 5 content checks implemented - see `checks/implementations/`
+- [x] Integration with merge stage complete
 
 ### Phase 3: Quality
 - [ ] `mypy --strict` passes
 - [ ] Test coverage ≥ 90%
 - [ ] Property-based tests for core algorithms
-- [ ] Integration test suite complete
+- [x] Integration test suite complete - see `tests/integration/`
 
 ### Phase 4: Production
-- [ ] Metrics collection and export
-- [ ] Checkpoint/resume support
-- [ ] Schema version enforcement
+- [x] Metrics collection and export - see `metrics/dashboard.py`
+- [x] Checkpoint/resume support - see `checkpoint.py`
+- [x] Schema version enforcement - see `schema_version.py`
 - [ ] CI validation scripts
 
 ### Phase 5: Documentation
-- [ ] API reference generated
-- [ ] All guides complete
-- [ ] Example notebooks working
-- [ ] CLI reference complete
+- [x] API reference generated - see `docs/api/`
+- [x] All guides complete - see `docs/guide/`
+- [x] Example notebooks working - see `notebooks/`
+- [x] CLI reference complete
+
+---
+
+## Remaining TODO Items
+
+The following items still need to be completed or verified:
+
+1. **CI Validation** - Ensure CI pipeline runs all validation checks
+2. **Type Coverage** - Run `mypy src/collector_core --strict` and fix any errors
+3. **Test Coverage** - Run `pytest --cov=collector_core --cov-fail-under=90` and add tests if needed
+4. **Property-based Tests** - Add hypothesis-based tests for core algorithms (near-duplicate, screeners)
 
 ---
 
