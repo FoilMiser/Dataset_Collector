@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import time
 import warnings
+from collections.abc import ItemsView, KeysView, ValuesView
 from typing import TYPE_CHECKING, Any
 
 # Import for backward compatibility (tests may monkeypatch these)
@@ -343,9 +344,10 @@ def _get_default_strategy_handlers() -> dict[str, StrategyHandler]:
 
 
 # Use a property-like access pattern for DEFAULT_STRATEGY_HANDLERS
-class _LazyDict(dict):
+class _LazyDict(dict[str, StrategyHandler]):
     """Dictionary that populates itself on first access."""
-    _populated = False
+
+    _populated: bool = False
 
     def __getitem__(self, key: str) -> StrategyHandler:
         if not self._populated:
@@ -359,21 +361,21 @@ class _LazyDict(dict):
             self._populated = True
         return super().get(key, default)
 
-    def items(self):
+    def items(self) -> ItemsView[str, StrategyHandler]:
         if not self._populated:
             self.update(_get_default_strategy_handlers())
             self._populated = True
         return super().items()
 
-    def keys(self):
+    def keys(self) -> KeysView[str]:
         if not self._populated:
             self.update(_get_default_strategy_handlers())
             self._populated = True
         return super().keys()
 
-    def values(self):
+    def values(self) -> ValuesView[StrategyHandler]:
         if not self._populated:
-            self.update(_get_default_handlers())
+            self.update(_get_default_strategy_handlers())
             self._populated = True
         return super().values()
 

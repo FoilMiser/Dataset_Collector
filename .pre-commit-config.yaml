@@ -41,7 +41,9 @@ repos:
     hooks:
       - id: validate-yaml-schemas
         name: Validate YAML schemas
-        entry: python -m tools.validate_yaml_schemas
-        language: system
+        entry: dc-validate-yaml-schemas --root .
+        language: python
+        additional_dependencies:
+          - -e .
         files: ^(configs/|pipelines/targets/).*\.yaml$
         pass_filenames: false

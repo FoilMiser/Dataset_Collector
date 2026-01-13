@@ -8,8 +8,6 @@ jobs:
   validate:
     name: validate (${{ matrix.install-mode }}, py${{ matrix.python-version }}, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    env:
-      PYTHONPATH: ${{ github.workspace }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
@@ -43,9 +41,12 @@ jobs:
       - name: Install tooling
         run: |
           python -m pip install pytest pytest-cov hypothesis pytest_httpserver ruff yamllint mypy
+      - name: Install package (editable)
+        run: |
+          python -m pip install -c requirements.constraints.txt -e .
       - name: Check constraints up to date
         run: |
-          python -m tools.check_constraints
+          dc-check-constraints
       - name: Ruff
         run: |
           ruff check .
@@ -70,13 +71,13 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
       - name: Validate repo
         run: |
-          python -m tools.validate_repo --root .
+          dc-validate-repo --root .
       - name: Validate YAML schemas
         run: |
-          python -m tools.validate_yaml_schemas --root .
+          dc-validate-yaml-schemas --root .
       - name: Preflight
         run: |
-          python -m tools.preflight --repo-root . --quiet
+          dc-preflight --repo-root . --quiet
       - name: Check for tracked cache artifacts
         run: |
           python -c "import subprocess, re, sys; out=subprocess.check_output(['git','ls-files'], text=True).splitlines(); bad=[p for p in out if re.search(r'(__pycache__/|\\.pyc$|\\.pytest_cache/|\\.ruff_cache/)', p)]; [print('Tracked cache artifact:', p) for p in bad]; sys.exit(1 if bad else 0)"
@@ -90,8 +91,6 @@ jobs:
   minimal-dry-run:
     name: minimal dry run (classify/acquire/merge/catalog)
     runs-on: ubuntu-latest
-    env:
-      PYTHONPATH: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -103,6 +102,9 @@ jobs:
       - name: Install deps
         run: |
           python -m pip install -r requirements.in
+      - name: Install package (editable)
+        run: |
+          python -m pip install -e .
       - name: Run minimal dry run fixture
         run: |
-          bash tools/run_minimal_dry_run.sh
+          bash scripts/run_minimal_dry_run.sh

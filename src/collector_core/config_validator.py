@@ -21,7 +21,7 @@ except ImportError:  # pragma: no cover - optional in some environments
     Draft7Validator = None
     FormatChecker = None
 
-_FALLBACK_SCHEMA_DIR = Path(__file__).resolve().parents[2] / "schemas"
+_FALLBACK_SCHEMA_DIR = Path(__file__).resolve().parent / "schemas"
 
 
 def _load_schema_from_package(schema_name: str) -> dict[str, Any] | None:

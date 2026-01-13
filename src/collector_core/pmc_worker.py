@@ -24,10 +24,12 @@ import gzip
 import io
 import json
 import logging
+import re
 import tarfile
 import time
 import xml.etree.ElementTree as ET
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -53,16 +55,24 @@ FTP = _try_import("ftplib", "FTP")
 logger = logging.getLogger(__name__)
 
 
-def pools_from_targets_yaml(targets_yaml: Path, fallback: Path):
+@dataclass(frozen=True)
+class PoolsPaths:
+    """Container for pool directory paths."""
+
+    permissive: Path
+    copyleft: Path
+    quarantine: Path
+
+
+def pools_from_targets_yaml(targets_yaml: Path, fallback: Path) -> PoolsPaths:
+    """Load pool paths from targets YAML configuration."""
     cfg = read_yaml(targets_yaml, schema_name="targets")
     pools = cfg.get("globals", {}).get("pools", {})
-
-    class Pools:
-        permissive = Path(pools.get("permissive", fallback / "permissive")).expanduser()
-        copyleft = Path(pools.get("copyleft", fallback / "copyleft")).expanduser()
-        quarantine = Path(pools.get("quarantine", fallback / "quarantine")).expanduser()
-
-    return Pools()
+    return PoolsPaths(
+        permissive=Path(pools.get("permissive", fallback / "permissive")).expanduser(),
+        copyleft=Path(pools.get("copyleft", fallback / "copyleft")).expanduser(),
+        quarantine=Path(pools.get("quarantine", fallback / "quarantine")).expanduser(),
+    )
 
 
 def chunk_defaults_from_targets_yaml(targets_yaml: Path) -> dict[str, Any]:
@@ -467,7 +477,7 @@ def run_pmc_worker(
     successful = 0
     shard_files: dict[str, list] = {"train": [], "valid": []}
 
-    def flush(split: str):
+    def flush(split: str) -> None:
         nonlocal train_idx, valid_idx, train_buf, valid_buf, total_train, total_valid
         if split == "train" and train_buf:
             suffix = f"train_{train_idx:05d}" if parsed.emit_train_split else f"{train_idx:05d}"

@@ -76,10 +76,27 @@ all = [
 ]
 
 [project.scripts]
+# Main CLI commands
 dc-review = "collector_core.review_queue:main"
 dc-catalog = "collector_core.catalog_builder:main"
 dc-pipeline = "collector_core.pipeline_cli:main"
 dc = "collector_core.dc_cli:main"
+# Tooling / validation
+dc-preflight = "tools.preflight:main"
+dc-validate-repo = "tools.validate_repo:main"
+dc-validate-yaml-schemas = "tools.validate_yaml_schemas:main"
+dc-check-constraints = "tools.check_constraints:main"
+# Maintenance
+dc-sync-wrappers = "tools.sync_pipeline_wrappers:main"
+dc-clean-repo-tree = "tools.clean_repo_tree:main"
+dc-touch-updated-utc = "tools.touch_updated_utc:main"
+dc-make-release-zip = "tools.make_release_zip:main"
+dc-init-layout = "tools.init_layout:main"
+dc-generate-pipeline = "tools.generate_pipeline:main"
+dc-migrate-pipeline-structure = "tools.migrate_pipeline_structure:main"
+dc-update-wrapper-deprecations = "tools.update_wrapper_deprecations:main"
+dc-validate-metrics-outputs = "tools.validate_metrics_outputs:main"
+dc-build-natural-corpus = "tools.build_natural_corpus:main"
 
 [tool.setuptools.dynamic]
 version = { attr = "collector_core.__version__.__version__" }
