@@ -9,7 +9,7 @@ import pstats
 import tracemalloc
 from collections.abc import Iterable, Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.artifact_metadata import build_artifact_metadata
@@ -41,6 +41,7 @@ from collector_core.utils.io import append_jsonl, read_jsonl, write_json
 from collector_core.utils.logging import utc_now
 from collector_core.utils.paths import ensure_dir
 
+tqdm_progress: Callable[..., Iterable[Any]] | None
 if importlib.util.find_spec("tqdm"):
     from tqdm import tqdm as tqdm_progress
 else:  # pragma: no cover - optional dependency

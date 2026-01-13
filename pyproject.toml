@@ -47,6 +47,7 @@ dev = [
   "pytest-cov",
   "ruff",
   "mypy>=1.8.0",
+  "boto3-stubs",
   "types-PyYAML",
   "types-requests",
   "types-jsonschema",
@@ -99,7 +100,34 @@ testpaths = ["tests"]
 
 [tool.mypy]
 python_version = "3.10"
+strict = true
 warn_unused_configs = true
+
+[[tool.mypy.overrides]]
+module = [
+  "boto3",
+  "boto3.*",
+  "botocore",
+  "botocore.*",
+  "datasketch",
+  "datasketch.*",
+  "datasets",
+  "datasets.*",
+  "lxml",
+  "lxml.*",
+  "pdfminer",
+  "pdfminer.*",
+  "pyarrow",
+  "pyarrow.*",
+  "pypdf",
+  "pypdf.*",
+  "tqdm",
+  "tqdm.*",
+  "trafilatura",
+  "trafilatura.*",
+  "zstandard",
+  "zstandard.*",
+]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
