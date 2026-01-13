@@ -81,6 +81,9 @@ jobs:
       - name: Validate output contract
         run: |
           dc-validate-output-contract --root .
+      - name: Validate pipeline specs
+        run: |
+          dc-validate-pipeline-specs --check-loader
       - name: Check for tracked cache artifacts
         run: |
           python -c "import subprocess, re, sys; out=subprocess.check_output(['git','ls-files'], text=True).splitlines(); bad=[p for p in out if re.search(r'(__pycache__/|\\.pyc$|\\.pytest_cache/|\\.ruff_cache/)', p)]; [print('Tracked cache artifact:', p) for p in bad]; sys.exit(1 if bad else 0)"
