@@ -22,6 +22,12 @@ __pycache__/
 .mypy_cache/
 .venv/
 
+# Test coverage
+.coverage
+coverage.xml
+htmlcov/
+.hypothesis/
+
 # Jupyter
 .ipynb_checkpoints/
 
