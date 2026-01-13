@@ -25,7 +25,6 @@ register_pipeline(
             "level": 5,
             "granularity": "target",
         },
-        yellow_screen_module="yellow_screen_chem",
     )
 )
 
@@ -247,7 +246,6 @@ register_pipeline(
             "level": 5,
             "granularity": "target",
         },
-        yellow_screen_module="yellow_screen_nlp",
     )
 )
 
@@ -282,7 +280,6 @@ register_pipeline(
             "level": 5,
             "granularity": "target",
         },
-        yellow_screen_module="yellow_screen_kg_nav",
     )
 )
 
@@ -304,7 +301,6 @@ register_pipeline(
             "level": 5,
             "granularity": "target",
         },
-        yellow_screen_module="yellow_screen_econ",
         include_routing_dict_in_row=True,
     )
 )
@@ -344,7 +340,6 @@ register_pipeline(
             "level": 5,
             "granularity": "target",
         },
-        yellow_screen_module="yellow_screen_safety",
     )
 )
 

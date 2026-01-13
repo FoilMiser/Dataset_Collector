@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""CLI wrapper for running all Dataset Collector pipelines."""
+"""CLI wrapper for running all Dataset Collector pipelines.
+
+NOTE: This script assumes the package is installed (pip install -e .).
+For the best experience, use the console script directly:
+    dc-build-natural-corpus
+"""
 
 from __future__ import annotations
 
 import sys
-from pathlib import Path
-
-SRC_ROOT = Path(__file__).resolve().parent / "src"
-if SRC_ROOT.is_dir():
-    sys.path.insert(0, str(SRC_ROOT))
 
 from tools.build_natural_corpus import main
 

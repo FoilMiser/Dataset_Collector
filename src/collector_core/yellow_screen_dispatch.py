@@ -2,12 +2,11 @@
 collector_core/yellow_screen_dispatch.py
 
 Unified dispatcher for yellow screen workers. Routes to domain-specific
-modules when configured in PipelineSpec, otherwise uses yellow_screen_standard.
+modules when configured via yellow_screen parameter, otherwise uses standard.
 """
 
 from __future__ import annotations
 
-import importlib
 from collections.abc import Callable
 
 from collector_core.__version__ import __version__ as VERSION  # noqa: F401
@@ -17,13 +16,23 @@ from collector_core.yellow_screen_common import default_yellow_roots
 
 
 @stable_api
-def get_yellow_screen_main(domain: str) -> Callable[[], None]:
+def get_yellow_screen_main(
+    domain: str, *, yellow_screen: str | None = None
+) -> Callable[[], None]:
     """
     Return the main() function for the given domain's yellow screen worker.
 
-    If the domain's PipelineSpec has a yellow_screen_module configured,
-    imports and returns its main(). Otherwise, returns a wrapper around
-    yellow_screen_standard.main() with domain-specific defaults.
+    Args:
+        domain: Pipeline domain slug (e.g., "chem", "physics")
+        yellow_screen: Optional override for yellow screen domain module.
+            If provided and not "standard", uses collector_core.yellow.domains.<yellow_screen>.
+            If None, falls back to standard yellow screen.
+
+    Returns:
+        A callable main() function for running the yellow screen stage.
+
+    Raises:
+        ValueError: If domain is not registered or yellow_screen module not found.
     """
     spec = get_pipeline_spec(domain)
     if spec is None:
@@ -31,37 +40,52 @@ def get_yellow_screen_main(domain: str) -> Callable[[], None]:
 
     defaults = default_yellow_roots(spec.prefix)
 
-    if spec.yellow_screen_module:
-        module_name = f"collector_core.{spec.yellow_screen_module}"
-        try:
-            mod = importlib.import_module(module_name)
+    # Determine yellow screen module: explicit override > standard
+    effective_yellow = yellow_screen
 
-            # Wrap the module's main to pass defaults
-            def _custom_main() -> None:
-                mod.main(defaults=defaults)
+    if effective_yellow and effective_yellow != "standard":
+        # Import from collector_core.yellow.domains
+        from collector_core.yellow import domains as yellow_domains
 
-            return _custom_main
-        except ImportError as e:
-            raise ImportError(
-                f"Failed to import yellow screen module {module_name} for domain {domain}: {e}"
-            ) from e
+        domain_mod = getattr(yellow_domains, effective_yellow, None)
+        if domain_mod is None:
+            available = [
+                name for name in dir(yellow_domains) if not name.startswith("_")
+            ]
+            raise ValueError(
+                f"Yellow screen module '{effective_yellow}' not found in "
+                f"collector_core.yellow.domains. Available: {', '.join(available)}"
+            )
+
+        def _domain_main() -> None:
+            # Lazy import to avoid requiring datasets module at module load time
+            from collector_core.yellow.base import run_yellow_screen
+
+            run_yellow_screen(defaults=defaults, domain=domain_mod)
+
+        return _domain_main
 
     def _standard_main() -> None:
         # Lazy import to avoid requiring datasets module at module load time
-        from collector_core import yellow_screen_standard
+        from collector_core.yellow.base import run_yellow_screen
+        from collector_core.yellow.domains import standard
 
-        yellow_screen_standard.main(defaults=defaults)
+        run_yellow_screen(defaults=defaults, domain=standard)
 
     return _standard_main
 
 
 @stable_api
-def main_yellow_screen(domain: str) -> None:
+def main_yellow_screen(domain: str, *, yellow_screen: str | None = None) -> None:
     """
     Entry point for running yellow screen for a domain.
-    Dispatches to the appropriate module based on PipelineSpec.
+    Dispatches to the appropriate module based on configuration.
+
+    Args:
+        domain: Pipeline domain slug (e.g., "chem", "physics")
+        yellow_screen: Optional override for yellow screen domain module.
     """
-    main_fn = get_yellow_screen_main(domain)
+    main_fn = get_yellow_screen_main(domain, yellow_screen=yellow_screen)
     main_fn()
 
 

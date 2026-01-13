@@ -193,37 +193,12 @@ def _run_merge(pipeline_id: str, slug: str, targets_path: Path | None, args: lis
 
 def _run_yellow_screen(slug: str, targets_path: Path | None, args: list[str], ctx) -> int:
     args = _resolve_targets_arg(args, targets_path, "--targets")
-    try:
-        main_fn = get_yellow_screen_main(slug)
-        return _run_with_args(main_fn, args)
-    except ValueError:
-        # Fallback: if domain is not registered, check overrides
-        module = (
-            (ctx.overrides.get("yellow_screen") or "standard")
-            if isinstance(ctx.overrides, dict)
-            else "standard"
-        )
-        if module != "standard":
-            # Try to get from dispatch with override module name
-            from collector_core.pipeline_spec import get_pipeline_spec
-
-            spec = get_pipeline_spec(slug)
-            if spec is None:
-                # Create a temporary lookup using the override module
-                import importlib
-
-                module_name = f"collector_core.yellow_screen_{module}"
-                try:
-                    mod = importlib.import_module(module_name)
-                    return _run_with_args(mod.main, args)
-                except ImportError:
-                    pass
-        # Ultimate fallback to standard
-        from collector_core import yellow_screen_standard
-        from collector_core.yellow_screen_common import default_yellow_roots
-
-        defaults = default_yellow_roots(slug)
-        return _run_with_args(lambda: yellow_screen_standard.main(defaults=defaults), args)
+    # Get yellow_screen override from config (source of truth: configs/pipelines.yaml)
+    yellow_screen: str | None = None
+    if isinstance(ctx.overrides, dict):
+        yellow_screen = ctx.overrides.get("yellow_screen")
+    main_fn = get_yellow_screen_main(slug, yellow_screen=yellow_screen)
+    return _run_with_args(main_fn, args)
 
 
 def main() -> int:

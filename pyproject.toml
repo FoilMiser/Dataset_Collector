@@ -97,6 +97,7 @@ dc-migrate-pipeline-structure = "tools.migrate_pipeline_structure:main"
 dc-update-wrapper-deprecations = "tools.update_wrapper_deprecations:main"
 dc-validate-metrics-outputs = "tools.validate_metrics_outputs:main"
 dc-build-natural-corpus = "tools.build_natural_corpus:main"
+dc-validate-output-contract = "tools.output_contract:main"
 
 [tool.setuptools.dynamic]
 version = { attr = "collector_core.__version__.__version__" }
@@ -155,8 +156,16 @@ module = [
   "collector_core.evidence.*",
   "collector_core.acquire_strategies",
   "collector_core.merge.*",
-  "collector_core.yellow_screen_*",
+  "collector_core.yellow_screen_standard",
+  "collector_core.yellow_screen_common",
+  "collector_core.yellow_screen_dispatch",
   "collector_core.yellow_scrubber_base",
+]
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = [
+  "tools.*",
 ]
 disallow_untyped_defs = true
 

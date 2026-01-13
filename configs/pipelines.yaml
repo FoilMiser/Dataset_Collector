@@ -66,8 +66,7 @@ pipelines:
         category: misc
         level: 5
         granularity: target
-    knobs:
-      yellow_screen_module: yellow_screen_chem
+    knobs: {}
     acquire:
       figshare_variant: article
       github_release_repo: chem-corpus-acquire
@@ -124,7 +123,6 @@ pipelines:
         granularity: target
     knobs:
       domain_prefix: econ
-      yellow_screen_module: yellow_screen_econ
       include_routing_dict_in_row: true
     yellow_screen: econ
   earth:
@@ -182,8 +180,7 @@ pipelines:
         category: misc
         level: 5
         granularity: target
-    knobs:
-      yellow_screen_module: yellow_screen_kg_nav
+    knobs: {}
     acquire:
       figshare_variant: files
       extra_handlers:
@@ -266,8 +263,7 @@ pipelines:
         category: misc
         level: 5
         granularity: target
-    knobs:
-      yellow_screen_module: yellow_screen_nlp
+    knobs: {}
     acquire:
       figshare_variant: article
       github_release_repo: nlp-corpus-acquire
@@ -315,5 +311,4 @@ pipelines:
         granularity: target
     knobs:
       domain_prefix: safety
-      yellow_screen_module: yellow_screen_safety
     yellow_screen: safety
