@@ -19,7 +19,6 @@ from collector_core.yellow.base import (
     standard_transform,
 )
 
-
 # SPDX License Identifier pattern
 SPDX_PATTERN = re.compile(
     r"SPDX-License-Identifier:\s*([A-Za-z0-9\-\.+]+(?:\s+(?:AND|OR|WITH)\s+[A-Za-z0-9\-\.+]+)*)",

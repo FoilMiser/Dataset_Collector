@@ -19,7 +19,6 @@ from collector_core.yellow.base import (
     standard_transform,
 )
 
-
 # Select Agent and Toxin patterns (CDC/USDA regulated)
 # Reference: https://www.selectagents.gov/sat/list.htm
 BIOSECURITY_PATTERNS = [
