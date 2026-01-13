@@ -15,6 +15,7 @@ from collector_core.checks.actions import (
     normalize_content_check_actions,
     resolve_content_check_action,
 )
+from collector_core.checks.implementations import ContentCheck, load_check_implementations
 from collector_core.checks.runner import generate_run_id, run_checks_for_target
 from collector_core.classification.logic import (
     apply_yellow_signoff_requirement,
@@ -70,6 +71,7 @@ SUPPORTED_CONTENT_CHECKS = {
     "code_and_docs_chunking",
     "collect_statistics",
     "computed_only_extract",
+    "distribution_statement",
     "distribution_statement_scan",
     "domain_filter_arxiv_math",
     "domain_filter_math_stackexchange",
@@ -86,7 +88,9 @@ SUPPORTED_CONTENT_CHECKS = {
     "formal_chunk_by_module",
     "formal_chunk_by_theorem",
     "html_crawl",
+    "language_detect",
     "license_metadata_validate",
+    "license_validate",
     "mesh_extract_metadata",
     "mesh_geometry_dedupe",
     "mesh_render_thumbnails",
@@ -99,12 +103,26 @@ SUPPORTED_CONTENT_CHECKS = {
     "pii_scan_and_redact",
     "pii_scan_and_redact_strict",
     "record_level_filter",
+    "schema_validate",
     "secret_scan",
     "segregate_copyleft_pool",
     "strip_third_party_media",
+    "toxicity_scan",
     "validate_schema",
     "weapon_trademark_filter",
 }
+
+_CONTENT_CHECK_REGISTRY: dict[str, ContentCheck] = {}
+
+
+def load_content_check_registry() -> dict[str, ContentCheck]:
+    if _CONTENT_CHECK_REGISTRY:
+        return dict(_CONTENT_CHECK_REGISTRY)
+    implementations = load_check_implementations()
+    for name, check_impl in implementations.items():
+        if name in SUPPORTED_CONTENT_CHECKS:
+            _CONTENT_CHECK_REGISTRY[name] = check_impl
+    return dict(_CONTENT_CHECK_REGISTRY)
 
 
 @dataclasses.dataclass
