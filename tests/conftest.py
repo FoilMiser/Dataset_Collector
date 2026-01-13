@@ -215,14 +215,20 @@ def run_dc(
         *,
         check: bool = True,
         capture_output: bool = False,
+        env_overrides: dict[str, str] | None = None,
+        timeout: float | None = None,
     ) -> subprocess.CompletedProcess[str]:
+        env = dict(dc_env)
+        if env_overrides:
+            env.update(env_overrides)
         return subprocess.run(
             [sys.executable, "-m", "collector_core.dc_cli", *args],
             check=check,
             cwd=repo_root,
-            env=dc_env,
+            env=env,
             text=True,
             capture_output=capture_output,
+            timeout=timeout,
         )
 
     return _run
