@@ -192,7 +192,9 @@ def safe_extract_zip(
                 continue
 
             # Track extracted size
-            extracted_bytes += member.file_size
+            # P1.4C: Check member.file_size for None
+            file_size = member.file_size or 0
+            extracted_bytes += file_size
             if extracted_bytes > max_extracted_bytes:
                 raise ExtractedSizeLimitError(
                     f"Extracted size {extracted_bytes} exceeds limit {max_extracted_bytes}"
@@ -210,7 +212,7 @@ def safe_extract_zip(
                     if not chunk:
                         break
                     written += len(chunk)
-                    if written > member.file_size * 1.1:  # Allow 10% overhead
+                    if file_size and written > file_size * 1.1:  # Allow 10% overhead
                         raise DecompressionBombError(
                             f"File {member.filename} expanded beyond declared size"
                         )

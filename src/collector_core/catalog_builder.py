@@ -36,11 +36,20 @@ def count_lines(path: Path, max_lines: int = 0) -> int:
 
 
 def file_stats(path: Path) -> dict[str, Any]:
-    return {
-        "name": path.name,
-        "bytes": path.stat().st_size,
-        "lines_estimate": count_lines(path, max_lines=1000),
-    }
+    # P1.2D: Handle FileNotFoundError for file stats
+    try:
+        return {
+            "name": path.name,
+            "bytes": path.stat().st_size,
+            "lines_estimate": count_lines(path, max_lines=1000),
+        }
+    except FileNotFoundError:
+        return {
+            "name": path.name,
+            "bytes": 0,
+            "lines_estimate": 0,
+            "error": "file_not_found",
+        }
 
 
 def collect_raw_stats(root: Path, top_n: int) -> dict[str, Any]:

@@ -19,7 +19,8 @@ def _resolve_git_sha() -> str:
             capture_output=True,
             text=True,
         )
-    except Exception:
+    except (subprocess.SubprocessError, FileNotFoundError, OSError):
+        # P1.1B: Catch specific subprocess/file errors
         return "unknown"
     sha = (result.stdout or "").strip()
     return sha or "unknown"

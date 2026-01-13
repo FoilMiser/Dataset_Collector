@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -76,7 +77,11 @@ def handle_figshare_article(
         retry_on_429=rate_config.retry_on_429,
         retry_on_403=rate_config.retry_on_403,
     )
-    meta = resp.json()
+    # P1.2A: Handle JSON decode errors from API response
+    try:
+        meta = resp.json()
+    except json.JSONDecodeError as e:
+        return [{"status": "error", "error": f"Invalid JSON from Figshare API: {e}"}]
     files = meta.get("files", []) or []
     results: list[dict[str, Any]] = []
     for idx, fmeta in enumerate(files):
@@ -167,10 +172,17 @@ def handle_figshare_files(
         retry_on_429=rate_config.retry_on_429,
         retry_on_403=rate_config.retry_on_403,
     )
-    files = resp.json() or []
+    # P1.2A: Handle JSON decode errors from API response
+    try:
+        files = resp.json() or []
+    except json.JSONDecodeError as e:
+        return [{"status": "error", "error": f"Invalid JSON from Figshare API: {e}"}]
     ensure_dir(out_dir)
     results: list[dict[str, Any]] = []
     for f in files:
+        # P1.4A: Check if f is a dict before calling .get()
+        if not isinstance(f, dict):
+            continue
         link = f.get("download_url") or (f.get("links") or {}).get("download")
         if not link:
             continue

@@ -575,7 +575,11 @@ def snapshot_evidence(
         while prev_path.exists():
             prev_path = manifest_dir / f"{prev_prefix}_{counter}{prev_ext}"
             counter += 1
-        existing_path.rename(prev_path)
+        # P1.2G: Handle OSError on rename
+        try:
+            existing_path.rename(prev_path)
+        except OSError:
+            pass  # Ignore rename failures, proceed with new file
         previous_renamed_path = prev_path
         previous_entry = {
             "sha256": previous_digest,

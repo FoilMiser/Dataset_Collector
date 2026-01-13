@@ -9,6 +9,7 @@ def stable_api(obj: T) -> T:
     """Annotate a public API object as stable for tooling and documentation."""
     try:
         setattr(obj, "__stability__", "stable")
-    except Exception:
+    except (AttributeError, TypeError):
+        # P1.1A: Some objects (e.g., built-ins) don't support setattr
         pass
     return obj

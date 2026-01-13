@@ -257,7 +257,11 @@ def extract_pubchem_computed_only(
     state: dict[str, Any] = {"processed_files": [], "last_shard_idx": 0}
     processed: set[str] = set()
     if resume_state_path and resume_state_path.exists():
-        state = json.loads(resume_state_path.read_text(encoding="utf-8"))
+        # P1.4D: Add try/except for JSON load
+        try:
+            state = json.loads(resume_state_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            state = {"processed_files": [], "last_shard_idx": 0}
         processed = set(state.get("processed_files") or [])
 
     files = sorted([p for p in quarantine_dir.glob("*.gz")])
@@ -455,7 +459,8 @@ def fetch_text_with_fallback(
             )
             r.raise_for_status()
             return r.text, url
-        except Exception:
+        except requests.RequestException:
+            # P1.1F: Catch specific requests exception
             continue
 
     raise RuntimeError(f"Failed to fetch from any URL: {urls}")

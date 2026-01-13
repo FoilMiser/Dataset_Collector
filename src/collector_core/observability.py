@@ -98,11 +98,13 @@ def _setup_otel_tracing() -> Any | None:
                 exporter = OTLPSpanExporter(endpoint=otlp_endpoint)
                 _tracer_provider.add_span_processor(BatchSpanProcessor(exporter))
                 logger.info(f"OpenTelemetry tracing enabled, exporting to {otlp_endpoint}")
-            except Exception as e:
+            except (ImportError, OSError, RuntimeError) as e:
+                # P1.1J: Catch specific OTEL exporter setup errors
                 logger.warning(f"Failed to setup OTLP exporter: {e}")
 
         return _tracer_provider
-    except Exception as e:
+    except (ImportError, AttributeError, RuntimeError) as e:
+        # P1.1J: Catch specific OTEL initialization errors
         logger.debug(f"Failed to initialize OpenTelemetry tracing: {e}")
         return None
 
@@ -178,7 +180,8 @@ def _get_prometheus_registry() -> Any:
         from prometheus_client import CollectorRegistry
         _prometheus_registry = CollectorRegistry()
         return _prometheus_registry
-    except Exception:
+    except (ImportError, RuntimeError):
+        # P1.1J: Catch specific Prometheus initialization errors
         return None
 
 
@@ -202,7 +205,8 @@ def prometheus_counter(
             _prometheus_counters[key] = Counter(
                 name, description, labelnames=labelnames, registry=registry
             )
-        except Exception as e:
+        except (ImportError, ValueError) as e:
+            # P1.1J: Catch specific Prometheus metric creation errors
             logger.debug(f"Failed to create Prometheus counter {name}: {e}")
             return None
     return _prometheus_counters[key]
@@ -228,7 +232,8 @@ def prometheus_gauge(
             _prometheus_gauges[key] = Gauge(
                 name, description, labelnames=labelnames, registry=registry
             )
-        except Exception as e:
+        except (ImportError, ValueError) as e:
+            # P1.1J: Catch specific Prometheus metric creation errors
             logger.debug(f"Failed to create Prometheus gauge {name}: {e}")
             return None
     return _prometheus_gauges[key]
@@ -261,7 +266,8 @@ def prometheus_histogram(
             if buckets:
                 kwargs["buckets"] = buckets
             _prometheus_histograms[key] = Histogram(**kwargs)
-        except Exception as e:
+        except (ImportError, ValueError) as e:
+            # P1.1J: Catch specific Prometheus metric creation errors
             logger.debug(f"Failed to create Prometheus histogram {name}: {e}")
             return None
     return _prometheus_histograms[key]
@@ -296,7 +302,8 @@ def start_metrics_server(port: int = 9090) -> bool:
         _metrics_server_started = True
         logger.info(f"Prometheus metrics server started on port {port}")
         return True
-    except Exception as e:
+    except (ImportError, OSError, RuntimeError) as e:
+        # P1.1J: Catch specific server startup errors
         logger.warning(f"Failed to start metrics server: {e}")
         return False
 
@@ -437,7 +444,8 @@ def shutdown_observability() -> None:
     if _tracer_provider is not None:
         try:
             _tracer_provider.shutdown()
-        except Exception as e:
+        except (AttributeError, RuntimeError, OSError) as e:
+            # P1.1J: Catch specific OTEL shutdown errors
             logger.debug(f"Error shutting down tracer provider: {e}")
         _tracer_provider = None
 

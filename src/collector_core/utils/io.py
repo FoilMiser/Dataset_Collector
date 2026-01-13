@@ -3,6 +3,7 @@ from __future__ import annotations
 import gzip
 import io
 import json
+import os
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
@@ -27,7 +28,11 @@ def write_json(path: Path, obj: dict[str, Any], *, indent: int = 2) -> None:
     """Write dict to JSON file atomically."""
     ensure_dir(path.parent)
     tmp_path = path.with_suffix(path.suffix + ".tmp")
-    tmp_path.write_text(json.dumps(obj, indent=indent, ensure_ascii=False) + "\n", encoding="utf-8")
+    # P1.3B: Write with fsync to ensure data is on disk before rename
+    with tmp_path.open("w", encoding="utf-8") as f:
+        f.write(json.dumps(obj, indent=indent, ensure_ascii=False) + "\n")
+        f.flush()
+        os.fsync(f.fileno())
     tmp_path.replace(path)
 
 
@@ -35,11 +40,15 @@ def _open_text(path: Path, mode: str) -> io.TextIOBase:
     if path.suffix == ".gz":
         return gzip.open(path, mode, encoding="utf-8", errors="ignore")
     if path.suffix == ".zst":
-        if "r" in mode:
-            stream = zstd.ZstdDecompressor().stream_reader(path.open("rb"))
-            return io.TextIOWrapper(stream, encoding="utf-8", errors="ignore")
-        stream = zstd.ZstdCompressor().stream_writer(path.open("wb"))
-        return io.TextIOWrapper(stream, encoding="utf-8")
+        # P1.2E: Handle zstd decompression errors
+        try:
+            if "r" in mode:
+                stream = zstd.ZstdDecompressor().stream_reader(path.open("rb"))
+                return io.TextIOWrapper(stream, encoding="utf-8", errors="ignore")
+            stream = zstd.ZstdCompressor().stream_writer(path.open("wb"))
+            return io.TextIOWrapper(stream, encoding="utf-8")
+        except zstd.ZstdError as e:
+            raise OSError(f"Failed to open zstd file {path}: {e}") from e
     return open(path, mode, encoding="utf-8", errors="ignore")
 
 

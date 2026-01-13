@@ -29,7 +29,8 @@ def extract_domain(url: str) -> str:
 
         parsed = urlparse(url)
         return parsed.hostname or ""
-    except Exception:
+    except ValueError:
+        # P1.1C: Catch specific URL parsing exception
         logger.debug("Failed to extract domain from URL: %r", url)
         return ""
 

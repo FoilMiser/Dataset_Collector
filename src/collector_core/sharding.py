@@ -435,11 +435,18 @@ class AtomicShardWriter:
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         try:
+            # P1.3A: Flush and fsync before atomic rename
             if self._wrapper is not None:
+                self._wrapper.flush()
                 self._wrapper.close()
             if self._file is not None:
+                self._file.flush()
+                if hasattr(self._file, "fileno"):
+                    os.fsync(self._file.fileno())
                 self._file.close()
-        except Exception:
+        except OSError:
+            # P1.1D: Catch specific OS errors during file operations
+            logger.warning("Error closing shard file: %s", self.tmp_path)
             pass
 
         if exc_type is None:

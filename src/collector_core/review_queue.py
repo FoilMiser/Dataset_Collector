@@ -112,7 +112,8 @@ def load_existing_signoff(manifest_dir: Path) -> dict[str, Any]:
         return {}
     try:
         return json.loads(p.read_text(encoding="utf-8"))
-    except Exception:
+    except (json.JSONDecodeError, OSError):
+        # P1.1H: Catch specific JSON decode and file read errors
         logger.warning("Failed to load review signoff from %s", p, exc_info=True)
         return {}
 
@@ -123,7 +124,8 @@ def load_license_evidence_meta(manifest_dir: Path) -> dict[str, Any]:
         return {}
     try:
         return json.loads(p.read_text(encoding="utf-8"))
-    except Exception:
+    except (json.JSONDecodeError, OSError):
+        # P1.1H: Catch specific JSON decode and file read errors
         logger.warning("Failed to load license evidence meta from %s", p, exc_info=True)
         return {}
 

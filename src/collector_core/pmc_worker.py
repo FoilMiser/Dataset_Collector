@@ -28,6 +28,7 @@ import re
 import tarfile
 import time
 import xml.etree.ElementTree as ET
+import zlib
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -209,7 +210,8 @@ def extract_nxml_v2(pkg_bytes: bytes) -> tuple[bytes | None, list[str]]:
                     f = tf.extractfile(m)
                     if f:
                         return f.read(), members
-    except Exception:
+    except (tarfile.TarError, zlib.error, OSError):
+        # P1.1G: Catch specific archive and decompression errors
         return None, members
     return None, members
 
