@@ -260,6 +260,19 @@ register_pipeline(
 )
 ```
 
+### Domain Screener Outputs
+
+Domain screeners return a `FilterDecision` with structured metadata that is preserved in the
+canonical record under `screening`. When a record is allowed, the screener adds:
+
+- `screening.domain`: domain identifier (e.g., `nlp`, `cyber`).
+- `screening.quality.score`: floating score in `[0, 1]` representing domain-specific quality.
+- `screening.quality.signals`: normalized signals such as language detection, CVE counts, or
+  relation coverage used to compute the score.
+
+Rejected records still include the standard `reason` in the pitch ledger and may provide
+extra signals to aid manual review.
+
 ---
 
 ## Policy Semantics
