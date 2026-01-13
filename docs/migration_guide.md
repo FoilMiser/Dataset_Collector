@@ -145,12 +145,54 @@ python -m collector_core.dc_cli run --pipeline chem --stage acquire
    python -m pytest tests/test_yellow_review_helpers.py
    ```
 
+## Removed in v3.0
+
+### Per-Pipeline Worker Scripts
+
+The following wrapper files have been removed from all `*_pipeline_v2/` directories:
+- `acquire_worker.py`
+- `merge_worker.py`
+- `yellow_screen_worker.py`
+- `pipeline_driver.py`
+- `catalog_builder.py`
+- `review_queue.py`
+- `pmc_worker.py`
+
+**Migration:** use the unified CLI instead.
+
+```bash
+# Old (removed):
+python math_pipeline_v2/acquire_worker.py --queue /data/math/_queues/green.jsonl
+
+# New:
+dc run --pipeline math --stage acquire -- --queue /data/math/_queues/green.jsonl
+```
+
+```bash
+# Old (removed):
+python chem_pipeline_v2/pipeline_driver.py --targets targets_chem.yaml --no-fetch
+
+# New:
+dc pipeline chem --targets targets_chem.yaml --no-fetch
+```
+
+### Legacy Shell Scripts
+
+All per-pipeline `legacy/` directories (including `run_pipeline.sh`) have been removed.
+Replace them with `dc pipeline` or `dc run`.
+
+```bash
+# Old (removed):
+./chem_pipeline_v2/legacy/run_pipeline.sh --targets targets_chem.yaml
+
+# New:
+dc pipeline chem --targets targets_chem.yaml
+```
+
 ## Backwards Compatibility
 
-- Existing `pipeline_driver.py` files continue to work, but `dc pipeline`/`dc run` are the canonical entrypoints.
-- The `safe_name` alias is provided in `acquire_strategies.py`
-- Legacy `run_pipeline.sh` scripts have moved under each pipeline's `legacy/` directory and are deprecated (removal target: v3.0).
+- The `safe_name` alias is provided in `acquire_strategies.py`.
 
 ## Breaking Changes
 
-None. All changes are additive and backwards compatible.
+- Per-pipeline wrapper scripts and legacy shell scripts have been removed. Use `dc pipeline` and `dc run` instead.

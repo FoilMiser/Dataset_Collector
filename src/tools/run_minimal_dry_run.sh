@@ -24,13 +24,18 @@ python -m tools.patch_targets \
   --dataset-root "${DATASET_ROOT}" \
   --output "${TEMP_FIXTURES}/targets_minimal_patched.yaml"
 
-python regcomp_pipeline_v2/pipeline_driver.py \
+python -m collector_core.dc_cli \
+  pipeline regcomp \
   --targets "${TEMP_FIXTURES}/targets_minimal_patched.yaml" \
   --license-map "${TEMP_FIXTURES}/license_map_minimal.yaml" \
   --no-fetch \
   --quiet
 
-python regcomp_pipeline_v2/acquire_worker.py \
+python -m collector_core.dc_cli \
+  run \
+  --pipeline regcomp \
+  --stage acquire \
+  -- \
   --queue "${DATASET_ROOT}/_queues/green_download.jsonl" \
   --targets-yaml "${TEMP_FIXTURES}/targets_minimal_patched.yaml" \
   --bucket green \
@@ -40,7 +45,11 @@ python regcomp_pipeline_v2/acquire_worker.py \
   --limit-targets 1 \
   --workers 1
 
-python regcomp_pipeline_v2/acquire_worker.py \
+python -m collector_core.dc_cli \
+  run \
+  --pipeline regcomp \
+  --stage acquire \
+  -- \
   --queue "${DATASET_ROOT}/_queues/yellow_pipeline.jsonl" \
   --targets-yaml "${TEMP_FIXTURES}/targets_minimal_patched.yaml" \
   --bucket yellow \
@@ -50,7 +59,11 @@ python regcomp_pipeline_v2/acquire_worker.py \
   --limit-targets 1 \
   --workers 1
 
-python regcomp_pipeline_v2/merge_worker.py \
+python -m collector_core.dc_cli \
+  run \
+  --pipeline regcomp \
+  --stage merge \
+  -- \
   --targets "${TEMP_FIXTURES}/targets_minimal_patched.yaml" \
   --dataset-root "${DATASET_ROOT}"
 

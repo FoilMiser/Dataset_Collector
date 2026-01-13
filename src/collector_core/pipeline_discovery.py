@@ -28,7 +28,7 @@ def normalize_pipeline_id(pipeline_id: str | None) -> str | None:
 
 def resolve_repo_root(path: Path) -> Path:
     """Resolve the repository root from a given path."""
-    if path.name.endswith("_pipeline_v2") and (path / "pipeline_driver.py").exists():
+    if path.name.endswith("_pipeline_v2"):
         return path.parent
     return path
 

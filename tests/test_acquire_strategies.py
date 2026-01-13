@@ -606,7 +606,7 @@ def test_run_acquire_worker_strict_exits_on_error(
         sys,
         "argv",
         [
-            "acquire_worker.py",
+            "dc run",
             "--queue",
             str(queue_path),
             "--bucket",
