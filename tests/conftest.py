@@ -14,7 +14,6 @@ import json
 from collections.abc import Callable, Generator
 from pathlib import Path
 import os
-import shutil
 import subprocess
 import sys
 from typing import Any
@@ -183,12 +182,7 @@ def create_sample_merged_records(path: Path) -> None:
 
 
 def _build_dc_env(repo_root: Path) -> dict[str, str]:
-    schema_root = repo_root / "src" / "schemas"
-    if not schema_root.exists():
-        try:
-            schema_root.symlink_to(repo_root / "schemas", target_is_directory=True)
-        except OSError:
-            shutil.copytree(repo_root / "schemas", schema_root)
+    # Schemas are now packaged in src/collector_core/schemas/ - no symlink needed
     env = os.environ.copy()
     env["PYTHONPATH"] = f"{repo_root / 'src'}{os.pathsep}{env.get('PYTHONPATH', '')}".strip(
         os.pathsep

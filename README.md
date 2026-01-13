@@ -262,13 +262,14 @@ if __name__ == "__main__":
 To regenerate all thin wrappers from the registry:
 
 ```bash
-PYTHONPATH=src python src/tools/sync_pipeline_wrappers.py --write
+pip install -e .
+dc-sync-wrappers --write
 ```
 
 To check wrappers are up-to-date (CI mode):
 
 ```bash
-python src/tools/sync_pipeline_wrappers.py --check
+dc-sync-wrappers --check
 ```
 
 ## Expected directory structure & configurable paths
@@ -353,25 +354,26 @@ Update these in the pipeline’s configuration files (for example `pipelines/tar
 Run the preflight checker to validate pipeline map entries, verify target YAML paths, and detect enabled targets with missing or unsupported download strategies. It also warns about missing optional dependencies or external tools needed by enabled strategies.
 
 ```bash
-python -m tools.preflight
+pip install -e .
+dc-preflight
 ```
 
 To run checks for specific pipelines:
 
 ```bash
-python -m tools.preflight --pipelines chem_pipeline_v2 biology_pipeline_v2
+dc-preflight --pipelines chem_pipeline_v2 biology_pipeline_v2
 ```
 
 To point at a custom pipeline map location:
 
 ```bash
-python -m tools.preflight --pipeline-map src/tools/pipeline_map.sample.yaml
+dc-preflight --pipeline-map src/tools/pipeline_map.sample.yaml
 ```
 
 To emit warnings for disabled targets:
 
 ```bash
-python -m tools.preflight --warn-disabled
+dc-preflight --warn-disabled
 ```
 
 For local runs, copy `src/tools/pipeline_map.sample.yaml` to something like `src/tools/pipeline_map.local.yaml`, set `destination_root` to your dataset folder, and pass it via `--pipeline-map` when running tooling. For pipeline execution, prefer `dc pipeline`/`dc run` with `--dataset-root` or `DATASET_ROOT`. This keeps user-specific paths out of version control.
@@ -381,13 +383,14 @@ For local runs, copy `src/tools/pipeline_map.sample.yaml` to something like `src
 Validate all enabled targets across pipeline configs and emit a JSON summary:
 
 ```bash
-python -m tools.validate_repo --output src/tools/validate_report.json
+pip install -e .
+dc-validate-repo --output src/tools/validate_report.json
 ```
 
 Fail the run if warnings are present:
 
 ```bash
-python -m tools.validate_repo --strict --output src/tools/validate_report.json
+dc-validate-repo --strict --output src/tools/validate_report.json
 ```
 
 ## Cleaning local artifacts
@@ -395,7 +398,8 @@ python -m tools.validate_repo --strict --output src/tools/validate_report.json
 If you ran pipelines inside the repo and need to reset the tree:
 
 ```bash
-python src/tools/clean_repo_tree.py --yes
+pip install -e .
+dc-clean-repo-tree --yes
 ```
 
 ## Adding a new target safely

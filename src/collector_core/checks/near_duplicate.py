@@ -4,7 +4,7 @@ import importlib.util
 import re
 import time
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Any, Iterable
 
 from collector_core.stability import stable_api
 
@@ -135,7 +135,7 @@ class NearDuplicateDetector:
         tokens = _tokenize(text, max_tokens=self.max_tokens)
         return _build_shingles(tokens, self.shingle_size)
 
-    def _build_minhash(self, tokens: list[str]):
+    def _build_minhash(self, tokens: list[str]) -> Any:
         from datasketch import MinHash
 
         minhash = MinHash(num_perm=self.num_perm)

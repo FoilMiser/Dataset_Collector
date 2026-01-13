@@ -157,7 +157,8 @@ targets:
 Run the preflight checker:
 
 ```bash
-python -m tools.preflight --pipelines math_pipeline_v2
+pip install -e .
+dc-preflight --pipelines math_pipeline_v2
 ```
 
 ### 3. Run Classification
