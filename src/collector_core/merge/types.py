@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 from collector_core.stability import stable_api
 
 if TYPE_CHECKING:
+    from collector_core.checks.near_duplicate import NearDuplicateDetector
     from collector_core.merge.dedupe import DedupeIndex, PartitionedDedupeIndex
     from collector_core.merge.shard import Sharder
 
@@ -63,6 +64,8 @@ class GreenSkip:
 class MergeState:
     summary: dict[str, Any]
     dedupe: DedupeIndex | PartitionedDedupeIndex
+    near_dedup: NearDuplicateDetector | None
+    near_dedup_text_field: str
     shard_cfg: ShardingConfig
     pool_sharders: dict[str, Sharder]
     target_meta: dict[str, dict[str, Any]]
@@ -87,3 +90,11 @@ class MergeRuntimeConfig:
     profile_path: Path | None = None
     profile_sort: str = "tottime"
     dedupe_partitions: int = 1
+    near_dedup: bool = False
+    near_dedup_text_field: str = "text"
+    near_dedup_threshold: float = 0.85
+    near_dedup_backend: str | None = None
+    near_dedup_num_perm: int = 128
+    near_dedup_shingle_size: int = 3
+    near_dedup_max_tokens: int = 2000
+    near_dedup_max_candidates: int = 50
