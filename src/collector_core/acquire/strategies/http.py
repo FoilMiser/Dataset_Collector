@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
 from urllib.parse import urljoin, urlparse
 
 from collector_core.acquire.context import (
@@ -29,6 +29,9 @@ from collector_core.acquire.strategies.http_base import (
     DownloadResult,
     HttpDownloadBase,
 )
+
+if TYPE_CHECKING:
+    import requests as requests_module
 
 # Lazy import for requests
 requests = _try_import("requests")
@@ -90,7 +93,7 @@ def validate_download_url(
 
 
 def _validate_redirect_chain(
-    response: "requests.Response",
+    response: "requests_module.Response",
     allow_non_global_hosts: bool,
     internal_mirror_allowlist: InternalMirrorAllowlist,
 ) -> tuple[bool, str | None, str | None]:
@@ -155,7 +158,7 @@ def _http_download_with_resume(
     blocked_reason: str | None = None
 
     def _stream_response(
-        response: "requests.Response", write_mode: str, existing_offset: int
+        response: "requests_module.Response", write_mode: str, existing_offset: int
     ) -> None:
         nonlocal content_length, resolved_url
         resolved_url = response.url
