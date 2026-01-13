@@ -76,7 +76,8 @@ def pick_existing(queues_root: Path, candidates: list[str]) -> Path:
 
 
 def _run_stage(
-    pipeline_dir: Path,
+    repo_root: Path,
+    pipeline_slug: str,
     stage: str,
     targets_path: Path,
     queues_root: Path,
@@ -86,16 +87,28 @@ def _run_stage(
     log_path: Path,
 ) -> None:
     python_exe = sys.executable
+    cli_module = [python_exe, "-m", "collector_core.dc_cli"]
     cmd: list[str]
     if stage == "classify":
-        cmd = [python_exe, "pipeline_driver.py", "--targets", str(targets_path)]
+        cmd = [
+            *cli_module,
+            "pipeline",
+            pipeline_slug,
+            "--targets",
+            str(targets_path),
+        ]
         if not execute:
             cmd.append("--no-fetch")
     elif stage == "acquire_green":
         queue_path = pick_existing(queues_root, ["green_download.jsonl", "green_queue.jsonl"])
         cmd = [
-            python_exe,
-            "acquire_worker.py",
+            *cli_module,
+            "run",
+            "--pipeline",
+            pipeline_slug,
+            "--stage",
+            "acquire",
+            "--",
             "--queue",
             str(queue_path),
             "--targets-yaml",
@@ -110,8 +123,13 @@ def _run_stage(
     elif stage == "acquire_yellow":
         queue_path = pick_existing(queues_root, ["yellow_pipeline.jsonl", "yellow_queue.jsonl"])
         cmd = [
-            python_exe,
-            "acquire_worker.py",
+            *cli_module,
+            "run",
+            "--pipeline",
+            pipeline_slug,
+            "--stage",
+            "acquire",
+            "--",
             "--queue",
             str(queue_path),
             "--targets-yaml",
@@ -126,8 +144,13 @@ def _run_stage(
     elif stage == "yellow_screen":
         queue_path = pick_existing(queues_root, ["yellow_pipeline.jsonl", "yellow_queue.jsonl"])
         cmd = [
-            python_exe,
-            "yellow_screen_worker.py",
+            *cli_module,
+            "run",
+            "--pipeline",
+            pipeline_slug,
+            "--stage",
+            "yellow_screen",
+            "--",
             "--targets",
             str(targets_path),
             "--queue",
@@ -136,13 +159,25 @@ def _run_stage(
         if execute:
             cmd.append("--execute")
     elif stage == "merge":
-        cmd = [python_exe, "merge_worker.py", "--targets", str(targets_path)]
+        cmd = [
+            *cli_module,
+            "run",
+            "--pipeline",
+            pipeline_slug,
+            "--stage",
+            "merge",
+            "--",
+            "--targets",
+            str(targets_path),
+        ]
         if execute:
             cmd.append("--execute")
     elif stage == "catalog":
         cmd = [
-            python_exe,
-            "catalog_builder.py",
+            *cli_module,
+            "catalog-builder",
+            "--pipeline",
+            pipeline_slug,
             "--targets",
             str(targets_path),
             "--output",
@@ -155,7 +190,7 @@ def _run_stage(
     with log_path.open("w", encoding="utf-8") as log_file:
         subprocess.run(
             cmd,
-            cwd=pipeline_dir,
+            cwd=repo_root,
             stdout=log_file,
             stderr=subprocess.STDOUT,
             check=True,
@@ -213,7 +248,6 @@ def main(argv: Iterable[str] | None = None) -> int:
         if not dest_folder or not targets_yaml:
             raise SystemExit(f"Pipeline map entry incomplete for {pipeline_name}.")
 
-        pipeline_dir = repo_root / pipeline_name
         slug = pipeline_name.removesuffix("_pipeline_v2")
         targets_path = resolve_targets_path(repo_root, slug, targets_yaml)
         if not targets_path or not targets_path.exists():
@@ -236,7 +270,8 @@ def main(argv: Iterable[str] | None = None) -> int:
                 dataset_root_fs / "_logs" / f"orchestrator_{pipeline_name}_{stage}_{timestamp}.log"
             )
             _run_stage(
-                pipeline_dir=pipeline_dir,
+                repo_root=repo_root,
+                pipeline_slug=slug,
                 stage=stage,
                 targets_path=patched_targets_path,
                 queues_root=queues_root,

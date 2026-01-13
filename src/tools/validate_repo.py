@@ -53,22 +53,6 @@ def iter_targets_files(root: Path) -> Iterable[Path]:
     yield from list_targets_files(root)
 
 
-def iter_pipeline_drivers(pipeline_dirs: Iterable[Path]) -> Iterable[Path]:
-    for pipeline_dir in pipeline_dirs:
-        driver = pipeline_dir / "pipeline_driver.py"
-        if driver.exists():
-            yield driver
-
-
-def iter_acquire_workers(root: Path) -> Iterable[Path]:
-    for pipeline_dir in sorted(root.glob("*_pipeline_v2")):
-        if not pipeline_dir.is_dir():
-            continue
-        worker = pipeline_dir / "acquire_worker.py"
-        if worker.exists():
-            yield worker
-
-
 def iter_yellow_scrubbers(root: Path) -> Iterable[Path]:
     for pipeline_dir in sorted(root.glob("*_pipeline_v2")):
         if not pipeline_dir.is_dir():
@@ -124,9 +108,8 @@ def _load_pipeline_map(
     return pipeline_map_path, pipeline_map
 
 
-def validate_pipeline_layout(root: Path) -> tuple[list[dict[str, Any]], list[Path]]:
+def validate_pipeline_layout(root: Path) -> list[dict[str, Any]]:
     errors: list[dict[str, Any]] = []
-    pipeline_dirs: list[Path] = []
 
     pipeline_map_entry = _load_pipeline_map(root, errors)
     if pipeline_map_entry is not None:
@@ -144,20 +127,6 @@ def validate_pipeline_layout(root: Path) -> tuple[list[dict[str, Any]], list[Pat
                     }
                 )
                 continue
-            pipeline_dirs.append(pipeline_dir)
-            required_files = [
-                pipeline_dir / "pipeline_driver.py",
-                pipeline_dir / "acquire_worker.py",
-            ]
-            for required_path in required_files:
-                if not required_path.exists():
-                    errors.append(
-                        {
-                            "type": "missing_pipeline_file",
-                            "pipeline": pipeline_name,
-                            "path": str(required_path),
-                        }
-                    )
             targets_yaml = pipeline_entry.get("targets_yaml")
             if not targets_yaml:
                 errors.append(
@@ -181,20 +150,6 @@ def validate_pipeline_layout(root: Path) -> tuple[list[dict[str, Any]], list[Pat
         for pipeline_dir in sorted(root.glob("*_pipeline_v2")):
             if not pipeline_dir.is_dir():
                 continue
-            pipeline_dirs.append(pipeline_dir)
-            required_files = [
-                pipeline_dir / "pipeline_driver.py",
-                pipeline_dir / "acquire_worker.py",
-            ]
-            for required_path in required_files:
-                if not required_path.exists():
-                    errors.append(
-                        {
-                            "type": "missing_pipeline_file",
-                            "pipeline": pipeline_dir.name,
-                            "path": str(required_path),
-                        }
-                    )
             slug = pipeline_dir.name.removesuffix("_pipeline_v2")
             targets_path = resolve_targets_path(root, slug)
             if not targets_path:
@@ -206,32 +161,7 @@ def validate_pipeline_layout(root: Path) -> tuple[list[dict[str, Any]], list[Pat
                     }
                 )
 
-    return errors, pipeline_dirs
-
-
-def _is_thin_wrapper_driver(text: str) -> bool:
-    """Check if driver is a thin wrapper delegating to pipeline_factory."""
-    patterns = [
-        "from collector_core.pipeline_factory import get_pipeline_driver",
-        "from collector_core import pipeline_factory",
-        "pipeline_factory.get_pipeline_driver",
-        "get_pipeline_driver(",
-    ]
-    return any(pattern in text for pattern in patterns)
-
-
-def _is_thin_wrapper_worker(text: str) -> bool:
-    """Check if worker is a thin wrapper delegating to generic_workers."""
-    patterns = [
-        "from collector_core.generic_workers import main_acquire",
-        "from collector_core.generic_workers import main_yellow_screen",
-        "from collector_core import generic_workers",
-        "generic_workers.main_acquire",
-        "generic_workers.main_yellow_screen",
-        "main_acquire(",
-        "main_yellow_screen(",
-    ]
-    return any(pattern in text for pattern in patterns)
+    return errors
 
 
 def _is_thin_wrapper_scrubber(text: str) -> bool:
@@ -243,43 +173,12 @@ def _is_thin_wrapper_scrubber(text: str) -> bool:
     return any(pattern in text for pattern in patterns)
 
 
-def validate_pipeline_driver_versions(pipeline_dirs: Iterable[Path]) -> list[dict[str, Any]]:
-    errors: list[dict[str, Any]] = []
-    drivers = list(iter_pipeline_drivers(pipeline_dirs))
-
-    version_assignment = re.compile(r"^\s*VERSION\s*=", re.M)
-    for driver in drivers:
-        text = driver.read_text(encoding="utf-8")
-        if version_assignment.search(text):
-            errors.append(
-                {
-                    "type": "hardcoded_pipeline_version",
-                    "path": str(driver),
-                    "message": "Remove VERSION assignment from pipeline drivers.",
-                }
-            )
-        # Thin wrappers that delegate to pipeline_factory don't need VERSION import
-        if _is_thin_wrapper_driver(text):
-            continue
-        if "collector_core.__version__" not in text:
-            errors.append(
-                {
-                    "type": "missing_pipeline_version_import",
-                    "path": str(driver),
-                    "message": "Import VERSION from collector_core.__version__.",
-                }
-            )
-
-    return errors
-
-
 def validate_versioned_modules(root: Path) -> list[dict[str, Any]]:
     errors: list[dict[str, Any]] = []
-    acquire_workers = list(iter_acquire_workers(root))
     yellow_scrubbers = list(iter_yellow_scrubbers(root))
     core_modules = list(iter_collector_core_versioned_modules(root))
 
-    versioned_files = acquire_workers + yellow_scrubbers + core_modules
+    versioned_files = yellow_scrubbers + core_modules
     if not versioned_files:
         return errors
 
@@ -297,15 +196,9 @@ def validate_versioned_modules(root: Path) -> list[dict[str, Any]]:
                 }
             )
 
-        # Thin wrappers don't need VERSION import - they delegate to core
-        is_acquire_worker = path in acquire_workers
         is_yellow_scrubber = path in yellow_scrubbers
 
-        if is_acquire_worker and _is_thin_wrapper_worker(text):
-            continue
-        if is_yellow_scrubber and (
-            _is_thin_wrapper_scrubber(text) or _is_thin_wrapper_worker(text)
-        ):
+        if is_yellow_scrubber and _is_thin_wrapper_scrubber(text):
             continue
 
         if "collector_core.__version__" not in text:
@@ -616,9 +509,7 @@ def main() -> int:
         report["errors"].extend(errors)
         report["warnings"].extend(warnings)
 
-    layout_errors, pipeline_dirs = validate_pipeline_layout(root)
-    report["errors"].extend(layout_errors)
-    report["errors"].extend(validate_pipeline_driver_versions(pipeline_dirs))
+    report["errors"].extend(validate_pipeline_layout(root))
     report["errors"].extend(validate_versioned_modules(root))
 
     output_path = None
