@@ -6,9 +6,6 @@ URL validation, and multi-file download capabilities.
 
 from __future__ import annotations
 
-import hashlib
-import ipaddress
-import socket
 import time
 from pathlib import Path
 from typing import Any
@@ -27,22 +24,14 @@ from collector_core.acquire_limits import (
 from collector_core.dependencies import _try_import, requires
 from collector_core.stability import stable_api
 from collector_core.utils.paths import ensure_dir, safe_filename
+from collector_core.acquire.strategies.http_base import (
+    CHUNK_SIZE,
+    DownloadResult,
+    HttpDownloadBase,
+)
 
 # Lazy import for requests
 requests = _try_import("requests")
-
-
-def _sha256_file(path: Path) -> str:
-    """Compute SHA-256 hash of a file.
-
-    This is a local version that always returns a string (never None),
-    as required by the download validation logic.
-    """
-    h = hashlib.sha256()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            h.update(chunk)
-    return h.hexdigest()
 
 
 @stable_api
@@ -72,51 +61,6 @@ def normalize_download(download: dict[str, Any]) -> dict[str, Any]:
     return d
 
 
-def _non_global_ip_reason(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> str:
-    """Get a human-readable reason why an IP is non-global.
-
-    Args:
-        ip: IP address to check
-
-    Returns:
-        String describing the type of non-global IP
-    """
-    if ip.is_private:
-        return "private"
-    if ip.is_loopback:
-        return "loopback"
-    if ip.is_link_local:
-        return "link_local"
-    if ip.is_multicast:
-        return "multicast"
-    if ip.is_reserved:
-        return "reserved"
-    if ip.is_unspecified:
-        return "unspecified"
-    return "non_global"
-
-
-def _resolve_host_ips(hostname: str) -> list[str]:
-    """Resolve a hostname to its IP addresses.
-
-    Args:
-        hostname: Hostname to resolve
-
-    Returns:
-        Sorted list of IP address strings
-    """
-    ips: set[str] = set()
-    try:
-        addrinfo = socket.getaddrinfo(hostname, None)
-    except socket.gaierror:
-        return []
-    for item in addrinfo:
-        sockaddr = item[4]
-        if sockaddr:
-            ips.add(sockaddr[0])
-    return sorted(ips)
-
-
 @stable_api
 def validate_download_url(
     url: str,
@@ -139,35 +83,10 @@ def validate_download_url(
     Returns:
         Tuple of (is_valid, error_reason)
     """
-    parsed = urlparse(url)
-    scheme = (parsed.scheme or "").lower()
-    if scheme not in {"http", "https"}:
-        return False, f"unsupported_scheme:{scheme or 'missing'}"
-    if not parsed.hostname:
-        return False, "missing_hostname"
-    if allow_non_global_hosts:
-        return True, None
-    allowlist = internal_mirror_allowlist or InternalMirrorAllowlist()
-    hostname = parsed.hostname
-    if allowlist.allows_host(hostname):
-        return True, None
-    try:
-        ip_value = ipaddress.ip_address(hostname)
-    except ValueError:
-        ips = _resolve_host_ips(hostname)
-        if not ips:
-            return False, "unresolvable_hostname"
-        for ip_str in ips:
-            ip_value = ipaddress.ip_address(ip_str)
-            if ip_value.is_global:
-                continue
-            if allowlist.allows_ip(ip_value):
-                continue
-            return False, f"blocked_ip:{ip_str}:{_non_global_ip_reason(ip_value)}"
-        return True, None
-    if not ip_value.is_global and not allowlist.allows_ip(ip_value):
-        return False, f"blocked_ip:{ip_value}:{_non_global_ip_reason(ip_value)}"
-    return True, None
+    result = HttpDownloadBase.validate_download_url(
+        url, allow_non_global_hosts, internal_mirror_allowlist
+    )
+    return result.allowed, result.reason
 
 
 def _validate_redirect_chain(
@@ -191,39 +110,10 @@ def _validate_redirect_chain(
         if location:
             redirect_urls.append(urljoin(resp.url, location))
     redirect_urls.append(response.url)
-    for redirect_url in redirect_urls:
-        allowed, reason = validate_download_url(
-            redirect_url, allow_non_global_hosts, internal_mirror_allowlist
-        )
-        if not allowed:
-            return False, reason, redirect_url
-    return True, None, None
-
-
-def _parse_content_length(response: "requests.Response", existing: int) -> int | None:
-    """Parse total content length from response headers.
-
-    Handles both Content-Length and Content-Range headers for resume support.
-
-    Args:
-        response: HTTP response object
-        existing: Bytes already downloaded (for resume)
-
-    Returns:
-        Total content length or None if unknown
-    """
-    content_range = response.headers.get("Content-Range")
-    if content_range and "/" in content_range:
-        total = content_range.split("/", 1)[1]
-        if total.isdigit():
-            return int(total)
-    content_length = response.headers.get("Content-Length")
-    if content_length and content_length.isdigit():
-        length = int(content_length)
-        if response.status_code == 206 and existing:
-            return existing + length
-        return length
-    return None
+    result = HttpDownloadBase.validate_redirect_urls(
+        redirect_urls, allow_non_global_hosts, internal_mirror_allowlist
+    )
+    return result.allowed, result.reason, result.blocked_url
 
 
 def _http_download_with_resume(
@@ -269,24 +159,13 @@ def _http_download_with_resume(
     ) -> None:
         nonlocal content_length, resolved_url
         resolved_url = response.url
-        content_length = _parse_content_length(response, existing_offset)
+        content_length = HttpDownloadBase.parse_content_length(
+            response.headers, response.status_code, existing_offset
+        )
         with temp_path.open(write_mode) as f:
-            for chunk in response.iter_content(chunk_size=1024 * 1024):
+            for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
                 if chunk:
                     f.write(chunk)
-
-    def _valid_content_range(header: str | None, start_offset: int) -> bool:
-        if not header:
-            return False
-        if not header.startswith("bytes "):
-            return False
-        try:
-            range_part = header.split(" ", 1)[1]
-            span, _total = range_part.split("/", 1)
-            start_str, _end_str = span.split("-", 1)
-            return int(start_str) == start_offset
-        except ValueError:
-            return False
 
     def _is_transient_error(exc: Exception) -> bool:
         if isinstance(exc, requests.exceptions.HTTPError):
@@ -303,16 +182,16 @@ def _http_download_with_resume(
             ),
         )
 
-    allowed, reason = validate_download_url(
+    validation = HttpDownloadBase.validate_download_url(
         url, ctx.allow_non_global_download_hosts, ctx.internal_mirror_allowlist
     )
-    if not allowed:
-        return {
-            "status": "error",
-            "error": "blocked_url",
-            "reason": reason,
-            "url": url,
-        }
+    if not validation.allowed:
+        return DownloadResult(
+            status="error",
+            error="blocked_url",
+            reason=validation.reason,
+            url=url,
+        ).to_dict()
 
     for attempt in range(max_attempts):
         headers: dict[str, str] = {}
@@ -337,7 +216,9 @@ def _http_download_with_resume(
                     break
                 if existing and ctx.mode.enable_resume:
                     content_range = r.headers.get("Content-Range")
-                    valid_range = _valid_content_range(content_range, existing)
+                    valid_range = HttpDownloadBase.valid_content_range(
+                        content_range, existing
+                    )
                     if r.status_code == 206:
                         if content_range and not valid_range:
                             raise RuntimeError("Invalid Content-Range for resumed download.")
@@ -373,47 +254,50 @@ def _http_download_with_resume(
         break
     if blocked_url:
         temp_path.unlink(missing_ok=True)
-        return {
-            "status": "error",
-            "error": "blocked_url",
-            "reason": blocked_reason,
-            "url": url,
-            "blocked_url": blocked_url,
-        }
+        return DownloadResult(
+            status="error",
+            error="blocked_url",
+            reason=blocked_reason,
+            url=url,
+            blocked_url=blocked_url,
+        ).to_dict()
     actual_size = temp_path.stat().st_size
     if content_length is None:
         content_length = actual_size
     if expected_size is not None and actual_size != expected_size:
         temp_path.unlink(missing_ok=True)
-        return {
-            "status": "error",
-            "error": "size_mismatch",
-            "message": f"Expected size {expected_size} bytes but downloaded {actual_size} bytes.",
-            "resolved_url": resolved_url,
-            "content_length": content_length,
-        }
-    sha256 = _sha256_file(temp_path)
+        return DownloadResult(
+            status="error",
+            error="size_mismatch",
+            message=(
+                f"Expected size {expected_size} bytes "
+                f"but downloaded {actual_size} bytes."
+            ),
+            resolved_url=resolved_url,
+            content_length=content_length,
+        ).to_dict()
+    sha256 = HttpDownloadBase.sha256_file(temp_path)
     if expected_sha256 and sha256.lower() != expected_sha256.lower():
         temp_path.unlink(missing_ok=True)
-        return {
-            "status": "error",
-            "error": "sha256_mismatch",
-            "message": "Expected sha256 did not match downloaded content.",
-            "expected_sha256": expected_sha256,
-            "sha256": sha256,
-            "resolved_url": resolved_url,
-            "content_length": content_length,
-        }
+        return DownloadResult(
+            status="error",
+            error="sha256_mismatch",
+            message="Expected sha256 did not match downloaded content.",
+            expected_sha256=expected_sha256,
+            sha256=sha256,
+            resolved_url=resolved_url,
+            content_length=content_length,
+        ).to_dict()
     temp_path.replace(out_path)
-    result: dict[str, Any] = {
-        "status": "ok",
-        "path": str(out_path),
-        "resolved_url": resolved_url,
-        "content_length": content_length,
-        "sha256": sha256,
-    }
+    result: dict[str, Any] = DownloadResult(
+        status="ok",
+        path=str(out_path),
+        resolved_url=resolved_url,
+        content_length=content_length,
+        sha256=sha256,
+    ).to_dict()
     if ctx.mode.verify_sha256 and "sha256" not in result:
-        result["sha256"] = _sha256_file(out_path)
+        result["sha256"] = HttpDownloadBase.sha256_file(out_path)
     return result
 
 
