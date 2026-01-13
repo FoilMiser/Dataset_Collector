@@ -228,6 +228,12 @@ def transform_record(
     if result is None:
         return None
 
+    # Add screening metadata
+    screening: dict[str, Any] = {"domain": "biology"}
+    if decision.extra:
+        screening.update(decision.extra)
+    result["screening"] = screening
+
     extra = decision.extra or {}
 
     # Add extracted identifiers

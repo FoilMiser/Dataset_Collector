@@ -275,6 +275,12 @@ def transform_record(
     if result is None:
         return None
 
+    # Add screening metadata
+    screening: dict[str, Any] = {"domain": "chem"}
+    if decision.extra:
+        screening.update(decision.extra)
+    result["screening"] = screening
+
     # Add chemistry-specific fields
     extra = decision.extra or {}
     if extra.get("cas_numbers"):

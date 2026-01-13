@@ -3,10 +3,12 @@ from __future__ import annotations
 from collector_core.yellow.domains import standard
 
 
-def test_standard_rejects_missing_text(domain_ctx) -> None:
-    decision = standard.filter_record({}, domain_ctx)
+def test_standard_rejects_text_too_long(domain_ctx) -> None:
+    # Text exceeding max_chars should be rejected
+    long_text = "x" * 20000
+    decision = standard.filter_record({"text": long_text}, domain_ctx)
     assert decision.allow is False
-    assert decision.reason == "no_text"
+    assert decision.reason == "length_bounds"
 
 
 def test_standard_allows_and_transforms_record(domain_ctx) -> None:
