@@ -16,7 +16,8 @@ def sort_queue_rows(rows: list[dict[str, object]]) -> list[dict[str, object]]:
         p = row.get("priority", None)
         try:
             pi = int(p) if p is not None else -999999
-        except Exception:
+        except (ValueError, TypeError):
+            # P1.1I: Catch specific type conversion errors
             logger.debug("Failed to parse priority %r for row %s", p, row.get("id", ""))
             pi = -999999
         return (-pi, str(row.get("id", "")))

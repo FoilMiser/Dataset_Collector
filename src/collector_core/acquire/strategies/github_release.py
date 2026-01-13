@@ -6,6 +6,7 @@ release assets from GitHub repositories via their REST API.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from pathlib import Path
@@ -97,13 +98,13 @@ def make_github_release_handler(user_agent: str) -> StrategyHandler:
         if not owner or not repo:
             return [{"status": "error", "error": "missing owner/repo"}]
         headers = {"User-Agent": f"{user_agent}/{VERSION}"}
-        token = (download.get("github_token") or os.environ.get("GITHUB_TOKEN") or "").strip()
-        token_file = Path.home() / ".github_token"
-        if not token and token_file.exists():
-            try:
-                token = token_file.read_text().strip()
-            except Exception:
-                token = ""
+        # P0.5: Warn if github_token is set in config (should use env var instead)
+        if download.get("github_token"):
+            logger.warning(
+                "github_token in config is deprecated; use GITHUB_TOKEN env var or gh auth"
+            )
+        # Only use env var for token - file-based tokens removed for security
+        token = os.environ.get("GITHUB_TOKEN", "").strip()
         if token:
             headers["Authorization"] = f"Bearer {token}"
         base = f"https://api.github.com/repos/{owner}/{repo}/releases"
@@ -135,7 +136,11 @@ def make_github_release_handler(user_agent: str) -> StrategyHandler:
             retry_on_429=rate_config.retry_on_429,
             retry_on_403=rate_config.retry_on_403,  # GitHub uses 403 for rate limits
         )
-        meta = resp.json()
+        # P1.2C: Handle JSON decode errors from API response
+        try:
+            meta = resp.json()
+        except json.JSONDecodeError as e:
+            return [{"status": "error", "error": f"Invalid JSON from GitHub API: {e}"}]
         assets = meta.get("assets", []) or []
         results: list[dict[str, Any]] = []
         ensure_dir(out_dir)

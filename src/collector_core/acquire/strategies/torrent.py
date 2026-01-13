@@ -5,6 +5,7 @@ Torrent/magnet download via aria2c.
 
 from __future__ import annotations
 
+import re
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -18,6 +19,53 @@ from collector_core.acquire_limits import (
 from collector_core.acquire_strategies import normalize_download
 from collector_core.stability import stable_api
 from collector_core.utils.paths import ensure_dir
+
+# Pattern for valid magnet URIs (BTIHv1: 40 hex chars, BTIHv2: 64 hex chars)
+_MAGNET_PATTERN = re.compile(
+    r"^magnet:\?xt=urn:btih:[a-fA-F0-9]{40}([a-fA-F0-9]{24})?(&.*)?$"
+)
+
+# Pattern for valid .torrent file paths (local files only)
+_TORRENT_FILE_PATTERN = re.compile(r"^[a-zA-Z0-9_./-]+\.torrent$")
+
+# Shell metacharacters that should never appear in magnet/torrent links
+_SHELL_METACHAR_PATTERN = re.compile(r"[;&|`$(){}[\]<>!#\n\r]")
+
+
+def _is_valid_magnet(link: str) -> bool:
+    """Validate that a magnet link or torrent path is safe.
+
+    Validates magnet links have proper format:
+    - Must start with "magnet:?xt=urn:btih:"
+    - Must contain a 40-char (v1) or 64-char (v2) hex infohash
+    - Must not contain shell metacharacters
+
+    For .torrent files:
+    - Must be a simple path ending in .torrent
+    - Must not contain shell metacharacters
+
+    Args:
+        link: The magnet URI or torrent file path to validate.
+
+    Returns:
+        True if the link is safe, False otherwise.
+    """
+    if not link or not isinstance(link, str):
+        return False
+
+    # Reject any shell metacharacters
+    if _SHELL_METACHAR_PATTERN.search(link):
+        return False
+
+    # Check if it's a magnet link
+    if link.startswith("magnet:"):
+        return bool(_MAGNET_PATTERN.match(link))
+
+    # Check if it's a .torrent file path
+    if link.endswith(".torrent"):
+        return bool(_TORRENT_FILE_PATTERN.match(link))
+
+    return False
 
 
 @stable_api
@@ -69,6 +117,9 @@ def handle_torrent(
     magnet = download.get("magnet") or download.get("torrent")
     if not magnet:
         return [{"status": "error", "error": "missing magnet/torrent"}]
+    # P0.2: Validate magnet link format to prevent command injection
+    if not _is_valid_magnet(magnet):
+        return [{"status": "error", "error": f"Invalid magnet link format: {magnet[:50]!r}..."}]
     limit_error = enforcer.start_file(magnet)
     if limit_error:
         return [limit_error]
@@ -87,7 +138,7 @@ def handle_torrent(
             cleanup_path(out_dir)
             return [limit_error]
         return [result]
-    except Exception as e:
+    except subprocess.SubprocessError as e:
         return [{"status": "error", "error": repr(e)}]
 
 

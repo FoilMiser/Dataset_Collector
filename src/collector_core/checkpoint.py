@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -38,7 +39,11 @@ def checkpoint_path(checkpoint_dir: Path, pipeline_id: str) -> Path:
 def load_checkpoint(path: Path) -> CheckpointState | None:
     if not path.exists():
         return None
-    payload = read_json(path)
+    # P1.2F: Handle JSON decode errors when loading checkpoint
+    try:
+        payload = read_json(path)
+    except (json.JSONDecodeError, OSError):
+        return None
     return CheckpointState(
         run_id=str(payload.get("run_id") or ""),
         pipeline_id=str(payload.get("pipeline_id") or ""),

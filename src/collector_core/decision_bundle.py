@@ -237,8 +237,9 @@ def load_decision_bundle(path: Path) -> DecisionBundle | None:
     """Load a decision bundle from a file."""
     if not path.exists():
         return None
+    # P1.2H: Handle file read and JSON decode errors
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         bundle = DecisionBundle(
             target_id=data["target_id"],
             decision=data["decision"],
@@ -299,7 +300,8 @@ def load_decision_bundle(path: Path) -> DecisionBundle | None:
             bundle.override_link = override.get("link")
 
         return bundle
-    except Exception:
+    except (json.JSONDecodeError, KeyError, OSError, TypeError):
+        # P1.2H: Handle file read, JSON decode, and key errors
         return None
 
 

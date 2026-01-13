@@ -5,6 +5,7 @@ import cProfile
 import gzip
 import importlib.util
 import json
+import os
 import pstats
 import tracemalloc
 from collections.abc import Iterable, Iterator
@@ -599,6 +600,10 @@ def apply_pending_updates(roots: Roots, state: MergeState) -> None:
                         max_duplicates=state.max_duplicates,
                     )
                 dst.write(json.dumps(record, ensure_ascii=False) + "\n")
+            # P1.3C: Flush and fsync before atomic rename
+            dst.flush()
+            if hasattr(dst, "fileno"):
+                os.fsync(dst.fileno())
         temp_path.replace(path)
 
 

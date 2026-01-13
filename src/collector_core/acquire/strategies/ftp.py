@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -15,6 +16,38 @@ from collector_core.utils.hash import sha256_file
 from collector_core.utils.paths import ensure_dir, safe_filename
 
 FTP = _try_import("ftplib", "FTP")
+
+# Pattern to detect unsafe characters in FTP filenames
+_UNSAFE_FILENAME_PATTERN = re.compile(r"[\x00-\x1f\x7f]|\.\.|\\/")
+
+
+def _is_safe_filename(fname: str) -> bool:
+    """Validate that a filename from FTP server is safe.
+
+    Rejects filenames containing:
+    - Control characters (newlines, carriage returns, null bytes, etc.)
+    - Path traversal sequences (..)
+    - Absolute path indicators (leading /)
+    - Backslashes (Windows path separators)
+
+    Args:
+        fname: The filename to validate.
+
+    Returns:
+        True if the filename is safe, False otherwise.
+    """
+    if not fname or not fname.strip():
+        return False
+    # Reject control characters, path traversal, and absolute paths
+    if _UNSAFE_FILENAME_PATTERN.search(fname):
+        return False
+    # Reject absolute paths
+    if fname.startswith("/") or fname.startswith("\\"):
+        return False
+    # Reject filenames that are just dots
+    if fname.strip(".") == "":
+        return False
+    return True
 
 
 @stable_api
@@ -58,6 +91,13 @@ def handle_ftp(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
         for g in globs:
             files = ftp.nlst(g)
             for fname in files:
+                # P0.1: Validate filename to prevent command injection
+                if not _is_safe_filename(fname):
+                    results.append({
+                        "status": "error",
+                        "error": f"Unsafe filename from FTP server: {fname!r}",
+                    })
+                    continue
                 limit_error = enforcer.start_file(fname)
                 if limit_error:
                     results.append(limit_error)

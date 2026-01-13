@@ -7,6 +7,7 @@ This module provides handlers for AWS S3 data acquisition:
 
 from __future__ import annotations
 
+import re
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,45 @@ from collector_core.acquire_strategies import normalize_download
 from collector_core.stability import stable_api
 from collector_core.utils.hash import sha256_file
 from collector_core.utils.paths import ensure_dir, safe_filename
+
+# P0.3: Whitelist of allowed request_payer values
+_ALLOWED_REQUEST_PAYER_VALUES = frozenset({"requester", ""})
+
+# P0.3: Whitelist of allowed extra_args prefixes for aws s3 sync
+_ALLOWED_EXTRA_ARG_PREFIXES = frozenset({
+    "--no-sign-request",
+    "--region",
+    "--endpoint-url",
+    "--exclude",
+    "--include",
+    "--delete",
+    "--dryrun",
+    "--quiet",
+    "--only-show-errors",
+})
+
+# Pattern to detect shell metacharacters
+_SHELL_METACHAR_PATTERN = re.compile(r"[;&|`$(){}[\]<>!#\n\r]")
+
+
+def _validate_s3_extra_args(extra_args: list[Any]) -> str | None:
+    """Validate extra_args against whitelist.
+
+    Args:
+        extra_args: List of extra arguments to validate.
+
+    Returns:
+        Error message if validation fails, None if valid.
+    """
+    for arg in extra_args:
+        arg_str = str(arg)
+        # Check for shell metacharacters
+        if _SHELL_METACHAR_PATTERN.search(arg_str):
+            return f"Disallowed S3 extra arg (shell metacharacters): {arg_str}"
+        # Check against whitelist
+        if not any(arg_str.startswith(prefix) for prefix in _ALLOWED_EXTRA_ARG_PREFIXES):
+            return f"Disallowed S3 extra arg: {arg_str}"
+    return None
 
 
 @stable_api
@@ -79,6 +119,17 @@ def handle_s3_sync(
     ensure_dir(out_dir)
     results: list[dict[str, Any]] = []
     extra_args = download.get("extra_args", []) or []
+
+    # P0.3: Validate request_payer value
+    request_payer = download.get("request_payer")
+    if request_payer and str(request_payer) not in _ALLOWED_REQUEST_PAYER_VALUES:
+        return [{"status": "error", "error": f"Invalid request_payer value: {request_payer}"}]
+
+    # P0.3: Validate extra_args against whitelist
+    extra_args_error = _validate_s3_extra_args(extra_args)
+    if extra_args_error:
+        return [{"status": "error", "error": extra_args_error}]
+
     for url in urls:
         limit_error = enforcer.start_file(url)
         if limit_error:
@@ -157,6 +208,9 @@ def handle_aws_requester_pays(
         return [{"status": "noop", "path": str(out_path)}]
     ensure_dir(out_path.parent)
     payer = download.get("request_payer", "requester")
+    # P0.3: Validate request_payer value
+    if payer and str(payer) not in _ALLOWED_REQUEST_PAYER_VALUES and str(payer) != "requester":
+        return [{"status": "error", "error": f"Invalid request_payer value: {payer}"}]
     temp_path = out_path.with_name(f"{out_path.name}.part")
     cmd = [
         "aws",

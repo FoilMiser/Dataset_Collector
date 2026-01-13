@@ -448,7 +448,8 @@ def _is_probable_url(value: str) -> bool:
 
         parsed = urlparse(value)
         return parsed.scheme.lower() in {"http", "https"} and bool(parsed.netloc)
-    except Exception:
+    except ValueError:
+        # P1.1E: Catch specific URL parsing exception
         logger.debug("Failed to parse URL: %r", value)
         return False
 
@@ -486,7 +487,8 @@ def read_review_signoff(manifest_dir: Path) -> dict[str, Any]:
         return {}
     try:
         return json.loads(p.read_text(encoding="utf-8"))
-    except Exception:
+    except (json.JSONDecodeError, OSError):
+        # P1.1E: Catch specific JSON decode and file read errors
         logger.warning("Failed to read review signoff from %s", p, exc_info=True)
         return {}
 

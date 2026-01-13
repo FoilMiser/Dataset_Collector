@@ -7,7 +7,9 @@ from Zenodo records via their REST API.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +27,10 @@ from collector_core.dependencies import _try_import, requires
 from collector_core.network_utils import _with_retries
 from collector_core.stability import stable_api
 from collector_core.utils.paths import ensure_dir, safe_filename
+
+# P0.4: Validation patterns for Zenodo identifiers
+_RECORD_ID_PATTERN = re.compile(r"^\d+$")
+_DOI_PATTERN = re.compile(r"^10\.\d{4,}/[^\s<>\"]+$")
 
 # Alias for backwards compatibility
 safe_name = safe_filename
@@ -82,6 +88,13 @@ def handle_zenodo(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> li
     record_id = download.get("record_id")
     doi = download.get("doi")
     url = download.get("url")
+
+    # P0.4: Validate record_id and doi to prevent SSRF
+    if record_id and not _RECORD_ID_PATTERN.match(str(record_id)):
+        return [{"status": "error", "error": f"Invalid Zenodo record_id: {record_id}"}]
+    if doi and not _DOI_PATTERN.match(str(doi)):
+        return [{"status": "error", "error": f"Invalid DOI format: {doi}"}]
+
     if not api_url:
         if record_id:
             api_url = f"https://zenodo.org/api/records/{record_id}"
@@ -108,12 +121,21 @@ def handle_zenodo(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> li
         backoff_base=ctx.retry.backoff_base,
         backoff_max=ctx.retry.backoff_max,
     )
-    data = resp.json()
+    # P1.2B: Handle JSON decode errors from API response
+    try:
+        data = resp.json()
+    except json.JSONDecodeError as e:
+        return [{"status": "error", "error": f"Invalid JSON from Zenodo API: {e}"}]
     hits = data.get("hits", {}).get("hits", [])
     if hits and not data.get("files"):
         data = hits[0]
     results: list[dict[str, Any]] = []
-    files = data.get("files", []) or data.get("hits", {}).get("hits", [{}])[0].get("files", [])
+    # P1.4B: Fix unsafe [0] access on potentially empty list
+    files = data.get("files", [])
+    if not files:
+        fallback_hits = data.get("hits", {}).get("hits", [])
+        if fallback_hits:
+            files = fallback_hits[0].get("files", [])
     for f in files:
         link = f.get("links", {}).get("self") or f.get("link")
         if not link:
