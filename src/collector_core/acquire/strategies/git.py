@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -14,49 +13,8 @@ from collector_core.acquire_limits import (
 )
 from collector_core.stability import stable_api
 from collector_core.utils.paths import ensure_dir, safe_filename
-
-
-def normalize_download(download: dict[str, Any]) -> dict[str, Any]:
-    """Normalize download configuration by merging nested config and handling aliases."""
-    d = dict(download or {})
-    cfg = d.get("config")
-
-    if isinstance(cfg, dict):
-        merged = dict(cfg)
-        merged.update({k: v for k, v in d.items() if k != "config"})
-        d = merged
-
-    if d.get("strategy") == "zenodo":
-        if not d.get("record_id") and d.get("record"):
-            d["record_id"] = d["record"]
-        if not d.get("record_id") and isinstance(d.get("record_ids"), list) and d["record_ids"]:
-            d["record_id"] = d["record_ids"][0]
-
-    return d
-
-
-@stable_api
-def run_cmd(cmd: list[str], cwd: Path | None = None) -> str:
-    """Run a shell command and return its stdout output.
-
-    Args:
-        cmd: Command and arguments as a list of strings.
-        cwd: Optional working directory for the command.
-
-    Returns:
-        The stdout output of the command as a string.
-
-    Raises:
-        subprocess.CalledProcessError: If the command exits with non-zero status.
-    """
-    p = subprocess.run(
-        cmd,
-        cwd=str(cwd) if cwd else None,
-        check=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-    )
-    return p.stdout.decode("utf-8", errors="ignore")
+from collector_core.utils.download import normalize_download
+from collector_core.utils.subprocess import run_cmd
 
 
 @stable_api

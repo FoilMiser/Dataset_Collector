@@ -8,16 +8,16 @@ This module provides handlers for AWS S3 data acquisition:
 from __future__ import annotations
 
 import re
-import subprocess
 from pathlib import Path
 from typing import Any
 
 from collector_core.acquire.context import AcquireContext, StrategyHandler
 from collector_core.acquire_limits import build_target_limit_enforcer, resolve_result_bytes
-from collector_core.acquire_strategies import normalize_download
 from collector_core.stability import stable_api
+from collector_core.utils.download import normalize_download
 from collector_core.utils.hash import sha256_file
 from collector_core.utils.paths import ensure_dir, safe_filename
+from collector_core.utils.subprocess import run_cmd
 
 # P0.3: Whitelist of allowed request_payer values
 _ALLOWED_REQUEST_PAYER_VALUES = frozenset({"requester", ""})
@@ -57,30 +57,6 @@ def _validate_s3_extra_args(extra_args: list[Any]) -> str | None:
         if not any(arg_str.startswith(prefix) for prefix in _ALLOWED_EXTRA_ARG_PREFIXES):
             return f"Disallowed S3 extra arg: {arg_str}"
     return None
-
-
-@stable_api
-def run_cmd(cmd: list[str], cwd: Path | None = None) -> str:
-    """Run a shell command and return its output.
-
-    Args:
-        cmd: Command and arguments to execute.
-        cwd: Working directory for the command.
-
-    Returns:
-        Command stdout as a string.
-
-    Raises:
-        subprocess.CalledProcessError: If the command fails.
-    """
-    p = subprocess.run(
-        cmd,
-        cwd=str(cwd) if cwd else None,
-        check=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-    )
-    return p.stdout.decode("utf-8", errors="ignore")
 
 
 @stable_api
