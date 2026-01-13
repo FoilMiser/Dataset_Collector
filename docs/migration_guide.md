@@ -151,6 +151,120 @@ python -m collector_core.dc_cli run --pipeline chem --stage acquire
 - The `safe_name` alias is provided in `acquire_strategies.py`
 - Legacy `run_pipeline.sh` scripts have moved under each pipeline's `legacy/` directory and are deprecated (removal target: v3.0).
 
+## Removed in v3.0
+
+### Per-Pipeline Worker Scripts
+
+The following files have been removed from all pipeline directories:
+- `acquire_worker.py`
+- `merge_worker.py`
+- `yellow_screen_worker.py`
+- `pipeline_driver.py`
+- `catalog_builder.py`
+- `review_queue.py`
+- `pmc_worker.py`
+
+**Migration:** Use the unified CLI instead:
+
+```bash
+# Old (removed):
+python math_pipeline_v2/acquire_worker.py --queue /data/math/_queues/green.jsonl
+
+# New:
+dc run --pipeline math --stage acquire -- --queue /data/math/_queues/green.jsonl
+```
+
+### Legacy Shell Scripts
+
+The `legacy/` directories have been removed from all pipelines. Use `dc run` or `dc pipeline` commands.
+
+## New Features in v3.0
+
+### 1. Near-Duplicate Detection
+
+Efficient near-duplicate detection is now available:
+
+```python
+from collector_core.checks import create_detector
+
+detector = create_detector(threshold=0.8)
+detector.add("doc1", "Machine learning is a subset of AI.")
+
+result = detector.query("Machine learning is part of AI.")
+print(f"Is duplicate: {result.is_duplicate}")  # True
+```
+
+### 2. Domain-Specific Yellow Screeners
+
+All domain screeners now have real implementations with domain-specific logic:
+- Chemistry: CAS number extraction, controlled substance detection
+- Biology: Gene ID extraction, biosecurity screening
+- Code: License detection, secret scanning, malware patterns
+- NLP: Language detection, PII detection, toxicity scanning
+- Cyber: CVE extraction, exploit detection
+- Safety: Incident classification, severity assessment
+- Economics: Financial data sensitivity, temporal coverage
+- Knowledge Graph: Entity extraction, ontology compliance
+
+### 3. Content Checks
+
+New content check implementations:
+- `language_detect`: Language detection with confidence scoring
+- `license_validate`: License validation and classification
+- `toxicity_scan`: Toxicity and harmful content detection
+- `schema_validate`: Schema validation for structured data
+- `distribution_statement`: Export control and distribution statement extraction
+
+### 4. Metrics Dashboard
+
+Pipeline metrics collection and export:
+
+```python
+from collector_core.metrics import MetricsCollector
+
+collector = MetricsCollector()
+with collector.track("math", "acquire") as metrics:
+    metrics.records_processed = 1000
+    metrics.records_passed = 950
+
+collector.export_json(Path("metrics.json"))
+```
+
+### 5. Checkpoint/Resume Support
+
+Long-running operations can now checkpoint and resume:
+
+```python
+from collector_core.checkpoint import CheckpointManager
+
+checkpoint_mgr = CheckpointManager(Path("/data/_checkpoints"))
+state = checkpoint_mgr.load("my-operation")
+
+# Process with checkpointing
+for i, item in enumerate(items):
+    if i < state.get("last_index", 0):
+        continue
+    process(item)
+    if i % 100 == 0:
+        checkpoint_mgr.save("my-operation", {"last_index": i})
+
+checkpoint_mgr.cleanup("my-operation")
+```
+
+### 6. Schema Version Enforcement
+
+Configuration files are now validated for schema version compatibility:
+
+```python
+from collector_core.schema_version import validate_schema_version
+
+validate_schema_version(config, "targets", min_version="0.9")
+```
+
 ## Breaking Changes
 
-None. All changes are additive and backwards compatible.
+### v3.0 Breaking Changes
+
+1. **Per-pipeline wrapper scripts removed**: Use `dc run` or `dc pipeline` commands instead.
+2. **Legacy directories removed**: Shell scripts in `legacy/` directories have been deleted.
+3. **Schemas moved to package resources**: The `src/schemas` symlink has been removed. Schemas are now included as package data in `collector_core/schemas/`.

@@ -69,8 +69,12 @@ async = [
   "httpx>=0.27.0",
 ]
 
+dedup = [
+  "datasketch>=1.6.0",
+]
+
 all = [
-  "dataset-collector[dev,observability,async]",
+  "dataset-collector[dev,observability,async,dedup]",
 ]
 
 [project.scripts]
@@ -86,7 +90,7 @@ version = { attr = "collector_core.__version__.__version__" }
 package-dir = { "" = "src" }
 
 [tool.setuptools.package-data]
-collector_core = ["py.typed"]
+collector_core = ["py.typed", "schemas/*.json"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -100,18 +104,30 @@ testpaths = ["tests"]
 [tool.mypy]
 python_version = "3.10"
 warn_unused_configs = true
-ignore_missing_imports = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+strict_equality = true
+strict_concatenate = true
+check_untyped_defs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_return_any = true
 
 [[tool.mypy.overrides]]
 module = [
-  "collector_core.classification.*",
-  "collector_core.evidence.*",
-  "collector_core.acquire_strategies",
-  "collector_core.merge.*",
-  "collector_core.yellow_screen_*",
-  "collector_core.yellow_scrubber_base",
+  "datasets.*",
+  "boto3.*",
+  "botocore.*",
+  "datasketch.*",
+  "trafilatura.*",
+  "pypdf.*",
+  "pdfminer.*",
+  "bs4.*",
+  "lxml.*",
 ]
-disallow_untyped_defs = true
+ignore_missing_imports = true
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
