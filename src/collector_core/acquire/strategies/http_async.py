@@ -24,7 +24,6 @@ Usage:
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import logging
 from collections.abc import Callable, Coroutine
 from pathlib import Path
@@ -35,9 +34,13 @@ from collector_core.acquire.context import (
     AcquireContext,
     InternalMirrorAllowlist,
 )
-from collector_core.acquire.strategies.http import (
-    normalize_download,
-    validate_download_url,
+from collector_core.acquire.strategies.http import normalize_download
+from collector_core.acquire.strategies.http_base import (
+    CHUNK_SIZE,
+    DEFAULT_CONNECT_TIMEOUT,
+    DEFAULT_READ_TIMEOUT,
+    DownloadResult,
+    HttpDownloadBase,
 )
 from collector_core.acquire_limits import (
     build_target_limit_enforcer,
@@ -65,25 +68,6 @@ AsyncStrategyHandler = Callable[
 
 # Default concurrency settings
 DEFAULT_MAX_CONCURRENT_DOWNLOADS = 5
-DEFAULT_CONNECT_TIMEOUT = 15.0
-DEFAULT_READ_TIMEOUT = 300.0
-CHUNK_SIZE = 1024 * 1024  # 1 MB chunks
-
-
-def _sha256_file(path: Path) -> str:
-    """Compute SHA-256 hash of a file.
-
-    Args:
-        path: Path to the file
-
-    Returns:
-        Lowercase hex-encoded SHA-256 hash
-    """
-    h = hashlib.sha256()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(CHUNK_SIZE), b""):
-            h.update(chunk)
-    return h.hexdigest()
 
 
 def is_async_available() -> bool:
@@ -136,60 +120,6 @@ class _AsyncDownloadState:
         self.blocked_reason: str | None = None
 
 
-def _valid_content_range(header: str | None, start_offset: int) -> bool:
-    """Validate Content-Range header for resumed download.
-
-    Args:
-        header: Content-Range header value
-        start_offset: Expected start byte offset
-
-    Returns:
-        True if header is valid and matches expected offset
-    """
-    if not header:
-        return False
-    if not header.startswith("bytes "):
-        return False
-    try:
-        range_part = header.split(" ", 1)[1]
-        span, _total = range_part.split("/", 1)
-        start_str, _end_str = span.split("-", 1)
-        return int(start_str) == start_offset
-    except ValueError:
-        return False
-
-
-def _parse_content_length_from_headers(
-    headers: dict[str, str],
-    status_code: int,
-    existing: int,
-) -> int | None:
-    """Parse total content length from response headers.
-
-    Handles both Content-Length and Content-Range headers for resume support.
-
-    Args:
-        headers: Response headers dictionary
-        status_code: HTTP response status code
-        existing: Bytes already downloaded (for resume)
-
-    Returns:
-        Total content length or None if unknown
-    """
-    content_range = headers.get("Content-Range") or headers.get("content-range")
-    if content_range and "/" in content_range:
-        total = content_range.split("/", 1)[1]
-        if total.isdigit():
-            return int(total)
-    content_length = headers.get("Content-Length") or headers.get("content-length")
-    if content_length and content_length.isdigit():
-        length = int(content_length)
-        if status_code == 206 and existing:
-            return existing + length
-        return length
-    return None
-
-
 def _is_transient_status_code(status_code: int) -> bool:
     """Check if HTTP status code indicates a transient/retryable error.
 
@@ -236,13 +166,10 @@ async def _validate_redirect_chain_aiohttp(
 
     redirect_urls.append(str(response.url))
 
-    for redirect_url in redirect_urls:
-        allowed, reason = validate_download_url(
-            redirect_url, allow_non_global_hosts, internal_mirror_allowlist
-        )
-        if not allowed:
-            return False, reason, redirect_url
-    return True, None, None
+    result = HttpDownloadBase.validate_redirect_urls(
+        redirect_urls, allow_non_global_hosts, internal_mirror_allowlist
+    )
+    return result.allowed, result.reason, result.blocked_url
 
 
 async def _validate_redirect_chain_httpx(
@@ -270,13 +197,10 @@ async def _validate_redirect_chain_httpx(
 
     redirect_urls.append(str(response.url))
 
-    for redirect_url in redirect_urls:
-        allowed, reason = validate_download_url(
-            redirect_url, allow_non_global_hosts, internal_mirror_allowlist
-        )
-        if not allowed:
-            return False, reason, redirect_url
-    return True, None, None
+    result = HttpDownloadBase.validate_redirect_urls(
+        redirect_urls, allow_non_global_hosts, internal_mirror_allowlist
+    )
+    return result.allowed, result.reason, result.blocked_url
 
 
 def _is_transient_exception_aiohttp(exc: Exception) -> bool:
@@ -351,7 +275,7 @@ async def _stream_response_aiohttp(
     """
     state.resolved_url = str(response.url)
     headers = {k: v for k, v in response.headers.items()}
-    state.content_length = _parse_content_length_from_headers(
+    state.content_length = HttpDownloadBase.parse_content_length(
         headers, response.status, existing_offset
     )
 
@@ -379,7 +303,7 @@ async def _stream_response_httpx(
     """
     state.resolved_url = str(response.url)
     headers = {k: v for k, v in response.headers.items()}
-    state.content_length = _parse_content_length_from_headers(
+    state.content_length = HttpDownloadBase.parse_content_length(
         headers, response.status_code, existing_offset
     )
 
@@ -421,16 +345,16 @@ async def _async_download_aiohttp(
     state = _AsyncDownloadState()
 
     # Validate initial URL
-    allowed, reason = validate_download_url(
+    validation = HttpDownloadBase.validate_download_url(
         url, ctx.allow_non_global_download_hosts, ctx.internal_mirror_allowlist
     )
-    if not allowed:
-        return {
-            "status": "error",
-            "error": "blocked_url",
-            "reason": reason,
-            "url": url,
-        }
+    if not validation.allowed:
+        return DownloadResult(
+            status="error",
+            error="blocked_url",
+            reason=validation.reason,
+            url=url,
+        ).to_dict()
 
     timeout = aiohttp.ClientTimeout(
         connect=DEFAULT_CONNECT_TIMEOUT,
@@ -472,7 +396,9 @@ async def _async_download_aiohttp(
 
                         resp_headers = {k: v for k, v in response.headers.items()}
                         content_range = resp_headers.get("Content-Range")
-                        valid_range = _valid_content_range(content_range, existing)
+                        valid_range = HttpDownloadBase.valid_content_range(
+                            content_range, existing
+                        )
 
                         if existing and ctx.mode.enable_resume:
                             if response.status == 206:
@@ -541,13 +467,13 @@ async def _async_download_aiohttp(
     # Check for blocked redirect
     if state.blocked_url:
         temp_path.unlink(missing_ok=True)
-        return {
-            "status": "error",
-            "error": "blocked_url",
-            "reason": state.blocked_reason,
-            "url": url,
-            "blocked_url": state.blocked_url,
-        }
+        return DownloadResult(
+            status="error",
+            error="blocked_url",
+            reason=state.blocked_reason,
+            url=url,
+            blocked_url=state.blocked_url,
+        ).to_dict()
 
     # Verify download
     actual_size = temp_path.stat().st_size
@@ -556,43 +482,43 @@ async def _async_download_aiohttp(
 
     if expected_size is not None and actual_size != expected_size:
         temp_path.unlink(missing_ok=True)
-        return {
-            "status": "error",
-            "error": "size_mismatch",
-            "message": (
+        return DownloadResult(
+            status="error",
+            error="size_mismatch",
+            message=(
                 f"Expected size {expected_size} bytes "
                 f"but downloaded {actual_size} bytes."
             ),
-            "resolved_url": state.resolved_url,
-            "content_length": state.content_length,
-        }
+            resolved_url=state.resolved_url,
+            content_length=state.content_length,
+        ).to_dict()
 
-    sha256 = _sha256_file(temp_path)
+    sha256 = HttpDownloadBase.sha256_file(temp_path)
     if expected_sha256 and sha256.lower() != expected_sha256.lower():
         temp_path.unlink(missing_ok=True)
-        return {
-            "status": "error",
-            "error": "sha256_mismatch",
-            "message": "Expected sha256 did not match downloaded content.",
-            "expected_sha256": expected_sha256,
-            "sha256": sha256,
-            "resolved_url": state.resolved_url,
-            "content_length": state.content_length,
-        }
+        return DownloadResult(
+            status="error",
+            error="sha256_mismatch",
+            message="Expected sha256 did not match downloaded content.",
+            expected_sha256=expected_sha256,
+            sha256=sha256,
+            resolved_url=state.resolved_url,
+            content_length=state.content_length,
+        ).to_dict()
 
     # Move temp file to final location
     temp_path.replace(out_path)
 
-    result: dict[str, Any] = {
-        "status": "ok",
-        "path": str(out_path),
-        "resolved_url": state.resolved_url,
-        "content_length": state.content_length,
-        "sha256": sha256,
-    }
+    result: dict[str, Any] = DownloadResult(
+        status="ok",
+        path=str(out_path),
+        resolved_url=state.resolved_url,
+        content_length=state.content_length,
+        sha256=sha256,
+    ).to_dict()
 
     if ctx.mode.verify_sha256 and "sha256" not in result:
-        result["sha256"] = _sha256_file(out_path)
+        result["sha256"] = HttpDownloadBase.sha256_file(out_path)
 
     return result
 
@@ -629,16 +555,16 @@ async def _async_download_httpx(
     state = _AsyncDownloadState()
 
     # Validate initial URL
-    allowed, reason = validate_download_url(
+    validation = HttpDownloadBase.validate_download_url(
         url, ctx.allow_non_global_download_hosts, ctx.internal_mirror_allowlist
     )
-    if not allowed:
-        return {
-            "status": "error",
-            "error": "blocked_url",
-            "reason": reason,
-            "url": url,
-        }
+    if not validation.allowed:
+        return DownloadResult(
+            status="error",
+            error="blocked_url",
+            reason=validation.reason,
+            url=url,
+        ).to_dict()
 
     timeout = httpx.Timeout(
         connect=DEFAULT_CONNECT_TIMEOUT,
@@ -683,7 +609,9 @@ async def _async_download_httpx(
 
                         resp_headers = {k: v for k, v in response.headers.items()}
                         content_range = resp_headers.get("Content-Range")
-                        valid_range = _valid_content_range(content_range, existing)
+                        valid_range = HttpDownloadBase.valid_content_range(
+                            content_range, existing
+                        )
 
                         if existing and ctx.mode.enable_resume:
                             if response.status_code == 206:
@@ -752,13 +680,13 @@ async def _async_download_httpx(
     # Check for blocked redirect
     if state.blocked_url:
         temp_path.unlink(missing_ok=True)
-        return {
-            "status": "error",
-            "error": "blocked_url",
-            "reason": state.blocked_reason,
-            "url": url,
-            "blocked_url": state.blocked_url,
-        }
+        return DownloadResult(
+            status="error",
+            error="blocked_url",
+            reason=state.blocked_reason,
+            url=url,
+            blocked_url=state.blocked_url,
+        ).to_dict()
 
     # Verify download
     actual_size = temp_path.stat().st_size
@@ -767,43 +695,43 @@ async def _async_download_httpx(
 
     if expected_size is not None and actual_size != expected_size:
         temp_path.unlink(missing_ok=True)
-        return {
-            "status": "error",
-            "error": "size_mismatch",
-            "message": (
+        return DownloadResult(
+            status="error",
+            error="size_mismatch",
+            message=(
                 f"Expected size {expected_size} bytes "
                 f"but downloaded {actual_size} bytes."
             ),
-            "resolved_url": state.resolved_url,
-            "content_length": state.content_length,
-        }
+            resolved_url=state.resolved_url,
+            content_length=state.content_length,
+        ).to_dict()
 
-    sha256 = _sha256_file(temp_path)
+    sha256 = HttpDownloadBase.sha256_file(temp_path)
     if expected_sha256 and sha256.lower() != expected_sha256.lower():
         temp_path.unlink(missing_ok=True)
-        return {
-            "status": "error",
-            "error": "sha256_mismatch",
-            "message": "Expected sha256 did not match downloaded content.",
-            "expected_sha256": expected_sha256,
-            "sha256": sha256,
-            "resolved_url": state.resolved_url,
-            "content_length": state.content_length,
-        }
+        return DownloadResult(
+            status="error",
+            error="sha256_mismatch",
+            message="Expected sha256 did not match downloaded content.",
+            expected_sha256=expected_sha256,
+            sha256=sha256,
+            resolved_url=state.resolved_url,
+            content_length=state.content_length,
+        ).to_dict()
 
     # Move temp file to final location
     temp_path.replace(out_path)
 
-    result: dict[str, Any] = {
-        "status": "ok",
-        "path": str(out_path),
-        "resolved_url": state.resolved_url,
-        "content_length": state.content_length,
-        "sha256": sha256,
-    }
+    result: dict[str, Any] = DownloadResult(
+        status="ok",
+        path=str(out_path),
+        resolved_url=state.resolved_url,
+        content_length=state.content_length,
+        sha256=sha256,
+    ).to_dict()
 
     if ctx.mode.verify_sha256 and "sha256" not in result:
-        result["sha256"] = _sha256_file(out_path)
+        result["sha256"] = HttpDownloadBase.sha256_file(out_path)
 
     return result
 
