@@ -98,6 +98,7 @@ dc-update-wrapper-deprecations = "tools.update_wrapper_deprecations:main"
 dc-validate-metrics-outputs = "tools.validate_metrics_outputs:main"
 dc-build-natural-corpus = "tools.build_natural_corpus:main"
 dc-validate-output-contract = "tools.output_contract:main"
+dc-validate-pipeline-specs = "tools.validate_pipeline_specs:main"
 
 [tool.setuptools.dynamic]
 version = { attr = "collector_core.__version__.__version__" }
