@@ -4,6 +4,7 @@ jupyterlab
 ipykernel
 pytest
 pytest-cov
+hypothesis
 pytest_httpserver
 ruff
 yamllint
