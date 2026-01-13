@@ -408,7 +408,12 @@ def run_acquire_worker(
     ap = argparse.ArgumentParser(description=f"Acquire Worker v{VERSION}")
     ap.add_argument("--queue", required=True, help="Queue JSONL emitted by pipeline_driver.py")
     ap.add_argument(
-        "--targets-yaml", default=None, help=f"Path to {targets_yaml_label} for roots"
+        "--targets", default=None, help=f"Path to {targets_yaml_label} for roots"
+    )
+    # P2.4: Deprecated alias for --targets
+    ap.add_argument(
+        "--targets-yaml", default=None, dest="targets_yaml_deprecated",
+        help="DEPRECATED: Use --targets instead"
     )
     ap.add_argument(
         "--bucket", required=True, choices=["green", "yellow"], help="Bucket being processed"
@@ -470,7 +475,20 @@ def run_acquire_worker(
     queue_path = Path(args.queue).expanduser().resolve()
     rows = read_jsonl_list(queue_path)
 
-    targets_path = Path(args.targets_yaml).expanduser().resolve() if args.targets_yaml else None
+    # P2.4: Handle deprecated --targets-yaml with warning
+    targets_arg = args.targets
+    if args.targets_yaml_deprecated:
+        import warnings
+        warnings.warn(
+            "--targets-yaml is deprecated; use --targets instead. "
+            "This argument will be removed in v4.0.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if not targets_arg:
+            targets_arg = args.targets_yaml_deprecated
+
+    targets_path = Path(targets_arg).expanduser().resolve() if targets_arg else None
     cfg = load_config(targets_path)
     roots = load_roots(cfg, args, defaults)
     ensure_dir(roots.logs_root)

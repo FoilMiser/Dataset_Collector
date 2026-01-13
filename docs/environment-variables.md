@@ -8,19 +8,31 @@ None globally. Individual pipelines may require API keys depending on enabled ta
 
 ## Optional (global)
 
-| Variable | Purpose | Used by |
+| Variable | Default | Purpose | Used by |
+| --- | --- | --- | --- |
+| `DATASET_ROOT` | (none) | Root directory for pipeline outputs and queues. | `collector_core/pipeline_driver_base.py`, `collector_core/merge.py`, `collector_core/yellow_screen_common.py` |
+| `DATASET_COLLECTOR_ROOT` | (none) | Alternate root directory for outputs (used if `DATASET_ROOT` is unset). | Same as above |
+| `PIPELINE_RETRY_MAX` | `3` | Maximum number of retries for stage actions. | `collector_core/pipeline_driver_base.py` |
+| `PIPELINE_RETRY_BACKOFF` | `2.0` | Retry backoff multiplier in seconds. | `collector_core/pipeline_driver_base.py` |
+
+## Observability
+
+| Variable | Default | Purpose |
 | --- | --- | --- |
-| `DATASET_ROOT` | Root directory for pipeline outputs and queues. | `collector_core/pipeline_driver_base.py`, `collector_core/merge.py`, `collector_core/yellow_screen_common.py` |
-| `DATASET_COLLECTOR_ROOT` | Alternate root directory for outputs (used if `DATASET_ROOT` is unset). | Same as above |
-| `PIPELINE_RETRY_MAX` | Overrides the maximum number of retries for stage actions. | `collector_core/pipeline_driver_base.py` |
-| `PIPELINE_RETRY_BACKOFF` | Overrides retry backoff (seconds) between failures. | `collector_core/pipeline_driver_base.py` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | (none) | OpenTelemetry collector endpoint for distributed tracing. |
+| `OTEL_SERVICE_NAME` | `dataset-collector` | Service name for OpenTelemetry traces. |
+| `DC_LOG_LEVEL` | `INFO` | Logging level (DEBUG, INFO, WARNING, ERROR). |
+| `DC_LOG_FORMAT` | `text` | Log format (text or json). |
 
 ## Optional (pipeline-specific)
 
-| Variable | Purpose | Notes |
-| --- | --- | --- |
-| `GITHUB_TOKEN` | Higher GitHub API rate limits for targets that pull from GitHub. | Mentioned in several `pipelines/targets/targets_*.yaml` files and used in pipeline acquire workers. |
-| `CHEMSPIDER_API_KEY` | Access to ChemSpider-backed sources. | Referenced in `pipelines/targets/targets_chem.yaml`. |
+| Variable | Default | Purpose | Notes |
+| --- | --- | --- | --- |
+| `GITHUB_TOKEN` | (none) | Higher GitHub API rate limits for targets that pull from GitHub. | Mentioned in several `pipelines/targets/targets_*.yaml` files and used in pipeline acquire workers. |
+| `CHEMSPIDER_API_KEY` | (none) | Access to ChemSpider-backed sources. | Referenced in `pipelines/targets/targets_chem.yaml`. |
+| `HF_TOKEN` | (none) | Hugging Face Hub authentication for gated datasets. | Used by HuggingFace acquisition strategy. |
+| `AWS_ACCESS_KEY_ID` | (none) | AWS credentials for S3 downloads. | Used by S3 acquisition strategy. |
+| `AWS_SECRET_ACCESS_KEY` | (none) | AWS credentials for S3 downloads. | Used by S3 acquisition strategy. |
 
 ## How variables are resolved
 

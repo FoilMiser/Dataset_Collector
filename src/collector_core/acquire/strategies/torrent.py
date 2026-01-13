@@ -16,9 +16,10 @@ from collector_core.acquire_limits import (
     cleanup_path,
     resolve_result_bytes,
 )
-from collector_core.acquire_strategies import normalize_download
 from collector_core.stability import stable_api
+from collector_core.utils.download import normalize_download
 from collector_core.utils.paths import ensure_dir
+from collector_core.utils.subprocess import run_cmd
 
 # Pattern for valid magnet URIs (BTIHv1: 40 hex chars, BTIHv2: 64 hex chars)
 _MAGNET_PATTERN = re.compile(
@@ -66,30 +67,6 @@ def _is_valid_magnet(link: str) -> bool:
         return bool(_TORRENT_FILE_PATTERN.match(link))
 
     return False
-
-
-@stable_api
-def run_cmd(cmd: list[str], cwd: Path | None = None) -> str:
-    """Run a command and return its output.
-
-    Args:
-        cmd: Command and arguments to execute.
-        cwd: Optional working directory.
-
-    Returns:
-        Decoded stdout output from the command.
-
-    Raises:
-        subprocess.CalledProcessError: If command exits with non-zero status.
-    """
-    p = subprocess.run(
-        cmd,
-        cwd=str(cwd) if cwd else None,
-        check=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-    )
-    return p.stdout.decode("utf-8", errors="ignore")
 
 
 @stable_api

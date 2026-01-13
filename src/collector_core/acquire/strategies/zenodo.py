@@ -6,7 +6,6 @@ from Zenodo records via their REST API.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import re
@@ -19,13 +18,12 @@ from collector_core.acquire_limits import (
     cleanup_path,
     resolve_result_bytes,
 )
-from collector_core.acquire_strategies import (
-    _http_download_with_resume,
-    normalize_download,
-)
+from collector_core.acquire_strategies import _http_download_with_resume
 from collector_core.dependencies import _try_import, requires
 from collector_core.network_utils import _with_retries
 from collector_core.stability import stable_api
+from collector_core.utils.download import normalize_download
+from collector_core.utils.hash import md5_file
 from collector_core.utils.paths import ensure_dir, safe_filename
 
 # P0.4: Validation patterns for Zenodo identifiers
@@ -38,22 +36,6 @@ safe_name = safe_filename
 requests = _try_import("requests")
 
 logger = logging.getLogger(__name__)
-
-
-def md5_file(path: Path) -> str:
-    """Compute MD5 hash of a file.
-
-    Args:
-        path: Path to the file to hash.
-
-    Returns:
-        The MD5 hex digest of the file contents.
-    """
-    h = hashlib.md5()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            h.update(chunk)
-    return h.hexdigest()
 
 
 @stable_api
@@ -161,7 +143,8 @@ def handle_zenodo(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> li
         r = _http_download_with_resume(ctx, link, out_path)
         if ctx.mode.verify_zenodo_md5 and f.get("checksum", "").startswith("md5:"):
             expected_md5 = f["checksum"].split(":", 1)[1]
-            if md5_file(out_path) != expected_md5:
+            actual_md5 = md5_file(out_path)
+            if actual_md5 is None or actual_md5 != expected_md5:
                 r = {"status": "error", "error": "md5_mismatch"}
         size_bytes = resolve_result_bytes(r, out_path)
         limit_error = enforcer.record_bytes(size_bytes, filename)

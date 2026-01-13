@@ -10,35 +10,13 @@ from typing import Any
 
 from collector_core.config_validator import read_yaml
 from collector_core.pipeline_registry import resolve_acquire_hooks, resolve_pipeline_context
+from collector_core.targets_paths import resolve_targets_path, targets_root
+from collector_core.utils.download import normalize_download as _normalize_download
 from tools.strategy_registry import (
     get_external_tools,
     get_strategy_requirement_errors,
     get_strategy_spec,
 )
-from collector_core.targets_paths import resolve_targets_path, targets_root
-
-
-def _normalize_download(download: dict[str, Any]) -> dict[str, Any]:
-    """Normalize download config by merging nested config into parent dict.
-
-    This mirrors the normalization done at runtime in acquire_strategies.normalize_download.
-    """
-    d = dict(download or {})
-    cfg = d.get("config")
-
-    if isinstance(cfg, dict):
-        merged = dict(cfg)
-        merged.update({k: v for k, v in d.items() if k != "config"})
-        d = merged
-
-    # Zenodo record_id normalization
-    if d.get("strategy") == "zenodo":
-        if not d.get("record_id") and d.get("record"):
-            d["record_id"] = d["record"]
-        if not d.get("record_id") and isinstance(d.get("record_ids"), list) and d["record_ids"]:
-            d["record_id"] = d["record_ids"][0]
-
-    return d
 
 
 TOOL_INSTALL_HINTS = {

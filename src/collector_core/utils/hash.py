@@ -34,6 +34,29 @@ def sha256_file(path: Path) -> str | None:
         return None
 
 
+def md5_file(path: Path) -> str | None:
+    """Compute MD5 hash of a file. Returns None on error.
+
+    Note: MD5 should only be used for checksum verification, not security.
+    For security-sensitive applications, use sha256_file instead.
+
+    Args:
+        path: Path to the file to hash.
+
+    Returns:
+        Lowercase hex digest of the MD5 hash, or None if hashing failed.
+    """
+    try:
+        h = hashlib.md5()
+        with path.open("rb") as f:
+            for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except Exception:
+        logger.warning("Failed to compute MD5 hash for %s", path, exc_info=True)
+        return None
+
+
 def stable_json_hash(value: Any) -> str:
     """Compute a stable SHA-256 hash for JSON-serializable values."""
     payload = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)

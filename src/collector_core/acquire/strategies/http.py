@@ -24,6 +24,7 @@ from collector_core.acquire_limits import (
 from collector_core.dependencies import _try_import, requires
 from collector_core.stability import stable_api
 from collector_core.utils.paths import ensure_dir, safe_filename
+from collector_core.utils.download import normalize_download as _normalize_download_impl
 from collector_core.acquire.strategies.http_base import (
     CHUNK_SIZE,
     DownloadResult,
@@ -41,27 +42,16 @@ requests = _try_import("requests")
 def normalize_download(download: dict[str, Any]) -> dict[str, Any]:
     """Normalize download configuration by merging nested config.
 
+    This function delegates to the canonical implementation in
+    collector_core.utils.download.normalize_download.
+
     Args:
         download: Raw download configuration dictionary
 
     Returns:
         Normalized download configuration with merged config
     """
-    d = dict(download or {})
-    cfg = d.get("config")
-
-    if isinstance(cfg, dict):
-        merged = dict(cfg)
-        merged.update({k: v for k, v in d.items() if k != "config"})
-        d = merged
-
-    if d.get("strategy") == "zenodo":
-        if not d.get("record_id") and d.get("record"):
-            d["record_id"] = d["record"]
-        if not d.get("record_id") and isinstance(d.get("record_ids"), list) and d["record_ids"]:
-            d["record_id"] = d["record_ids"][0]
-
-    return d
+    return _normalize_download_impl(download)
 
 
 @stable_api
