@@ -105,14 +105,39 @@ dc-validate-repo [options]
 
 ### dc-validate-yaml-schemas
 
-Validate YAML files against their JSON schemas.
+Validate checked-in YAML configuration files against their JSON schemas.
+
+This command automatically discovers and validates:
+- All targets YAML files in `pipelines/targets/`
+- Companion files (license_map.yaml, denylist.yaml, field_schemas.yaml)
+- Pipeline map files in `src/tools/`
 
 ```bash
-dc-validate-yaml-schemas [paths...]
+dc-validate-yaml-schemas [options]
 ```
 
 **Options:**
-- `--schema <name>` - Schema to validate against (targets, license_map, etc.)
+- `--root <path>` - Repository root (default: current directory)
+
+**Validated Schemas:**
+| Schema Name | Files | Description |
+|-------------|-------|-------------|
+| `targets` | `targets_*.yaml` | Pipeline target configurations |
+| `license_map` | `license_map.yaml` | License classification rules |
+| `denylist` | `denylist.yaml` | Domain/publisher denylist |
+| `field_schemas` | `field_schemas.yaml` | Field validation schemas |
+| `pipeline_map` | `pipeline_map*.yaml` | Pipeline registry |
+
+**Note:** Requires `jsonschema` package for full validation. Without it, only version checks are performed.
+
+**Example:**
+```bash
+# Validate all YAML files in current repo
+dc-validate-yaml-schemas --root .
+
+# Used in CI/pre-commit hooks
+dc-validate-yaml-schemas --root .
+```
 
 ### dc-check-constraints
 

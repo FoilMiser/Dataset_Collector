@@ -116,7 +116,7 @@ dc catalog-builder --pipeline math -- \
 ### Environment Variables
 
 - `DATASET_ROOT` or `DATASET_COLLECTOR_ROOT`: Default dataset root
-- `DC_PROFILE`: Configuration profile (development, production)
+- `DC_PROFILE`: Configuration profile (development, production) — **Note**: Profile loading from `configs/profiles/` is defined but not yet integrated into the CLI. Configure settings via targets YAML `globals` section for now.
 
 ---
 
