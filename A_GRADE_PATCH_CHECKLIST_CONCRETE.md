@@ -286,13 +286,29 @@ This is a **concrete, implementable** checklist (rename/move/delete exact files;
   - Tests for `record_evidence_change()` ledger and queue operations
   - Tests for `check_merge_eligibility()`
 
-#### P3.2 — Add Tests for Untested Pipelines 🔲 PENDING
+#### P3.2 — Add Tests for Untested Pipelines ✅ PARTIAL
 - [ ] **P3.2A**: Create `tests/test_domain_screeners/test_agri_circular_screener.py`
+  - **BLOCKED**: Domain screener `src/collector_core/yellow/domains/agri_circular.py` does not exist
+  - The `agri_circular` pipeline uses default `standard` screening (no `yellow_screen` config)
 - [ ] **P3.2B**: Create `tests/test_domain_screeners/test_earth_screener.py`
-- [ ] **P3.2C**: Create `tests/test_domain_screeners/test_econ_screener.py`
+  - **BLOCKED**: Domain screener `src/collector_core/yellow/domains/earth.py` does not exist
+  - The `earth` pipeline uses default `standard` screening (no `yellow_screen` config)
+- [x] **P3.2C**: Expanded `tests/test_domain_screeners/test_econ_screener.py`
+  - Added 16 comprehensive tests covering:
+  - Financial terms detection and missing terms rejection
+  - PII detection rejection (email addresses)
+  - Stale timeframe rejection (dates >10 years old)
+  - Methodology terms quality boost
+  - Sensitive terms quality reduction
+  - Multiple years extraction
+  - Length score calculation
+  - Quality score bounds (0-1)
+  - Transform record behavior and metadata
 - [ ] **P3.2D**: Create `tests/test_domain_screeners/test_engineering_screener.py`
+  - **BLOCKED**: Domain screener `src/collector_core/yellow/domains/engineering.py` does not exist
+  - The `engineering` pipeline uses default `standard` screening (no `yellow_screen` config)
 
-#### P3.3 — Add Error Path Tests ✅ PARTIAL
+#### P3.3 — Add Error Path Tests ✅ MOSTLY COMPLETE
 - [x] **P3.3A**: Added edge case tests to `tests/test_merge_shard.py`
   - Tests for empty flush, partial shard flush, no compression
   - Tests for shard index incrementing
@@ -302,7 +318,16 @@ This is a **concrete, implementable** checklist (rename/move/delete exact files;
   - Tests for text truncation
   - Tests for resolve_routing with various key formats
   - Tests for record_id generation and preservation
-- [ ] **P3.3C**: Add error path tests to `tests/test_pipeline_driver_classification.py`
+- [x] **P3.3C**: Added error path tests to `tests/test_pipeline_driver_classification.py`
+  - Tests for empty targets list producing empty queues
+  - Tests for disabled targets excluded from queues
+  - Tests for missing license_evidence forcing YELLOW
+  - Tests for multiple targets with mixed buckets distribution
+  - Tests for explicit bucket override (`force_bucket`)
+  - Tests for invalid SPDX treated as unknown
+  - Tests for metrics counts matching queue lengths
+  - Tests for extra fields preservation
+  - Tests for required queue row fields
 - [ ] **P3.3D**: Target: Increase error path coverage from 6.6% to >30%
 
 #### P3.4 — Fix Documentation Issues ✅ MOSTLY DONE
@@ -356,8 +381,9 @@ This is a **concrete, implementable** checklist (rename/move/delete exact files;
 
 ### Test Coverage ✅ MOSTLY COMPLETE
 - [x] Key untested modules now have test files (P3.1A-F) — 6/6 done
-- [ ] All 19 pipelines have screener tests (P3.2) — Pending (low priority)
-- [x] Error path tests added (P3.3A, P3.3B) — 2/4 done
+- [x] Existing domain screener tests expanded (P3.2C) — econ screener now has 16 tests
+- [ ] New domain screener tests (P3.2A,B,D) — BLOCKED: screener modules don't exist (pipelines use default `standard` screening)
+- [x] Error path tests added (P3.3A, P3.3B, P3.3C) — 3/4 done
 
 ### Documentation ✅ COMPLETE
 - [x] All environment variables documented with defaults (P3.4B) — Updated

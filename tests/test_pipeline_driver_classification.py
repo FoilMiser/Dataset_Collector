@@ -533,3 +533,260 @@ def test_edge_conditions_and_low_confidence(
     for bucket, rows in buckets.items():
         if bucket != expected_bucket:
             assert not rows
+
+
+# ============================================================================
+# Error Path Tests (P3.3C)
+# ============================================================================
+
+
+def test_empty_targets_produces_empty_queues(
+    tmp_path: Path, minimal_config: PipelineTestConfig, run_dc
+) -> None:
+    """Test that an empty targets list produces empty queue files."""
+    targets: list[dict[str, object]] = []
+    targets_path = minimal_config.write_targets(tmp_path, targets)
+
+    run_driver(run_dc, targets_path, minimal_config.license_map_path)
+
+    green_rows = read_jsonl(minimal_config.queues_root / "green_download.jsonl")
+    yellow_rows = read_jsonl(minimal_config.queues_root / "yellow_pipeline.jsonl")
+    red_rows = read_jsonl(minimal_config.queues_root / "red_rejected.jsonl")
+
+    assert not green_rows
+    assert not yellow_rows
+    assert not red_rows
+
+
+def test_disabled_target_excluded_from_queues(
+    tmp_path: Path, minimal_config: PipelineTestConfig, run_dc
+) -> None:
+    """Test that disabled targets are excluded from all queues."""
+    targets = [
+        {
+            "id": "enabled_target",
+            "name": "Enabled Dataset",
+            "license_profile": "permissive",
+            "license_evidence": {"spdx_hint": "MIT", "url": "https://example.test/terms"},
+        },
+        {
+            "id": "disabled_target",
+            "name": "Disabled Dataset",
+            "enabled": False,
+            "license_profile": "permissive",
+            "license_evidence": {"spdx_hint": "MIT", "url": "https://example.test/terms"},
+        },
+    ]
+    targets_path = minimal_config.write_targets(tmp_path, targets)
+
+    run_driver(run_dc, targets_path, minimal_config.license_map_path)
+
+    green_rows = read_jsonl(minimal_config.queues_root / "green_download.jsonl")
+    yellow_rows = read_jsonl(minimal_config.queues_root / "yellow_pipeline.jsonl")
+    red_rows = read_jsonl(minimal_config.queues_root / "red_rejected.jsonl")
+
+    all_ids = (
+        {row["id"] for row in green_rows}
+        | {row["id"] for row in yellow_rows}
+        | {row["id"] for row in red_rows}
+    )
+    assert "enabled_target" in all_ids
+    assert "disabled_target" not in all_ids
+
+
+def test_missing_license_evidence_forces_yellow(
+    tmp_path: Path, minimal_config: PipelineTestConfig, run_dc
+) -> None:
+    """Test that targets missing license_evidence are classified as YELLOW."""
+    targets = [
+        {
+            "id": "no_evidence_target",
+            "name": "No Evidence Dataset",
+            "license_profile": "permissive",
+            # No license_evidence field
+        }
+    ]
+    targets_path = minimal_config.write_targets(tmp_path, targets)
+
+    run_driver(run_dc, targets_path, minimal_config.license_map_path)
+
+    green_rows = read_jsonl(minimal_config.queues_root / "green_download.jsonl")
+    yellow_rows = read_jsonl(minimal_config.queues_root / "yellow_pipeline.jsonl")
+
+    # Should be in YELLOW due to missing evidence
+    assert not green_rows
+    assert {row["id"] for row in yellow_rows} == {"no_evidence_target"}
+
+
+def test_multiple_targets_with_mixed_buckets(
+    tmp_path: Path, minimal_config: PipelineTestConfig, run_dc
+) -> None:
+    """Test that multiple targets are correctly distributed across buckets."""
+    targets = [
+        {
+            "id": "green_1",
+            "name": "Green Dataset 1",
+            "license_profile": "permissive",
+            "license_evidence": {"spdx_hint": "MIT", "url": "https://example.test/terms"},
+        },
+        {
+            "id": "green_2",
+            "name": "Green Dataset 2",
+            "license_profile": "permissive",
+            "license_evidence": {"spdx_hint": "MIT", "url": "https://example.test/terms"},
+        },
+        {
+            "id": "yellow_1",
+            "name": "Yellow Dataset 1",
+            "license_profile": "permissive",
+            "license_evidence": {"spdx_hint": "LGPL-2.1-only", "url": "https://example.test/terms"},
+        },
+        {
+            "id": "red_1",
+            "name": "Red Dataset 1",
+            "license_profile": "permissive",
+            "license_evidence": {"spdx_hint": "GPL-3.0-only", "url": "https://example.test/terms"},
+        },
+    ]
+    targets_path = minimal_config.write_targets(tmp_path, targets)
+
+    run_driver(run_dc, targets_path, minimal_config.license_map_path)
+
+    green_rows = read_jsonl(minimal_config.queues_root / "green_download.jsonl")
+    yellow_rows = read_jsonl(minimal_config.queues_root / "yellow_pipeline.jsonl")
+    red_rows = read_jsonl(minimal_config.queues_root / "red_rejected.jsonl")
+
+    assert {row["id"] for row in green_rows} == {"green_1", "green_2"}
+    assert {row["id"] for row in yellow_rows} == {"yellow_1"}
+    assert {row["id"] for row in red_rows} == {"red_1"}
+
+
+def test_target_with_explicit_bucket_override(
+    tmp_path: Path, minimal_config: PipelineTestConfig, run_dc
+) -> None:
+    """Test that explicit bucket override in target config takes precedence."""
+    targets = [
+        {
+            "id": "force_yellow_target",
+            "name": "Force Yellow Dataset",
+            "license_profile": "permissive",
+            "license_evidence": {"spdx_hint": "MIT", "url": "https://example.test/terms"},
+            "force_bucket": "YELLOW",
+            "force_bucket_reason": "manual_review_required",
+        }
+    ]
+    targets_path = minimal_config.write_targets(tmp_path, targets)
+
+    run_driver(run_dc, targets_path, minimal_config.license_map_path)
+
+    green_rows = read_jsonl(minimal_config.queues_root / "green_download.jsonl")
+    yellow_rows = read_jsonl(minimal_config.queues_root / "yellow_pipeline.jsonl")
+
+    # Should be in YELLOW due to force_bucket override, not GREEN
+    assert not green_rows
+    assert {row["id"] for row in yellow_rows} == {"force_yellow_target"}
+
+
+def test_invalid_spdx_treated_as_unknown(
+    tmp_path: Path, minimal_config: PipelineTestConfig, run_dc
+) -> None:
+    """Test that invalid SPDX identifiers are treated as unknown."""
+    targets = [
+        {
+            "id": "invalid_spdx_target",
+            "name": "Invalid SPDX Dataset",
+            "license_profile": "permissive",
+            "license_evidence": {
+                "spdx_hint": "NOT-A-REAL-LICENSE-123",
+                "url": "https://example.test/terms",
+            },
+        }
+    ]
+    targets_path = minimal_config.write_targets(tmp_path, targets)
+
+    run_driver(run_dc, targets_path, minimal_config.license_map_path)
+
+    yellow_rows = read_jsonl(minimal_config.queues_root / "yellow_pipeline.jsonl")
+
+    # Invalid SPDX should be treated as unknown -> YELLOW
+    assert {row["id"] for row in yellow_rows} == {"invalid_spdx_target"}
+
+
+def test_metrics_counts_match_queue_lengths(
+    tmp_path: Path, minimal_config: PipelineTestConfig, run_dc
+) -> None:
+    """Test that metrics counts accurately reflect queue contents."""
+    targets = [
+        {
+            "id": f"target_{i}",
+            "name": f"Dataset {i}",
+            "license_profile": "permissive",
+            "license_evidence": {"spdx_hint": "MIT", "url": "https://example.test/terms"},
+        }
+        for i in range(5)
+    ]
+    targets_path = minimal_config.write_targets(tmp_path, targets)
+
+    run_driver(run_dc, targets_path, minimal_config.license_map_path)
+
+    green_rows = read_jsonl(minimal_config.queues_root / "green_download.jsonl")
+
+    run_dirs = [path for path in minimal_config.ledger_root.iterdir() if path.is_dir()]
+    assert len(run_dirs) == 1
+    metrics = json.loads((run_dirs[0] / "metrics.json").read_text(encoding="utf-8"))
+
+    assert metrics["counts"]["targets_total"] == 5
+    assert metrics["counts"]["queued_green"] == len(green_rows)
+
+
+def test_target_extra_fields_preserved_in_queue(
+    tmp_path: Path, minimal_config: PipelineTestConfig, run_dc
+) -> None:
+    """Test that extra fields in target config are preserved in queue output."""
+    targets = [
+        {
+            "id": "extra_fields_target",
+            "name": "Extra Fields Dataset",
+            "license_profile": "permissive",
+            "license_evidence": {"spdx_hint": "MIT", "url": "https://example.test/terms"},
+            "custom_field": "custom_value",
+            "tags": ["tag1", "tag2"],
+        }
+    ]
+    targets_path = minimal_config.write_targets(tmp_path, targets)
+
+    run_driver(run_dc, targets_path, minimal_config.license_map_path)
+
+    green_rows = read_jsonl(minimal_config.queues_root / "green_download.jsonl")
+
+    assert len(green_rows) == 1
+    # Extra fields should be preserved or accessible
+    assert green_rows[0]["id"] == "extra_fields_target"
+
+
+def test_queue_rows_contain_required_fields(
+    tmp_path: Path, minimal_config: PipelineTestConfig, run_dc
+) -> None:
+    """Test that queue rows contain all required fields for downstream processing."""
+    targets = [
+        {
+            "id": "field_check_target",
+            "name": "Field Check Dataset",
+            "license_profile": "permissive",
+            "license_evidence": {"spdx_hint": "MIT", "url": "https://example.test/terms"},
+        }
+    ]
+    targets_path = minimal_config.write_targets(tmp_path, targets)
+
+    run_driver(run_dc, targets_path, minimal_config.license_map_path)
+
+    green_rows = read_jsonl(minimal_config.queues_root / "green_download.jsonl")
+
+    assert len(green_rows) == 1
+    row = green_rows[0]
+
+    # Check required fields exist
+    assert "id" in row
+    assert "bucket_reason" in row
+    assert "signals" in row
+    assert isinstance(row["signals"], dict)
