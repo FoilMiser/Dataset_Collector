@@ -1,3 +1,7 @@
+# DEPRECATED: This file is deprecated as of v3.0.
+# Use pipelines/requirements/math.txt instead.
+# See pipelines/requirements/README.md for migration details.
+#
 # Math Corpus Pipeline v2 - Requirements
 -r ../requirements.constraints.txt
 

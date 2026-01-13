@@ -48,8 +48,9 @@ py -3.11 -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.constraints.txt
 pip install -e .
-pip install -r math_pipeline_v2\requirements.txt
+pip install -r pipelines\requirements\math.txt
 # repeat for other pipeline extras as needed
+# Note: legacy *_pipeline_v2\requirements.txt files are deprecated; use pipelines\requirements\
 
 dc pipeline math -- --targets pipelines/targets/targets_math.yaml --dataset-root "E:\AI-Research\datasets\Natural\math" --stage classify
 dc run --pipeline math --stage acquire --dataset-root "E:\AI-Research\datasets\Natural\math" -- --queue "E:\AI-Research\datasets\Natural\math\_queues\green_pipeline.jsonl" --bucket green --targets-yaml pipelines/targets/targets_math.yaml --execute
