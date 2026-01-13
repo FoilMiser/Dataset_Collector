@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 
+from collector_core.acquire.context import InternalMirrorAllowlist
 from collector_core.acquire.strategies.http_base import HttpDownloadBase
 
 
@@ -40,3 +41,37 @@ def test_sha256_file(tmp_path) -> None:
     file_path.write_bytes(payload)
     expected = hashlib.sha256(payload).hexdigest()
     assert HttpDownloadBase.sha256_file(file_path) == expected
+
+
+def test_parse_content_length_from_content_range() -> None:
+    headers = {"Content-Range": "bytes 0-9/30"}
+    assert HttpDownloadBase.parse_content_length(headers, status_code=206, existing=10) == 30
+
+
+def test_parse_content_length_with_resume() -> None:
+    headers = {"content-length": "15"}
+    assert HttpDownloadBase.parse_content_length(headers, status_code=206, existing=5) == 20
+
+
+def test_valid_content_range_matches_start_offset() -> None:
+    assert HttpDownloadBase.valid_content_range("bytes 10-19/30", start_offset=10) is True
+    assert HttpDownloadBase.valid_content_range("bytes 9-19/30", start_offset=10) is False
+
+
+def test_validate_download_url_allows_allowlisted_host() -> None:
+    allowlist = InternalMirrorAllowlist(hosts=frozenset({".example.com"}))
+    result = HttpDownloadBase.validate_download_url(
+        "https://files.example.com/data.csv",
+        allow_non_global_hosts=False,
+        internal_mirror_allowlist=allowlist,
+    )
+    assert result.allowed is True
+
+
+def test_validate_redirect_urls_reports_blocked_redirect() -> None:
+    result = HttpDownloadBase.validate_redirect_urls(
+        ["https://example.com/data", "http://127.0.0.1/data"],
+        allow_non_global_hosts=False,
+    )
+    assert result.allowed is False
+    assert result.blocked_url == "http://127.0.0.1/data"
