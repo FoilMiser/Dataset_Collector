@@ -31,6 +31,10 @@ python -m collector_core.dc_cli \
   --no-fetch \
   --quiet
 
+python -m tools.validate_metrics_outputs \
+  --ledger-root "${DATASET_ROOT}/_ledger" \
+  --output-dir "${WORKDIR}/metrics_dashboard"
+
 python -m collector_core.dc_cli \
   run \
   --pipeline regcomp \

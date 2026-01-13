@@ -13,6 +13,7 @@ except ModuleNotFoundError:  # pragma: no cover - fallback for minimal environme
     from collector_core import yaml_lite as yaml
 
 from collector_core.exceptions import ConfigValidationError, YamlParseError
+from collector_core.schema_version import validate_schema_version
 
 try:
     from jsonschema import Draft7Validator, FormatChecker
@@ -87,6 +88,7 @@ def read_yaml(path: Path, schema_name: str | None = None) -> Any:
         data = {}
     if schema_name:
         validate_config(data, schema_name, config_path=path)
+        validate_schema_version(schema_name, data)
     return data
 
 

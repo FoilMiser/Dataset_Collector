@@ -35,11 +35,19 @@ from collector_core.denylist_matcher import (
 )
 from collector_core.dataset_root import resolve_dataset_root
 from collector_core.exceptions import ConfigValidationError
+from collector_core.checkpoint import (
+    CheckpointState,
+    checkpoint_path,
+    cleanup_checkpoint,
+    init_checkpoint,
+    load_checkpoint,
+    save_checkpoint,
+)
 from collector_core.logging_config import add_logging_args, configure_logging
 from collector_core.metrics import MetricsCollector, clear_collector, set_collector
 from collector_core.policy_snapshot import build_policy_snapshot
 from collector_core.queue.emission import emit_queues
-from collector_core.utils.io import write_json
+from collector_core.utils.io import read_json, read_jsonl_list, write_json
 from collector_core.utils.logging import utc_now
 from collector_core.utils.paths import ensure_dir
 from collector_core.utils.text import coerce_int, contains_any
@@ -203,6 +211,23 @@ class ClassificationResult:
     evidence_fetch_ok: int = 0
     evidence_fetch_errors: int = 0
     evidence_fetch_skipped: int = 0
+
+
+def load_existing_results(queues_root: Path) -> ClassificationResult:
+    green_path = queues_root / "green_download.jsonl"
+    yellow_path = queues_root / "yellow_pipeline.jsonl"
+    red_path = queues_root / "red_rejected.jsonl"
+    warnings: list[dict[str, Any]] = []
+    summary_path = queues_root / "run_summary.json"
+    if summary_path.exists():
+        summary = read_json(summary_path)
+        warnings = list(summary.get("warnings") or [])
+    return ClassificationResult(
+        green_rows=read_jsonl_list(green_path) if green_path.exists() else [],
+        yellow_rows=read_jsonl_list(yellow_path) if yellow_path.exists() else [],
+        red_rows=read_jsonl_list(red_path) if red_path.exists() else [],
+        warnings=warnings,
+    )
 
 
 def load_license_map(paths: Path | list[Path]) -> LicenseMap:
@@ -750,6 +775,24 @@ class BasePipelineDriver:
 
     def run(self, args: argparse.Namespace) -> None:
         cfg = load_driver_config(args)
+        checkpoint_dir = (
+            Path(args.checkpoint_dir).expanduser().resolve()
+            if args.checkpoint_dir
+            else cfg.ledger_root / "checkpoints"
+        )
+        checkpoint_file = checkpoint_path(checkpoint_dir, self.DOMAIN)
+        checkpoint_state = load_checkpoint(checkpoint_file) if args.resume else None
+        if checkpoint_state and checkpoint_state.run_id:
+            cfg = dataclasses.replace(cfg, checks_run_id=checkpoint_state.run_id)
+        elif args.resume:
+            logger.warning("Resume requested but no checkpoint found at %s", checkpoint_file)
+            checkpoint_state = None
+        if checkpoint_state is None:
+            checkpoint_state = init_checkpoint(
+                checkpoint_file,
+                pipeline_id=self.DOMAIN,
+                run_id=cfg.checks_run_id,
+            )
         run_ledger_root = cfg.ledger_root / cfg.checks_run_id
         ensure_dir(run_ledger_root)
         collector = MetricsCollector(self.DOMAIN)
@@ -769,7 +812,17 @@ class BasePipelineDriver:
             policy_timer.stop()
             write_json(run_ledger_root / "policy_snapshot.json", policy_snapshot)
             classify_timer = collector.timer("classification_ms").start()
-            results = self.classify_targets(cfg)
+            results = self.classify_targets(
+                cfg,
+                checkpoint_state=checkpoint_state,
+                checkpoint_file=checkpoint_file,
+            )
+            if args.resume and checkpoint_state:
+                existing = load_existing_results(cfg.queues_root)
+                results.green_rows = existing.green_rows + results.green_rows
+                results.yellow_rows = existing.yellow_rows + results.yellow_rows
+                results.red_rows = existing.red_rows + results.red_rows
+                results.warnings = existing.warnings + results.warnings
             classify_timer.stop()
             queues_timer = collector.timer("emit_queues_ms").start()
             self.emit_queues(cfg.queues_root, results)
@@ -783,13 +836,24 @@ class BasePipelineDriver:
             run_timer.stop()
             metrics = self.build_metrics_payload(cfg, results, collector)
             write_json(run_ledger_root / "metrics.json", metrics)
+            cleanup_checkpoint(checkpoint_file)
         finally:
             clear_collector()
 
-    def classify_targets(self, cfg: DriverConfig) -> ClassificationResult:
+    def classify_targets(
+        self,
+        cfg: DriverConfig,
+        *,
+        checkpoint_state: CheckpointState | None = None,
+        checkpoint_file: Path | None = None,
+    ) -> ClassificationResult:
         results = ClassificationResult([], [], [], [])
         contexts: list[TargetContext] = []
+        completed = set(checkpoint_state.completed_targets) if checkpoint_state else set()
         for target in cfg.targets:
+            tid = str(target.get("id", "") or "unknown_id").strip() or "unknown_id"
+            if tid in completed:
+                continue
             ctx, warnings = self.prepare_target_context(target, cfg)
             results.warnings.extend(warnings)
             contexts.append(ctx)
@@ -805,13 +869,22 @@ class BasePipelineDriver:
             evaluation, row = self.classify_target(ctx, cfg, evidence)
             write_json(ctx.target_manifest_dir / "evaluation.json", evaluation)
             if not ctx.enabled:
+                if checkpoint_state and checkpoint_file:
+                    checkpoint_state.record_target(ctx.tid, bucket="disabled")
+                    save_checkpoint(checkpoint_file, checkpoint_state)
                 continue
             if row["effective_bucket"] == "GREEN":
                 results.green_rows.append(row)
+                bucket = "green"
             elif row["effective_bucket"] == "YELLOW":
                 results.yellow_rows.append(row)
+                bucket = "yellow"
             else:
                 results.red_rows.append(row)
+                bucket = "red"
+            if checkpoint_state and checkpoint_file:
+                checkpoint_state.record_target(ctx.tid, bucket=bucket)
+                save_checkpoint(checkpoint_file, checkpoint_state)
         return results
 
     def prepare_target_context(
@@ -1342,6 +1415,16 @@ class BasePipelineDriver:
             "--targets",
             required=True,
             help=f"Path to {cls.TARGETS_LABEL} (v0.9)",
+        )
+        ap.add_argument(
+            "--resume",
+            action="store_true",
+            help="Resume from the latest checkpoint if available.",
+        )
+        ap.add_argument(
+            "--checkpoint-dir",
+            default=None,
+            help="Directory to store pipeline checkpoints (default: <ledger_root>/checkpoints).",
         )
         ap.add_argument(
             "--license-map",

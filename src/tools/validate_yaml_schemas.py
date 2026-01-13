@@ -74,8 +74,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     if Draft7Validator is None:
-        print("Install jsonschema for schema validation.")
-        return 1
+        print("Install jsonschema for full schema validation. Running version checks only.")
 
     root = Path(args.root).resolve()
     errors: list[str] = []

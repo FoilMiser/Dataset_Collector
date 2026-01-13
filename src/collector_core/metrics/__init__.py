@@ -1,5 +1,5 @@
 """
-collector_core/metrics.py
+collector_core/metrics
 
 Metrics collection for pipeline operations.
 Provides a simple, lightweight interface for tracking operational metrics.
