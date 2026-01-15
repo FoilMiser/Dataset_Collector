@@ -10,7 +10,7 @@ from collector_core.exceptions import ConfigValidationError
 SUPPORTED_SCHEMA_VERSIONS: dict[str, set[str]] = {
     "targets": {"0.9"},
     "license_map": {"0.9"},
-    "denylist": {"0.9"},
+    "denylist": {"0.9", "1.0"},
     "field_schemas": {"0.9"},
 }
 

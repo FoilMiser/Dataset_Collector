@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -54,7 +53,7 @@ class TestValidateConfig:
     def test_validate_config_invalid_type(self, tmp_path: Path) -> None:
         """validate_config should raise ConfigValidationError for invalid type."""
         try:
-            import jsonschema
+            import jsonschema  # noqa: F401
         except ImportError:
             pytest.skip("jsonschema not installed")
 
@@ -69,7 +68,7 @@ class TestValidateConfig:
     def test_validate_config_missing_required_field(self, tmp_path: Path) -> None:
         """validate_config should raise for missing required fields."""
         try:
-            import jsonschema
+            import jsonschema  # noqa: F401
         except ImportError:
             pytest.skip("jsonschema not installed")
 
@@ -112,7 +111,7 @@ class TestReadYaml:
     def test_read_yaml_with_schema_validation(self, tmp_path: Path) -> None:
         """read_yaml should validate against schema if provided."""
         try:
-            import jsonschema
+            import jsonschema  # noqa: F401
         except ImportError:
             pytest.skip("jsonschema not installed")
 
@@ -159,21 +158,39 @@ class TestExpandIncludes:
         assert any(line.startswith("    ") for line in lines)  # Included content indented
 
     def test_expand_includes_path_traversal_blocked(self, tmp_path: Path) -> None:
-        """_expand_includes should block path traversal attempts."""
-        # Try to include a file outside base_dir
+        """_expand_includes should block path traversal outside repository."""
+        # Try to include a file outside repo (../../etc/passwd)
         text = "config: !include ../../etc/passwd\n"
 
         with pytest.raises(ValueError) as exc_info:
-            _expand_includes(text, tmp_path)
-        assert "escapes base directory" in str(exc_info.value)
+            _expand_includes(text, tmp_path, repo_root=tmp_path)
+        assert "escapes repository" in str(exc_info.value)
 
     def test_expand_includes_absolute_path_blocked(self, tmp_path: Path) -> None:
-        """_expand_includes should block absolute paths that escape base_dir."""
+        """_expand_includes should block absolute paths outside repository."""
         text = "config: !include /etc/passwd\n"
 
         with pytest.raises(ValueError) as exc_info:
-            _expand_includes(text, tmp_path)
-        assert "escapes base directory" in str(exc_info.value)
+            _expand_includes(text, tmp_path, repo_root=tmp_path)
+        assert "escapes repository" in str(exc_info.value)
+
+    def test_expand_includes_cross_directory_within_repo(self, tmp_path: Path) -> None:
+        """_expand_includes should allow cross-directory includes within repo."""
+        # Create directory structure: repo/subdir1/file.yaml includes repo/subdir2/shared.yaml
+        subdir1 = tmp_path / "subdir1"
+        subdir2 = tmp_path / "subdir2"
+        subdir1.mkdir()
+        subdir2.mkdir()
+
+        shared = subdir2 / "shared.yaml"
+        shared.write_text("shared_data: from_subdir2\n")
+
+        # File in subdir1 includes ../subdir2/shared.yaml
+        text = "local: data\nconfig: !include ../subdir2/shared.yaml\n"
+        result = _expand_includes(text, subdir1, repo_root=tmp_path)
+
+        assert "local: data" in result
+        assert "shared_data: from_subdir2" in result
 
     def test_expand_includes_symlink_blocked(self, tmp_path: Path) -> None:
         """_expand_includes should block symlinks."""
@@ -196,7 +213,7 @@ class TestExpandIncludes:
         text = "config: !include link.yaml\n"
 
         with pytest.raises(ValueError) as exc_info:
-            _expand_includes(text, tmp_path)
+            _expand_includes(text, tmp_path, repo_root=tmp_path)
         assert "Symlinks not allowed" in str(exc_info.value)
 
     def test_expand_includes_nested(self, tmp_path: Path) -> None:
