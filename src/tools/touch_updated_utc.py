@@ -41,7 +41,9 @@ def touch_files(paths: Iterable[Path], date_value: str) -> list[Path]:
         lines = text.splitlines(keepends=True)
         updated_lines = _normalize_lines(lines, date_value)
         if updated_lines != lines:
-            path.write_text("".join(updated_lines), encoding="utf-8")
+            tmp_path = path.with_suffix(path.suffix + ".tmp")
+            tmp_path.write_text("".join(updated_lines), encoding="utf-8")
+            tmp_path.replace(path)
             changed.append(path)
     return changed
 
