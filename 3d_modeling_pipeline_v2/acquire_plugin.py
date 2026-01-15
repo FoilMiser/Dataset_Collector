@@ -17,10 +17,13 @@ from pathlib import Path
 
 import fnmatch
 import json
+import logging
 import time
 from typing import Any
 from urllib.parse import urljoin, urlparse
 from urllib.robotparser import RobotFileParser
+
+logger = logging.getLogger(__name__)
 
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.acquire_strategies import (
@@ -183,8 +186,8 @@ def handle_api(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
                     parsed = resp.json()
                     if parsed == {} or (isinstance(parsed, list) and not parsed):
                         break
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to parse API response as JSON (continuing): %s", e)
             time.sleep(delay)
 
     write_json(catalog_dir / "api_calls.json", {"base_url": base_url, "results": call_log})

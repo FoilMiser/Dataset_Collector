@@ -4,9 +4,11 @@ import html
 import ipaddress
 import json
 import logging
+import random
 import re
 import socket
 import threading
+import time
 import urllib.parse
 from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
@@ -584,9 +586,10 @@ def snapshot_evidence(
                 "Too many previous evidence files for %s, cannot rotate. Using timestamp-based name.",
                 previous_digest[:8],
             )
-            import time
-
-            prev_path = manifest_dir / f"{prev_prefix}_{int(time.time())}{prev_ext}"
+            # Use timestamp + random suffix to prevent collisions
+            timestamp = int(time.time())
+            rand_suffix = random.randint(1000, 9999)
+            prev_path = manifest_dir / f"{prev_prefix}_{timestamp}_{rand_suffix}{prev_ext}"
         # P1.2G: Handle OSError on rename - improved error handling for BUG-004
         try:
             existing_path.rename(prev_path)
