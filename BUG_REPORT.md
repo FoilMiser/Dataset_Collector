@@ -7,10 +7,11 @@
 
 ## 🔴 CRITICAL BUGS
 
-### BUG-001: Infinite Loop with Zero Refill Rate
+### BUG-001: Infinite Loop with Zero Refill Rate ✅ FIXED
 **Location**: `src/collector_core/rate_limit.py:191`
 **Severity**: CRITICAL
 **Type**: Logic Bug / Infinite Loop
+**Status**: ✅ FIXED - Validation added in `__post_init__` and `from_dict()`
 
 **Description**:
 If `refill_rate` is set to 0, the `acquire()` method will enter an infinite loop. Line 191 checks `if self.refill_rate > 0` and defaults to waiting 1 second if it's 0, but the `_refill()` method (line 159) calculates `added = elapsed * self.refill_rate`, which will always be 0 when refill_rate is 0. This means tokens will never refill, and the while loop will run forever.
@@ -35,10 +36,11 @@ if refill_rate <= 0:
 
 ---
 
-### BUG-002: Non-Atomic Write Causing Potential Data Corruption
+### BUG-002: Non-Atomic Write Causing Potential Data Corruption ✅ FIXED
 **Location**: `src/collector_core/decision_bundle.py:228`
 **Severity**: CRITICAL
 **Type**: Data Corruption Risk
+**Status**: ✅ FIXED - Now uses atomic write pattern
 
 **Description**:
 The `save_decision_bundle()` function writes directly to the target file without using a temporary file + atomic rename pattern. If the process is interrupted (crash, kill signal, power loss) during the write, the file will be partially written and corrupted.
@@ -65,10 +67,11 @@ tmp_path.replace(output_path)
 
 ---
 
-### BUG-003: Non-Atomic Write in Dry Run Report
+### BUG-003: Non-Atomic Write in Dry Run Report ✅ FIXED
 **Location**: `src/collector_core/pipeline_driver_base.py:632`
 **Severity**: HIGH
 **Type**: Data Corruption Risk
+**Status**: ✅ FIXED - Now uses atomic write pattern
 
 **Description**:
 The dry run report write is not atomic and could be corrupted if interrupted.
@@ -89,10 +92,11 @@ Use atomic write pattern as in BUG-002.
 
 ---
 
-### BUG-004: TOCTOU Race Condition in Evidence File Rotation
+### BUG-004: TOCTOU Race Condition in Evidence File Rotation ✅ FIXED
 **Location**: `src/collector_core/evidence/fetching.py:577-584`
 **Severity**: HIGH
 **Type**: Race Condition / Data Loss Risk
+**Status**: ✅ FIXED - Added max_retries, timestamp fallback, and proper error handling
 
 **Description**:
 Lines 577-582 check if `prev_path` exists in a loop to find a non-existing path, then rename the existing evidence file to `prev_path`. However, between the `exists()` check and the `rename()` call, another process could create a file at `prev_path`, causing the rename to fail. The OSError is caught but silently ignored with `pass`, and execution continues, potentially overwriting the original evidence file without preserving the old version.
@@ -126,10 +130,11 @@ except OSError:
 
 ## 🟠 HIGH PRIORITY BUGS
 
-### BUG-005: Missing Validation for Rate Limiter Configuration
+### BUG-005: Missing Validation for Rate Limiter Configuration ✅ FIXED
 **Location**: `src/collector_core/rate_limit.py:67-108`
 **Severity**: HIGH
 **Type**: Configuration Validation Bug
+**Status**: ✅ FIXED - Validation added for capacity, refill_rate, and initial_tokens
 
 **Description**:
 The `RateLimiterConfig.from_dict()` method does not validate that `capacity` and `refill_rate` are positive numbers. Negative or zero values would cause unexpected behavior:
@@ -170,10 +175,11 @@ if initial_tokens is not None and initial_tokens < 0:
 
 ## 🟡 MEDIUM PRIORITY BUGS
 
-### BUG-006: Unreachable Code in PMC Worker
+### BUG-006: Unreachable Code in PMC Worker ✅ FIXED
 **Location**: `3d_modeling_pipeline_v2/acquire_plugin.py:186-187`
 **Severity**: MEDIUM
 **Type**: Logic Bug (Unreachable Code)
+**Status**: ✅ FIXED - Added proper logging for JSON parse failures
 
 **Description**:
 There's a bare `except Exception: pass` that catches and silently ignores all exceptions when parsing JSON responses. This makes debugging API issues difficult.
@@ -199,14 +205,44 @@ except Exception as e:
 
 ---
 
+### BUG-007: Non-Atomic Writes in Secondary Files
+**Location**: Multiple files
+**Severity**: MEDIUM
+**Type**: Data Corruption Risk
+
+**Description**:
+Several secondary/regenerable files were being written non-atomically, which could cause corruption if the process is interrupted during writes.
+
+**Affected Files**:
+- `3d_modeling_pipeline_v2/mesh_worker.py:289` - Manifest JSON
+- `src/collector_core/metrics/dashboard.py:204-211` - HTML dashboard and Prometheus metrics
+- `src/collector_core/yellow_scrubber_base.py:554` - PMC OA list HTML
+
+**Impact**:
+- Corrupted files if process interrupted during write
+- Lower severity than BUG-002/BUG-003 since files are regenerable
+- Inconsistency with rest of codebase which uses atomic writes
+
+**Recommendation**:
+Use atomic write pattern consistently:
+```python
+tmp_path = target_path.with_suffix(".tmp")
+tmp_path.write_text(content, encoding="utf-8")
+tmp_path.replace(target_path)
+```
+
+**Status**: ✅ FIXED (2026-01-15)
+
+---
+
 ## 📊 BUG SUMMARY
 
-| Priority | Count | Categories |
-|----------|-------|-----------|
-| CRITICAL | 4 | Infinite Loop, Data Corruption (2x), Race Condition |
-| HIGH | 1 | Configuration Validation |
-| MEDIUM | 1 | Silent Failures |
-| **TOTAL** | **6** | |
+| Priority | Count | Categories | Fixed |
+|----------|-------|-----------|-------|
+| CRITICAL | 4 | Infinite Loop, Data Corruption (2x), Race Condition | ✅ 4/4 |
+| HIGH | 1 | Configuration Validation | ✅ 1/1 |
+| MEDIUM | 2 | Silent Failures, Non-Atomic Writes | ✅ 2/2 |
+| **TOTAL** | **7** | | ✅ **7/7** |
 
 ---
 

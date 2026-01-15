@@ -551,7 +551,11 @@ def plan_pmc_allowlist(
         html, used_url = fetch_text_with_fallback(
             PMC_OA_LIST_URLS[:2], user_agent_prefix=user_agent_prefix
         )
-        (out_dir / "pmc_openftlist.html").write_text(html, encoding="utf-8")
+        # Atomic write to prevent corruption if interrupted
+        html_path = out_dir / "pmc_openftlist.html"
+        html_tmp = html_path.with_suffix(".tmp")
+        html_tmp.write_text(html, encoding="utf-8")
+        html_tmp.replace(html_path)
         plan["oa_list_page_url"] = used_url
     except Exception as e:
         plan["error"] = f"Failed to fetch OA list page: {e}"
