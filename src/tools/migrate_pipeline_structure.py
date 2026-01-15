@@ -219,9 +219,11 @@ def execute_migration(repo_root: Path, report: MigrationReport) -> MigrationRepo
                 if "collector_core" in str(path):
                     init_file = path / "__init__.py"
                     if not init_file.exists():
-                        init_file.write_text(
+                        tmp_path = init_file.with_suffix(init_file.suffix + ".tmp")
+                        tmp_path.write_text(
                             f'"""Domain-specific logic for {path.name}."""\n'
                         )
+                        tmp_path.replace(init_file)
 
             elif action.action == "move":
                 src = Path(action.source)
@@ -232,9 +234,11 @@ def execute_migration(repo_root: Path, report: MigrationReport) -> MigrationRepo
                     # Create __init__.py if needed
                     init_file = dest.parent / "__init__.py"
                     if not init_file.exists():
-                        init_file.write_text(
+                        tmp_path = init_file.with_suffix(init_file.suffix + ".tmp")
+                        tmp_path.write_text(
                             f'"""Domain-specific logic for {dest.parent.name}."""\n'
                         )
+                        tmp_path.replace(init_file)
 
             elif action.action == "copy":
                 src = Path(action.source)

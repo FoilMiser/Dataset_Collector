@@ -59,7 +59,9 @@ def main() -> int:
             new_content = update_deprecation_notice(content, filename, domain)
 
             if new_content != content:
-                filepath.write_text(new_content)
+                tmp_path = filepath.with_suffix(filepath.suffix + ".tmp")
+                tmp_path.write_text(new_content)
+                tmp_path.replace(filepath)
                 print(f"Updated: {filepath.relative_to(repo_root)}")
                 updated += 1
 

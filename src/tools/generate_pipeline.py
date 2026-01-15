@@ -593,7 +593,9 @@ def write_file(path: Path, content: str, force: bool) -> None:
     if path.exists() and not force:
         raise FileExistsError(f"Refusing to overwrite existing file: {path}")
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    tmp_path.write_text(content, encoding="utf-8")
+    tmp_path.replace(path)
 
 
 def generate_pipeline(

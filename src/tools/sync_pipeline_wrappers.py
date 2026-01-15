@@ -398,7 +398,9 @@ def sync_domain(domain: str, check_only: bool = False, dry_run: bool = False) ->
                 elif dry_run:
                     issues.append(f"WOULD UPDATE: {file_path}")
                 else:
-                    file_path.write_text(expected_content)
+                    tmp_path = file_path.with_suffix(file_path.suffix + ".tmp")
+                    tmp_path.write_text(expected_content)
+                    tmp_path.replace(file_path)
                     issues.append(f"UPDATED: {file_path}")
         else:
             if check_only:
@@ -406,7 +408,9 @@ def sync_domain(domain: str, check_only: bool = False, dry_run: bool = False) ->
             elif dry_run:
                 issues.append(f"WOULD CREATE: {file_path}")
             else:
-                file_path.write_text(expected_content)
+                tmp_path = file_path.with_suffix(file_path.suffix + ".tmp")
+                tmp_path.write_text(expected_content)
+                tmp_path.replace(file_path)
                 issues.append(f"CREATED: {file_path}")
 
     return issues
