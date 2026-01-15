@@ -72,9 +72,10 @@ def read_jsonl_list(path: Path) -> list[dict[str, Any]]:
 def write_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
     """Write records to JSONL file (supports .gz/.zst) atomically."""
     ensure_dir(path.parent)
-    # For compressed files, write to temp then rename
+    # For compressed files, insert .tmp before the compression suffix
+    # to preserve compression handling (e.g., test.jsonl.gz -> test.jsonl.tmp.gz)
     if path.suffix in (".gz", ".zst"):
-        tmp_path = path.with_suffix(path.suffix + ".tmp")
+        tmp_path = path.parent / f"{path.stem}.tmp{path.suffix}"
     else:
         tmp_path = path.with_suffix(".tmp")
 
@@ -107,7 +108,8 @@ def append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
 def write_jsonl_gz(path: Path, rows: Iterable[dict[str, Any]]) -> tuple[int, int]:
     """Write rows to gzipped JSONL file atomically, return (count, bytes)."""
     ensure_dir(path.parent)
-    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    # Insert .tmp before .gz suffix (e.g., test.jsonl.gz -> test.jsonl.tmp.gz)
+    tmp_path = path.parent / f"{path.stem}.tmp{path.suffix}"
     count = 0
     with gzip.open(tmp_path, "wt", encoding="utf-8") as f:
         for row in rows:
