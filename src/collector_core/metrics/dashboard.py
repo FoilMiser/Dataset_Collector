@@ -201,12 +201,14 @@ def write_dashboard(ledger_root: Path, output_dir: Path) -> dict[str, Any]:
     }
     ensure_dir(output_dir)
     write_json(output_dir / "metrics_dashboard.json", payload)
-    (output_dir / "metrics_dashboard.html").write_text(
-        render_html_report(summary, runs),
-        encoding="utf-8",
-    )
-    (output_dir / "metrics.prom").write_text(
-        render_prometheus(runs),
-        encoding="utf-8",
-    )
+    # Atomic writes to prevent corruption if interrupted
+    html_path = output_dir / "metrics_dashboard.html"
+    html_tmp = html_path.with_suffix(".tmp")
+    html_tmp.write_text(render_html_report(summary, runs), encoding="utf-8")
+    html_tmp.replace(html_path)
+
+    prom_path = output_dir / "metrics.prom"
+    prom_tmp = prom_path.with_suffix(".tmp")
+    prom_tmp.write_text(render_prometheus(runs), encoding="utf-8")
+    prom_tmp.replace(prom_path)
     return payload

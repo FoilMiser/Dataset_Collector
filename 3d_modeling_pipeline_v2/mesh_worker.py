@@ -286,9 +286,11 @@ def main() -> None:
         "results": results,
     }
     (output_dir / "_manifests").mkdir(parents=True, exist_ok=True)
-    (output_dir / "_manifests" / "mesh_worker_manifest.json").write_text(
-        json.dumps(manifest, indent=2), encoding="utf-8"
-    )
+    # Atomic write to prevent corruption if interrupted
+    manifest_path = output_dir / "_manifests" / "mesh_worker_manifest.json"
+    tmp_path = manifest_path.with_suffix(".tmp")
+    tmp_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    tmp_path.replace(manifest_path)
     print(json.dumps({"records": len(metadata_rows), "jsonl": str(jsonl_path)}, indent=2))
 
 
