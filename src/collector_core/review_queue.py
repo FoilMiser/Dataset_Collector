@@ -329,11 +329,13 @@ def cmd_export(args: argparse.Namespace) -> int:
         tmp_path.replace(out_path)
     elif fmt == "csv":
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        with out_path.open("w", newline="", encoding="utf-8") as f:
+        tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
+        with tmp_path.open("w", newline="", encoding="utf-8") as f:
             if reviewed:
                 writer = csv.DictWriter(f, fieldnames=reviewed[0].keys())
                 writer.writeheader()
                 writer.writerows(reviewed)
+        tmp_path.replace(out_path)
     else:
         logger.error("Unknown format: %s. Use 'json' or 'csv'.", fmt)
         return 1

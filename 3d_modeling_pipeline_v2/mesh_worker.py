@@ -141,9 +141,11 @@ def compute_metadata(
 
 def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     ensure_dir(path.parent)
-    with path.open("w", encoding="utf-8") as f:
+    tmp_path = path.with_suffix(".tmp")
+    with tmp_path.open("w", encoding="utf-8") as f:
         for r in rows:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
+    tmp_path.replace(path)
 
 
 def write_parquet(path: Path, rows: list[dict[str, Any]]) -> None:

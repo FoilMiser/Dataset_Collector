@@ -70,11 +70,18 @@ def read_jsonl_list(path: Path) -> list[dict[str, Any]]:
 
 
 def write_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
-    """Write records to JSONL file (supports .gz/.zst)."""
+    """Write records to JSONL file (supports .gz/.zst) atomically."""
     ensure_dir(path.parent)
-    with _open_text(path, "wt") as f:
+    # For compressed files, write to temp then rename
+    if path.suffix in (".gz", ".zst"):
+        tmp_path = path.with_suffix(path.suffix + ".tmp")
+    else:
+        tmp_path = path.with_suffix(".tmp")
+
+    with _open_text(tmp_path, "wt") as f:
         for row in rows:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    tmp_path.replace(path)
 
 
 def append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
@@ -98,11 +105,13 @@ def append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
 
 
 def write_jsonl_gz(path: Path, rows: Iterable[dict[str, Any]]) -> tuple[int, int]:
-    """Write rows to gzipped JSONL file, return (count, bytes)."""
+    """Write rows to gzipped JSONL file atomically, return (count, bytes)."""
     ensure_dir(path.parent)
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
     count = 0
-    with gzip.open(path, "wt", encoding="utf-8") as f:
+    with gzip.open(tmp_path, "wt", encoding="utf-8") as f:
         for row in rows:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
             count += 1
+    tmp_path.replace(path)
     return count, path.stat().st_size

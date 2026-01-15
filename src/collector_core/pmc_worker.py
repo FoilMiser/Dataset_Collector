@@ -170,7 +170,9 @@ def fetch_pmc_package(
 
         if cache_dir:
             ensure_dir(cache_dir)
-            cache_path.write_bytes(content)
+            tmp_path = cache_path.with_suffix(".tmp")
+            tmp_path.write_bytes(content)
+            tmp_path.replace(cache_path)
 
         meta["status"] = "ok"
         meta["bytes"] = len(content)
