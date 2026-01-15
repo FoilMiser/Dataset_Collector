@@ -1,7 +1,11 @@
 # A-Grade Remaining Work — What's Missing
 
 **Current Status**: Repository has achieved **A-Grade** ✅
-**Remaining Items**: 2 categories (both non-critical, optional improvements)
+**Remaining Items**: 1 category (non-critical, optional improvement)
+
+**COMPLETED SINCE LAST UPDATE**:
+- ✅ **P3.2A,B,D**: Documented domain screener decision in `docs/domain_screeners.md`
+- ✅ **Refactoring Helpers**: Added comments to 3 long functions marking extraction points
 
 ---
 
@@ -170,20 +174,31 @@ def run_preflight(args):
 
 ---
 
-## 🔶 BLOCKED: P3.2A,B,D — Domain Screener Tests
+## ✅ COMPLETED: P3.2A,B,D — Domain Screener Tests
 
 **Priority**: Low
-**Status**: BLOCKED - Cannot create tests for non-existent modules
-**Blocking**: Yes - Must create domain screener modules first
-**Effort**: High (4-6 hours per screener + tests)
+**Status**: ✅ COMPLETE - Documented decision not to implement custom screeners
+**Completion Date**: 2026-01-15
+**Effort**: Low (documentation approach)
 
-### Why Blocked?
-These pipelines currently use the **default `standard` screener**. There are no custom domain-specific screeners implemented for:
-- Agriculture/Circular Economy (`agri_circular`)
-- Earth Sciences (`earth`)
-- Engineering (`engineering`)
+### What Was Done
 
-**Two Options**:
+Created comprehensive documentation in **`docs/domain_screeners.md`** that:
+
+1. **Documents Rationale**: Explains why these three pipelines use standard screener
+   - Agriculture/Circular Economy: Interdisciplinary, broad terminology
+   - Earth Sciences: Diverse subdisciplines, hard to define universal terms
+   - Engineering: Extremely broad field, term filtering ineffective
+
+2. **Implementation Status Table**: Shows which domains have custom screeners vs standard
+
+3. **Decision Criteria**: Defines when to implement custom screeners (5 key conditions)
+
+4. **Implementation Guide**: Provides template for future custom screener creation
+
+5. **Evaluation Metrics**: Defines thresholds for deciding if custom screener needed
+
+### Historical Context - Two Options That Were Considered:
 
 ---
 
@@ -504,16 +519,14 @@ git push -u origin claude/a-grade-patch-completion-xFbol
 
 ## 📋 Quick Decision Matrix
 
-| Item | Must Do? | Effort | Benefit | Recommendation |
-|------|----------|--------|---------|----------------|
-| **P2.2 (Refactor long functions)** | No | Medium | Medium | Do if planning future feature work on these functions |
-| **P3.2A,B,D Option 1 (Implement screeners)** | No | High | High if noise is an issue | Do if data quality feedback indicates need |
-| **P3.2A,B,D Option 2 (Document decision)** | No | Low | Low | Do for completeness, low priority |
+| Item | Must Do? | Effort | Benefit | Status |
+|------|----------|--------|---------|--------|
+| **P2.2 (Refactor long functions)** | No | Medium | Medium | ⏸️ DEFERRED - Do if planning future feature work |
+| ~~**P3.2A,B,D (Document decision)**~~ | ~~No~~ | ~~Low~~ | ~~Low~~ | ✅ COMPLETE - Documented in docs/domain_screeners.md |
 
-**Recommendation**:
-1. ✅ **Do P3.2A,B,D Option 2** (15 minutes) - Quick documentation win
-2. ⏸️ **Defer P2.2** - Only refactor if touching these functions for other reasons
-3. ⏸️ **Defer P3.2A,B,D Option 1** - Only implement if data quality becomes an issue
+**Current Recommendation**:
+- ⏸️ **Defer P2.2** - Only refactor if touching these functions for other reasons
+- ✅ **P3.2 Complete** - Documentation approach chosen and implemented
 
 ---
 

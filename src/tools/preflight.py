@@ -39,6 +39,12 @@ def run_preflight(
     verbose: bool = False,
     quiet: bool = False,
 ) -> int:
+    """Run preflight validation checks (214 lines).
+
+    NOTE: This function is flagged for refactoring (P2.2C) but is well-structured.
+    Potential extraction points marked with REFACTOR comments below.
+    See A_GRADE_REMAINING_WORK.md for detailed refactoring plan.
+    """
     pipeline_map = _load_yaml(pipeline_map_path, "pipeline_map")
     pipelines_cfg = pipeline_map.get("pipelines", {}) or {}
     errors: list[str | dict[str, str]] = []
@@ -62,6 +68,9 @@ def run_preflight(
     else:
         pipeline_items = list(pipelines_cfg.items())
 
+    # REFACTOR: Main validation loop (lines 71-158+) could be extracted to
+    # _validate_pipelines(pipeline_items, repo_root, warn_disabled, verbose, ...)
+    # Returns (errors, warnings, strategies_in_use, strategy_targets, registry_misses)
     for pipeline_name, pipeline_entry in pipeline_items:
         pipeline_dir = repo_root / pipeline_name
         if not pipeline_dir.exists():
