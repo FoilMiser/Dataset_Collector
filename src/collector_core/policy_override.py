@@ -215,11 +215,13 @@ def load_override_registry(path: Path) -> OverrideRegistry:
 
 @stable_api
 def save_override_registry(registry: OverrideRegistry, path: Path) -> None:
-    """Save override registry to a JSONL file."""
+    """Save override registry to a JSONL file atomically."""
     ensure_dir(path.parent)
-    with path.open("w", encoding="utf-8") as f:
+    tmp_path = path.with_suffix(".tmp")
+    with tmp_path.open("w", encoding="utf-8") as f:
         for override in registry.overrides:
             f.write(json.dumps(override.to_dict()) + "\n")
+    tmp_path.replace(path)
 
 
 @stable_api
