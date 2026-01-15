@@ -193,6 +193,49 @@ class TestCatalogHelpers:
         assert counts["github"] == 1
         assert counts["unknown"] == 1
 
+    def test_file_stats_missing_file_returns_error(self, tmp_path: Path) -> None:
+        """file_stats should return error dict for missing file."""
+        missing_file = tmp_path / "nonexistent.jsonl"
+        stats = file_stats(missing_file)
+
+        assert "error" in stats
+        assert stats["error"] == "file_not_found"
+        assert stats["bytes"] == 0
+        assert stats["lines_estimate"] == 0
+        assert stats["name"] == "nonexistent.jsonl"
+
+    def test_count_lines_with_gzipped_file(self, tmp_path: Path) -> None:
+        """count_lines should handle gzipped files."""
+        import gzip
+
+        gz_file = tmp_path / "test.jsonl.gz"
+        with gzip.open(gz_file, "wt", encoding="utf-8") as f:
+            f.write("line1\nline2\nline3\nline4\n")
+
+        count = count_lines(gz_file)
+        assert count == 4
+
+    def test_count_lines_with_encoding_errors(self, tmp_path: Path) -> None:
+        """count_lines should handle encoding errors gracefully."""
+        test_file = tmp_path / "bad_encoding.txt"
+        # Write some binary data that's not valid UTF-8
+        test_file.write_bytes(b"line1\nline2\n\xff\xfe invalid bytes\nline3\n")
+
+        # Should not crash, errors='ignore' should handle it
+        count = count_lines(test_file)
+        assert count > 0  # Should count something
+
+    def test_file_stats_with_empty_file(self, tmp_path: Path) -> None:
+        """file_stats should handle empty files."""
+        empty_file = tmp_path / "empty.jsonl"
+        empty_file.write_text("")
+
+        stats = file_stats(empty_file)
+        assert stats["bytes"] == 0
+        assert stats["lines_estimate"] == 0
+        assert stats["name"] == "empty.jsonl"
+        assert "error" not in stats
+
 
 class TestCollectRawStats:
     """Tests for collect_raw_stats function."""

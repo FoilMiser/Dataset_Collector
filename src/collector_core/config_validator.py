@@ -109,7 +109,15 @@ def _expand_includes(text: str, base_dir: Path) -> str:
         raw_path = raw_path.strip("'\"")
         include_path = Path(raw_path)
         if not include_path.is_absolute():
-            include_path = (base_dir / include_path).resolve()
+            include_path = base_dir / include_path
+
+        # P0.6: Symlinks not allowed in includes (prevent symlink attacks)
+        # Check BEFORE resolving, so we can detect symlinks
+        if include_path.is_symlink():
+            raise ValueError(f"Symlinks not allowed in includes: {include_path}")
+
+        # Resolve the path after symlink check
+        include_path = include_path.resolve()
 
         # P0.6: Verify resolved path is within allowed directory (prevent path traversal)
         try:
@@ -117,10 +125,6 @@ def _expand_includes(text: str, base_dir: Path) -> str:
                 raise ValueError(f"Include path escapes base directory: {include_path}")
         except ValueError:
             raise ValueError(f"Include path escapes base directory: {include_path}")
-
-        # P0.6: Symlinks not allowed in includes (prevent symlink attacks)
-        if include_path.is_symlink():
-            raise ValueError(f"Symlinks not allowed in includes: {include_path}")
 
         include_text = include_path.read_text(encoding="utf-8")
         expanded = _expand_includes(include_text, include_path.parent)
