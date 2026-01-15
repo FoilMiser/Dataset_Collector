@@ -46,7 +46,8 @@ from collector_core.exceptions import (
 from collector_core.logging_config import add_logging_args, configure_logging
 from collector_core.utils.hash import sha256_bytes, sha256_file, stable_unit_interval
 from collector_core.utils.http import build_user_agent, http_get_bytes
-from collector_core.utils.io import append_jsonl, read_jsonl_list as read_jsonl, write_json
+from collector_core.utils.io import append_jsonl, write_json
+from collector_core.utils.io import read_jsonl_list as read_jsonl
 from collector_core.utils.logging import utc_now
 from collector_core.utils.paths import ensure_dir, validate_tar_archive
 from collector_core.utils.text import normalize_whitespace, safe_text

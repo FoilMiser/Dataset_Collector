@@ -10,7 +10,6 @@ from collector_core.yellow.base import (
     standard_transform,
 )
 
-
 _CVE_RE = re.compile(r"\bCVE-\d{4}-\d{4,7}\b", re.IGNORECASE)
 _SHA256_RE = re.compile(r"\b[a-fA-F0-9]{64}\b")
 _SHA1_RE = re.compile(r"\b[a-fA-F0-9]{40}\b")

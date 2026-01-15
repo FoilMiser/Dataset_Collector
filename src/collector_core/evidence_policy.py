@@ -9,16 +9,15 @@ Issue 4.3 (v3.0): When evidence hash changes:
 
 from __future__ import annotations
 
-import json
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Any
 
 from collector_core.evidence.change_detection import (
     compute_signoff_mismatches,
-    normalize_evidence_change_policy,
     normalize_cosmetic_change_policy,
+    normalize_evidence_change_policy,
     resolve_evidence_change,
 )
 from collector_core.stability import stable_api
@@ -86,7 +85,7 @@ class EvidencePolicyConfig:
     re_review_grace_days: int = 0
 
     @classmethod
-    def from_config(cls, cfg: dict[str, Any]) -> "EvidencePolicyConfig":
+    def from_config(cls, cfg: dict[str, Any]) -> EvidencePolicyConfig:
         """Create from pipeline/targets configuration."""
         policy_cfg = cfg.get("globals", {}).get("evidence_policy", {})
         return cls(

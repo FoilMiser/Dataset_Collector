@@ -16,7 +16,6 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-
 from collector_core.__version__ import __version__ as PIPELINE_VERSION
 from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.config_validator import read_yaml

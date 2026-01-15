@@ -171,7 +171,7 @@ def plan_migration(repo_root: Path) -> MigrationReport:
                     action="update_deprecation",
                     source=str(path),
                     destination=None,
-                    reason=f"Mark as deprecated wrapper (removal in v4.0)",
+                    reason="Mark as deprecated wrapper (removal in v4.0)",
                 )
             )
             report.skipped_files.append(str(path.relative_to(repo_root)))
@@ -324,7 +324,7 @@ def main() -> int:
             for error in report.errors:
                 print(f"  ERROR: {error}")
             return 1
-        print(f"Migration completed successfully.")
+        print("Migration completed successfully.")
         print(f"  Moved: {len(report.moved_files)} files")
         print(f"  Skipped (wrappers): {len(report.skipped_files)} files")
 

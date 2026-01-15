@@ -13,8 +13,7 @@ from typing import Any
 
 import yaml
 
-from collector_core.pipeline_spec import PipelineSpec, register_pipeline, PIPELINE_SPECS
-
+from collector_core.pipeline_spec import PipelineSpec, register_pipeline
 
 # Human-readable names for each domain
 # This mapping ensures consistent naming across the system

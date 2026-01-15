@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Module cache for lazy loading
-_domain_cache: dict[str, "ModuleType"] = {}
+_domain_cache: dict[str, ModuleType] = {}
 
 # Default domain name to fall back to for unknown domains
 _DEFAULT_DOMAIN = "standard"
@@ -68,7 +68,7 @@ _DOMAIN_ALIASES: dict[str, str] = {
 }
 
 
-def _lazy_import_domain(module_name: str) -> "ModuleType":
+def _lazy_import_domain(module_name: str) -> ModuleType:
     """Lazily import a domain module.
 
     Args:
@@ -115,7 +115,7 @@ def _resolve_domain_name(domain_name: str) -> str:
 
 
 @stable_api
-def get_domain(domain_name: str) -> "ModuleType":
+def get_domain(domain_name: str) -> ModuleType:
     """Get a domain module by name with lazy loading.
 
     This function lazily imports the domain module only when needed,
@@ -307,7 +307,7 @@ def dispatch_yellow_screen(
 def create_domain_runner(
     domain_name: str,
     prefix: str | None = None,
-) -> "callable[[], None]":
+) -> callable[[], None]:
     """Create a main function for running yellow screening for a specific domain.
 
     This creates a callable suitable for use as a module's main() function,

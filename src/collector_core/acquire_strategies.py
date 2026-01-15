@@ -21,7 +21,6 @@ Example migration:
 
 from __future__ import annotations
 
-import time
 import warnings
 from collections.abc import ItemsView, KeysView, ValuesView
 from typing import TYPE_CHECKING, Any
@@ -43,8 +42,6 @@ from collector_core.acquire.context import (
     RootsDefaults,
     RunMode,
     StrategyHandler,
-    _build_internal_mirror_allowlist,
-    _normalize_internal_mirror_allowlist,
 )
 
 # Re-export utility functions that are used elsewhere
@@ -173,21 +170,21 @@ def normalize_download(download: dict[str, Any]) -> dict[str, Any]:
     return http.normalize_download(download)
 
 
-def sha256_file(path: "Path") -> str:
+def sha256_file(path: Path) -> str:
     """DEPRECATED: Use collector_core.utils.hash.sha256_file."""
     _emit_deprecation_warning()
     from collector_core.utils.hash import sha256_file as _sha256_file
     return _sha256_file(path)
 
 
-def md5_file(path: "Path") -> str:
+def md5_file(path: Path) -> str:
     """DEPRECATED: Use collector_core.utils.hash.md5_file."""
     _emit_deprecation_warning()
     from collector_core.utils.hash import md5_file as _md5_file
     return _md5_file(path)
 
 
-def run_cmd(cmd: list[str], cwd: "Path | None" = None) -> str:
+def run_cmd(cmd: list[str], cwd: Path | None = None) -> str:
     """DEPRECATED: Use subprocess.run directly."""
     _emit_deprecation_warning()
     import subprocess
@@ -204,7 +201,7 @@ def run_cmd(cmd: list[str], cwd: "Path | None" = None) -> str:
 def _http_download_with_resume(
     ctx: AcquireContext,
     url: str,
-    out_path: "Path",
+    out_path: Path,
     expected_size: int | None = None,
     expected_sha256: str | None = None,
 ) -> dict[str, Any]:
@@ -219,14 +216,14 @@ def _http_download_with_resume(
 # ============================================================================
 
 
-def handle_http(ctx: AcquireContext, row: dict[str, Any], out_dir: "Path") -> list[dict[str, Any]]:
+def handle_http(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     """DEPRECATED: Use collector_core.acquire.strategies.http.handle_http."""
     http = _lazy_import_http()
     return http.handle_http(ctx, row, out_dir)
 
 
 def handle_http_multi(
-    ctx: AcquireContext, row: dict[str, Any], out_dir: "Path"
+    ctx: AcquireContext, row: dict[str, Any], out_dir: Path
 ) -> list[dict[str, Any]]:
     """DEPRECATED: Use collector_core.acquire.strategies.http.handle_http_multi."""
     http = _lazy_import_http()
@@ -234,27 +231,27 @@ def handle_http_multi(
 
 
 def handle_http_single(
-    ctx: AcquireContext, row: dict[str, Any], out_dir: "Path"
+    ctx: AcquireContext, row: dict[str, Any], out_dir: Path
 ) -> list[dict[str, Any]]:
     """DEPRECATED: Use collector_core.acquire.strategies.http.handle_http_single."""
     http = _lazy_import_http()
     return http.handle_http_single(ctx, row, out_dir)
 
 
-def handle_ftp(ctx: AcquireContext, row: dict[str, Any], out_dir: "Path") -> list[dict[str, Any]]:
+def handle_ftp(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     """DEPRECATED: Use collector_core.acquire.strategies.ftp.handle_ftp."""
     ftp = _lazy_import_ftp()
     return ftp.handle_ftp(ctx, row, out_dir)
 
 
-def handle_git(ctx: AcquireContext, row: dict[str, Any], out_dir: "Path") -> list[dict[str, Any]]:
+def handle_git(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[dict[str, Any]]:
     """DEPRECATED: Use collector_core.acquire.strategies.git.handle_git."""
     git = _lazy_import_git()
     return git.handle_git(ctx, row, out_dir)
 
 
 def handle_zenodo(
-    ctx: AcquireContext, row: dict[str, Any], out_dir: "Path"
+    ctx: AcquireContext, row: dict[str, Any], out_dir: Path
 ) -> list[dict[str, Any]]:
     """DEPRECATED: Use collector_core.acquire.strategies.zenodo.handle_zenodo."""
     zenodo = _lazy_import_zenodo()
@@ -262,7 +259,7 @@ def handle_zenodo(
 
 
 def handle_dataverse(
-    ctx: AcquireContext, row: dict[str, Any], out_dir: "Path"
+    ctx: AcquireContext, row: dict[str, Any], out_dir: Path
 ) -> list[dict[str, Any]]:
     """DEPRECATED: Use collector_core.acquire.strategies.dataverse.handle_dataverse."""
     dataverse = _lazy_import_dataverse()
@@ -270,7 +267,7 @@ def handle_dataverse(
 
 
 def handle_figshare(
-    ctx: AcquireContext, row: dict[str, Any], out_dir: "Path"
+    ctx: AcquireContext, row: dict[str, Any], out_dir: Path
 ) -> list[dict[str, Any]]:
     """DEPRECATED: Use collector_core.acquire.strategies.figshare.handle_figshare_article."""
     figshare = _lazy_import_figshare()
@@ -278,7 +275,7 @@ def handle_figshare(
 
 
 def handle_figshare_article(
-    ctx: AcquireContext, row: dict[str, Any], out_dir: "Path"
+    ctx: AcquireContext, row: dict[str, Any], out_dir: Path
 ) -> list[dict[str, Any]]:
     """DEPRECATED: Use collector_core.acquire.strategies.figshare.handle_figshare_article."""
     figshare = _lazy_import_figshare()
@@ -286,7 +283,7 @@ def handle_figshare_article(
 
 
 def handle_figshare_files(
-    ctx: AcquireContext, row: dict[str, Any], out_dir: "Path"
+    ctx: AcquireContext, row: dict[str, Any], out_dir: Path
 ) -> list[dict[str, Any]]:
     """DEPRECATED: Use collector_core.acquire.strategies.figshare.handle_figshare_files."""
     figshare = _lazy_import_figshare()
@@ -300,7 +297,7 @@ def make_github_release_handler(user_agent: str) -> StrategyHandler:
 
 
 def handle_hf_datasets(
-    ctx: AcquireContext, row: dict[str, Any], out_dir: "Path"
+    ctx: AcquireContext, row: dict[str, Any], out_dir: Path
 ) -> list[dict[str, Any]]:
     """DEPRECATED: Use collector_core.acquire.strategies.hf.handle_hf_datasets."""
     hf = _lazy_import_hf()
@@ -308,7 +305,7 @@ def handle_hf_datasets(
 
 
 def handle_s3_sync(
-    ctx: AcquireContext, row: dict[str, Any], out_dir: "Path"
+    ctx: AcquireContext, row: dict[str, Any], out_dir: Path
 ) -> list[dict[str, Any]]:
     """DEPRECATED: Use collector_core.acquire.strategies.s3.handle_s3_sync."""
     s3 = _lazy_import_s3()
@@ -316,7 +313,7 @@ def handle_s3_sync(
 
 
 def handle_aws_requester_pays(
-    ctx: AcquireContext, row: dict[str, Any], out_dir: "Path"
+    ctx: AcquireContext, row: dict[str, Any], out_dir: Path
 ) -> list[dict[str, Any]]:
     """DEPRECATED: Use collector_core.acquire.strategies.s3.handle_aws_requester_pays."""
     s3 = _lazy_import_s3()
@@ -324,7 +321,7 @@ def handle_aws_requester_pays(
 
 
 def handle_torrent(
-    ctx: AcquireContext, row: dict[str, Any], out_dir: "Path"
+    ctx: AcquireContext, row: dict[str, Any], out_dir: Path
 ) -> list[dict[str, Any]]:
     """DEPRECATED: Use collector_core.acquire.strategies.torrent.handle_torrent."""
     torrent = _lazy_import_torrent()
@@ -410,7 +407,7 @@ def resolve_license_pool(row: dict[str, Any]) -> str:
 # ============================================================================
 
 
-def resolve_output_dir(ctx: AcquireContext, bucket: str, pool: str, target_id: str) -> "Path":
+def resolve_output_dir(ctx: AcquireContext, bucket: str, pool: str, target_id: str) -> Path:
     """DEPRECATED: Use collector_core.acquire.worker.resolve_output_dir."""
     _emit_deprecation_warning()
     from collector_core.acquire import worker
@@ -443,7 +440,7 @@ def run_target(
     return worker.run_target(ctx, bucket, row, strategy_handlers, postprocess)
 
 
-def load_config(targets_path: "Path | None") -> dict[str, Any]:
+def load_config(targets_path: Path | None) -> dict[str, Any]:
     """DEPRECATED: Use collector_core.acquire.worker.load_config."""
     _emit_deprecation_warning()
     from collector_core.acquire import worker

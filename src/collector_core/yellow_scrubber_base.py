@@ -43,7 +43,8 @@ from collector_core.companion_files import (
 from collector_core.stability import stable_api
 from collector_core.utils.hash import sha256_file
 from collector_core.utils.http import requests, require_requests
-from collector_core.utils.io import read_jsonl_list as read_jsonl, read_yaml, write_json, write_jsonl_gz
+from collector_core.utils.io import read_jsonl_list as read_jsonl
+from collector_core.utils.io import read_yaml, write_json, write_jsonl_gz
 from collector_core.utils.logging import utc_now
 from collector_core.utils.paths import ensure_dir
 from collector_core.utils.text import lower, normalize_whitespace, safe_text

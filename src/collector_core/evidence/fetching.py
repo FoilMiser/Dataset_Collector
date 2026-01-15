@@ -4,16 +4,20 @@ import html
 import ipaddress
 import json
 import logging
+import random
 import re
 import socket
 import threading
+import time
 import urllib.parse
-from copy import deepcopy
+from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
 from pathlib import Path
-from typing import Any, Callable, Sequence
+from typing import Any
 
 import requests
+
 from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.dependencies import _try_import
 from collector_core.network_utils import _with_retries
@@ -572,23 +576,43 @@ def snapshot_evidence(
         prev_prefix = f"license_evidence.prev_{previous_digest[:8]}"
         prev_path = manifest_dir / f"{prev_prefix}{prev_ext}"
         counter = 1
-        while prev_path.exists():
+        # TOCTOU mitigation: Limit retries to prevent infinite loop
+        max_retries = 100
+        while prev_path.exists() and counter < max_retries:
             prev_path = manifest_dir / f"{prev_prefix}_{counter}{prev_ext}"
             counter += 1
-        # P1.2G: Handle OSError on rename
+        if counter >= max_retries:
+            logger.warning(
+                "Too many previous evidence files for %s, cannot rotate. Using timestamp-based name.",
+                previous_digest[:8],
+            )
+            # Use timestamp + random suffix to prevent collisions
+            timestamp = int(time.time())
+            rand_suffix = random.randint(1000, 9999)
+            prev_path = manifest_dir / f"{prev_prefix}_{timestamp}_{rand_suffix}{prev_ext}"
+        # P1.2G: Handle OSError on rename - improved error handling for BUG-004
         try:
             existing_path.rename(prev_path)
-        except OSError:
-            pass  # Ignore rename failures, proceed with new file
-        previous_renamed_path = prev_path
-        previous_entry = {
-            "sha256": previous_digest,
-            "sha256_raw_bytes": previous_digest,
-            "sha256_normalized_text": previous_normalized_digest,
-            "filename": prev_path.name,
-            "fetched_at_utc": existing_meta.get("fetched_at_utc"),
-        }
-        history.append(previous_entry)
+        except OSError as e:
+            logger.error(
+                "Failed to rotate previous evidence file %s to %s: %s. Evidence history may be incomplete.",
+                existing_path,
+                prev_path,
+                e,
+            )
+            # Continue without rotation - better to have new evidence than fail entirely
+            prev_path = None
+        previous_renamed_path = prev_path if prev_path else None
+        # Only add to history if rename succeeded
+        if prev_path:
+            previous_entry = {
+                "sha256": previous_digest,
+                "sha256_raw_bytes": previous_digest,
+                "sha256_normalized_text": previous_normalized_digest,
+                "filename": prev_path.name,
+                "fetched_at_utc": existing_meta.get("fetched_at_utc"),
+            }
+            history.append(previous_entry)
     temp_path.write_bytes(content)
     temp_path.replace(out_path)
     saved_digest = sha256_file(out_path)
@@ -657,12 +681,12 @@ def snapshot_evidence(
 @stable_api
 def fetch_evidence(
     *,
-    ctx: "TargetContext",
-    cfg: "DriverConfig",
+    ctx: TargetContext,
+    cfg: DriverConfig,
     user_agent: str,
     max_bytes: int,
     fetch_cache: EvidenceFetchCache | None = None,
-) -> "EvidenceResult":
+) -> EvidenceResult:
     from collector_core.pipeline_driver_base import EvidenceResult
 
     evidence_snapshot = {"status": "skipped", "url": ctx.evidence_url}
@@ -720,12 +744,12 @@ def fetch_evidence(
 @stable_api
 def fetch_evidence_batch(
     *,
-    ctxs: Sequence["TargetContext"],
-    cfg: "DriverConfig",
+    ctxs: Sequence[TargetContext],
+    cfg: DriverConfig,
     user_agent: str,
     max_bytes: int,
     max_workers: int | None = None,
-) -> list["EvidenceResult"]:
+) -> list[EvidenceResult]:
     if not ctxs:
         return []
     fetch_cache = EvidenceFetchCache()

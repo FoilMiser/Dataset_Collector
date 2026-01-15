@@ -70,7 +70,7 @@ _STRATEGY_LOADERS: dict[str, tuple[str, str, dict[str, Any]]] = {
 }
 
 
-def get_handler(name: str, **kwargs: Any) -> "StrategyHandler":
+def get_handler(name: str, **kwargs: Any) -> StrategyHandler:
     """Get a strategy handler by name with lazy loading.
 
     This function lazily imports the strategy module only when needed,
@@ -146,7 +146,7 @@ def build_default_handlers(
     figshare_variant: str | None = None,
     github_release_repo: str | None = None,
     extra_handlers: list[str] | None = None,
-) -> dict[str, "StrategyHandler"]:
+) -> dict[str, StrategyHandler]:
     """Build a dictionary of default strategy handlers.
 
     This function builds the standard set of handlers for pipeline use.
@@ -161,7 +161,7 @@ def build_default_handlers(
     Returns:
         Dictionary mapping strategy names to handler functions
     """
-    handlers: dict[str, "StrategyHandler"] = {
+    handlers: dict[str, StrategyHandler] = {
         "http": get_handler("http", variant=http_handler),
         "ftp": get_handler("ftp"),
         "git": get_handler("git"),

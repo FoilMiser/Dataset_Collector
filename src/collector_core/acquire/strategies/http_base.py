@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from email.message import Message
-from email.utils import decode_rfc2231
-from urllib.parse import unquote
 import hashlib
 import ipaddress
 import socket
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
+from email.message import Message
+from email.utils import decode_rfc2231
 from pathlib import Path
-from typing import Iterable, Mapping
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 from collector_core.acquire.context import InternalMirrorAllowlist
 

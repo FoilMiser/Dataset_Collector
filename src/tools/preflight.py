@@ -18,7 +18,6 @@ from tools.strategy_registry import (
     get_strategy_spec,
 )
 
-
 TOOL_INSTALL_HINTS = {
     "git": "Install Git for Windows: https://git-scm.com/download/win",
     "aria2c": "Install aria2: https://aria2.github.io/",

@@ -7,8 +7,8 @@ Replaces per-pipeline acquire_worker.py, merge_worker.py, etc.
 
 from __future__ import annotations
 
-import sys
 import argparse
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 

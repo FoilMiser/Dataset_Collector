@@ -1,9 +1,9 @@
 from __future__ import annotations
-from pathlib import Path
 
 import dataclasses
-import threading
 import shutil
+import threading
+from pathlib import Path
 from typing import Any
 
 # Default allowed content types for downloads
@@ -129,7 +129,7 @@ class TargetLimitEnforcer:
     limit_files: int | None
     max_bytes_per_target: int | None
     max_bytes_per_file: int | None
-    run_budget: "RunByteBudget | None" = None
+    run_budget: RunByteBudget | None = None
     files_seen: int = 0
     bytes_seen: int = 0
 
@@ -232,7 +232,7 @@ def build_target_limit_enforcer(
     limit_files: int | None,
     max_bytes_per_target: int | None,
     download: dict[str, Any] | None,
-    run_budget: "RunByteBudget | None" = None,
+    run_budget: RunByteBudget | None = None,
 ) -> TargetLimitEnforcer:
     download_cfg = download or {}
     max_bytes_per_file = _as_int(download_cfg.get("max_bytes_per_file"))

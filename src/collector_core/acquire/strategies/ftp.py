@@ -8,12 +8,12 @@ from typing import Any
 from urllib.parse import urlparse
 
 from collector_core.acquire.context import AcquireContext, StrategyHandler
-from collector_core.acquire_limits import build_target_limit_enforcer, resolve_result_bytes
+from collector_core.acquire_limits import build_target_limit_enforcer
 from collector_core.acquire_strategies import normalize_download
 from collector_core.dependencies import _try_import, requires
 from collector_core.stability import stable_api
 from collector_core.utils.hash import sha256_file
-from collector_core.utils.paths import ensure_dir, safe_filename
+from collector_core.utils.paths import ensure_dir
 
 FTP = _try_import("ftplib", "FTP")
 

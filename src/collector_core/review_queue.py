@@ -48,7 +48,8 @@ from collector_core.__version__ import __version__ as TOOL_VERSION
 from collector_core.config_validator import read_yaml
 from collector_core.dataset_root import ensure_data_root_allowed
 from collector_core.logging_config import add_logging_args, configure_logging
-from collector_core.utils.io import read_jsonl_list as read_jsonl, write_json
+from collector_core.utils.io import read_jsonl_list as read_jsonl
+from collector_core.utils.io import write_json
 from collector_core.utils.logging import utc_now
 
 logger = logging.getLogger(__name__)

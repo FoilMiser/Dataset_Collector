@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 from collector_core.stability import stable_api
 
 if TYPE_CHECKING:
-    from typing import BinaryIO
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -286,7 +286,7 @@ def safe_extract_tar(
     else:
         mode = "r"
 
-    with tarfile.open(archive_path, mode) as tf:
+    with tarfile.open(str(archive_path), mode) as tf:
         members = tf.getmembers()
 
         # Check file count

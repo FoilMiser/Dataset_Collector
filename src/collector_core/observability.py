@@ -24,8 +24,9 @@ from __future__ import annotations
 import atexit
 import logging
 import os
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Iterator
+from typing import TYPE_CHECKING, Any
 
 from collector_core.dependencies import _try_import
 
@@ -43,7 +44,6 @@ _prometheus_client = _try_import("prometheus_client")
 
 if TYPE_CHECKING:
     from opentelemetry.trace import Tracer
-    from opentelemetry.metrics import Meter
 
 # Module state
 _tracer_provider: Any = None
@@ -77,8 +77,8 @@ def _setup_otel_tracing() -> Any | None:
 
     try:
         from opentelemetry import trace
+        from opentelemetry.sdk.resources import SERVICE_NAME, SERVICE_VERSION, Resource
         from opentelemetry.sdk.trace import TracerProvider
-        from opentelemetry.sdk.resources import Resource, SERVICE_NAME, SERVICE_VERSION
 
         resource = Resource.create({
             SERVICE_NAME: _get_service_name(),
@@ -112,7 +112,7 @@ def _setup_otel_tracing() -> Any | None:
 class NoOpSpan:
     """No-op span when OpenTelemetry is not available."""
 
-    def __enter__(self) -> "NoOpSpan":
+    def __enter__(self) -> NoOpSpan:
         return self
 
     def __exit__(self, *args: Any) -> None:
@@ -147,7 +147,7 @@ class NoOpTracer:
         yield NoOpSpan()
 
 
-def get_tracer(name: str = "dataset-collector") -> "Tracer | NoOpTracer":
+def get_tracer(name: str = "dataset-collector") -> Tracer | NoOpTracer:
     """Get a tracer instance.
 
     Returns a real OpenTelemetry tracer if available, otherwise a no-op tracer.
@@ -390,7 +390,7 @@ def record_error(pipeline: str, error_type: str) -> None:
 @contextmanager
 def traced_operation(
     name: str,
-    tracer: "Tracer | NoOpTracer | None" = None,
+    tracer: Tracer | NoOpTracer | None = None,
     attributes: dict[str, Any] | None = None,
 ) -> Iterator[Any]:
     """Context manager for tracing an operation.

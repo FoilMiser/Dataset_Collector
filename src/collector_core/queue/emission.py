@@ -25,7 +25,7 @@ def sort_queue_rows(rows: list[dict[str, object]]) -> list[dict[str, object]]:
     return sorted(rows, key=sort_key)
 
 
-def emit_queues(queues_root: Path, results: "ClassificationResult") -> None:
+def emit_queues(queues_root: Path, results: ClassificationResult) -> None:
     results.green_rows = sort_queue_rows(results.green_rows)
     results.yellow_rows = sort_queue_rows(results.yellow_rows)
     results.red_rows = sort_queue_rows(results.red_rows)
