@@ -67,10 +67,12 @@ def patch_targets_yaml(
     cfg["queues"] = queues_cfg
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
+    tmp_path = output_path.with_suffix(output_path.suffix + ".tmp")
+    tmp_path.write_text(
         yaml.safe_dump(cfg, sort_keys=False, default_flow_style=False),
         encoding="utf-8",
     )
+    tmp_path.replace(output_path)
     return output_path
 
 
