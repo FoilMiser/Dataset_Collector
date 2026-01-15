@@ -267,11 +267,13 @@ def run_target(
         )
         write_json(out_dir / "download_manifest.json", manifest)
 
-        status = (
-            "ok"
-            if any(r.get("status") == "ok" for r in manifest["results"])
-            else manifest["results"][0].get("status", "error")
-        )
+        results = manifest["results"]
+        if any(r.get("status") == "ok" for r in results):
+            status = "ok"
+        elif results:
+            status = results[0].get("status", "error")
+        else:
+            status = "error"
         if post_processors:
             for proc in post_processors.values():
                 if isinstance(proc, dict) and proc.get("status") not in {"ok", "noop"}:
