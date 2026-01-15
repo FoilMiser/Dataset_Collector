@@ -191,3 +191,78 @@ class TestCheckpointResume:
         final_state = load_checkpoint(path)
         assert final_state is not None
         assert final_state.completed_targets == ["target_a", "target_b", "target_c", "target_d"]
+
+
+class TestCheckpointErrorPaths:
+    """Tests for error handling in checkpoint operations."""
+
+    def test_load_checkpoint_with_corrupted_json(self, tmp_path: Path) -> None:
+        """load_checkpoint should return None for corrupted JSON."""
+        path = tmp_path / "corrupted.json"
+        path.write_text("{invalid json content here")
+
+        result = load_checkpoint(path)
+        assert result is None
+
+    def test_load_checkpoint_with_missing_fields(self, tmp_path: Path) -> None:
+        """load_checkpoint should handle missing fields gracefully."""
+        path = tmp_path / "incomplete.json"
+        # Write minimal JSON with missing fields
+        path.write_text('{"run_id": "test"}')
+
+        result = load_checkpoint(path)
+        assert result is not None
+        assert result.run_id == "test"
+        assert result.pipeline_id == ""  # Should default to empty string
+        assert result.completed_targets == []  # Should default to empty list
+        assert result.counts == {}  # Should default to empty dict
+
+    def test_load_checkpoint_with_invalid_data_types(self, tmp_path: Path) -> None:
+        """load_checkpoint should raise exception for invalid data types."""
+        path = tmp_path / "invalid_types.json"
+        # completed_targets should be a list, but we give it a string
+        # counts should be a dict, but we give it a string
+        path.write_text(
+            '{"run_id": "test", "pipeline_id": "test", '
+            '"created_at_utc": "2024-01-01T00:00:00Z", '
+            '"updated_at_utc": "2024-01-01T00:00:00Z", '
+            '"completed_targets": "not_a_list", "counts": "not_a_dict"}'
+        )
+
+        # The code doesn't handle type errors gracefully - it will raise
+        with pytest.raises(AttributeError):
+            load_checkpoint(path)
+
+    def test_load_checkpoint_with_empty_json(self, tmp_path: Path) -> None:
+        """load_checkpoint should handle empty JSON object."""
+        path = tmp_path / "empty.json"
+        path.write_text("{}")
+
+        result = load_checkpoint(path)
+        assert result is not None
+        assert result.run_id == ""
+        assert result.pipeline_id == ""
+        assert result.completed_targets == []
+        assert result.counts == {}
+
+    def test_save_checkpoint_creates_parent_directory(self, tmp_path: Path) -> None:
+        """save_checkpoint should create parent directory if missing."""
+        path = tmp_path / "nested" / "dir" / "checkpoint.json"
+        assert not path.parent.exists()
+
+        state = CheckpointState(
+            run_id="test",
+            pipeline_id="test",
+            created_at_utc="2024-01-01T00:00:00Z",
+            updated_at_utc="2024-01-01T00:00:00Z",
+        )
+        save_checkpoint(path, state)
+
+        assert path.exists()
+        assert path.parent.exists()
+
+    def test_checkpoint_path_with_empty_pipeline_id(self) -> None:
+        """checkpoint_path should handle empty pipeline_id."""
+        checkpoint_dir = Path("/tmp/checkpoints")
+        path = checkpoint_path(checkpoint_dir, "")
+        assert "pipeline_checkpoint.json" in str(path)

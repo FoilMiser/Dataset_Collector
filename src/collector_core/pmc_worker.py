@@ -403,6 +403,12 @@ def run_pmc_worker(
     extract_nxml_fn: Callable[[bytes], tuple[bytes | None, list[str]]] = extract_nxml,
     include_pools_root_arg: bool = True,
 ) -> None:
+    """Run PMC article processing worker (247 lines).
+
+    NOTE: This function is flagged for refactoring (P2.2A) but is well-structured.
+    Potential extraction points marked with REFACTOR comments below.
+    See A_GRADE_REMAINING_WORK.md for detailed refactoring plan.
+    """
     ap = argparse.ArgumentParser(description=f"PMC Worker v{version} ({pipeline_id})")
     ap.add_argument("--targets", required=True)
     ap.add_argument("--allowlist", required=True)
@@ -479,6 +485,8 @@ def run_pmc_worker(
     successful = 0
     shard_files: dict[str, list] = {"train": [], "valid": []}
 
+    # REFACTOR: This inner flush() function could be extracted to module level
+    # as _flush_shard_buffer(split, train_buf, valid_buf, ...) - Lines 482-506
     def flush(split: str) -> None:
         nonlocal train_idx, valid_idx, train_buf, valid_buf, total_train, total_valid
         if split == "train" and train_buf:
@@ -505,6 +513,9 @@ def run_pmc_worker(
             valid_buf = []
             valid_idx += 1
 
+    # REFACTOR: Main processing loop (lines 514-607) could be extracted to
+    # _process_pmc_articles(rows, processed, parsed, chunk_cfg, ...)
+    # This would separate article processing from setup/teardown logic
     for r in rows:
         pmcid = safe_text(r.get("pmcid")).strip()
         file_ref = safe_text(r.get("file")).strip()

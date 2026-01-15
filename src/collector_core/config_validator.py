@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 import re
-from importlib import resources
 from functools import cache
+from importlib import resources
 from pathlib import Path
 from typing import Any
 
@@ -95,9 +95,28 @@ def read_yaml(path: Path, schema_name: str | None = None) -> Any:
 _INCLUDE_PATTERN = re.compile(r"^(?P<indent>\s*)(?P<key>[^:#]+:\s*)!include\s+(?P<path>.+)$")
 
 
-def _expand_includes(text: str, base_dir: Path) -> str:
+def _find_repo_root(start_path: Path) -> Path:
+    """Find repository root by walking up to find .git directory.
+
+    Falls back to start_path if no .git found (for testing/non-git scenarios).
+    """
+    current = start_path.resolve()
+    while current != current.parent:
+        if (current / ".git").exists():
+            return current
+        current = current.parent
+    # Fallback: return the original path if no .git found
+    return start_path.resolve()
+
+
+def _expand_includes(text: str, base_dir: Path, repo_root: Path | None = None) -> str:
     lines: list[str] = []
     trailing_newline = text.endswith("\n")
+
+    # Determine repository root for security boundary check
+    if repo_root is None:
+        repo_root = _find_repo_root(base_dir)
+
     for raw_line in text.splitlines():
         match = _INCLUDE_PATTERN.match(raw_line)
         if not match:
@@ -109,21 +128,33 @@ def _expand_includes(text: str, base_dir: Path) -> str:
         raw_path = raw_path.strip("'\"")
         include_path = Path(raw_path)
         if not include_path.is_absolute():
-            include_path = (base_dir / include_path).resolve()
-
-        # P0.6: Verify resolved path is within allowed directory (prevent path traversal)
-        try:
-            if not include_path.is_relative_to(base_dir.resolve()):
-                raise ValueError(f"Include path escapes base directory: {include_path}")
-        except ValueError:
-            raise ValueError(f"Include path escapes base directory: {include_path}")
+            include_path = base_dir / include_path
 
         # P0.6: Symlinks not allowed in includes (prevent symlink attacks)
+        # Check BEFORE resolving, so we can detect symlinks
         if include_path.is_symlink():
             raise ValueError(f"Symlinks not allowed in includes: {include_path}")
 
+        # Resolve the path after symlink check
+        include_path = include_path.resolve()
+
+        # P0.6B: Verify resolved path is within repository root (prevent path traversal)
+        # Use repo_root instead of base_dir to allow legitimate cross-directory includes
+        try:
+            if not include_path.is_relative_to(repo_root):
+                raise ValueError(
+                    f"Include path escapes repository: {include_path} "
+                    f"(repo root: {repo_root})"
+                )
+        except ValueError:
+            raise ValueError(
+                f"Include path escapes repository: {include_path} "
+                f"(repo root: {repo_root})"
+            ) from None
+
         include_text = include_path.read_text(encoding="utf-8")
-        expanded = _expand_includes(include_text, include_path.parent)
+        # Pass repo_root to recursive calls to maintain security boundary
+        expanded = _expand_includes(include_text, include_path.parent, repo_root=repo_root)
         indented_lines = [
             f"{indent}  {line}" if line else f"{indent}  {line}"
             for line in expanded.splitlines()

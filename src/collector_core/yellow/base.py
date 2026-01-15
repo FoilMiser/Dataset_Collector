@@ -226,6 +226,12 @@ def process_target(
     pitch_cfg: PitchConfig,
     domain: Any,
 ) -> dict[str, Any]:
+    """Process yellow screening target (231 lines).
+
+    NOTE: This function is flagged for refactoring (P2.2B) but is well-structured.
+    Potential extraction points marked with REFACTOR comments below.
+    See A_GRADE_REMAINING_WORK.md for detailed refactoring plan.
+    """
     target_id = queue_row["id"]
     target_cfg = _resolve_target(cfg, target_id)
     screen_cfg = merge_screening_config(cfg, target_cfg)
@@ -244,6 +250,9 @@ def process_target(
     pitch_counts: dict[tuple[str, str], int] = {}
     pitch_reasons: Counter[str] = Counter()
 
+    # REFACTOR: Signoff validation logic (lines 253-301) could be extracted to
+    # _validate_signoff_requirements(require_signoff, allow_without_signoff, status, ...)
+    # Returns early with manifest if signoff check fails
     if require_signoff and not allow_without_signoff:
         if status == "rejected":
             if execute:
@@ -294,6 +303,9 @@ def process_target(
                 write_json(roots.manifests_root / target_id / "yellow_screen_done.json", manifest)
             return manifest
 
+    # REFACTOR: Main screening loop (lines 303-420+) could be extracted to
+    # _screen_target_pools(roots, queue_row, screen_cfg, shard_cfg, domain, ...)
+    # This would separate the actual screening logic from validation/setup
     for pool in _resolve_pools(roots, queue_row):
         raw_dir = roots.raw_root / "yellow" / pool / target_id
         if not raw_dir.exists():

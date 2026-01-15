@@ -109,6 +109,28 @@ class TestJsonIO:
         # No .tmp file should remain
         assert not (tmp_path / "test.json.tmp").exists()
 
+    def test_read_json_missing_file(self, tmp_path: Path):
+        """read_json should raise FileNotFoundError for missing file."""
+        file = tmp_path / "nonexistent.json"
+        with pytest.raises(FileNotFoundError):
+            read_json(file)
+
+    def test_read_json_invalid_json(self, tmp_path: Path):
+        """read_json should raise JSONDecodeError for invalid JSON."""
+        import json
+
+        file = tmp_path / "invalid.json"
+        file.write_text("{invalid json content")
+        with pytest.raises(json.JSONDecodeError):
+            read_json(file)
+
+    def test_write_json_creates_parent_dir(self, tmp_path: Path):
+        """write_json should create parent directory if missing."""
+        file = tmp_path / "nested" / "dir" / "data.json"
+        write_json(file, {"test": "data"})
+        assert file.exists()
+        assert read_json(file) == {"test": "data"}
+
 
 class TestJsonlIO:
     def test_write_read_jsonl(self, tmp_path: Path):
@@ -137,6 +159,39 @@ class TestJsonlIO:
         file.write_text('{"valid": true}\ninvalid json\n{"also": "valid"}\n')
         result = read_jsonl_list(file)
         assert len(result) == 2
+
+    def test_read_jsonl_missing_file(self, tmp_path: Path):
+        """read_jsonl_list should raise FileNotFoundError for missing file."""
+        file = tmp_path / "nonexistent.jsonl"
+        with pytest.raises(FileNotFoundError):
+            read_jsonl_list(file)
+
+    def test_read_jsonl_empty_file(self, tmp_path: Path):
+        """read_jsonl_list should handle empty file."""
+        file = tmp_path / "empty.jsonl"
+        file.write_text("")
+        result = read_jsonl_list(file)
+        assert result == []
+
+    def test_write_jsonl_creates_parent_dir(self, tmp_path: Path):
+        """write_jsonl should create parent directory if missing."""
+        file = tmp_path / "nested" / "dir" / "data.jsonl"
+        write_jsonl(file, [{"test": "data"}])
+        assert file.exists()
+
+    def test_append_jsonl_creates_file_if_missing(self, tmp_path: Path):
+        """append_jsonl should create file if it doesn't exist."""
+        file = tmp_path / "new.jsonl"
+        append_jsonl(file, [{"a": 1}])
+        assert file.exists()
+        result = read_jsonl_list(file)
+        assert result == [{"a": 1}]
+
+    def test_read_jsonl_gzip_missing_file(self, tmp_path: Path):
+        """read_jsonl_list should raise FileNotFoundError for missing .gz file."""
+        file = tmp_path / "nonexistent.jsonl.gz"
+        with pytest.raises(FileNotFoundError):
+            read_jsonl_list(file)
 
 
 class TestSafeFilename:
