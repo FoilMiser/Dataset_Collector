@@ -222,10 +222,15 @@ def create_decision_bundle(
 
 @stable_api
 def save_decision_bundle(bundle: DecisionBundle, output_dir: Path) -> Path:
-    """Save a decision bundle to the output directory."""
+    """Save a decision bundle to the output directory.
+
+    Uses atomic write (temp file + rename) to prevent corruption if interrupted.
+    """
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / f"decision_bundle_{bundle.target_id}.json"
-    output_path.write_text(json.dumps(bundle.to_dict(), indent=2))
+    tmp_path = output_path.with_suffix(".tmp")
+    tmp_path.write_text(json.dumps(bundle.to_dict(), indent=2))
+    tmp_path.replace(output_path)
     return output_path
 
 

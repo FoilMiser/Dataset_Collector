@@ -627,9 +627,11 @@ def generate_dry_run_report(
 
     report = "\n".join(lines)
 
-    # Write report to file
+    # Write report to file (atomic write to prevent corruption)
     report_path = queues_root / "dry_run_report.txt"
-    report_path.write_text(report, encoding="utf-8")
+    tmp_path = report_path.with_suffix(".tmp")
+    tmp_path.write_text(report, encoding="utf-8")
+    tmp_path.replace(report_path)
 
     return report
 

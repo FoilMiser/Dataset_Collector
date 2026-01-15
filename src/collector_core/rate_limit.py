@@ -81,6 +81,9 @@ class RateLimiterConfig:
         if "burst" in d:
             capacity = float(d["burst"])
 
+        if capacity <= 0:
+            raise ValueError(f"capacity must be positive, got {capacity}")
+
         # Determine refill rate (tokens per second)
         refill_rate = float(d.get("refill_rate", 1.0))
         if "requests_per_second" in d:
@@ -90,8 +93,13 @@ class RateLimiterConfig:
         elif "requests_per_hour" in d:
             refill_rate = float(d["requests_per_hour"]) / 3600.0
 
-        # Determine initial tokens
-        initial_tokens = float(d["initial_tokens"]) if d.get("initial_tokens") else None
+        if refill_rate <= 0:
+            raise ValueError(f"refill_rate must be positive, got {refill_rate}")
+
+        # Determine initial tokens (fix: handle initial_tokens=0 correctly)
+        initial_tokens = float(d["initial_tokens"]) if "initial_tokens" in d else None
+        if initial_tokens is not None and initial_tokens < 0:
+            raise ValueError(f"initial_tokens must be non-negative, got {initial_tokens}")
 
         # Retry behavior options
         retry_on_429 = bool(d.get("retry_on_429", True))
@@ -134,6 +142,10 @@ class RateLimiter:
     sleep: Callable[[float], None] = field(default=time.sleep, repr=False)
 
     def __post_init__(self) -> None:
+        if self.capacity <= 0:
+            raise ValueError(f"capacity must be positive, got {self.capacity}")
+        if self.refill_rate <= 0:
+            raise ValueError(f"refill_rate must be positive, got {self.refill_rate}")
         self.tokens = self.capacity
         self.last_refill = self.clock()
 
