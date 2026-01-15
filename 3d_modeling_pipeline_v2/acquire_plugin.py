@@ -163,11 +163,17 @@ def handle_api(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
                     )
                     tmp_path.replace(dest)
                 elif "html" in content_type or "xml" in content_type:
-                    dest.write_text(resp.text, encoding="utf-8")
+                    tmp_path = dest.with_suffix(dest.suffix + ".tmp")
+                    tmp_path.write_text(resp.text, encoding="utf-8")
+                    tmp_path.replace(dest)
                 else:
-                    dest.write_bytes(resp.content)
+                    tmp_path = dest.with_suffix(dest.suffix + ".tmp")
+                    tmp_path.write_bytes(resp.content)
+                    tmp_path.replace(dest)
             except Exception:
-                dest.write_bytes(resp.content)
+                tmp_path = dest.with_suffix(dest.suffix + ".tmp")
+                tmp_path.write_bytes(resp.content)
+                tmp_path.replace(dest)
 
             payload_size = dest.stat().st_size
             result_meta.update(
@@ -325,16 +331,19 @@ def handle_web_crawl(
             rp.set_url(robots_url)
             rp.read()
             return rp.can_fetch("*", url)
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to parse robots.txt for %s: %s", robots_url, e)
             return True
 
     def snapshot_tos(url: str) -> None:
         try:
             resp = requests.get(url, timeout=15)
             fname = catalog_dir / f"tos_{safe_name(urlparse(url).netloc)}.html"
-            fname.write_text(resp.text, encoding="utf-8")
-        except Exception:
-            pass
+            tmp_path = fname.with_suffix(".tmp")
+            tmp_path.write_text(resp.text, encoding="utf-8")
+            tmp_path.replace(fname)
+        except Exception as e:
+            logger.debug("Failed to snapshot ToS from %s: %s", url, e)
 
     results: list[dict[str, Any]] = []
     visited = set()
@@ -378,7 +387,9 @@ def handle_web_crawl(
             if path_part and any(fnmatch.fnmatch(path_part, g) for g in include_globs):
                 dest = out_dir / safe_name(path_part)
                 ensure_dir(dest.parent)
-                dest.write_bytes(resp.content)
+                tmp_path = dest.with_suffix(dest.suffix + ".tmp")
+                tmp_path.write_bytes(resp.content)
+                tmp_path.replace(dest)
                 results.append(
                     {
                         "status": "ok",

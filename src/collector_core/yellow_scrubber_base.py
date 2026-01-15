@@ -657,9 +657,11 @@ def plan_pmc_allowlist(
     plan["unknown_rows"] = unk
 
     allow_path = out_dir / "pmc_allowlist.jsonl"
-    with allow_path.open("w", encoding="utf-8") as f:
+    tmp_path = allow_path.with_suffix(".tmp")
+    with tmp_path.open("w", encoding="utf-8") as f:
         for rr in allow_rows:
             f.write(json.dumps(rr, ensure_ascii=False) + "\n")
+    tmp_path.replace(allow_path)
     plan["allowlist_path"] = str(allow_path)
 
     write_json(out_dir / "_manifests" / f"pmc_allowlist_plan_{int(time.time())}.json", plan)
