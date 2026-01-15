@@ -8,12 +8,14 @@ import re
 import socket
 import threading
 import urllib.parse
-from copy import deepcopy
+from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
 from pathlib import Path
-from typing import Any, Callable, Sequence
+from typing import Any
 
 import requests
+
 from collector_core.artifact_metadata import build_artifact_metadata
 from collector_core.dependencies import _try_import
 from collector_core.network_utils import _with_retries
@@ -657,12 +659,12 @@ def snapshot_evidence(
 @stable_api
 def fetch_evidence(
     *,
-    ctx: "TargetContext",
-    cfg: "DriverConfig",
+    ctx: TargetContext,
+    cfg: DriverConfig,
     user_agent: str,
     max_bytes: int,
     fetch_cache: EvidenceFetchCache | None = None,
-) -> "EvidenceResult":
+) -> EvidenceResult:
     from collector_core.pipeline_driver_base import EvidenceResult
 
     evidence_snapshot = {"status": "skipped", "url": ctx.evidence_url}
@@ -720,12 +722,12 @@ def fetch_evidence(
 @stable_api
 def fetch_evidence_batch(
     *,
-    ctxs: Sequence["TargetContext"],
-    cfg: "DriverConfig",
+    ctxs: Sequence[TargetContext],
+    cfg: DriverConfig,
     user_agent: str,
     max_bytes: int,
     max_workers: int | None = None,
-) -> list["EvidenceResult"]:
+) -> list[EvidenceResult]:
     if not ctxs:
         return []
     fetch_cache = EvidenceFetchCache()

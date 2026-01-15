@@ -27,7 +27,7 @@ import asyncio
 import logging
 from collections.abc import Callable, Coroutine
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urljoin, urlparse
 
 from collector_core.acquire.context import (
@@ -142,7 +142,7 @@ def _is_transient_status_code(status_code: int) -> bool:
 
 
 async def _validate_redirect_chain_aiohttp(
-    response: "aiohttp.ClientResponse",
+    response: aiohttp.ClientResponse,
     allow_non_global_hosts: bool,
     internal_mirror_allowlist: InternalMirrorAllowlist,
 ) -> tuple[bool, str | None, str | None]:
@@ -173,7 +173,7 @@ async def _validate_redirect_chain_aiohttp(
 
 
 async def _validate_redirect_chain_httpx(
-    response: "httpx.Response",
+    response: httpx.Response,
     allow_non_global_hosts: bool,
     internal_mirror_allowlist: InternalMirrorAllowlist,
 ) -> tuple[bool, str | None, str | None]:
@@ -258,7 +258,7 @@ def _is_transient_exception_httpx(exc: Exception) -> bool:
 
 
 async def _stream_response_aiohttp(
-    response: "aiohttp.ClientResponse",
+    response: aiohttp.ClientResponse,
     temp_path: Path,
     write_mode: str,
     existing_offset: int,
@@ -286,7 +286,7 @@ async def _stream_response_aiohttp(
 
 
 async def _stream_response_httpx(
-    response: "httpx.Response",
+    response: httpx.Response,
     temp_path: Path,
     write_mode: str,
     existing_offset: int,

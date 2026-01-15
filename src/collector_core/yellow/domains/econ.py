@@ -11,7 +11,6 @@ from collector_core.yellow.base import (
     standard_transform,
 )
 
-
 _FINANCIAL_TERMS = {
     "revenue",
     "earnings",

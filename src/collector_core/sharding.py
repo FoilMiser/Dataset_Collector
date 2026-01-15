@@ -19,9 +19,10 @@ import json
 import logging
 import os
 import time
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from collector_core.stability import stable_api
 from collector_core.utils.paths import ensure_dir
@@ -338,8 +339,8 @@ def shard_lock(
                 try:
                     fcntl.flock(lock_fd, fcntl.LOCK_UN)
                     logger.debug("Released lock for shard: %s", shard_path)
-                except OSError:
-                    pass
+                except OSError as e:
+                    logger.warning("Failed to release lock for shard %s: %s", shard_path, e)
             os.close(lock_fd)
 
 
@@ -392,7 +393,6 @@ class AtomicShardWriter:
 
             self._file = gzip.open(self.tmp_path, "wt", encoding="utf-8")
         elif self.compression in ("zstd", "zst"):
-            import io
 
             import zstandard as zstd
 
@@ -447,7 +447,6 @@ class AtomicShardWriter:
         except OSError:
             # P1.1D: Catch specific OS errors during file operations
             logger.warning("Error closing shard file: %s", self.tmp_path)
-            pass
 
         if exc_type is None:
             # Success - atomically move temp to final

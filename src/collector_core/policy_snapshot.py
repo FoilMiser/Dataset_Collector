@@ -1,9 +1,10 @@
 from __future__ import annotations
-from pathlib import Path
 
 import hashlib
 import subprocess
-from typing import Any, Sequence
+from collections.abc import Sequence
+from pathlib import Path
+from typing import Any
 
 from collector_core.__version__ import __schema_version__ as SCHEMA_VERSION
 from collector_core.__version__ import __version__ as VERSION

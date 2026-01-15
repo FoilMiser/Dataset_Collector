@@ -10,7 +10,6 @@ from collector_core.yellow.base import (
     standard_transform,
 )
 
-
 _ENTITY_RE = re.compile(r"\b[A-Z][a-zA-Z0-9_\-]{2,}\b")
 _RELATION_TERMS = {"located_in", "part_of", "member_of", "capital_of", "adjacent_to"}
 _GEO_TERMS = {"latitude", "longitude", "geo", "coordinates"}

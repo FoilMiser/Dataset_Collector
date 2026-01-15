@@ -11,17 +11,14 @@ This enables reviewers to answer "why was this target red/yellow?" from artifact
 
 from __future__ import annotations
 
-import hashlib
 import json
-from dataclasses import dataclass, field, asdict
-from datetime import datetime, timezone
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.stability import stable_api
 from collector_core.utils.logging import utc_now
-
 
 RoutingDecision = Literal["GREEN", "YELLOW", "RED", "UNKNOWN"]
 
@@ -104,7 +101,7 @@ class DecisionBundle:
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
-        data = {
+        data: dict[str, Any] = {
             "target_id": self.target_id,
             "decision": self.decision,
             "decided_at_utc": self.decided_at_utc,

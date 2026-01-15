@@ -5,18 +5,21 @@ import cProfile
 import gzip
 import importlib.util
 import json
+import logging
 import os
 import pstats
 import tracemalloc
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.artifact_metadata import build_artifact_metadata
+from collector_core.checks.near_duplicate import create_detector
 from collector_core.config_validator import read_yaml
 from collector_core.dataset_root import ensure_data_root_allowed, resolve_dataset_root
-from collector_core.checks.near_duplicate import create_detector
 from collector_core.merge.contract import (
     canonicalize_row,
     normalize_record,
@@ -380,8 +383,8 @@ def iter_with_progress(
         yield item
         count += 1
         if count % interval == 0:
-            print(f"[merge] {desc}: {count} records processed")
-    print(f"[merge] {desc}: {count} records processed")
+            logger.info("%s: %d records processed", desc, count)
+    logger.info("%s: %d records processed (final)", desc, count)
 
 
 def handle_record(

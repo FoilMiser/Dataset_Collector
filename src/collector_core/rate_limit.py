@@ -18,11 +18,11 @@ Usage:
 
     # Acquire before each request (blocks if needed)
     limiter.acquire()
-    response = requests.get(url)
+    response = requests.get(url, timeout=(15, 300))
 
     # Or use try_acquire for non-blocking check
     if limiter.try_acquire():
-        response = requests.get(url)
+        response = requests.get(url, timeout=(15, 300))
     else:
         print("Rate limited, try again later")
 

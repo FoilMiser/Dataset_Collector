@@ -12,7 +12,6 @@ import re
 import sys
 from pathlib import Path
 
-
 WRAPPER_FILES = [
     "acquire_worker.py",
     "merge_worker.py",

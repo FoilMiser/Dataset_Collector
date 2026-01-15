@@ -44,7 +44,6 @@ Usage:
 """
 
 from __future__ import annotations
-from pathlib import Path
 
 from dataclasses import dataclass, field
 from typing import Any, Generic, TypeVar
@@ -116,7 +115,7 @@ class Result(Generic[T]):
         )
 
 
-def Ok(value: T = None, **extras: Any) -> Result[T]:  # noqa: N802 - intentional PascalCase
+def Ok(value: T | None = None, **extras: Any) -> Result[T]:  # noqa: N802 - intentional PascalCase
     """Create a successful result."""
     return Result(status="ok", value=value, extras=extras)
 

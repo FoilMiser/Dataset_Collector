@@ -10,13 +10,13 @@ Issue 4.4 (v3.0): Overrides are:
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Any
 
 from collector_core.stability import stable_api
-from collector_core.utils.io import read_jsonl, append_jsonl
+from collector_core.utils.io import append_jsonl, read_jsonl
 from collector_core.utils.logging import utc_now
 from collector_core.utils.paths import ensure_dir
 
@@ -65,7 +65,7 @@ class PolicyOverride:
         return result
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "PolicyOverride":
+    def from_dict(cls, data: dict[str, Any]) -> PolicyOverride:
         return cls(
             override_id=data["override_id"],
             target_id=data["target_id"],

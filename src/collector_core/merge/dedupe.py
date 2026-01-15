@@ -158,10 +158,9 @@ class PartitionedDedupeIndex:
 
 @stable_api
 def build_dedupe_index(
-    roots: "Roots",
+    roots: Roots,
     partitions: int,
 ) -> DedupeIndex | PartitionedDedupeIndex:
-    from collector_core.merge.types import Roots
 
     base_path = roots.ledger_root / "combined_dedupe.sqlite"
     if partitions > 1:

@@ -8,13 +8,18 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urljoin, urlparse
 
 from collector_core.acquire.context import (
     AcquireContext,
     InternalMirrorAllowlist,
     StrategyHandler,
+)
+from collector_core.acquire.strategies.http_base import (
+    CHUNK_SIZE,
+    DownloadResult,
+    HttpDownloadBase,
 )
 from collector_core.acquire_limits import (
     build_target_limit_enforcer,
@@ -23,13 +28,8 @@ from collector_core.acquire_limits import (
 )
 from collector_core.dependencies import _try_import, requires
 from collector_core.stability import stable_api
-from collector_core.utils.paths import ensure_dir, safe_filename
 from collector_core.utils.download import normalize_download as _normalize_download_impl
-from collector_core.acquire.strategies.http_base import (
-    CHUNK_SIZE,
-    DownloadResult,
-    HttpDownloadBase,
-)
+from collector_core.utils.paths import ensure_dir, safe_filename
 
 if TYPE_CHECKING:
     import requests as requests_module
@@ -83,7 +83,7 @@ def validate_download_url(
 
 
 def _validate_redirect_chain(
-    response: "requests_module.Response",
+    response: requests_module.Response,
     allow_non_global_hosts: bool,
     internal_mirror_allowlist: InternalMirrorAllowlist,
 ) -> tuple[bool, str | None, str | None]:
@@ -148,7 +148,7 @@ def _http_download_with_resume(
     blocked_reason: str | None = None
 
     def _stream_response(
-        response: "requests_module.Response", write_mode: str, existing_offset: int
+        response: requests_module.Response, write_mode: str, existing_offset: int
     ) -> None:
         nonlocal content_length, resolved_url
         resolved_url = response.url

@@ -16,12 +16,11 @@ from __future__ import annotations
 
 import os
 import re
-from pathlib import Path, PurePosixPath, PureWindowsPath
+from pathlib import Path
 from typing import Any
 
 from collector_core.dataset_root import resolve_dataset_root
 from collector_core.stability import stable_api
-
 
 # Template pattern: ${VAR_NAME} or $VAR_NAME
 TEMPLATE_PATTERN = re.compile(r"\$\{([A-Z_][A-Z0-9_]*)\}|\$([A-Z_][A-Z0-9_]*)")

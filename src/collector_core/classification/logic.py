@@ -13,7 +13,7 @@ if False:  # pragma: no cover - type checking
 
 @stable_api
 def resolve_spdx_with_confidence(
-    license_map: "LicenseMap", evidence_text: str, spdx_hint: str
+    license_map: LicenseMap, evidence_text: str, spdx_hint: str
 ) -> tuple[str, float, str]:
     """Resolve SPDX with a lightweight confidence score and rationale."""
 
@@ -69,7 +69,7 @@ def resolve_spdx_with_confidence(
 
 
 @stable_api
-def spdx_bucket(license_map: "LicenseMap", spdx: str) -> str:
+def spdx_bucket(license_map: LicenseMap, spdx: str) -> str:
     s = str(spdx or "").strip()
     if not s or s.upper() == "UNKNOWN":
         return license_map.gating.get("unknown_spdx_bucket", "YELLOW")
@@ -88,7 +88,7 @@ def spdx_bucket(license_map: "LicenseMap", spdx: str) -> str:
 
 @stable_api
 def compute_effective_bucket(
-    license_map: "LicenseMap",
+    license_map: LicenseMap,
     license_gates: list[str],
     resolved_spdx: str,
     restriction_hits: list[str],
@@ -163,9 +163,9 @@ def apply_review_gates(
 
 @stable_api
 def resolve_effective_bucket(
-    license_map: "LicenseMap",
+    license_map: LicenseMap,
     license_gates: list[str],
-    evidence: "EvidenceResult",
+    evidence: EvidenceResult,
     spdx: str,
     restriction_hits: list[str],
     min_confidence: float,
@@ -245,9 +245,9 @@ def summarize_denylist_hits(dl_hits: list[dict[str, Any]]) -> tuple[bool, bool]:
 @stable_api
 def build_bucket_signals(
     *,
-    ctx: "TargetContext",
-    license_map: "LicenseMap",
-    evidence: "EvidenceResult",
+    ctx: TargetContext,
+    license_map: LicenseMap,
+    evidence: EvidenceResult,
     restriction_hits: list[str],
     resolved: str,
     resolved_confidence: float,

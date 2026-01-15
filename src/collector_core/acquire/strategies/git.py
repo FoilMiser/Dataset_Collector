@@ -12,8 +12,8 @@ from collector_core.acquire_limits import (
     resolve_result_bytes,
 )
 from collector_core.stability import stable_api
-from collector_core.utils.paths import ensure_dir, safe_filename
 from collector_core.utils.download import normalize_download
+from collector_core.utils.paths import ensure_dir
 from collector_core.utils.subprocess import run_cmd
 
 

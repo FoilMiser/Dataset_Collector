@@ -11,6 +11,14 @@ from typing import Any
 
 from collector_core.__version__ import __version__ as VERSION
 from collector_core.artifact_metadata import build_artifact_metadata
+from collector_core.checkpoint import (
+    CheckpointState,
+    checkpoint_path,
+    cleanup_checkpoint,
+    init_checkpoint,
+    load_checkpoint,
+    save_checkpoint,
+)
 from collector_core.checks.actions import (
     normalize_content_check_actions,
     resolve_content_check_action,
@@ -26,6 +34,7 @@ from collector_core.classification.logic import (
 )
 from collector_core.companion_files import read_license_maps, resolve_companion_paths
 from collector_core.config_validator import read_yaml
+from collector_core.dataset_root import resolve_dataset_root
 
 # Denylist functions extracted to denylist_matcher.py for modularity - re-exported for compatibility
 from collector_core.denylist_matcher import (
@@ -33,25 +42,6 @@ from collector_core.denylist_matcher import (
     denylist_hits,
     load_denylist,
 )
-from collector_core.dataset_root import resolve_dataset_root
-from collector_core.exceptions import ConfigValidationError
-from collector_core.checkpoint import (
-    CheckpointState,
-    checkpoint_path,
-    cleanup_checkpoint,
-    init_checkpoint,
-    load_checkpoint,
-    save_checkpoint,
-)
-from collector_core.logging_config import add_logging_args, configure_logging
-from collector_core.metrics import MetricsCollector, clear_collector, set_collector
-from collector_core.policy_snapshot import build_policy_snapshot
-from collector_core.queue.emission import emit_queues
-from collector_core.utils.io import read_json, read_jsonl_list, write_json
-from collector_core.utils.logging import utc_now
-from collector_core.utils.paths import ensure_dir
-from collector_core.utils.text import coerce_int, contains_any
-
 from collector_core.evidence.change_detection import (
     compute_signoff_mismatches,
     normalize_cosmetic_change_policy,
@@ -65,6 +55,15 @@ from collector_core.evidence.fetching import (
     redact_headers_for_manifest,
     snapshot_evidence,
 )
+from collector_core.exceptions import ConfigValidationError
+from collector_core.logging_config import add_logging_args, configure_logging
+from collector_core.metrics import MetricsCollector, clear_collector, set_collector
+from collector_core.policy_snapshot import build_policy_snapshot
+from collector_core.queue.emission import emit_queues
+from collector_core.utils.io import read_json, read_jsonl_list, write_json
+from collector_core.utils.logging import utc_now
+from collector_core.utils.paths import ensure_dir
+from collector_core.utils.text import coerce_int, contains_any
 
 logger = logging.getLogger(__name__)
 

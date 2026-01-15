@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from typing import Any
-
 import re
+from typing import Any
 
 from collector_core.stability import stable_api
 from collector_core.utils.hash import sha256_bytes

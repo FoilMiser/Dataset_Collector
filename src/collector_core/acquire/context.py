@@ -69,7 +69,7 @@ class AcquireContext:
     retry: RetryConfig
     run_budget: RunByteBudget | None = None
     allow_non_global_download_hosts: bool = False
-    internal_mirror_allowlist: "InternalMirrorAllowlist" = dataclasses.field(
+    internal_mirror_allowlist: InternalMirrorAllowlist = dataclasses.field(
         default_factory=lambda: InternalMirrorAllowlist()
     )
     cfg: dict[str, Any] | None = None

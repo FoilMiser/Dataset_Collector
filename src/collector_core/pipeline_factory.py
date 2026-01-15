@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from collector_core.__version__ import __version__ as VERSION
 import collector_core.pipeline_specs_registry  # noqa: F401
+from collector_core.__version__ import __version__ as VERSION
 from collector_core.pipeline_driver_base import BasePipelineDriver, RoutingBlockSpec
 from collector_core.pipeline_spec import PipelineSpec, get_pipeline_spec, list_pipelines
 

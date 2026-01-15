@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from typing import Type
-
 from collector_core.checks.base import BaseCheck
 
-_CHECK_REGISTRY: dict[str, Type[BaseCheck]] = {}
+_CHECK_REGISTRY: dict[str, type[BaseCheck]] = {}
 
 
-def register_check(check_cls: Type[BaseCheck]) -> Type[BaseCheck]:
+def register_check(check_cls: type[BaseCheck]) -> type[BaseCheck]:
     name = check_cls.check_name().strip()
     if not name:
         raise ValueError("Check classes must define a non-empty name.")
@@ -16,7 +14,7 @@ def register_check(check_cls: Type[BaseCheck]) -> Type[BaseCheck]:
     return check_cls
 
 
-def get_check(name: str) -> Type[BaseCheck] | None:
+def get_check(name: str) -> type[BaseCheck] | None:
     return _CHECK_REGISTRY.get(name)
 
 
