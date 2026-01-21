@@ -53,6 +53,9 @@ pipelines:
         level: 5
         granularity: target
     knobs: {}
+    # NOTE: Domain screener exists at src/collector_core/yellow/domains/biology.py
+    # but is intentionally not activated. Biology targets use standard screening.
+    # To enable: add "yellow_screen: biology" below
   chem:
     pipeline_id: chem_pipeline_v2
     targets_path: pipelines/targets/targets_chem.yaml
@@ -90,6 +93,9 @@ pipelines:
     acquire:
       plugin_module: acquire_plugin.py
       postprocess: code_postprocess
+    # NOTE: Domain screener exists at src/collector_core/yellow/domains/code.py
+    # but is intentionally not activated. Code quality filtering is handled by
+    # the code_worker custom worker instead. To enable: add "yellow_screen: code"
   cyber:
     pipeline_id: cyber_pipeline_v2
     targets_path: pipelines/targets/targets_cyber.yaml
@@ -108,6 +114,9 @@ pipelines:
         nvd_worker: nvd_worker.py
         stix_worker: stix_worker.py
         advisory_worker: advisory_worker.py
+    # NOTE: Domain screener exists at src/collector_core/yellow/domains/cyber.py
+    # but is intentionally not activated. Cyber data filtering is handled by
+    # specialized workers (nvd, stix, advisory). To enable: add "yellow_screen: cyber"
   econ_stats_decision_adaptation:
     pipeline_id: econ_stats_decision_adaptation_pipeline_v2
     targets_path: pipelines/targets/targets_econ_stats_decision_v2.yaml
