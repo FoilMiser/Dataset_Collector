@@ -635,3 +635,208 @@ def test_run_acquire_worker_strict_exits_on_error(
         )
 
     assert excinfo.value.code == 1
+
+
+# =============================================================================
+# Tests for API Key Authentication (Issue #1 from AUDIT_REPORT_2026.md)
+# =============================================================================
+
+
+class ApiResponse:
+    """Mock response for API requests with JSON support."""
+
+    def __init__(
+        self,
+        payload: dict | list,
+        status_code: int = 200,
+        url: str = "",
+        content_type: str = "application/json",
+    ) -> None:
+        self._payload = payload
+        self.status_code = status_code
+        self.url = url or "https://api.example.com/v1/data"
+        self.headers = {"Content-Type": content_type}
+        self.text = json.dumps(payload)
+        self.content = self.text.encode("utf-8")
+
+    def json(self) -> dict | list:
+        return self._payload
+
+
+def test_handle_api_uses_api_key_from_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that handle_api reads api_key_env and sets Authorization header."""
+    # Import the 3d_modeling acquire_plugin which has handle_api
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).parent.parent / "3d_modeling_pipeline_v2"))
+    from acquire_plugin import handle_api
+
+    # Track what headers were passed to requests
+    captured_headers: dict = {}
+
+    def fake_request(method: str, url: str, params: dict, headers: dict, timeout: int):
+        captured_headers.update(headers)
+        return ApiResponse({"result": "success"})
+
+    # Set up the environment variable
+    monkeypatch.setenv("TEST_API_KEY", "secret-key-12345")
+
+    # Mock requests module
+    import requests as real_requests
+
+    monkeypatch.setattr(
+        "acquire_plugin.requests",
+        SimpleNamespace(request=fake_request, exceptions=real_requests.exceptions),
+    )
+
+    ctx = make_ctx(tmp_path)
+    row = {
+        "id": "api-test",
+        "download": {
+            "strategy": "api",
+            "base_url": "https://api.example.com/v1",
+            "api_key_env": "TEST_API_KEY",
+            "endpoints": [{"path": "data"}],
+        },
+    }
+    out_dir = tmp_path / "api"
+    results = handle_api(ctx, row, out_dir)
+
+    # Verify the API key was passed in Authorization header
+    assert "Authorization" in captured_headers
+    assert captured_headers["Authorization"] == "Bearer secret-key-12345"
+    assert results[0]["status"] == "ok"
+
+
+def test_handle_api_custom_auth_header_format(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test that handle_api supports custom auth header names and formats."""
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).parent.parent / "3d_modeling_pipeline_v2"))
+    from acquire_plugin import handle_api
+
+    captured_headers: dict = {}
+
+    def fake_request(method: str, url: str, params: dict, headers: dict, timeout: int):
+        captured_headers.update(headers)
+        return ApiResponse({"result": "success"})
+
+    monkeypatch.setenv("CHEMSPIDER_API_KEY", "chemspider-key-xyz")
+
+    import requests as real_requests
+
+    monkeypatch.setattr(
+        "acquire_plugin.requests",
+        SimpleNamespace(request=fake_request, exceptions=real_requests.exceptions),
+    )
+
+    ctx = make_ctx(tmp_path)
+    row = {
+        "id": "chemspider-test",
+        "download": {
+            "strategy": "api",
+            "base_url": "https://api.rsc.org/compounds/v1",
+            "api_key_env": "CHEMSPIDER_API_KEY",
+            "auth_header": "X-API-Key",
+            "auth_format": "{key}",
+            "endpoints": [{"path": "search"}],
+        },
+    }
+    out_dir = tmp_path / "chemspider"
+    results = handle_api(ctx, row, out_dir)
+
+    # Verify the custom header name and format were used
+    assert "X-API-Key" in captured_headers
+    assert captured_headers["X-API-Key"] == "chemspider-key-xyz"
+    assert "Authorization" not in captured_headers
+    assert results[0]["status"] == "ok"
+
+
+def test_handle_api_warns_when_api_key_not_set(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Test that handle_api logs a warning when api_key_env is specified but not set."""
+    import sys
+    import logging
+
+    sys.path.insert(0, str(Path(__file__).parent.parent / "3d_modeling_pipeline_v2"))
+    from acquire_plugin import handle_api
+
+    captured_headers: dict = {}
+
+    def fake_request(method: str, url: str, params: dict, headers: dict, timeout: int):
+        captured_headers.update(headers)
+        return ApiResponse({"result": "success"})
+
+    # Ensure the env var is NOT set
+    monkeypatch.delenv("MISSING_API_KEY", raising=False)
+
+    import requests as real_requests
+
+    monkeypatch.setattr(
+        "acquire_plugin.requests",
+        SimpleNamespace(request=fake_request, exceptions=real_requests.exceptions),
+    )
+
+    ctx = make_ctx(tmp_path)
+    row = {
+        "id": "api-missing-key",
+        "download": {
+            "strategy": "api",
+            "base_url": "https://api.example.com/v1",
+            "api_key_env": "MISSING_API_KEY",
+            "endpoints": [{"path": "data"}],
+        },
+    }
+    out_dir = tmp_path / "api"
+
+    with caplog.at_level(logging.WARNING):
+        results = handle_api(ctx, row, out_dir)
+
+    # Verify warning was logged
+    assert "MISSING_API_KEY" in caplog.text
+    assert "not set" in caplog.text
+
+    # Verify no Authorization header was added
+    assert "Authorization" not in captured_headers
+
+
+def test_handle_api_no_auth_when_api_key_env_not_specified(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test that handle_api works without api_key_env (backward compatibility)."""
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).parent.parent / "3d_modeling_pipeline_v2"))
+    from acquire_plugin import handle_api
+
+    captured_headers: dict = {}
+
+    def fake_request(method: str, url: str, params: dict, headers: dict, timeout: int):
+        captured_headers.update(headers)
+        return ApiResponse({"result": "success"})
+
+    import requests as real_requests
+
+    monkeypatch.setattr(
+        "acquire_plugin.requests",
+        SimpleNamespace(request=fake_request, exceptions=real_requests.exceptions),
+    )
+
+    ctx = make_ctx(tmp_path)
+    row = {
+        "id": "api-no-auth",
+        "download": {
+            "strategy": "api",
+            "base_url": "https://api.example.com/v1",
+            "endpoints": [{"path": "public-data"}],
+        },
+    }
+    out_dir = tmp_path / "api"
+    results = handle_api(ctx, row, out_dir)
+
+    # Verify no Authorization header was added
+    assert "Authorization" not in captured_headers
+    assert results[0]["status"] == "ok"

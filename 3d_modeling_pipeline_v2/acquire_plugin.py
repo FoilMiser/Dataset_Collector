@@ -18,6 +18,7 @@ from pathlib import Path
 import fnmatch
 import json
 import logging
+import os
 import time
 from typing import Any
 from urllib.parse import urljoin, urlparse
@@ -53,8 +54,20 @@ def handle_api(ctx: AcquireContext, row: dict[str, Any], out_dir: Path) -> list[
     base_url = (download.get("base_url") or "").strip()
     endpoints = download.get("endpoints") or download.get("paths") or [""]
     shared_query = download.get("query") or {}
-    headers = download.get("headers") or {}
+    headers = dict(download.get("headers") or {})
     delay = float(download.get("delay_seconds", 1.0))
+
+    # Handle API key authentication from environment variable
+    api_key_env = download.get("api_key_env")
+    if api_key_env:
+        api_key = os.environ.get(api_key_env, "").strip()
+        if api_key:
+            # Support configurable auth header and format
+            auth_header = download.get("auth_header", "Authorization")
+            auth_format = download.get("auth_format", "Bearer {key}")
+            headers[auth_header] = auth_format.format(key=api_key)
+        else:
+            logger.warning("API key env var %s is not set", api_key_env)
     default_method = (download.get("method") or "GET").upper()
 
     pagination = download.get("pagination") or {}
